@@ -73,6 +73,7 @@ stdenv.mkDerivation {
     mkdir -p $out/lib/highwayhash
     cp -r libmoon/deps/highwayhash/lib $out/lib/highwayhash
 
+    # autopatchelfHook?
     patchelf --shrink-rpath --allowed-rpath-prefixes /nix/store $out/bin/MoonGen
     patchelf --add-rpath $out/lib/libmoon $out/bin/MoonGen
     patchelf --add-rpath $out/lib/libmoon/tbb_cmake_build/tbb_cmake_build_subdir_release $out/bin/MoonGen
