@@ -6,7 +6,6 @@
   outputs = { self, nixpkgs }: let
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
   in  {
-    packages.x86_64-linux.hello = pkgs.hello;
     packages.x86_64-linux.moongen = pkgs.callPackage ./nix/moongen.nix {
       linux = pkgs.linuxPackages_5_10.kernel;
     };
