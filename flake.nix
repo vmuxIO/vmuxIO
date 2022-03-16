@@ -1,22 +1,36 @@
 {
   description = "A very basic flake";
 
-  inputs.nixpkgs.url = github:NixOS/nixpkgs/nixos-21.11;
+  inputs = {
+    nixpkgs.url = github:NixOS/nixpkgs/nixos-21.11;
+    flake-utils.url = "github:numtide/flake-utils";
+  };
 
-  outputs = { self, nixpkgs }: {
-    packages.x86_64-linux.hello = nixpkgs.legacyPackages.x86_64-linux.hello;
-    packages.x86_64-linux.moongen = nixpkgs.legacyPackages.x86_64-linux.callPackage ./nix/moongen.nix {
-      nixpkgs = nixpkgs.legacyPackages.x86_64-linux;
-      linux = nixpkgs.legacyPackages.x86_64-linux.linuxPackages_5_10.kernel;
+  outputs = { self, nixpkgs, flake-utils }: 
+  (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
+  let
+    pkgs = nixpkgs.legacyPackages.${system};
+  in  {
+    packages.moongen = pkgs.callPackage ./nix/moongen.nix {
+      linux = pkgs.linuxPackages_5_10.kernel;
     };
 
-    defaultPackage.x86_64-linux = self.packages.x86_64-linux.moongen;
+    defaultPackage = self.packages.${system}.moongen;
 
-    devShell = nixpkgs.legacyPackages.x86_64-linux.mkShell {
-      buildInputs = with nixpkgs.legacyPackages.x86_64-linux; [
-        self.packages.x86_64-linux.moongen
+    devShell = pkgs.mkShell {
+      buildInputs = [
+        self.packages.${system}.moongen
       ];
     };
 
-  };
+    # nix develop .#qemu
+    devShells.qemu = pkgs.qemu.overrideAttrs (old: {
+      buildInputs = [ pkgs.libndctl pkgs.libtasn1 ] ++ old.buildInputs;
+      nativeBuildInputs = [ pkgs.meson pkgs.ninja ] ++ old.nativeBuildInputs;
+      hardeningDisable = [ "stackprotector" ];
+      shellHook = ''
+        unset CPP # intereferes with dependency calculation
+      '';
+    });
+  }));
 }

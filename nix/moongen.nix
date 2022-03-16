@@ -1,26 +1,38 @@
-{nixpkgs, stdenv, fetchurl, writeShellApplication, linux, openssl, tbb, libbsd, numactl, luajit, hello}:
+{ stdenv
+, fetchFromGitHub
+, fetchurl
+, writeShellApplication
+, linux
+, openssl
+, tbb
+, libbsd
+, numactl
+, luajit
+, hello
+, cmake
+, ninja
+, meson
+, bash
+}:
 
 stdenv.mkDerivation {
   pname = "moongen";
   version = "2021.07.17";
 
   #src = /home/peter/dev/phd/MoonGen2;
-  src = nixpkgs.fetchgit {
-    url = "https://github.com/emmericp/MoonGen.git";
+  src = fetchFromGitHub {
+    owner = "emmericp";
+    repo = "MoonGen";
     rev = "25c61ee76b9ca30b83ecdeef8af2c7f89625cb4e";
     fetchSubmodules = true;
-    #deepClone = true;
     sha256 = "sha256-UVM98DYupE1BU2+VExJpv47nOZ8Ieno1E+YIe5p73Zo=";
   };
 
-  nativeBuildInputs = with nixpkgs; [
-    bashInteractive
+  nativeBuildInputs = [
     cmake
     ninja
     meson
     openssl
-    bash
-    strace
     (writeShellApplication {
       name = "git";
       text = ''
@@ -41,19 +53,16 @@ stdenv.mkDerivation {
 
   dontConfigure = true;
 
-  buildPhase = ''
-    substituteInPlace ./libmoon/build.sh \
-      --replace "#!/bin/bash" "#!${nixpkgs.bash}/bin/bash
-      echo $RTE_KERNELDIR"
+  postPatch = ''
+    patchShebangs ./libmoon/build.sh ./build.sh
     substituteInPlace ./libmoon/build.sh \
       --replace "./bind-interfaces.sh \''${FLAGS}" "echo skipping bind-interfaces.sh"
-
-    ${nixpkgs.bash}/bin/bash ./build.sh
   '';
+
+  buildPhase = "./build.sh";
 
   installPhase = ''
     mkdir -p $out/bin
-    cp ${hello}/bin/hello $out/bin
 
     cp build/MoonGen $out/bin
     mkdir -p $out/bin/lua
