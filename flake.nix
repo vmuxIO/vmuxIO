@@ -18,8 +18,10 @@
     defaultPackage = self.packages.${system}.moongen;
 
     devShell = pkgs.mkShell {
-      buildInputs = [
+      buildInputs = with pkgs; [
         self.packages.${system}.moongen
+        just
+        iperf2
       ];
     };
 
