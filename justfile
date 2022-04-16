@@ -40,3 +40,28 @@ hardware_loopback_test ETH1 ETH2 IP1 IP2 PERFARGS="" PREFIXSIZE="30":
   echo -n "Waiting for server to be killed (pid $SERVERPID)..."
   wait
   echo done
+
+ice_moongen:
+  nix build .#moongen
+  modprobe vfio-pci
+  sudo ./result/libmoon/deps/dpdk/usertools/dpdk-devbind.py --bind=vfio-pci 81:00.0
+  sudo ./result/libmoon/deps/dpdk/usertools/dpdk-devbind.py --bind=vfio-pci 81:00.1
+  sudo ./result/bin/MoonGen ./result/bin/examples/l2-load-latency.lua 0 1
+  echo this has no timestamping right now
+
+build_dpdk:
+  echo are you in nix develop nixos#dpdk?
+  mkdir build
+  meson build
+  cd build
+  meson configure -Dexamples=helloworld
+  ninja # to build
+
+dpdk_helloworld:
+  sudo su -c "echo 8 > /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages"
+  mkdir /dev/huge1Gpages
+  sudo mount -t hugetlbfs -o pagesize=1G nodev /dev/huge1Gpages
+  sudo ./build/examples/dpdk-helloworld --lcores 2
+
+  meson configure -Denable_kmods=true
+  meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
