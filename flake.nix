@@ -10,9 +10,16 @@
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
+    mydpdk = pkgs.callPackage ./nix/dpdk.nix {
+      kernel = pkgs.linuxPackages_5_10.kernel;
+    };
   in  {
     packages.moongen = pkgs.callPackage ./nix/moongen.nix {
       linux = pkgs.linuxPackages_5_10.kernel;
+    };
+    packages.dpdk = mydpdk;
+    packages.pktgen = pkgs.callPackage ./nix/pktgen.nix {
+      dpdk = mydpdk;
     };
 
     defaultPackage = self.packages.${system}.moongen;
