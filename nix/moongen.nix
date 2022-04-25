@@ -83,6 +83,9 @@ stdenv.mkDerivation {
     patchShebangs ./libmoon/build.sh ./build.sh
     substituteInPlace ./libmoon/build.sh \
       --replace "./bind-interfaces.sh \''${FLAGS}" "echo skipping bind-interfaces.sh"
+    substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.c \
+      --replace '#define ICE_DFLT_PKG_FILE "/lib/firmware/intel/ice/ddp/ice.pkg"' \
+      '#define ICE_DFLT_PKG_FILE "/scratch/okelmann/linux-firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
   '';
 
   buildPhase = "./build.sh";
