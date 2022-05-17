@@ -19,26 +19,26 @@ let
   libmoonsrc = fetchFromGitHub {
     owner = "vmuxIO";
     repo = "libmoon";
-    rev = "73caf07402def6e0395bc0e158e2e637af0a72b5";
+    rev = "73caf07402def6e0395bc0e158e2e637af0a72b5"; # dev/ice
     fetchSubmodules = true;
     sha256 = "sha256-/dW3MtszCXfbzK0UFTf5L8MTtDlfCq4bDzKLDlwkIvI=";
   };
   dpdksrc = fetchFromGitHub {
     owner = "vmuxIO";
     repo = "dpdk";
-    rev = "54dbc2501a10b6b41abed37ff124579b15bd2871";
+    rev = "54dbc2501a10b6b41abed37ff124579b15bd2871"; # v19.05-moon-vmux
     fetchSubmodules = true;
     sha256 = "sha256-LsvhuM9zG/2MCTqpYcYjLwMcJ8yHu/4SIGISv5pqEoo=";
   };
 in
 stdenv.mkDerivation {
   pname = "moongen";
-  version = "2021.07.17";
+  version = "2021.07.17-19";
 
   src = fetchFromGitHub {
     owner = "vmuxIO";
     repo = "MoonGen";
-    rev = "a51cdf15004df6631b23a7fae69d5661978facd4";
+    rev = "a51cdf15004df6631b23a7fae69d5661978facd4"; # dpdk-19.05
     fetchSubmodules = true;
     sha256 = "sha256-QPQWDV5OL86B9BtUaKCVv0Tno5TdvoHfjvm47cNka+0=";
   };
