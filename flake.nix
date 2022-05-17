@@ -17,6 +17,9 @@
     packages.moongen = pkgs.callPackage ./nix/moongen.nix {
       linux = pkgs.linuxPackages_5_10.kernel;
     };
+    packages.moongen21 = pkgs.callPackage ./nix/moongen21.nix {
+      linux = pkgs.linuxPackages_5_10.kernel;
+    };
     packages.dpdk = mydpdk;
     packages.pktgen = pkgs.callPackage ./nix/pktgen.nix {
       dpdk = mydpdk;
