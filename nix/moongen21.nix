@@ -29,16 +29,16 @@ let
     libmoon = fetchFromGitHub {
       owner = "vmuxIO";
       repo = "libmoon";
-      rev = "d81ebb4644355526b062b1bf896ce6af333617d8"; # dev/ice
+      rev = "a42ed97f0a5aa81db45c29572b9ec44e4dfdadde"; # dev/ice
       fetchSubmodules = true;
-      sha256 = "sha256-eRSWkZf1AYD0GPyR5C+0WZkzWLSndjJ5V5UN0X+lzvk=";
+      sha256 = "sha256-lbhIK6ktZdmL4yKE6/7uRL5x7Z/NFtOXSZB+hE5GpCg=";
     };
     dpdk = fetchFromGitHub {
       owner = "vmuxIO";
       repo = "dpdk";
-      rev = "220a3ff526a43567cc24e74ef3d7b0a776aa9b6a"; # 21.11-moon-mux
+      rev = "1717a5465aeda0cbaa393f66e4d3176cf6b3a6c0"; # 21.11-moon-mux
       fetchSubmodules = true;
-      sha256 = "sha256-9bT1eQvjw87JjVc05Eia8CRVACEfcQf9a3JDrMy4GUg=";
+      sha256 = "sha256-/Ixes+4cWSsKbLhxPTg8NM2IUKrYY+jh/LHFN9RS8vk=";
     };
   };
 in

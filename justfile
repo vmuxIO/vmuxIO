@@ -61,7 +61,7 @@ dpdk21moongen:
 
 
 build_dpdk:
-  echo are you in nix develop nixos#dpdk?
+  echo are you in nix develop .#dpdk?
   mkdir build
   meson build
   cd build
