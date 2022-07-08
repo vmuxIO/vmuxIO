@@ -14,42 +14,48 @@
 , meson
 , bash
 , gcc8Stdenv
+, libpcap
+, python3Packages
 }:
 let 
-  libmoonsrc = fetchFromGitHub {
-    owner = "vmuxIO";
-    repo = "libmoon";
-    rev = "73caf07402def6e0395bc0e158e2e637af0a72b5"; # dev/ice
-    fetchSubmodules = true;
-    sha256 = "sha256-/dW3MtszCXfbzK0UFTf5L8MTtDlfCq4bDzKLDlwkIvI=";
-  };
-  dpdksrc = fetchFromGitHub {
-    owner = "vmuxIO";
-    repo = "dpdk";
-    rev = "54dbc2501a10b6b41abed37ff124579b15bd2871"; # v19.05-moon-vmux
-    fetchSubmodules = true;
-    sha256 = "sha256-LsvhuM9zG/2MCTqpYcYjLwMcJ8yHu/4SIGISv5pqEoo=";
+  srcpack = {
+    libvfio-user = fetchFromGitHub {
+      owner = "vmuxIO";
+      repo = "libvfio-user";
+      rev = "9a5124df49efed644f0db7e573ebd0367df480cd"; # master 09.06.22
+      #fetchSubmodules = true;
+      sha256 = "";
+    };
+    qemu = fetchFromGitHub {
+      owner = "vmuxIO";
+      repo = "libmoon";
+      rev = "636e7a3d2063b4a08e3c53638b156709ea66f642"; # vfio-user-v10
+      #fetchSubmodules = true;
+      sha256 = "";
+    };
+    # make this the same version as for moongen21?!
+    dpdk = fetchFromGitHub {
+      owner = "vmuxIO";
+      repo = "dpdk";
+      rev = "220a3ff526a43567cc24e74ef3d7b0a776aa9b6a"; # 21.11-moon-mux
+      fetchSubmodules = true;
+      sha256 = "sha256-9bT1eQvjw87JjVc05Eia8CRVACEfcQf9a3JDrMy4GUg=";
+    };
   };
 in
 stdenv.mkDerivation {
-  pname = "moongen";
-  version = "2021.07.17-19";
+  pname = "moongen"; # TODO moongen -> vmux everything below this line
+  version = "2021.07.17-21";
 
-  src = fetchFromGitHub {
-    owner = "vmuxIO";
-    repo = "MoonGen";
-    rev = "a51cdf15004df6631b23a7fae69d5661978facd4"; # dpdk-19.05
-    fetchSubmodules = true;
-    sha256 = "sha256-QPQWDV5OL86B9BtUaKCVv0Tno5TdvoHfjvm47cNka+0=";
-  };
-  
+  src = srcpack.moongen;
+
   postUnpack = ''
     rm -r $sourceRoot/libmoon
-    cp -r ${libmoonsrc} $sourceRoot/libmoon
+    cp -r ${srcpack.libmoon} $sourceRoot/libmoon
     chmod -R u+w $sourceRoot/libmoon
 
     rm -r $sourceRoot/libmoon/deps/dpdk
-    cp -r ${dpdksrc} $sourceRoot/libmoon/deps/dpdk
+    cp -r ${srcpack.dpdk} $sourceRoot/libmoon/deps/dpdk
     chmod -R u+w $sourceRoot/libmoon/deps/dpdk
   '';
 
@@ -58,6 +64,7 @@ stdenv.mkDerivation {
     ninja
     meson
     openssl
+    python3Packages.pyelftools
     (writeShellApplication {
       name = "git";
       text = ''
@@ -71,6 +78,7 @@ stdenv.mkDerivation {
     libbsd
     numactl
     luajit
+    libpcap
   ];
   RTE_KERNELDIR = "${linux.dev}/lib/modules/${linux.modDirVersion}/build";
   NIX_CFLAGS_COMPILE = "-Wno-error=maybe-uninitialized";
@@ -83,9 +91,12 @@ stdenv.mkDerivation {
     patchShebangs ./libmoon/build.sh ./build.sh
     substituteInPlace ./libmoon/build.sh \
       --replace "./bind-interfaces.sh \''${FLAGS}" "echo skipping bind-interfaces.sh"
-    substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.c \
-      --replace '#define ICE_DFLT_PKG_FILE "/lib/firmware/intel/ice/ddp/ice.pkg"' \
-      '#define ICE_DFLT_PKG_FILE "/scratch/okelmann/linux-firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
+    substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
+      --replace '#define ICE_PKG_FILE_DEFAULT "/lib/firmware/intel/ice/ddp/ice.pkg"' \
+      '#define ICE_PKG_FILE_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
+    substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
+      --replace '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/lib/firmware/intel/ice/ddp/"' \
+      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/"'
   '';
 
   buildPhase = "./build.sh";
@@ -105,7 +116,8 @@ stdenv.mkDerivation {
     mkdir -p $out/lib/libmoon
     cp -r build/libmoon $out/lib/
     mkdir -p $out/lib/dpdk
-    cp -r libmoon/deps/dpdk/x86_64-native-linux-gcc/lib $out/lib/dpdk
+    cp -r libmoon/deps/dpdk/build/lib $out/lib/dpdk
+    cp -r libmoon/deps/dpdk/build/drivers $out/lib/dpdk
     mkdir -p $out/lib/luajit
     cp -r libmoon/deps/luajit/usr/local/lib $out/lib/luajit
     mkdir -p $out/lib/highwayhash
@@ -115,7 +127,8 @@ stdenv.mkDerivation {
     patchelf --shrink-rpath --allowed-rpath-prefixes /nix/store $out/bin/MoonGen
     patchelf --add-rpath $out/lib/libmoon $out/bin/MoonGen
     patchelf --add-rpath $out/lib/libmoon/tbb_cmake_build/tbb_cmake_build_subdir_release $out/bin/MoonGen
-    patchelf --add-rpath $out/lib/dpdk/x86_64-native-linuxapp-gcc/lib $out/bin/MoonGen
+    patchelf --add-rpath $out/lib/dpdk/lib $out/bin/MoonGen
+    patchelf --add-rpath $out/lib/dpdk/drivers $out/bin/MoonGen
     patchelf --add-rpath $out/lib/luajit/usr/local/lib $out/bin/MoonGen
     patchelf --add-rpath $out/lib/highwayhash/lib $out/bin/MoonGen
   '';

@@ -1,12 +1,31 @@
 {
   "nodes": {
+    "dpdk-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1657216509,
+        "narHash": "sha256-/Ixes+4cWSsKbLhxPTg8NM2IUKrYY+jh/LHFN9RS8vk=",
+        "ref": "21.11-moon-vmux",
+        "rev": "1717a5465aeda0cbaa393f66e4d3176cf6b3a6c0",
+        "revCount": 31525,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/vmuxIO/dpdk"
+      },
+      "original": {
+        "ref": "21.11-moon-vmux",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/vmuxIO/dpdk"
+      }
+    },
     "flake-utils": {
       "locked": {
-        "lastModified": 1648297722,
-        "narHash": "sha256-W+qlPsiZd8F3XkzXOzAoR+mpFqzm3ekQkJNa+PIh1BQ=",
+        "lastModified": 1656928814,
+        "narHash": "sha256-RIFfgBuKz6Hp89yRr7+NR5tzIAbn52h8vT6vXkYjZoM=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "0f8662f1319ad6abf89b3380dd2722369fc51ade",
+        "rev": "7e2a3b3dfd9af950a856d66b0a7d01e3c18aa249",
         "type": "github"
       },
       "original": {
@@ -15,13 +34,51 @@
         "type": "github"
       }
     },
+    "libmoon-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1657216690,
+        "narHash": "sha256-lbhIK6ktZdmL4yKE6/7uRL5x7Z/NFtOXSZB+hE5GpCg=",
+        "ref": "dev/ice",
+        "rev": "a42ed97f0a5aa81db45c29572b9ec44e4dfdadde",
+        "revCount": 452,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/vmuxIO/libmoon"
+      },
+      "original": {
+        "ref": "dev/ice",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/vmuxIO/libmoon"
+      }
+    },
+    "moonmux-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1650996743,
+        "narHash": "sha256-l3h58VU33AP1tWMHM2YMJMFP4A826Exkn+xyrxjJkdQ=",
+        "ref": "dpdk-21.11",
+        "rev": "fdd0d97a8b883159d90adad0354a4ec54a1722af",
+        "revCount": 1403,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/vmuxIO/MoonGen"
+      },
+      "original": {
+        "ref": "dpdk-21.11",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/vmuxIO/MoonGen"
+      }
+    },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1649490789,
-        "narHash": "sha256-YrhVxwoofZSx/wLZ4GYET//8vS+uqWX572zvdmP/Etg=",
+        "lastModified": 1656782578,
+        "narHash": "sha256-1eMCBEqJplPotTo/SZ/t5HU6Sf2I8qKlZi9MX7jv9fw=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "c86185d20d708013caf97a6adaa8dc6d72313c75",
+        "rev": "573603b7fdb9feb0eb8efc16ee18a015c667ab1b",
         "type": "github"
       },
       "original": {
@@ -33,7 +90,10 @@
     },
     "root": {
       "inputs": {
+        "dpdk-src": "dpdk-src",
         "flake-utils": "flake-utils",
+        "libmoon-src": "libmoon-src",
+        "moonmux-src": "moonmux-src",
         "nixpkgs": "nixpkgs"
       }
     }
