@@ -16,30 +16,15 @@
 , gcc8Stdenv
 , libpcap
 , python3Packages
+, moonmux-src
+, libmoon-src
+, dpdk-src
 }:
 let 
   srcpack = {
-    moongen = fetchFromGitHub {
-      owner = "vmuxIO";
-      repo = "MoonGen";
-      rev = "fdd0d97a8b883159d90adad0354a4ec54a1722af"; # dpdk-21.11
-      fetchSubmodules = true;
-      sha256 = "sha256-l3h58VU33AP1tWMHM2YMJMFP4A826Exkn+xyrxjJkdQ=";
-    };
-    libmoon = fetchFromGitHub {
-      owner = "vmuxIO";
-      repo = "libmoon";
-      rev = "a42ed97f0a5aa81db45c29572b9ec44e4dfdadde"; # dev/ice
-      fetchSubmodules = true;
-      sha256 = "sha256-lbhIK6ktZdmL4yKE6/7uRL5x7Z/NFtOXSZB+hE5GpCg=";
-    };
-    dpdk = fetchFromGitHub {
-      owner = "vmuxIO";
-      repo = "dpdk";
-      rev = "1717a5465aeda0cbaa393f66e4d3176cf6b3a6c0"; # 21.11-moon-mux
-      fetchSubmodules = true;
-      sha256 = "sha256-/Ixes+4cWSsKbLhxPTg8NM2IUKrYY+jh/LHFN9RS8vk=";
-    };
+    moongen = moonmux-src;
+    libmoon = libmoon-src;
+    dpdk = dpdk-src;
   };
 in
 stdenv.mkDerivation {

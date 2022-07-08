@@ -4,9 +4,30 @@
   inputs = {
     nixpkgs.url = github:NixOS/nixpkgs/nixos-21.11;
     flake-utils.url = "github:numtide/flake-utils";
+
+    # on flake submodules https://github.com/NixOS/nix/pull/5434
+    moonmux-src = {
+      url = "git+https://github.com/vmuxIO/MoonGen?ref=dpdk-21.11&submodules=1";
+      flake = false;
+    };
+    libmoon-src = {
+      url = "git+https://github.com/vmuxIO/libmoon?ref=dev/ice&submodules=1";
+      flake = false;
+    };
+    dpdk-src = {
+      url = "git+https://github.com/vmuxIO/dpdk?ref=21.11-moon-vmux&submodules=1";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils }: 
+  outputs = { 
+    self, 
+    nixpkgs, 
+    flake-utils, 
+    moonmux-src, 
+    libmoon-src,
+    dpdk-src,
+  }: 
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
@@ -19,6 +40,7 @@
     };
     packages.moongen21 = pkgs.callPackage ./nix/moongen21.nix {
       linux = pkgs.linuxPackages_5_10.kernel;
+      inherit moonmux-src libmoon-src dpdk-src;
     };
     packages.dpdk = mydpdk;
     packages.pktgen = pkgs.callPackage ./nix/pktgen.nix {
