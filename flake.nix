@@ -35,36 +35,38 @@
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
   in  {
-    packages.moongen = pkgs.callPackage ./nix/moongen.nix {
-      linux = pkgs.linuxPackages_5_10.kernel;
-    };
-    packages.moongen21 = pkgs.callPackage ./nix/moongen21.nix {
-      linux = pkgs.linuxPackages_5_10.kernel;
-      inherit moonmux-src libmoon-src dpdk-src;
-    };
-    packages.dpdk = mydpdk;
-    packages.pktgen = pkgs.callPackage ./nix/pktgen.nix {
+    packages = {
+      default = self.packages.${system}.moongen;
+      moongen = pkgs.callPackage ./nix/moongen.nix {
+        linux = pkgs.linuxPackages_5_10.kernel;
+      };
+      moongen21 = pkgs.callPackage ./nix/moongen21.nix {
+        linux = pkgs.linuxPackages_5_10.kernel;
+        inherit moonmux-src libmoon-src dpdk-src;
+      };
       dpdk = mydpdk;
+      pktgen = pkgs.callPackage ./nix/pktgen.nix {
+        dpdk = mydpdk;
+      };
     };
 
-    defaultPackage = self.packages.${system}.moongen;
-
-    devShell = pkgs.mkShell {
-      buildInputs = with pkgs; [
-        self.packages.${system}.moongen
-        just
-        iperf2
-      ];
+    devShells = {
+      default = pkgs.mkShell {
+        buildInputs = with pkgs; [
+          self.packages.${system}.moongen
+          just
+          iperf2
+        ];
+      };
+      # nix develop .#qemu
+      qemu = pkgs.qemu.overrideAttrs (old: {
+        buildInputs = [ pkgs.libndctl pkgs.libtasn1 ] ++ old.buildInputs;
+        nativeBuildInputs = [ pkgs.meson pkgs.ninja ] ++ old.nativeBuildInputs;
+        hardeningDisable = [ "stackprotector" ];
+        shellHook = ''
+          unset CPP # intereferes with dependency calculation
+        '';
+      });
     };
-
-    # nix develop .#qemu
-    devShells.qemu = pkgs.qemu.overrideAttrs (old: {
-      buildInputs = [ pkgs.libndctl pkgs.libtasn1 ] ++ old.buildInputs;
-      nativeBuildInputs = [ pkgs.meson pkgs.ninja ] ++ old.nativeBuildInputs;
-      hardeningDisable = [ "stackprotector" ];
-      shellHook = ''
-        unset CPP # intereferes with dependency calculation
-      '';
-    });
   }));
 }
