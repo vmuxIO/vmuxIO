@@ -2,8 +2,14 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-21.11;
+    nixpkgs.url = github:NixOS/nixpkgs/nixos-22.05;
+
     flake-utils.url = "github:numtide/flake-utils";
+
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     # on flake submodules https://github.com/NixOS/nix/pull/5434
     moonmux-src = {
@@ -24,6 +30,7 @@
     self, 
     nixpkgs, 
     flake-utils, 
+    nixos-generators,
     moonmux-src, 
     libmoon-src,
     dpdk-src,
@@ -37,6 +44,8 @@
   in  {
     packages = {
       default = self.packages.${system}.moongen;
+
+      # moongen/dpdk
       moongen = pkgs.callPackage ./nix/moongen.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
       };
@@ -48,14 +57,26 @@
       pktgen = pkgs.callPackage ./nix/pktgen.nix {
         dpdk = mydpdk;
       };
+
+      # qemu/kernel (ioregionfd)
+      host-image = nixos-generators.nixosGenerate {
+        inherit pkgs;
+        modules = [ ./nix/host-config.nix ];
+        format = "qcow";
+      };
+      guest-image = nixos-generators.nixosGenerate {
+        inherit pkgs;
+        modules = [ ./nix/guest-config.nix ];
+        format = "qcow";
+      };
     };
 
     devShells = {
       default = pkgs.mkShell {
         buildInputs = with pkgs; [
-          self.packages.${system}.moongen
           just
           iperf2
+          nixos-generators.packages.${system}.nixos-generators
         ];
       };
       # nix develop .#qemu
@@ -68,5 +89,22 @@
         '';
       });
     };
-  }));
+  })) // {
+    nixosConfigurations = {
+      host = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ./nix/host-config.nix
+        ];
+      };
+      # not bootable per se:
+      #guest = nixpkgs.lib.nixosSystem {
+      #  system = "x86_64-linux";
+      #  modules = [
+      #    ./nix/guest-config.nix
+      #  ];
+      #};
+    };
+
+  };
 }

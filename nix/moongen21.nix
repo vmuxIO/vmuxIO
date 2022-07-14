@@ -1,7 +1,7 @@
 { stdenv
 , fetchFromGitHub
 , fetchurl
-, writeShellApplication
+, writeScriptBin
 , linux
 , openssl
 , tbb
@@ -49,12 +49,9 @@ stdenv.mkDerivation {
     meson
     openssl
     python3Packages.pyelftools
-    (writeShellApplication {
-      name = "git";
-      text = ''
+    (writeScriptBin "git" ''
         echo ignoring git command
-      '';
-    })
+    '')
   ];
   buildInputs = [
     openssl
