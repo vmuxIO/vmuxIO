@@ -30,6 +30,11 @@ let
     fetchSubmodules = true;
     sha256 = "sha256-LsvhuM9zG/2MCTqpYcYjLwMcJ8yHu/4SIGISv5pqEoo=";
   };
+  linux-firmware = fetchGit {
+    url = "git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git";
+    ref = "main";
+    rev = "8a2d811764e7fcc9e2862549f91487770b70563b";
+  };
 in
 stdenv.mkDerivation {
   pname = "moongen";
@@ -83,7 +88,7 @@ stdenv.mkDerivation {
       --replace "./bind-interfaces.sh \''${FLAGS}" "echo skipping bind-interfaces.sh"
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.c \
       --replace '#define ICE_DFLT_PKG_FILE "/lib/firmware/intel/ice/ddp/ice.pkg"' \
-      '#define ICE_DFLT_PKG_FILE "/scratch/okelmann/linux-firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
+      '#define ICE_DFLT_PKG_FILE "${linux-firmware}/intel/ice/ddp/ice-1.3.26.0.pkg"'
   '';
 
   buildPhase = "./build.sh";
