@@ -1,4 +1,6 @@
-{ config, lib, pkgs, modulesPath, ... }:
+{ config, lib, pkgs, 
+extkern ? false, # whether to use externally, manually built kernel
+... }:
 {
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = false;
@@ -114,6 +116,15 @@
 
   boot.kernelParams = [ "nokaslr" ];
 
+  system.activationScripts = {
+    linkHome = {
+      text = ''
+        ln -s /mnt /home/gierens
+      '';
+      deps = [];
+    };
+  };
+} // lib.optionalAttrs extkern {
   # incremental build section
   boot.loader.grub.enable = false;
   boot.initrd.enable = false;
@@ -124,14 +135,4 @@
     serviceConfig.ExecStart = "${pkgs.util-linux}/sbin/agetty  --login-program ${pkgs.shadow}/bin/login --autologin root hvc0 --keep-baud vt100";
   };
   systemd.services."serial-getty@hvc0".enable = false;
-
-
-  system.activationScripts = {
-    linkHome = {
-      text = ''
-        ln -s /mnt /home/gierens
-      '';
-      deps = [];
-    };
-  };
 }

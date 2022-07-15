@@ -61,7 +61,22 @@
       # qemu/kernel (ioregionfd)
       host-image = nixos-generators.nixosGenerate {
         inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
+        modules = [ (import ./nix/host-config.nix { 
+          inherit pkgs;
+          inherit (pkgs) lib; 
+          inherit (self) config;
+          extkern = false; 
+        }) ];
+        format = "qcow";
+      };
+      host-extkern-image = nixos-generators.nixosGenerate {
+        inherit pkgs;
+        modules = [ (import ./nix/host-config.nix { 
+          inherit pkgs;
+          inherit (pkgs) lib; 
+          inherit (self) config;
+          extkern = true; 
+        }) ];
         format = "qcow";
       };
       guest-image = nixos-generators.nixosGenerate {
@@ -90,12 +105,17 @@
       });
     };
   })) // {
-    nixosConfigurations = {
-      host = nixpkgs.lib.nixosSystem {
+    nixosConfigurations = let
+      pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    in {
+      host-extkern = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [
-          ./nix/host-config.nix
-        ];
+        modules = [ (import ./nix/host-config.nix { 
+          inherit pkgs;
+          inherit (pkgs) lib; 
+          inherit (self) config;
+          extkern = true; 
+        }) ];
       };
       # not bootable per se:
       #guest = nixpkgs.lib.nixosSystem {
