@@ -67,14 +67,12 @@ stdenv.mkDerivation {
   ];
   buildInputs = [
     openssl
-    tbb
     libbsd
     numactl
     luajit
   ];
   RTE_KERNELDIR = "${linux.dev}/lib/modules/${linux.modDirVersion}/build";
-  NIX_CFLAGS_COMPILE = "-Wno-error=maybe-uninitialized";
-  CFLAGS_COMPILE = "-Wno-error=maybe-uninitialized";
+  CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
 
   dontConfigure = true;
 
