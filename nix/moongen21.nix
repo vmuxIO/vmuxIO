@@ -64,6 +64,7 @@ stdenv.mkDerivation {
   RTE_KERNELDIR = "${linux.dev}/lib/modules/${linux.modDirVersion}/build";
   NIX_CFLAGS_COMPILE = "-Wno-error=maybe-uninitialized";
   CFLAGS_COMPILE = "-Wno-error=maybe-uninitialized";
+  NIX_DEBUG = 1;
 
   dontConfigure = true;
 
@@ -78,9 +79,28 @@ stdenv.mkDerivation {
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/lib/firmware/intel/ice/ddp/"' \
       '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/"'
+
+
+    # use nixos tbb instead
+    substituteInPlace ./libmoon/CMakeLists.txt \
+      --replace 'SET(HIGHWAYHASH_LIBS' 'SET(HIGHWAYHASH_LIBS libtbb.so.2 libtbbmalloc_proxy.so.2 libtbbmalloc.so.2'
+    #substituteInPlace ./libmoon/CMakeLists.txt \
+    #  --replace '# add tbb' ' '
+    substituteInPlace ./libmoon/CMakeLists.txt \
+      --replace 'include(''${CMAKE_CURRENT_SOURCE_DIR}/deps/tbb/cmake/TBBBuild.cmake)' ' '
+    substituteInPlace ./libmoon/CMakeLists.txt \
+      --replace 'tbb_build(TBB_ROOT ''${CMAKE_CURRENT_SOURCE_DIR}/deps/tbb CONFIG_DIR TBB_DIR)' ' '
+    #substituteInPlace ./libmoon/CMakeLists.txt \
+    #  --replace 'find_package(TBB)' ' '
+    #substituteInPlace ./libmoon/CMakeLists.txt \
+    #  --replace ''\'''${TBB_IMPORTED_TARGETS}' ' '
+    substituteInPlace ./libmoon/CMakeLists.txt \
+      --replace ''\'''${CMAKE_CURRENT_SOURCE_DIR}/deps/tbb/include' ' '
+    substituteInPlace ./CMakeLists.txt \
+      --replace ''\'''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/tbb/include' ' '
   '';
 
-  buildPhase = "./build.sh";
+  buildPhase = "NIX_DEBUG=1 ./build.sh";
 
   installPhase = ''
     mkdir -p $out/bin
