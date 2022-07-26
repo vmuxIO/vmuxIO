@@ -115,7 +115,6 @@ stdenv.mkDerivation {
     patchelf --add-rpath $out/lib/dpdk/drivers $out/bin/MoonGen
     patchelf --add-rpath $out/lib/luajit/usr/local/lib $out/bin/MoonGen
     patchelf --add-rpath $out/lib/highwayhash/lib $out/bin/MoonGen
-    exit 1
   '';
 
   dontFixup = true;
