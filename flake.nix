@@ -24,6 +24,11 @@
       url = "git+https://github.com/vmuxIO/dpdk?ref=21.11-moon-vmux&submodules=1";
       flake = false;
     };
+
+    xdp-reflector = {
+      url = "git+https://github.com/gierens/xdp-reflector?ref=main&submodules=1";
+      flake = false;
+    };
   };
 
   outputs = { 
@@ -34,6 +39,7 @@
     moonmux-src, 
     libmoon-src,
     dpdk-src,
+    xdp-reflector,
   }: 
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
@@ -56,6 +62,11 @@
       dpdk = mydpdk;
       pktgen = pkgs.callPackage ./nix/pktgen.nix {
         dpdk = mydpdk;
+      };
+
+      # util
+      xdp-reflector = pkgs.callPackage ./nix/xdp-reflector.nix {
+        inherit self pkgs;
       };
 
       # qemu/kernel (ioregionfd)
@@ -92,7 +103,9 @@
           just
           iperf2
           nixos-generators.packages.${system}.nixos-generators
+          ccls
         ];
+        CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
       # nix develop .#qemu
       qemu = pkgs.qemu.overrideAttrs (old: {
