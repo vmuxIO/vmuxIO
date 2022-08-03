@@ -36,10 +36,7 @@
     nixpkgs, 
     flake-utils, 
     nixos-generators,
-    moonmux-src, 
-    libmoon-src,
-    dpdk-src,
-    xdp-reflector,
+    ...
   }: 
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
@@ -57,7 +54,7 @@
       };
       moongen21 = pkgs.callPackage ./nix/moongen21.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
-        inherit moonmux-src libmoon-src dpdk-src;
+        inherit self;
       };
       dpdk = mydpdk;
       pktgen = pkgs.callPackage ./nix/pktgen.nix {

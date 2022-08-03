@@ -1,4 +1,5 @@
-{ stdenv
+{ self
+,stdenv
 , fetchFromGitHub
 , fetchurl
 , writeScriptBin
@@ -16,15 +17,12 @@
 , gcc8Stdenv
 , libpcap
 , python3Packages
-, moonmux-src
-, libmoon-src
-, dpdk-src
 }:
 let 
   srcpack = {
-    moongen = moonmux-src;
-    libmoon = libmoon-src;
-    dpdk = dpdk-src;
+    moongen = self.inputs.moonmux-src;
+    libmoon = self.inputs.libmoon-src;
+    dpdk = self.inputs.dpdk-src;
     linux-firmware = fetchGit {
       url = "git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git";
       ref = "main";
