@@ -131,7 +131,27 @@
         "libmoon-src": "libmoon-src",
         "moonmux-src": "moonmux-src",
         "nixos-generators": "nixos-generators",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "xdp-reflector": "xdp-reflector"
+      }
+    },
+    "xdp-reflector": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1659451606,
+        "narHash": "sha256-hVyHTHwXfaz1BJXpTJGZLvV7krbjrwxXy+7nYN1lUz8=",
+        "ref": "main",
+        "rev": "5a80e5c8c8d2654c13a0e84c7cece119f7f677c7",
+        "revCount": 11,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/gierens/xdp-reflector"
+      },
+      "original": {
+        "ref": "main",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/gierens/xdp-reflector"
       }
     }
   },
