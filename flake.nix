@@ -100,7 +100,11 @@
           just
           iperf2
           nixos-generators.packages.${system}.nixos-generators
-          ccls
+          ccls # c lang serv
+          python310.pkgs.mypy # python static typing
+          # dependencies for hosts/apply.py
+          python310.pkgs.pyyaml
+          ethtool
         ];
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
