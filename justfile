@@ -7,6 +7,7 @@ help:
   just --list
 
 # test two unused links with iperf2 (brittle and not idempotent): just hardware_loopback_test enp129s0f0 enp129s0f1 10.0.0.1 10.0.0.2 "-P 8"
+# Remeber to set the used devices as unmanaged in `networkctl list`.
 hardware_loopback_test ETH1 ETH2 IP1 IP2 PERFARGS="" PREFIXSIZE="30":
   #!/bin/sh
   IPERF2=$(which iperf2)
@@ -41,6 +42,13 @@ hardware_loopback_test ETH1 ETH2 IP1 IP2 PERFARGS="" PREFIXSIZE="30":
   wait
   echo done
 
+prepare HOSTYAML:
+  sudo nix develop -c ./hosts/apply.py {{HOSTYAML}}
+
+build:
+  nix build -o mg .#moongen
+  nix build -o mg21 .#moongen21
+
 dpdk-setup:
   modprobe vfio-pci
   sudo ./result/libmoon/deps/dpdk/usertools/dpdk-devbind.py --bind=vfio-pci 81:00.0
@@ -57,16 +65,18 @@ ice_moongen: dpdk-setup
 
 dpdk21moongen:
   cd libmoon/deps/dpdk/build
-  meson configure -Dtests=false -Denable_kmods=false -Dexamples=helloworld -Ddisable_drivers=kni -Ddefault_library=shared -Dmachine=nehalem -Dmax_lcores=256
+  meson configure -Dtests=false -Denable_kmods=false -Dexamples=helloworld -Ddisable_drivers=kni -Ddefault_library=shared -Dmachine=nehalem -Dmax_lcores=256 -Dbuildtype=debug
 
 
 build_dpdk:
-  echo are you in nix develop .#dpdk?
+  echo are you in nix develop .#dpdk? or .#moongen21?
   mkdir build
   meson build
   cd build
   meson configure -Dexamples=helloworld
   ninja # to build
+  NIX_CFLAGS_COMPILE="$NIX_CFLAGS_COMPILE -O0" ninja -j128 # or this for debugging
+  pushd libmoon/deps/dpdk/build; ninja; popd; pushd build; make; popd
 
 dpdk_helloworld: dpdk-setup
   meson configure -Denable_kmods=true
