@@ -56,7 +56,7 @@ def checkDeviceConfig(devYaml: str) -> None:
     """
     checks expected pci id and firmware version
     """
-    modprobe(devYaml['dpdk-driver'])
+    modprobe(devYaml['kernel-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['kernel-driver'])
     info = subprocess.run(["ethtool", "-i", devYaml['if']], check=True, capture_output=True).stdout
     info = info.split(b'\n')

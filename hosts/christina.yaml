@@ -6,7 +6,7 @@ devices:
     type: Intel E810-C 100G
     pciid: 8086:1592
     firmware-version: "2.15 0x800049c3 1.2789.0"
-    dpdk-driver: vfio-pci
+    dpdk-driver: igb_uio
     kernel-driver: ice
   - name: ethDut
     pci: "18:00.1"
@@ -15,5 +15,5 @@ devices:
     type: Intel E810-C 100G
     pciid: 8086:1592
     firmware-version: "2.15 0x800049c3 1.2789.0"
-    dpdk-driver: vfio-pci
+    dpdk-driver: igb_uio
     kernel-driver: ice
