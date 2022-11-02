@@ -98,8 +98,8 @@ stdenv.mkDerivation {
     mkdir -p $out/lib/libmoon
     cp -r build/libmoon $out/lib/
     mkdir -p $out/lib/dpdk
-    cp -r libmoon/deps/dpdk/build/lib $out/lib/dpdk
-    cp -r libmoon/deps/dpdk/build/drivers $out/lib/dpdk
+    cp -r libmoon/deps/dpdk/x86_64-native-linux-gcc/lib $out/lib/dpdk
+    cp -r libmoon/deps/dpdk/x86_64-native-linux-gcc/drivers $out/lib/dpdk
     mkdir -p $out/lib/luajit
     cp -r libmoon/deps/luajit/usr/local/lib $out/lib/luajit
     mkdir -p $out/lib/highwayhash

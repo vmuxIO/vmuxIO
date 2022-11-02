@@ -94,11 +94,11 @@
     "moongen-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1667223296,
-        "narHash": "sha256-fkkT4n+mDndiszt7guQfbIPFIp83rXGFEDF3epnbtGo=",
+        "lastModified": 1667403878,
+        "narHash": "sha256-q0jdpKbsAFwO/Axj+fn6+CekylP3Rkcoc97wRsGvZKQ=",
         "ref": "master",
-        "rev": "5cfb6d1e62fdd8e014d845a3eb36cdfdd1eeb9b7",
-        "revCount": 1461,
+        "rev": "685a36a97763cf4e3fc6481224bb263fe002bde5",
+        "revCount": 1463,
         "submodules": true,
         "type": "git",
         "url": "https://public-access:glpat-G8kFYA45GcDP-oR-oyDj@gitlab.lrz.de/okelmann/moongen-lachnit.git"
