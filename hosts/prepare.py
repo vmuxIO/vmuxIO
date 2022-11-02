@@ -9,7 +9,7 @@ os.chdir(ROOT)
 
 # import dpdk helper code
 import importlib.util
-spec = importlib.util.spec_from_file_location("dpdk_devbind", "../mg-new/bin/libmoon/deps/dpdk/usertools/dpdk-devbind.py")
+spec = importlib.util.spec_from_file_location("dpdk_devbind", "../mg21/bin/libmoon/deps/dpdk/usertools/dpdk-devbind.py")
 dpdk_devbind = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(dpdk_devbind)
 
@@ -41,16 +41,22 @@ def dpdk_devbind_bind(dev_id: str, driver: str) -> None:
     dpdk_devbind_init()
     dpdk_devbind.bind_all([dev_id], driver)
 
+def modprobe(arg: str):
+    subprocess.run(["modprobe", arg], check=True);
+
+
 def applyDevice(devYaml: str) -> None:
     """
     bind device to expected driver
     """
+    modprobe(devYaml['dpdk-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['dpdk-driver'])
 
 def checkDeviceConfig(devYaml: str) -> None:
     """
     checks expected pci id and firmware version
     """
+    modprobe(devYaml['kernel-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['kernel-driver'])
     info = subprocess.run(["ethtool", "-i", devYaml['if']], check=True, capture_output=True).stdout
     info = info.split(b'\n')

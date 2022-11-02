@@ -43,11 +43,12 @@ hardware_loopback_test ETH1 ETH2 IP1 IP2 PERFARGS="" PREFIXSIZE="30":
   echo done
 
 prepare HOSTYAML:
-  sudo nix develop -c ./hosts/apply.py {{HOSTYAML}}
+  sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 build:
   nix build -o mg .#moongen
   nix build -o mg21 .#moongen21
+  nix build -o mgln .#moongen-lachnit
 
 dpdk-setup:
   modprobe vfio-pci

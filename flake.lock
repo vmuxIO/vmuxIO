@@ -1,5 +1,24 @@
 {
   "nodes": {
+    "dpdk-lachnit-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1646735640,
+        "narHash": "sha256-g65k3r4za29oFCyeo8hsI252X3c0j3aRS5agNyPyQnE=",
+        "ref": "v21.11-libmoon",
+        "rev": "879972416009a428432d50bcdec037a7ebe05c63",
+        "revCount": 31118,
+        "submodules": true,
+        "type": "git",
+        "url": "https://public-access:glpat-ye-ZjvZJzssBRhYmoemC@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
+      },
+      "original": {
+        "ref": "v21.11-libmoon",
+        "submodules": true,
+        "type": "git",
+        "url": "https://public-access:glpat-ye-ZjvZJzssBRhYmoemC@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
+      }
+    },
     "dpdk-src": {
       "flake": false,
       "locked": {
@@ -21,17 +40,36 @@
     },
     "flake-utils": {
       "locked": {
-        "lastModified": 1659877975,
-        "narHash": "sha256-zllb8aq3YO3h8B/U0/J1WBgAL8EX5yWf5pMj3G0NAmc=",
+        "lastModified": 1667077288,
+        "narHash": "sha256-bdC8sFNDpT0HK74u9fUkpbf1MEzVYJ+ka7NXCdgBoaA=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "c0e246b9b83f637f4681389ecabcb2681b4f3af0",
+        "rev": "6ee9ebb6b1ee695d2cacc4faa053a7b9baa76817",
         "type": "github"
       },
       "original": {
         "owner": "numtide",
         "repo": "flake-utils",
         "type": "github"
+      }
+    },
+    "libmoon-lachnit-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1667227091,
+        "narHash": "sha256-cLR+7SWruMAK6dbQy/fS2yUbKiWfClAIfSk3QEW4mZE=",
+        "ref": "dpdk-21.11",
+        "rev": "73bdbda1beef6b8177428b76d3f44ea75a9753fa",
+        "revCount": 621,
+        "submodules": true,
+        "type": "git",
+        "url": "https://public-access:glpat-xnmZ-yizTjswVRBsjtDS@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
+      },
+      "original": {
+        "ref": "dpdk-21.11",
+        "submodules": true,
+        "type": "git",
+        "url": "https://public-access:glpat-xnmZ-yizTjswVRBsjtDS@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
       }
     },
     "libmoon-src": {
@@ -51,6 +89,25 @@
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/libmoon"
+      }
+    },
+    "moongen-lachnit-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1667403878,
+        "narHash": "sha256-q0jdpKbsAFwO/Axj+fn6+CekylP3Rkcoc97wRsGvZKQ=",
+        "ref": "master",
+        "rev": "685a36a97763cf4e3fc6481224bb263fe002bde5",
+        "revCount": 1463,
+        "submodules": true,
+        "type": "git",
+        "url": "https://public-access:glpat-G8kFYA45GcDP-oR-oyDj@gitlab.lrz.de/okelmann/moongen-lachnit.git"
+      },
+      "original": {
+        "ref": "master",
+        "submodules": true,
+        "type": "git",
+        "url": "https://public-access:glpat-G8kFYA45GcDP-oR-oyDj@gitlab.lrz.de/okelmann/moongen-lachnit.git"
       }
     },
     "moonmux-src": {
@@ -95,11 +152,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1660727616,
-        "narHash": "sha256-zYTIvdPMYMx/EYqXODAwIIU30RiEHqNHdgarIHuEYZc=",
+        "lastModified": 1666812839,
+        "narHash": "sha256-0nBDgjPU+iDsvz89W+cDEyhnFGSwCJmwDl/gMGqYiU0=",
         "owner": "nix-community",
         "repo": "nixos-generators",
-        "rev": "adccd191a0e83039d537e021f19495b7bad546a1",
+        "rev": "41f3518bc194389df22a3d198215eae75e6b5ab9",
         "type": "github"
       },
       "original": {
@@ -110,11 +167,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1663410121,
-        "narHash": "sha256-+SN249gXLmawmwTVo3AhydVoVwgi/gbqutJV7YHrj0Y=",
+        "lastModified": 1666961615,
+        "narHash": "sha256-+Sqz6zQA85Q14U/KwsJO386oxd47zDte8dqBGOtRJGg=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "f21492b413295ab60f538d5e1812ab908e3e3292",
+        "rev": "040c6d8374d090f46ab0e99f1f7c27a4529ecffd",
         "type": "github"
       },
       "original": {
@@ -126,9 +183,12 @@
     },
     "root": {
       "inputs": {
+        "dpdk-lachnit-src": "dpdk-lachnit-src",
         "dpdk-src": "dpdk-src",
         "flake-utils": "flake-utils",
+        "libmoon-lachnit-src": "libmoon-lachnit-src",
         "libmoon-src": "libmoon-src",
+        "moongen-lachnit-src": "moongen-lachnit-src",
         "moonmux-src": "moonmux-src",
         "nixos-generators": "nixos-generators",
         "nixpkgs": "nixpkgs",
@@ -138,11 +198,11 @@
     "xdp-reflector": {
       "flake": false,
       "locked": {
-        "lastModified": 1659632890,
-        "narHash": "sha256-R9rtBU+HypdrLIBML0M3XG1XWbf5EBQDpTr/mZjUXdc=",
+        "lastModified": 1666444048,
+        "narHash": "sha256-OSxZJBYqdP2AICHhT/DeTyQl5MM9Sy6YzXPk0DeMs3Y=",
         "ref": "main",
-        "rev": "3757abd9869b7d5de4830b53b32b8884c8e3d565",
-        "revCount": 12,
+        "rev": "e60f72c90c6cbc49a8d57e42ac3ddcf762d6cbdb",
+        "revCount": 13,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/gierens/xdp-reflector"
