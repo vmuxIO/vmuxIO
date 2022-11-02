@@ -48,6 +48,7 @@ prepare HOSTYAML:
 build:
   nix build -o mg .#moongen
   nix build -o mg21 .#moongen21
+  nix build -o mgln .#moongen-lachnit
 
 dpdk-setup:
   modprobe vfio-pci
