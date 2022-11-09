@@ -120,8 +120,11 @@
           nixos-generators.packages.${system}.nixos-generators
           ccls # c lang serv
           python310.pkgs.mypy # python static typing
+
           # dependencies for hosts/apply.py
           python310.pkgs.pyyaml
+          # not available in 22.05 yet
+          # python310.pkgs.types-pyyaml
           ethtool
         ];
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17

@@ -1,0 +1,12 @@
+devices:
+  - name: ethDut
+    pci: "51:00.0"
+    if: enp81s0
+    mac: b4:96:91:b3:8b:3c
+    type: Intel E810-C 100G
+    pciid: 8086:1592
+    firmware-version: 
+      - "2.15 0x800049c3 1.2789.0"
+      - "2.30 0x80005d1e 1.2877.0"
+    dpdk-driver: igb_uio
+    kernel-driver: ice

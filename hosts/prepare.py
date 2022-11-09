@@ -2,16 +2,24 @@
 
 # cd to this files location
 from pathlib import Path
+from typing import Optional, TypeVar
 import os
 CALLEE_DIR = os.getcwd()
 ROOT = Path(__file__).parent.resolve()
 os.chdir(ROOT)
 
+
+U = TypeVar('U')
+def unwrap(a: Optional[U]) -> U: 
+    assert a is not None
+    return a
+
+
 # import dpdk helper code
 import importlib.util
-spec = importlib.util.spec_from_file_location("dpdk_devbind", "../mg21/bin/libmoon/deps/dpdk/usertools/dpdk-devbind.py")
+spec = unwrap(importlib.util.spec_from_file_location("dpdk_devbind", "../mg21/bin/libmoon/deps/dpdk/usertools/dpdk-devbind.py"))
 dpdk_devbind = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(dpdk_devbind)
+unwrap(spec.loader).exec_module(dpdk_devbind)
 
 import yaml
 import sys
@@ -59,6 +67,7 @@ def checkDeviceConfig(devYaml: str) -> None:
     modprobe(devYaml['kernel-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['kernel-driver'])
     info = subprocess.run(["ethtool", "-i", devYaml['if']], check=True, capture_output=True).stdout
+    print(f"ethtool: {info}")
     info = info.split(b'\n')
     firmware_version = info[2].split(b'firmware-version: ')[1].decode('utf-8')
     assert firmware_version == devYaml['firmware-version']
@@ -70,10 +79,12 @@ def checkDeviceConfig(devYaml: str) -> None:
 def apply(yamlPath: str, function: Callable[[str], None]) -> None:
     with open(yamlPath, 'r') as file:
         hostcfg = yaml.safe_load(file)['devices']
-        ethLoadgen = next(x for x in hostcfg if x['name'] == "ethLoadgen")
-        function(ethLoadgen)
-        ethDut = next(x for x in hostcfg if x['name'] == "ethDut")
-        function(ethDut)
+        ethLoadgen = next((x for x in hostcfg if x['name'] == "ethLoadgen"), None)
+        if ethLoadgen is not None:
+            function(ethLoadgen)
+        ethDut = next((x for x in hostcfg if x['name'] == "ethDut"), None)
+        if ethDut is not None:
+            function(ethDut)
 
 if __name__ == "__main__":
     import argparse
