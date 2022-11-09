@@ -70,7 +70,7 @@ def checkDeviceConfig(devYaml: str) -> None:
     print(f"ethtool: {info}")
     info = info.split(b'\n')
     firmware_version = info[2].split(b'firmware-version: ')[1].decode('utf-8')
-    assert firmware_version == devYaml['firmware-version']
+    assert firmware_version in devYaml['firmware-versions']
     bus_info = info[4].split(b'bus-info: ')[1].decode('utf-8')
     assert devYaml['pci'] in bus_info
     print(f"device check ok for {bus_info}")
