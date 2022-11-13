@@ -14,17 +14,20 @@ run EXTRA_CMDLINE="":
         -cpu host \
         -enable-kvm \
         -m 500M \
-        -chardev socket,path=/tmp/port0,server=on,wait=off,id=char0 \
         -device virtio-serial \
-        -device virtconsole,chardev=char0,id=ushell,nr=0 \
         -fsdev local,id=myid,path=$(pwd),security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -kernel {{proot}}/VMs/kernel/bzImage \
-        -append "root=/dev/vda console=hvc0 {{EXTRA_CMDLINE}}" \
+        -append "root=/dev/sda console=hvc0 {{EXTRA_CMDLINE}}" \
         -drive file={{host_extkern_image}} \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
-        -nographic
+        -nographic \
+        -serial null \
+        -chardev stdio,mux=on,id=char0,signal=off \
+        -mon chardev=char0,mode=readline \
+        -device virtconsole,chardev=char0,id=vmsh,nr=0
+
 # -kernel {{APP}} -nographic
 #-device virtio-net-pci,netdev=en0 \
 #-netdev bridge,id=en0,br=virbr0 \
