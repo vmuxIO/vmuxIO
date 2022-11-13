@@ -1,3 +1,6 @@
+proot := justfile_directory()
+host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
+qemu_ssh_port := "2222"
 
 default:
   @just --choose
@@ -5,6 +8,26 @@ default:
 # show help
 help:
   just --list
+
+run EXTRA_CMDLINE="":
+    sudo qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 500M \
+        -chardev socket,path=/tmp/port0,server=on,wait=off,id=char0 \
+        -device virtio-serial \
+        -device virtconsole,chardev=char0,id=ushell,nr=0 \
+        -fsdev local,id=myid,path=$(pwd),security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -kernel {{proot}}/VMs/kernel/bzImage \
+        -append "root=/dev/vda console=hvc0 {{EXTRA_CMDLINE}}" \
+        -drive file={{host_extkern_image}} \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -nographic
+# -kernel {{APP}} -nographic
+#-device virtio-net-pci,netdev=en0 \
+#-netdev bridge,id=en0,br=virbr0 \
 
 # test two unused links with iperf2 (brittle and not idempotent): just hardware_loopback_test enp129s0f0 enp129s0f1 10.0.0.1 10.0.0.2 "-P 8"
 # Remeber to set the used devices as unmanaged in `networkctl list`.
@@ -46,9 +69,14 @@ prepare HOSTYAML:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 build:
-  nix build -o mg .#moongen
-  nix build -o mg21 .#moongen21
-  nix build -o mgln .#moongen-lachnit
+  nix build -o {{proot}}mg .#moongen
+  nix build -o {{proot}}mg21 .#moongen21
+  nix build -o {{proot}}mgln .#moongen-lachnit
+  mkdir -p {{proot}}VMs
+  nix build -o {{proot}}VMs/kernel nixpkgs#linux
+  nix build -o {{proot}}VMs/host-extkern-image-ro .#host-extkern-image # read only
+  cp {{proot}}/VMs/host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  chmod 644 {{host_extkern_image}}
 
 dpdk-setup:
   modprobe vfio-pci
