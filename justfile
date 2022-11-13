@@ -9,13 +9,27 @@ default:
 help:
   just --list
 
-qemu EXTRA_CMDLINE="":
+# connect to `just qemu` vm
+ssh COMMAND="":
+  ssh \
+  -i {{proot}}/nix/ssh_key \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  -F /dev/null \
+  -p {{qemu_ssh_port}} \
+  root@localhost -- "{{COMMAND}}"
+
+# update nixos config running in vm (`just vm-update host` or host-extkern)
+vm-update config:
+  just ssh "cd /mnt && nixos-rebuild switch --flake .#{{config}}"
+
+vm EXTRA_CMDLINE="":
     sudo qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
-        -m 500M \
+        -m 8G \
         -device virtio-serial \
-        -fsdev local,id=myid,path=$(pwd),security_model=none \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -drive file={{proot}}/VMs/host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
@@ -23,13 +37,13 @@ qemu EXTRA_CMDLINE="":
         -nographic
 
 # not working
-qemu-extkern EXTRA_CMDLINE="":
+vm-extkern EXTRA_CMDLINE="":
     sudo qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
         -m 500M \
         -device virtio-serial \
-        -fsdev local,id=myid,path=$(pwd),security_model=none \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
         -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
@@ -86,6 +100,8 @@ build:
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
   nix build -o {{proot}}/mgln .#moongen-lachnit
+
+vm-overwrite:
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
   nix build -o {{proot}}/VMs/host-extkern-image-ro .#host-extkern-image # read only

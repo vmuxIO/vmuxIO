@@ -51,7 +51,8 @@
     flake-utils, 
     nixos-generators,
     ...
-  }: 
+  }: let 
+  in
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
@@ -144,6 +145,17 @@
     nixosConfigurations = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
     in {
+      host = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ (import ./nix/host-config.nix { 
+            inherit pkgs;
+            inherit (pkgs) lib; 
+            inherit (self) config;
+            extkern = false; 
+          }) 
+          ./nix/nixos-generators-qcow.nix
+        ];
+      };
       host-extkern = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ (import ./nix/host-config.nix { 

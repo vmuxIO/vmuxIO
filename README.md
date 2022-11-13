@@ -27,3 +27,11 @@ do a performance measurement with moongen-lachnit:
 ```shell
 sudo ./mgln/bin/MoonGen ./mgln/bin/examples/l2-load-latency.lua 0 1 --rate 100000
 ```
+
+setup vm images, start VMs and connect
+
+```shell
+just vm-overwrite
+just vm
+just ssh
+```

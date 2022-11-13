@@ -2,21 +2,22 @@
 extkern ? false, # whether to use externally, manually built kernel
 ... }:
 {
-  networking.useDHCP = false;
-  networking.interfaces.eth0.useDHCP = false;
-  networking.defaultGateway = "192.168.56.1";
-  networking.hostName = "host";
-  networking.domain = "gierens.de";
-  networking.bridges = {
-    "br0" = {
-      interfaces = [ "eth0" ];
-    };
-  };
-  networking.interfaces.br0.useDHCP = false;
-  networking.interfaces.br0.ipv4.addresses = [ {
-    address = "192.168.56.10";
-    prefixLength = 24;
-  } ];
+  # we are not in gierens.de anymore
+  #networking.useDHCP = false;
+  #networking.interfaces.eth0.useDHCP = false;
+  #networking.defaultGateway = "192.168.56.1";
+  #networking.hostName = "host";
+  #networking.domain = "gierens.de";
+  #networking.bridges = {
+    #"br0" = {
+      #interfaces = [ "eth0" ];
+    #};
+  #};
+  #networking.interfaces.br0.useDHCP = false;
+  #networking.interfaces.br0.ipv4.addresses = [ {
+    #address = "192.168.56.10";
+    #prefixLength = 24;
+  #} ];
 
   services.sshd.enable = true;
 
@@ -25,6 +26,9 @@ extkern ? false, # whether to use externally, manually built kernel
 
   users.users.root.password = "password";
   services.openssh.permitRootLogin = lib.mkDefault "yes";
+  users.users.root.openssh.authorizedKeys.keys = [
+    (builtins.readFile ./ssh_key.pub)
+  ];
   services.getty.autologinUser = lib.mkDefault "root";
 
   fileSystems."/mnt" = {
@@ -119,7 +123,7 @@ extkern ? false, # whether to use externally, manually built kernel
   system.activationScripts = {
     linkHome = {
       text = ''
-        ln -s /mnt /home/gierens
+        [[ -L /home/gierens ]] || ln -s /mnt /home/gierens
       '';
       deps = [];
     };
