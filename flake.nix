@@ -120,6 +120,7 @@
           nixos-generators.packages.${system}.nixos-generators
           ccls # c lang serv
           python310.pkgs.mypy # python static typing
+          qemu
 
           # dependencies for hosts/apply.py
           python310.pkgs.pyyaml

@@ -9,7 +9,7 @@ default:
 help:
   just --list
 
-run EXTRA_CMDLINE="":
+qemu EXTRA_CMDLINE="":
     sudo qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
@@ -17,17 +17,28 @@ run EXTRA_CMDLINE="":
         -device virtio-serial \
         -fsdev local,id=myid,path=$(pwd),security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
-        -kernel {{proot}}/VMs/kernel/bzImage \
-        -append "root=/dev/sda console=hvc0 {{EXTRA_CMDLINE}}" \
+        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -nographic
+
+# not working
+qemu-extkern EXTRA_CMDLINE="":
+    sudo qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 500M \
+        -device virtio-serial \
+        -fsdev local,id=myid,path=$(pwd),security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
+        -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
+        -append "root=/dev/vda {{EXTRA_CMDLINE}}" \
         -drive file={{host_extkern_image}} \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
-        -nographic \
-        -serial null \
-        -chardev stdio,mux=on,id=char0,signal=off \
-        -mon chardev=char0,mode=readline \
-        -device virtconsole,chardev=char0,id=vmsh,nr=0
-
+        -nographic
+#-kernel {{proot}}/VMs/kernel/bzImage \
 # -kernel {{APP}} -nographic
 #-device virtio-net-pci,netdev=en0 \
 #-netdev bridge,id=en0,br=virbr0 \
@@ -72,14 +83,15 @@ prepare HOSTYAML:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 build:
-  nix build -o {{proot}}mg .#moongen
-  nix build -o {{proot}}mg21 .#moongen21
-  nix build -o {{proot}}mgln .#moongen-lachnit
-  mkdir -p {{proot}}VMs
-  nix build -o {{proot}}VMs/kernel nixpkgs#linux
-  nix build -o {{proot}}VMs/host-extkern-image-ro .#host-extkern-image # read only
-  cp {{proot}}/VMs/host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
-  chmod 644 {{host_extkern_image}}
+  nix build -o {{proot}}/mg .#moongen
+  nix build -o {{proot}}/mg21 .#moongen21
+  nix build -o {{proot}}/mgln .#moongen-lachnit
+  mkdir -p {{proot}}/VMs
+  nix build -o {{proot}}/VMs/kernel nixpkgs#linux
+  nix build -o {{proot}}/VMs/host-extkern-image-ro .#host-extkern-image # read only
+  install -D -m644 {{proot}}/VMs/host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  nix build -o {{proot}}/VMs/host-image-ro .#host-image # read only
+  install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image.qcow2
 
 dpdk-setup:
   modprobe vfio-pci
