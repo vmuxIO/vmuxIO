@@ -2,7 +2,7 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-22.05;
+    nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -44,6 +44,14 @@
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
+    qemu-libvfio = pkgs.qemu.overrideAttrs ( new: old: {
+      src = pkgs.fetchFromGitHub {
+        owner = "oracle";
+        repo = "qemu";
+        rev = "b3b53245edbd399eb3ba1655d509478c76d37a8e";
+        hash = "sha256-jlSwAFWOrG6TkTEJEE3ESwEHig8OtgsJRlDUuTFeu+U=";
+      };
+    });
   in  {
     packages = {
       default = self.packages.${system}.moongen;
@@ -105,6 +113,7 @@
           # dependencies for hosts/apply.py
           python310.pkgs.pyyaml
           ethtool
+          qemu-libvfio
         ];
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
