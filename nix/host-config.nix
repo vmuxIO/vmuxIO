@@ -70,6 +70,7 @@ extkern ? false, # whether to use externally, manually built kernel
     tunctl
     bridge-utils
     killall
+    pciutils
   ];
 
   boot.kernelPackages = let

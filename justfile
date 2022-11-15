@@ -23,7 +23,7 @@ ssh COMMAND="":
 vm-update config:
   just ssh "cd /mnt && nixos-rebuild switch --flake .#{{config}}"
 
-vm EXTRA_CMDLINE="":
+vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
     sudo qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
@@ -34,6 +34,7 @@ vm EXTRA_CMDLINE="":
         -drive file={{proot}}/VMs/host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -device vfio-pci,host=18:00.0 \
         -nographic
 
 # not working
