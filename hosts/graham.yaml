@@ -1,3 +1,4 @@
+iommu_on: true
 devices:
   - name: ethLoadgen
     pci: "81:00.0"

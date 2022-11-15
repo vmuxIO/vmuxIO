@@ -123,8 +123,9 @@
           python310.pkgs.mypy # python static typing
           qemu
 
-          # dependencies for hosts/apply.py
+          # dependencies for hosts/prepare.py
           python310.pkgs.pyyaml
+          yq
           # not available in 22.05 yet
           # python310.pkgs.types-pyyaml
           ethtool

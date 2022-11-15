@@ -4,6 +4,7 @@
 from pathlib import Path
 from typing import Optional, TypeVar
 import os
+import time
 CALLEE_DIR = os.getcwd()
 ROOT = Path(__file__).parent.resolve()
 os.chdir(ROOT)
@@ -51,6 +52,7 @@ def dpdk_devbind_bind(dev_id: str, driver: str) -> None:
 
 def modprobe(arg: str):
     subprocess.run(["modprobe", arg], check=True);
+    time.sleep(1) # could this help to prevent "Error: Driver 'vfio-pci' is not loaded."?
 
 
 def applyDevice(devYaml: str) -> None:
@@ -70,21 +72,26 @@ def checkDeviceConfig(devYaml: str) -> None:
     print(f"ethtool: {info}")
     info = info.split(b'\n')
     firmware_version = info[2].split(b'firmware-version: ')[1].decode('utf-8')
-    assert firmware_version in devYaml['firmware-versions']
+    assert firmware_version in devYaml['firmware-versions'], \
+            f"Firmware version {firmware_version} does not match the expected ones from the yaml."
     bus_info = info[4].split(b'bus-info: ')[1].decode('utf-8')
-    assert devYaml['pci'] in bus_info
+    assert devYaml['pci'] in bus_info, \
+            f"PCI bus of {devYaml['if']} is {bus_info} instead of what the yaml expects."
     print(f"device check ok for {bus_info}")
 
 
-def apply(yamlPath: str, function: Callable[[str], None]) -> None:
-    with open(yamlPath, 'r') as file:
-        hostcfg = yaml.safe_load(file)['devices']
-        ethLoadgen = next((x for x in hostcfg if x['name'] == "ethLoadgen"), None)
-        if ethLoadgen is not None:
-            function(ethLoadgen)
-        ethDut = next((x for x in hostcfg if x['name'] == "ethDut"), None)
-        if ethDut is not None:
-            function(ethDut)
+def apply(hostcfg: str, function: Callable[[str], None]) -> None:
+    devsYaml = hostcfg['devices']
+    ethLoadgen = next((x for x in devsYaml if x['name'] == "ethLoadgen"), None)
+    if ethLoadgen is not None:
+        function(ethLoadgen)
+    ethDut = next((x for x in devsYaml if x['name'] == "ethDut"), None)
+    if ethDut is not None:
+        function(ethDut)
+
+def checkIommu(hostcfg: str) -> None:
+    iommu_on = os.path.isdir("/sys/devices/virtual/iommu")
+    assert iommu_on == hostcfg['iommu_on'], f"Iommu_is_on = {iommu_on} which is not what config requires"
 
 if __name__ == "__main__":
     import argparse
@@ -95,8 +102,10 @@ if __name__ == "__main__":
     yamlPath = Path(CALLEE_DIR)
     yamlPath /= args.file
 
-    apply(yamlPath, checkDeviceConfig)
-    apply(yamlPath, applyDevice)
-    # dpdk_devbind_print()
+    with open(yamlPath, 'r') as file:
+        hostcfg = yaml.safe_load(file)
+        apply(hostcfg, checkDeviceConfig)
+        apply(hostcfg, applyDevice)
+        # dpdk_devbind_print()
 
 

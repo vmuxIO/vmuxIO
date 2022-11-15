@@ -35,3 +35,16 @@ just vm-overwrite
 just vm
 just ssh
 ```
+
+Iommu: check that it is enabled
+```
+$ find /sys | grep dmar
+/sys/devices/virtual/iommu/dmar0
+...
+/sys/class/iommu/dmar0
+/sys/class/iommu/dmar1
+$ dmesg | grep IOMMU
+... DMAR: IOMMU enabled
+```
+
+and find its groups at `/sys/kernel/iommu_groups`

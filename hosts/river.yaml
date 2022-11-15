@@ -1,3 +1,4 @@
+iommu_on: true
 devices:
   - name: ethDut
     pci: "51:00.0"
