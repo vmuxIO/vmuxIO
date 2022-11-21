@@ -34,11 +34,12 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -drive file={{proot}}/VMs/host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
-        -device vfio-pci,host=18:00.0 \
+        -device vfio-pci,host={{PASSTHROUGH}} \
         -nographic
 
 # not working
 vm-extkern EXTRA_CMDLINE="":
+    echo {{host_extkern_image}}
     sudo qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
@@ -46,13 +47,14 @@ vm-extkern EXTRA_CMDLINE="":
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -hda {{host_extkern_image}} \
         -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
         -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
-        -append "root=/dev/vda {{EXTRA_CMDLINE}}" \
-        -drive file={{host_extkern_image}} \
+        -append "root=/dev/hda3 console=ttyS0 {{EXTRA_CMDLINE}}" \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -nographic
+# -drive file={{host_extkern_image}} \
 #-kernel {{proot}}/VMs/kernel/bzImage \
 # -kernel {{APP}} -nographic
 #-device virtio-net-pci,netdev=en0 \
@@ -118,6 +120,12 @@ dpdk-setup:
   mkdir /dev/huge1Gpages
   sudo mount -t hugetlbfs -o pagesize=1G nodev /dev/huge1Gpages
   sudo ./build/examples/dpdk-helloworld --lcores 2 # needed, because moongen cant load firmware
+
+vmdq-example: 
+  echo on christina with X550 with vfio-pci
+  sudo ./examples/dpdk-vmdq_dcb -l 1-4 -n 4 -a 01:00.0 -a 01:00.1 -- -p 3 --nb-pools 32 --nb-tcs 4
+  echo displays that it is forwarding stuff
+  echo ice driver lacks vmdq impl
 
 ice_moongen: dpdk-setup
   nix build .#moongen
