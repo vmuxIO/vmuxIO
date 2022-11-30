@@ -25,6 +25,20 @@
       flake = false;
     };
 
+    moongen-lachnit-src = {
+      url = "git+https://public-access:glpat-G8kFYA45GcDP-oR-oyDj@gitlab.lrz.de/okelmann/moongen-lachnit.git?ref=master&submodules=1";
+      flake = false;
+    };
+    libmoon-lachnit-src = {
+      #url = "git+file:///home/okelmann/idp-lachnit/moongen/libmoon";
+      url = "git+https://public-access:glpat-xnmZ-yizTjswVRBsjtDS@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-21.11&submodules=1";
+      flake = false;
+    };
+    dpdk-lachnit-src = {
+      url = "git+https://public-access:glpat-ye-ZjvZJzssBRhYmoemC@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v21.11-libmoon&submodules=1";
+      flake = false;
+    };
+
     xdp-reflector = {
       url = "git+https://github.com/gierens/xdp-reflector?ref=main&submodules=1";
       flake = false;
@@ -66,6 +80,10 @@
         linux = pkgs.linuxPackages_5_10.kernel;
       };
       moongen21 = pkgs.callPackage ./nix/moongen21.nix {
+        linux = pkgs.linuxPackages_5_10.kernel;
+        inherit self;
+      };
+      moongen-lachnit = pkgs.callPackage ./nix/moongen-lachnit.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
         inherit self;
       };
