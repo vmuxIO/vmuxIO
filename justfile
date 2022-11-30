@@ -103,3 +103,12 @@ trex_ieee1588:
   # cd into modified v2.97
   cd automation/trex_control_plane/interactive/
   python3 udp_1pkt_src_ip_split_latency_ieee_1588.py
+
+vfio-user-server:
+  qemu-system-x86_64 \
+  -machine x-remote,vfio-user=on \
+  -netdev bridge,id=en0,br=virbr0 \
+  -device virtio-net-pci,netdev=en0,id=ether1 \
+  -nographic \
+  -monitor unix:/home/mikilio/rem-sock,server,nowait \
+  -object x-vfio-user-server,id=vfioobj1,type=unix,path=/tmp/remotesock,device=ether1

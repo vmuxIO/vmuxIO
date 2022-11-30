@@ -44,7 +44,7 @@
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
-    qemu-libvfio = pkgs.qemu.overrideAttrs ( new: old: {
+    qemu-libvfio = pkgs.qemu_full.overrideAttrs ( new: old: {
       src = pkgs.fetchFromGitHub {
         owner = "oracle";
         repo = "qemu";
@@ -53,6 +53,9 @@
         fetchSubmodules = true;
       };
       version = "7.1.5";
+      buildInputs = [ pkgs.libndctl ] ++ old.buildInputs;
+      nativeBuildInputs = [ pkgs.json_c pkgs.cmocka ] ++ old.nativeBuildInputs;
+      configureFlags = old.configureFlags ++ [ "--enable-vfio-user-server"];
     });
   in  {
     packages = {
@@ -115,6 +118,7 @@
           # dependencies for hosts/apply.py
           python310.pkgs.pyyaml
           ethtool
+          dpdk
           qemu-libvfio
         ];
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
