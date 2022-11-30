@@ -1,3 +1,6 @@
+proot := justfile_directory()
+host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
+qemu_ssh_port := "2222"
 
 default:
   @just --choose
@@ -5,6 +8,57 @@ default:
 # show help
 help:
   just --list
+
+# connect to `just qemu` vm
+ssh COMMAND="":
+  ssh \
+  -i {{proot}}/nix/ssh_key \
+  -o StrictHostKeyChecking=no \
+  -o UserKnownHostsFile=/dev/null \
+  -F /dev/null \
+  -p {{qemu_ssh_port}} \
+  root@localhost -- "{{COMMAND}}"
+
+# update nixos config running in vm (`just vm-update host` or host-extkern)
+vm-update config:
+  just ssh "cd /mnt && nixos-rebuild switch --flake .#{{config}}"
+
+vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
+    sudo qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 8G \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -device vfio-pci,host={{PASSTHROUGH}} \
+        -nographic
+
+# not working
+vm-extkern EXTRA_CMDLINE="":
+    echo {{host_extkern_image}}
+    sudo qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 500M \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -hda {{host_extkern_image}} \
+        -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
+        -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
+        -append "root=/dev/sda console=ttyS0 {{EXTRA_CMDLINE}}" \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -nographic
+# -drive file={{host_extkern_image}} \
+#-kernel {{proot}}/VMs/kernel/bzImage \
+# -kernel {{APP}} -nographic
+#-device virtio-net-pci,netdev=en0 \
+#-netdev bridge,id=en0,br=virbr0 \
 
 # test two unused links with iperf2 (brittle and not idempotent): just hardware_loopback_test enp129s0f0 enp129s0f1 10.0.0.1 10.0.0.2 "-P 8"
 # Remeber to set the used devices as unmanaged in `networkctl list`.
@@ -46,9 +100,17 @@ prepare HOSTYAML:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 build:
-  nix build -o mg .#moongen
-  nix build -o mg21 .#moongen21
-  nix build -o mgln .#moongen-lachnit
+  nix build -o {{proot}}/mg .#moongen
+  nix build -o {{proot}}/mg21 .#moongen21
+  nix build -o {{proot}}/mgln .#moongen-lachnit
+
+vm-overwrite:
+  mkdir -p {{proot}}/VMs
+  nix build -o {{proot}}/VMs/kernel nixpkgs#linux
+  nix build -o {{proot}}/VMs/host-extkern-image-ro .#host-extkern-image # read only
+  install -D -m644 {{proot}}/VMs/host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  nix build -o {{proot}}/VMs/host-image-ro .#host-image # read only
+  install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image.qcow2
 
 dpdk-setup:
   modprobe vfio-pci
@@ -58,6 +120,12 @@ dpdk-setup:
   mkdir /dev/huge1Gpages
   sudo mount -t hugetlbfs -o pagesize=1G nodev /dev/huge1Gpages
   sudo ./build/examples/dpdk-helloworld --lcores 2 # needed, because moongen cant load firmware
+
+vmdq-example: 
+  echo on christina with X550 with vfio-pci
+  sudo ./examples/dpdk-vmdq_dcb -l 1-4 -n 4 -a 01:00.0 -a 01:00.1 -- -p 3 --nb-pools 32 --nb-tcs 4
+  echo displays that it is forwarding stuff
+  echo ice driver lacks vmdq impl
 
 ice_moongen: dpdk-setup
   nix build .#moongen
