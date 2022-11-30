@@ -50,7 +50,7 @@ vm-extkern EXTRA_CMDLINE="":
         -hda {{host_extkern_image}} \
         -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
         -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
-        -append "root=/dev/hda3 console=ttyS0 {{EXTRA_CMDLINE}}" \
+        -append "root=/dev/sda console=ttyS0 {{EXTRA_CMDLINE}}" \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -nographic

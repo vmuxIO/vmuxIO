@@ -1,4 +1,5 @@
 iommu_on: true
+hugepages1G: 8
 devices:
   - name: ethLoadgen
     pci: "18:00.0"

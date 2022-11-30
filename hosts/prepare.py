@@ -93,6 +93,12 @@ def checkIommu(hostcfg: str) -> None:
     iommu_on = os.path.isdir("/sys/devices/virtual/iommu")
     assert iommu_on == hostcfg['iommu_on'], f"Iommu_is_on = {iommu_on} which is not what config requires"
 
+def checkHugepages(hostcfg: str) -> None:
+    with open("/sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages", "r") as f:
+        pages1G = int(f.readline())
+        required = hostcfg['hugepages1G']
+        assert pages1G == required, f"{pages1G} 1G hugepages instead of {required} found"
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Apply host yamls.')
@@ -104,6 +110,9 @@ if __name__ == "__main__":
 
     with open(yamlPath, 'r') as file:
         hostcfg = yaml.safe_load(file)
+        checkIommu(hostcfg)
+        checkHugepages(hostcfg)
+        print("host config ok")
         apply(hostcfg, checkDeviceConfig)
         apply(hostcfg, applyDevice)
         # dpdk_devbind_print()
