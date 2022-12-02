@@ -2,16 +2,25 @@
 
 # cd to this files location
 from pathlib import Path
+from typing import Optional, TypeVar
 import os
+import time
 CALLEE_DIR = os.getcwd()
 ROOT = Path(__file__).parent.resolve()
 os.chdir(ROOT)
 
+
+U = TypeVar('U')
+def unwrap(a: Optional[U]) -> U: 
+    assert a is not None
+    return a
+
+
 # import dpdk helper code
 import importlib.util
-spec = importlib.util.spec_from_file_location("dpdk_devbind", "../mg21/bin/libmoon/deps/dpdk/usertools/dpdk-devbind.py")
+spec = unwrap(importlib.util.spec_from_file_location("dpdk_devbind", "../mg21/bin/libmoon/deps/dpdk/usertools/dpdk-devbind.py"))
 dpdk_devbind = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(dpdk_devbind)
+unwrap(spec.loader).exec_module(dpdk_devbind)
 
 import yaml
 import sys
@@ -43,6 +52,7 @@ def dpdk_devbind_bind(dev_id: str, driver: str) -> None:
 
 def modprobe(arg: str):
     subprocess.run(["modprobe", arg], check=True);
+    time.sleep(1) # could this help to prevent "Error: Driver 'vfio-pci' is not loaded."?
 
 
 def applyDevice(devYaml: str) -> None:
@@ -59,21 +69,35 @@ def checkDeviceConfig(devYaml: str) -> None:
     modprobe(devYaml['kernel-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['kernel-driver'])
     info = subprocess.run(["ethtool", "-i", devYaml['if']], check=True, capture_output=True).stdout
+    print(f"ethtool: {info}")
     info = info.split(b'\n')
     firmware_version = info[2].split(b'firmware-version: ')[1].decode('utf-8')
-    assert firmware_version == devYaml['firmware-version']
+    assert firmware_version in devYaml['firmware-versions'], \
+            f"Firmware version {firmware_version} does not match the expected ones from the yaml."
     bus_info = info[4].split(b'bus-info: ')[1].decode('utf-8')
-    assert devYaml['pci'] in bus_info
+    assert devYaml['pci'] in bus_info, \
+            f"PCI bus of {devYaml['if']} is {bus_info} instead of what the yaml expects."
     print(f"device check ok for {bus_info}")
 
 
-def apply(yamlPath: str, function: Callable[[str], None]) -> None:
-    with open(yamlPath, 'r') as file:
-        hostcfg = yaml.safe_load(file)['devices']
-        ethLoadgen = next(x for x in hostcfg if x['name'] == "ethLoadgen")
+def apply(hostcfg: str, function: Callable[[str], None]) -> None:
+    devsYaml = hostcfg['devices']
+    ethLoadgen = next((x for x in devsYaml if x['name'] == "ethLoadgen"), None)
+    if ethLoadgen is not None:
         function(ethLoadgen)
-        ethDut = next(x for x in hostcfg if x['name'] == "ethDut")
+    ethDut = next((x for x in devsYaml if x['name'] == "ethDut"), None)
+    if ethDut is not None:
         function(ethDut)
+
+def checkIommu(hostcfg: str) -> None:
+    iommu_on = os.path.isdir("/sys/devices/virtual/iommu")
+    assert iommu_on == hostcfg['iommu_on'], f"Iommu_is_on = {iommu_on} which is not what config requires"
+
+def checkHugepages(hostcfg: str) -> None:
+    with open("/sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages", "r") as f:
+        pages1G = int(f.readline())
+        required = hostcfg['hugepages1G']
+        assert pages1G == required, f"{pages1G} 1G hugepages instead of {required} found"
 
 if __name__ == "__main__":
     import argparse
@@ -84,8 +108,13 @@ if __name__ == "__main__":
     yamlPath = Path(CALLEE_DIR)
     yamlPath /= args.file
 
-    apply(yamlPath, checkDeviceConfig)
-    apply(yamlPath, applyDevice)
-    # dpdk_devbind_print()
+    with open(yamlPath, 'r') as file:
+        hostcfg = yaml.safe_load(file)
+        checkIommu(hostcfg)
+        checkHugepages(hostcfg)
+        print("host config ok")
+        apply(hostcfg, checkDeviceConfig)
+        apply(hostcfg, applyDevice)
+        # dpdk_devbind_print()
 
 

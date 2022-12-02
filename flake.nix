@@ -51,7 +51,8 @@
     flake-utils, 
     nixos-generators,
     ...
-  }: 
+  }: let 
+  in
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
@@ -133,8 +134,13 @@
           nixos-generators.packages.${system}.nixos-generators
           ccls # c lang serv
           python310.pkgs.mypy # python static typing
-          # dependencies for hosts/apply.py
+          qemu
+
+          # dependencies for hosts/prepare.py
           python310.pkgs.pyyaml
+          yq
+          # not available in 22.05 yet
+          # python310.pkgs.types-pyyaml
           ethtool
           dpdk
           qemu-libvfio
@@ -155,6 +161,17 @@
     nixosConfigurations = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
     in {
+      host = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ (import ./nix/host-config.nix { 
+            inherit pkgs;
+            inherit (pkgs) lib; 
+            inherit (self) config;
+            extkern = false; 
+          }) 
+          ./nix/nixos-generators-qcow.nix
+        ];
+      };
       host-extkern = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ (import ./nix/host-config.nix { 
