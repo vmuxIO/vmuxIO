@@ -45,13 +45,13 @@
     };
   };
 
-  outputs = { 
-    self, 
-    nixpkgs, 
-    flake-utils, 
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
     nixos-generators,
     ...
-  }: let 
+  }: let
   in
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
@@ -59,19 +59,6 @@
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
-    qemu-libvfio = pkgs.qemu_full.overrideAttrs ( new: old: {
-      src = pkgs.fetchFromGitHub {
-        owner = "oracle";
-        repo = "qemu";
-        rev = "b3b53245edbd399eb3ba1655d509478c76d37a8e";
-        hash = "sha256-kCX2ByuJxERLY2nHjPndVoo7TQm1j4qrpLjRcs42HU4=";
-        fetchSubmodules = true;
-      };
-      version = "7.1.5";
-      buildInputs = [ pkgs.libndctl ] ++ old.buildInputs;
-      nativeBuildInputs = [ pkgs.json_c pkgs.cmocka ] ++ old.nativeBuildInputs;
-      configureFlags = old.configureFlags ++ [ "--enable-vfio-user-server"];
-    });
   in  {
     packages = {
       default = self.packages.${system}.moongen;
@@ -98,24 +85,27 @@
         inherit self pkgs;
       };
 
+      #patched qemu
+      qemu = pkgs.callPackage ./nix/qemu-libvfio.nix {};
+
       # qemu/kernel (ioregionfd)
       host-image = nixos-generators.nixosGenerate {
         inherit pkgs;
-        modules = [ (import ./nix/host-config.nix { 
+        modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
-          inherit (pkgs) lib; 
+          inherit (pkgs) lib;
           inherit (self) config;
-          extkern = false; 
+          extkern = false;
         }) ];
         format = "qcow";
       };
       host-extkern-image = nixos-generators.nixosGenerate {
         inherit pkgs;
-        modules = [ (import ./nix/host-config.nix { 
+        modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
-          inherit (pkgs) lib; 
+          inherit (pkgs) lib;
           inherit (self) config;
-          extkern = true; 
+          extkern = true;
         }) ];
         format = "qcow";
       };
@@ -134,7 +124,6 @@
           nixos-generators.packages.${system}.nixos-generators
           ccls # c lang serv
           python310.pkgs.mypy # python static typing
-          qemu
 
           # dependencies for hosts/prepare.py
           python310.pkgs.pyyaml
@@ -142,9 +131,10 @@
           # not available in 22.05 yet
           # python310.pkgs.types-pyyaml
           ethtool
+        ] ++ (with self.packages; [
           dpdk
-          qemu-libvfio
-        ];
+          qemu
+        ]);
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
       # nix develop .#qemu
@@ -163,22 +153,22 @@
     in {
       host = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [ (import ./nix/host-config.nix { 
+        modules = [ (import ./nix/host-config.nix {
             inherit pkgs;
-            inherit (pkgs) lib; 
+            inherit (pkgs) lib;
             inherit (self) config;
-            extkern = false; 
-          }) 
+            extkern = false;
+          })
           ./nix/nixos-generators-qcow.nix
         ];
       };
       host-extkern = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [ (import ./nix/host-config.nix { 
+        modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
-          inherit (pkgs) lib; 
+          inherit (pkgs) lib;
           inherit (self) config;
-          extkern = true; 
+          extkern = true;
         }) ];
       };
       # not bootable per se:
