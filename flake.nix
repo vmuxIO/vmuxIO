@@ -2,7 +2,7 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-22.05;
+    nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -45,13 +45,13 @@
     };
   };
 
-  outputs = { 
-    self, 
-    nixpkgs, 
-    flake-utils, 
+  outputs = {
+    self,
+    nixpkgs,
+    flake-utils,
     nixos-generators,
     ...
-  }: let 
+  }: let
   in
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
@@ -85,24 +85,27 @@
         inherit self pkgs;
       };
 
+      #patched qemu
+      qemu = pkgs.callPackage ./nix/qemu-libvfio.nix {};
+
       # qemu/kernel (ioregionfd)
       host-image = nixos-generators.nixosGenerate {
         inherit pkgs;
-        modules = [ (import ./nix/host-config.nix { 
+        modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
-          inherit (pkgs) lib; 
+          inherit (pkgs) lib;
           inherit (self) config;
-          extkern = false; 
+          extkern = false;
         }) ];
         format = "qcow";
       };
       host-extkern-image = nixos-generators.nixosGenerate {
         inherit pkgs;
-        modules = [ (import ./nix/host-config.nix { 
+        modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
-          inherit (pkgs) lib; 
+          inherit (pkgs) lib;
           inherit (self) config;
-          extkern = true; 
+          extkern = true;
         }) ];
         format = "qcow";
       };
@@ -121,7 +124,6 @@
           nixos-generators.packages.${system}.nixos-generators
           ccls # c lang serv
           python310.pkgs.mypy # python static typing
-          qemu
 
           # dependencies for hosts/prepare.py
           python310.pkgs.pyyaml
@@ -129,7 +131,10 @@
           # not available in 22.05 yet
           # python310.pkgs.types-pyyaml
           ethtool
-        ];
+        ] ++ (with self.packages; [
+          dpdk
+          qemu
+        ]);
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
       # nix develop .#qemu
@@ -148,22 +153,22 @@
     in {
       host = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [ (import ./nix/host-config.nix { 
+        modules = [ (import ./nix/host-config.nix {
             inherit pkgs;
-            inherit (pkgs) lib; 
+            inherit (pkgs) lib;
             inherit (self) config;
-            extkern = false; 
-          }) 
+            extkern = false;
+          })
           ./nix/nixos-generators-qcow.nix
         ];
       };
       host-extkern = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [ (import ./nix/host-config.nix { 
+        modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
-          inherit (pkgs) lib; 
+          inherit (pkgs) lib;
           inherit (self) config;
-          extkern = true; 
+          extkern = true;
         }) ];
       };
       # not bootable per se:
