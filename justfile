@@ -100,9 +100,12 @@ prepare HOSTYAML:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 build:
+  meson build
+  meson compile -C build
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
   nix build -o {{proot}}/mgln .#moongen-lachnit
+  nix build -o {{proot}}/qemu .#qemu
 
 vm-overwrite:
   mkdir -p {{proot}}/VMs
