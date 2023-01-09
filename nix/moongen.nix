@@ -36,7 +36,7 @@ let
     rev = "8a2d811764e7fcc9e2862549f91487770b70563b";
   };
 in
-stdenv.mkDerivation {
+gcc8Stdenv.mkDerivation {
   pname = "moongen";
   version = "2021.07.17-19";
 
