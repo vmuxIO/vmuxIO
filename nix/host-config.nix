@@ -71,6 +71,7 @@ extkern ? false, # whether to use externally, manually built kernel
     bridge-utils
     killall
     pciutils
+    ioport # access port io (pio) via inb and outw commands
   ];
 
   # for libvfio-user testing with simple gpio device
