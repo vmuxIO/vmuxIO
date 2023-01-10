@@ -72,6 +72,10 @@ extkern ? false, # whether to use externally, manually built kernel
     killall
     pciutils
     ioport # access port io (pio) via inb and outw commands
+    busybox # for devmem to access physical memory
+    (writeScriptBin "devmem" ''
+      ${busybox}/bin/devmem $@
+    '')
   ];
 
   # for libvfio-user testing with simple gpio device
