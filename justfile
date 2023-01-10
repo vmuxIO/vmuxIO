@@ -37,6 +37,20 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -device vfio-pci,host={{PASSTHROUGH}} \
         -nographic
 
+vm-libvfio-user:
+    sudo {{proot}}/qemu/bin/qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 8G \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -device vfio-user-pci,socket=/tmp/peter.sock \
+        -nographic
+
 # not working
 vm-extkern EXTRA_CMDLINE="":
     echo {{host_extkern_image}}

@@ -73,6 +73,20 @@ extkern ? false, # whether to use externally, manually built kernel
     pciutils
   ];
 
+  # for libvfio-user testing with simple gpio device
+  boot.kernelModules = [ 
+    "gpio-pci-idio-16"  
+  ];
+  boot.kernelPatches = [{
+    name = "enable gpio fs";
+    patch = null;
+    extraConfig = ''
+      GPIOLIB y
+      EXPERT y
+      GPIO_SYSFS y
+    '';
+  }];
+
   # boot.kernelPackages = let
   #   linux_ioregfd_pkg = { fetchurl, buildLinux, ... } @ args:
 
