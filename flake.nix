@@ -123,7 +123,17 @@
           iperf2
           nixos-generators.packages.${system}.nixos-generators
           ccls # c lang serv
+          meson
+          ninja
           python310.pkgs.mypy # python static typing
+
+          # dependencies for libvfio-user
+          meson
+          ninja
+          cmake
+          json_c
+          cmocka
+          pkg-config
 
           # dependencies for hosts/prepare.py
           python310.pkgs.pyyaml
