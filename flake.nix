@@ -117,7 +117,9 @@
     };
 
     devShells = {
-      default = pkgs.mkShell {
+      # use clang over gcc because it has __builtin_dump_struct()
+      default = pkgs.clangStdenv.mkDerivation {
+        name = "clang-devshell";
         buildInputs = with pkgs; [
           just
           iperf2
@@ -126,6 +128,7 @@
           meson
           ninja
           python310.pkgs.mypy # python static typing
+          gdb
 
           # dependencies for libvfio-user
           meson
@@ -145,6 +148,7 @@
           dpdk
           qemu
         ]);
+        hardeningDisable = [ "all" ];
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
       # nix develop .#qemu

@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "libvfio-user.h"
+#include "src/vfio-consumer.h"
 
 typedef struct {
   uint64_t value[2];
@@ -55,7 +56,13 @@ int main() {
     .value = { 0x1, 0x0 }
   };
 
-  printf("hello 0x%X\n", VFIO_DEVICE_STATE_V1_RESUMING);
+  printf("hello 0x%X, %d, \n", VFIO_DEVICE_STATE_V1_RESUMING, VFIOC_SECRET);
+
+  // init vfio
+  
+  vfio_consumer_t vfioc;
+  vfioc_init(&vfioc);
+  /*return 0;*/
 
   // init vfio-user
 
