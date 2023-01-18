@@ -1,3 +1,4 @@
+#pragma once
 
 #define VFIOC_SECRET 1337
 

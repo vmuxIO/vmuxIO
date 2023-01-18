@@ -1,4 +1,4 @@
 sources += files(
-  'main.c',
-  'vfio-consumer.c'
+  'main.cpp',
+  'vfio-consumer.cpp'
   )

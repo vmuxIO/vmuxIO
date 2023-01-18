@@ -149,7 +149,7 @@
           qemu
         ]);
         hardeningDisable = [ "all" ];
-        CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
+        #CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
       # nix develop .#qemu
       qemu = pkgs.qemu.overrideAttrs (old: {

@@ -1,4 +1,4 @@
-#include "src/vfio-consumer.h"
+#include "src/vfio-consumer.hpp"
 #include <linux/vfio.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
@@ -8,7 +8,6 @@
 #include <signal.h>
 #include <err.h>
 #include <stdlib.h>
-
 
 int vfioc_init(vfio_consumer_t *self) {
   int ret, container, group, device;

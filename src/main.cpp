@@ -8,8 +8,11 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "libvfio-user.h"
-#include "src/vfio-consumer.h"
+#include "src/vfio-consumer.hpp"
+
+extern "C" {
+  #include "libvfio-user.h"
+}
 
 typedef struct {
   uint64_t value[2];
@@ -27,7 +30,7 @@ static ssize_t
 bar0_access(vfu_ctx_t *vfu_ctx, char * const buf, size_t count, __loff_t offset,
             const bool is_write)
 {
-  vmux_dev_ctx_t *dev_ctx = vfu_get_private(vfu_ctx);
+  vmux_dev_ctx_t *dev_ctx = (vmux_dev_ctx_t*)vfu_get_private(vfu_ctx);
 
   if (count > sizeof(dev_ctx->value) || offset + count > sizeof(dev_ctx->value)) {
     vfu_log(vfu_ctx, LOG_ERR, "bad BAR0 access %#llx-%#llx",
