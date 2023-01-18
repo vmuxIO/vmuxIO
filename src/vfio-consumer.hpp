@@ -1,9 +1,15 @@
 #pragma once
+#include<vector>
+
+/**
+ * Endpoint towards kernel
+ */
+class VfioConsumer {
+  public:
+    std::vector<struct vfio_region_info> regions;
+    std::vector<struct vfio_irq_info> interrupts;
+
+    int init();
+};
 
 #define VFIOC_SECRET 1337
-
-typedef struct {
-  int placeholder;
-} vfio_consumer_t;
-
-int vfioc_init(vfio_consumer_t *self);

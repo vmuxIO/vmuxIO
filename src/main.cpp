@@ -21,7 +21,7 @@ typedef struct {
 } vmux_dev_ctx_t;
 
 static void
-_log(vfu_ctx_t *vfu_ctx, int level, char const *msg)
+_log([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] int level, char const *msg)
 {
     fprintf(stderr, "server[%d]: %s\n", getpid(), msg);
 }
@@ -63,8 +63,10 @@ int main() {
 
   // init vfio
   
-  vfio_consumer_t vfioc;
-  vfioc_init(&vfioc);
+  VfioConsumer vfioc;
+  ret = vfioc.init();
+  if (ret < 0)
+    err(EXIT_FAILURE, "failed to initialize vfio consumer");
   /*return 0;*/
 
   // init vfio-user
@@ -115,7 +117,7 @@ int main() {
   dev_ctx.bar1size = 0x2000;
   dev_ctx.bar1 = mmap(NULL, dev_ctx.bar1size, PROT_READ | PROT_WRITE,
                           MAP_SHARED, tmpfd, 0);
-  *((uint64_t*)(dev_ctx.bar1)) = 0x2;
+  *((uint64_t*)(dev_ctx.bar1)) = 111;
   if (dev_ctx.bar1 == MAP_FAILED) {
       err(EXIT_FAILURE, "failed to mmap BAR1");
   }

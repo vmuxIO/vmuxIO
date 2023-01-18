@@ -8,8 +8,9 @@
 #include <signal.h>
 #include <err.h>
 #include <stdlib.h>
+#include <vector>
 
-int vfioc_init(vfio_consumer_t *self) {
+int VfioConsumer::init() {
   int ret, container, group, device;
   uint32_t i;
   struct vfio_group_status group_status =
@@ -105,6 +106,7 @@ int vfioc_init(vfio_consumer_t *self) {
 
           ioctl(device, VFIO_DEVICE_GET_REGION_INFO, &reg);
           __builtin_dump_struct(&reg, &printf);
+          this->regions.push_back(reg);
 
           /* Setup mappings... read/write offsets, mmaps
            * For PCI devices, config space is a region */
@@ -119,6 +121,7 @@ int vfioc_init(vfio_consumer_t *self) {
 
           ioctl(device, VFIO_DEVICE_GET_IRQ_INFO, &irq);
           __builtin_dump_struct(&irq, &printf);
+          this->interrupts.push_back(irq);
 
           /* Setup IRQs... eventfds, VFIO_DEVICE_SET_IRQS */
   }
