@@ -9,8 +9,14 @@
 #include <unistd.h>
 #include <map>
 #include <string>
+#include <fcntl.h>
+#include <iostream>
+#include <string>
+#include <exception>
+#include <stdexcept>
 
 #include "src/vfio-consumer.hpp"
+#include "src/util.hpp"
 
 extern "C" {
   #include "libvfio-user.h"
@@ -64,15 +70,34 @@ class VfioUserServer {
     VfioUserServer() {
     }
 
+    ~VfioUserServer() {
+      int ret;
+      printf("destroying server\n");
+      vfu_destroy_ctx(vfu_ctx);
+      ret = unlink(sock.c_str());
+      if (ret < 0) {
+        warn("Could not delete %s", sock.c_str());
+      }
+      for (const auto& [idx, fd] : shm_fds) {
+        ret = close(fd);
+        if (ret < 0) {
+          warn("Could not close fd %d", fd);
+        }
+      }
+      for (const auto& [idx, page] : mem_pages) {
+        free(page);
+      }
+    }
+
     int add_regions(std::vector<struct vfio_region_info> regions) {
       int ret;
 
-      if (regions.size() > VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX)
-        printf("Warning: got %u mappable regions, but we expect normal PCI to have %d at most", (uint)regions.size(), VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX);
+      if (regions.size() > VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX + 1)
+        printf("Warning: got %u mappable regions, but we expect normal PCI to have %d at most\n", (uint)regions.size(), VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX);
       for (int i = VFU_PCI_DEV_BAR0_REGION_IDX; i <= VFU_PCI_DEV_VGA_REGION_IDX; i++) {
         ret = this->add_region(&regions[i]);
         if (ret < 0) {
-            err(EXIT_FAILURE, "failed to add dma region to vfio-user");
+            die("failed to add dma region to vfio-user");
         }
       }
 
@@ -84,7 +109,7 @@ class VfioUserServer {
     unexpected_access_callback([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char * const buf, [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
                 [[maybe_unused]] const bool is_write)
     {
-      printf("Unexpectedly, a vfio register/DMA access callback was triggered.");
+      printf("Unexpectedly, a vfio register/DMA access callback was triggered.\n");
       return 0;
     }
 
@@ -92,30 +117,35 @@ class VfioUserServer {
       int ret;
 
       if (region->size == 0) {
-        return -1;
+        printf("Bar region %d skipped.\n", region->index);
+        return 0;
       }
 
       // create shared memory (file backing the memory and map it)
       int tmpfd;
+      std::string filename = this->tmpfilename;
       umask(0022);
-      if ((tmpfd = mkstemp(this->tmpfilename.data())) == -1) {
-          err(EXIT_FAILURE, "failed to create backing file");
+      if ((tmpfd = mkstemp(filename.data())) == -1) {
+          die("failed to create backing file");
       }
       this->shm_fds[region->index] = tmpfd;
       unlink(this->tmpfilename.c_str());
-      if (ftruncate(tmpfd, sizeof(region->size)) == -1) {
-          err(EXIT_FAILURE, "failed to truncate backing file");
+      if (fallocate(tmpfd, 0, region->offset, region->size) == -1) {
+          die("failed to truncate backing file");
       }
+      //if (ftruncate(tmpfd, region->size) == -1) {
+          //die("failed to truncate backing file");
+      //}
       void* sharable_page = mmap(NULL, region->size, PROT_READ | PROT_WRITE,
                               MAP_SHARED, tmpfd, 0);
       this->mem_pages[region->index] = sharable_page;
       if (sharable_page == MAP_FAILED) {
-          err(EXIT_FAILURE, "failed to mmap BAR %d", region->index);
+          die("failed to mmap BAR %d", region->index);
       }
 
       // set up dma VM<->vmux
       struct iovec bar_mmap_areas[] = {
-          { .iov_base  = (void*)0, .iov_len = region->size}, // no cb, just shmem
+          { .iov_base  = (void*)region->offset, .iov_len = region->size}, // no cb, just shmem
       };
       ret = vfu_setup_region(this->vfu_ctx, region->index,
                              region->size, &(this->unexpected_access_callback),
@@ -123,16 +153,16 @@ class VfioUserServer {
                              1, // nr. items in bar_mmap_areas
                              tmpfd, 0);
       if (ret < 0) {
-          err(EXIT_FAILURE, "failed to setup BAR region %d", region->index);
+          die("failed to setup BAR region %d", region->index);
       }
 
-      printf("Bar region %d (size 0x%x) set up.", region->index, (uint)region->size);
+      printf("Bar region %d (offset 0x%x, size 0x%x) set up.\n", region->index, (uint)region->offset, (uint)region->size);
 
       return 0;
     }
 };
 
-int main() {
+int _main() {
   int ret;
 
   printf("hello 0x%X, %d, \n", VFIO_DEVICE_STATE_V1_RESUMING, VFIOC_SECRET);
@@ -143,8 +173,9 @@ int main() {
   
   VfioConsumer vfioc;
   ret = vfioc.init();
-  if (ret < 0)
-    err(EXIT_FAILURE, "failed to initialize vfio consumer");
+  if (ret < 0) {
+    die("failed to initialize vfio consumer");
+  }
   /*return 0;*/
 
   // init vfio-user
@@ -157,18 +188,18 @@ int main() {
     VFU_DEV_TYPE_PCI
   );
   if (vfu.vfu_ctx == NULL) {
-    err(EXIT_FAILURE, "failed to initialize device emulation");
+    die("failed to initialize device emulation");
   }
   
   ret = vfu_setup_log(vfu.vfu_ctx, _log, LOG_DEBUG);
   if (ret < 0) {
-    err(EXIT_FAILURE, "failed to setup log");
+    die("failed to setup log");
   }
 
   ret = vfu_pci_init(vfu.vfu_ctx, VFU_PCI_TYPE_EXPRESS, // TODO express
                      PCI_HEADER_TYPE_NORMAL, 0); // TODO 4?
   if (ret < 0) {
-    err(EXIT_FAILURE, "vfu_pci_init() failed") ;
+    die("vfu_pci_init() failed") ;
   }
 
   vfu_pci_set_id(vfu.vfu_ctx, 0xdead, 0xbeef, 0xcafe, 0xbabe);
@@ -177,18 +208,18 @@ int main() {
 
   ret = vfu.add_regions(vfioc.regions);
   if (ret < 0)
-    err(EXIT_FAILURE, "failed to add regions");
+    die("failed to add regions");
 
   // finalize
 
   ret = vfu_realize_ctx(vfu.vfu_ctx);
   if (ret < 0) {
-      err(EXIT_FAILURE, "failed to realize device");
+      die("failed to realize device");
   }
 
   ret = vfu_attach_ctx(vfu.vfu_ctx);
   if (ret < 0) {
-      err(EXIT_FAILURE, "failed to attach device");
+      die("failed to attach device");
   }
 
   // runtime loop
@@ -202,11 +233,21 @@ int main() {
 
   if (ret == -1 &&
       errno != ENOTCONN && errno != EINTR && errno != ESHUTDOWN) {
-      errx(EXIT_FAILURE, "failed to realize device emulation");
+      die("failed to realize device emulation");
   }
 
-  // destruction
+  // destruction is done by ~VfioUserServer
 
-  vfu_destroy_ctx(vfu.vfu_ctx);
   return 0;
 }
+
+int main() {
+  try {
+    return _main();
+  } catch (...) {
+    // we seem to need this catch everyting so that our destructors work
+    return EXIT_FAILURE;
+  }
+  return 0;
+}
+
