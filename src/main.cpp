@@ -99,13 +99,29 @@ class VfioUserServer {
       int ret;
 
       if (regions.size() > VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX + 1)
-        printf("Warning: got %u mappable regions, but we expect normal PCI to have %d at most\n", (uint)regions.size(), VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX);
+        printf("Warning: got %u mappable regions, but we expect normal PCI to have %d at most\n", (uint)regions.size(), VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX + 1);
       // TODO update the above check since we only use bar0-5 now
       for (int i = VFU_PCI_DEV_BAR0_REGION_IDX; i <= VFU_PCI_DEV_BAR5_REGION_IDX; i++) {
         ret = this->add_region(&regions[i]);
         if (ret < 0) {
             die("failed to add dma region to vfio-user");
         }
+      }
+
+      return 0;
+    }
+
+    int add_irqs(std::vector<struct vfio_irq_info> irqs) {
+      int ret;
+      if (irqs.size() > VFU_DEV_REQ_IRQ - VFU_DEV_INTX_IRQ + 1)
+        printf("Warning: got %u irq types, but we only know %d at most\n", (uint)irqs.size(), VFU_DEV_REQ_IRQ - VFU_DEV_INTX_IRQ + 1);
+      for (int i = VFU_DEV_INTX_IRQ; i <= VFU_DEV_REQ_IRQ; i++) {
+        // TODO check ioeventfd compatibility
+        ret = vfu_setup_device_nr_irqs(this->vfu_ctx, (enum vfu_dev_irq_type)irqs[i].index, irqs[i].count);
+        if (ret < 0) {
+          die("Cannot set up vfio-user irq (type %d, num %d)", irqs[i].index, irqs[i].count);
+        }
+        printf("Interrupt (type %d, num %d) set up.\n", irqs[i].index, irqs[i].count);
       }
 
       return 0;
@@ -212,11 +228,15 @@ int _main() {
 
   vfu_pci_set_id(vfu.vfu_ctx, 0xdead, 0xbeef, 0xcafe, 0xbabe);
 
-  // set up DMA
+  // set up vfio-user DMA and irqs
 
   ret = vfu.add_regions(vfioc.regions);
   if (ret < 0)
     die("failed to add regions");
+
+  ret = vfu.add_irqs(vfioc.interrupts);
+  if (ret < 0)
+    die("failed to add irqs");
 
   // finalize
 
