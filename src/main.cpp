@@ -79,7 +79,6 @@ class VfioUserServer {
 
     ~VfioUserServer() {
       int ret;
-      printf("destroying server\n");
       vfu_destroy_ctx(vfu_ctx);
       ret = unlink(sock.c_str());
       if (ret < 0) {
@@ -101,7 +100,8 @@ class VfioUserServer {
 
       if (regions.size() > VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX + 1)
         printf("Warning: got %u mappable regions, but we expect normal PCI to have %d at most\n", (uint)regions.size(), VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX);
-      for (int i = VFU_PCI_DEV_BAR0_REGION_IDX; i <= VFU_PCI_DEV_VGA_REGION_IDX; i++) {
+      // TODO update the above check since we only use bar0-5 now
+      for (int i = VFU_PCI_DEV_BAR0_REGION_IDX; i <= VFU_PCI_DEV_BAR5_REGION_IDX; i++) {
         ret = this->add_region(&regions[i]);
         if (ret < 0) {
             die("failed to add dma region to vfio-user");
@@ -137,12 +137,12 @@ class VfioUserServer {
       }
       this->shm_fds[region->index] = tmpfd;
       unlink(this->tmpfilename.c_str());
-      if (fallocate(tmpfd, 0, region->offset, region->size) == -1) {
-          die("failed to truncate backing file");
-      }
-      //if (ftruncate(tmpfd, region->size) == -1) {
+      //if (fallocate(tmpfd, 0, region->offset, region->size) == -1) {
           //die("failed to truncate backing file");
       //}
+      if (ftruncate(tmpfd, region->size) == -1) {
+          die("failed to truncate backing file");
+      }
       void* sharable_page = mmap(NULL, region->size, PROT_READ | PROT_WRITE,
                               MAP_SHARED, tmpfd, 0);
       this->mem_pages[region->index] = sharable_page;
@@ -152,11 +152,12 @@ class VfioUserServer {
 
       // set up dma VM<->vmux
       struct iovec bar_mmap_areas[] = {
-          { .iov_base  = (void*)region->offset, .iov_len = region->size}, // no cb, just shmem
+          //{ .iov_base  = (void*)region->offset, .iov_len = region->size}, // no cb, just shmem
+          { .iov_base  = (void*)0, .iov_len = region->size}, // no cb, just shmem
       };
       ret = vfu_setup_region(this->vfu_ctx, region->index,
                              region->size, &(this->unexpected_access_callback),
-                             VFU_REGION_FLAG_RW, bar_mmap_areas, 
+                             VFU_REGION_FLAG_RW | VFU_REGION_FLAG_MEM, bar_mmap_areas, 
                              1, // nr. items in bar_mmap_areas
                              tmpfd, 0);
       if (ret < 0) {
