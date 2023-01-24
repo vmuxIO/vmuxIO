@@ -22,6 +22,13 @@ extern "C" {
   #include "libvfio-user.h"
 }
 
+
+#include <signal.h>
+#include <atomic>
+
+// set true by signals, should be respected by runtime loops
+std::atomic<bool> quit(false); 
+
 typedef struct {
   uint64_t value[2];
   void *bar1;
@@ -76,12 +83,12 @@ class VfioUserServer {
       vfu_destroy_ctx(vfu_ctx);
       ret = unlink(sock.c_str());
       if (ret < 0) {
-        warn("Could not delete %s", sock.c_str());
+        warn("Cleanup: Could not delete %s", sock.c_str());
       }
       for (const auto& [idx, fd] : shm_fds) {
         ret = close(fd);
         if (ret < 0) {
-          warn("Could not close fd %d", fd);
+          warn("Cleanup: Could not close fd %d", fd);
         }
       }
       for (const auto& [idx, page] : mem_pages) {
@@ -109,7 +116,7 @@ class VfioUserServer {
     unexpected_access_callback([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char * const buf, [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
                 [[maybe_unused]] const bool is_write)
     {
-      printf("Unexpectedly, a vfio register/DMA access callback was triggered.\n");
+      printf("Unexpectedly, a vfio register/DMA access callback was triggered (at 0x%lx, is write %d.\n", offset, is_write);
       return 0;
     }
 
@@ -229,7 +236,7 @@ int _main() {
     if (ret == -1 && errno == EINTR) {
       // interrupt happend during run and wants to be processed
     }
-  } while (ret == 0);
+  } while (ret == 0 && !quit.load());
 
   if (ret == -1 &&
       errno != ENOTCONN && errno != EINTR && errno != ESHUTDOWN) {
@@ -241,13 +248,25 @@ int _main() {
   return 0;
 }
 
+void signal_handler(int) {
+  quit.store(true);
+}
+
 int main() {
+  // register signal handler to handle SIGINT gracefully to call destructors
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = signal_handler;
+  sigfillset(&sa.sa_mask);
+  sigaction(SIGINT, &sa, NULL);
+
   try {
     return _main();
   } catch (...) {
     // we seem to need this catch everyting so that our destructors work
     return EXIT_FAILURE;
   }
-  return 0;
+
+  return quit;
 }
 
