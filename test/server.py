@@ -7,6 +7,7 @@ from datetime import datetime
 from abc import ABC
 from os import listdir
 from os.path import join as path_join
+import json
 
 
 @dataclass
@@ -1308,6 +1309,34 @@ class Host(Server):
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
         self.destroy_test_macvtap()
+
+    def qmp_exec(self: 'Host', command: str, arguments: dict = None) -> None:
+        """
+        Execute a QMP command.
+
+        Parameters
+        ----------
+        command : str
+            The QMP command to execute.
+        arguments : dict
+            The arguments to pass to the QMP command.
+
+        Returns
+        -------
+        dict : The QMP response.
+        """
+        query = {
+            'execute': command,
+        }
+        if arguments:
+            query['arguments'] = arguments
+        prequery_str = '{\\"execute\\": \\"qmp_capabilities\\"}'
+        query_str = json.dumps(query).replace('"', '\\"')
+        bash_cmd = (f'printf "{prequery_str}\n{query_str}\n"' +
+                    ' | nc -N 127.0.0.1 3456 | tail -n 1')
+        response_str = self.exec(bash_cmd)
+        response = json.loads(response_str)
+        return response
 
 
 class Guest(Server):
