@@ -200,6 +200,11 @@ int _main() {
   if (ret < 0) {
     die("failed to initialize vfio consumer");
   }
+  ret = vfioc.init_mmio();
+  if (ret < 0) {
+    die("failed to initialize vfio mmio mappings");
+  }
+  printf("Read: 0x%x\n", *(uint32_t*)((char*)(vfioc.mmio[VFU_PCI_DEV_BAR0_REGION_IDX]) + 0x83048));
   /*return 0;*/
 
   // init vfio-user

@@ -92,6 +92,7 @@ int VfioConsumer::init() {
   if (device < 0) {
     die("Cannot device id for group %d", group);
   }
+  this->device = device;
 
   /* Test and setup the device */
   ret = ioctl(device, VFIO_DEVICE_GET_INFO, &device_info);
@@ -131,5 +132,23 @@ int VfioConsumer::init() {
   /* Gratuitous device reset and go... */
   ioctl(device, VFIO_DEVICE_RESET);
 
+  return 0;
+}
+
+int VfioConsumer::init_mmio() {
+  // Only iterate bars 0-5. Bar 6 seems not mappable. 
+  for (int i = 0; i <= 5; i++) { 
+    auto region = this->regions[i];
+    if (region.size == 0) {
+      printf("Mapping region BAR %d skipped\n", region.index);
+      continue;
+    }
+    void* mem = mmap(NULL, region.size, PROT_READ | PROT_WRITE, MAP_SHARED, this->device, region.offset);
+    if (mem == MAP_FAILED) {
+      die("failed to map mmio region BAR %d via vfio", region.index);
+    }
+    this->mmio[region.index] = mem;
+    printf("Mapping region BAR %d offset 0x%llx size 0x%llx\n", region.index, region.offset, region.size);
+  }
   return 0;
 }
