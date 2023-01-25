@@ -1263,6 +1263,7 @@ class Host(Server):
             'fsdev=nixstorefs' +
             ' -serial stdio' +
             ' -monitor tcp:127.0.0.1:2345,server,nowait' +
+            ' -qmp tcp:127.0.0.1:3456,server,nowait' +
             f' -netdev tap,vhost=on,id=admin0,ifname={self.admin_tap},' +
             'script=no,downscript=no' +
             f' -device virtio-net-{dev_type},id=admif,netdev=admin0,' +
