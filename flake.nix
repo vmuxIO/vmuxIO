@@ -120,7 +120,7 @@
       common_deps = with pkgs; [
         just
         iperf2
-        nixos-generators.packages.${system}.nixos-generators
+        nixos-generators.packages.${system}.nixos-generate
         ccls # c lang serv
         meson
         ninja

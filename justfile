@@ -114,7 +114,7 @@ prepare HOSTYAML:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 build:
-  meson build
+  meson build --wipe
   meson compile -C build
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
