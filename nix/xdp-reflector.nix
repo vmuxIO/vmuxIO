@@ -7,6 +7,8 @@
   buildInputs = with pkgs; [
     llvm
     linuxHeaders
+    pkg-config
+    elfutils.dev
   ];
 
   hardeningDisable = [ "all" ];
@@ -16,4 +18,9 @@
     ls -lah
     cp reflector.o $out/lib
   '';
+
+  # someone added some --gcc-toolchain arg which is of course not consumed by
+  # clang.  Also, we overwrite this one default include by setting this
+  # variable, so we have to hardcode this here.
+  BPF_CFLAGS = "-I./libbpf/src/build/usr/include/ -Wno-unused-command-line-argument";
 }
