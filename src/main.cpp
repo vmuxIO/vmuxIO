@@ -41,6 +41,7 @@ _log([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] int level, char const
     fprintf(stderr, "server[%d]: %s\n", getpid(), msg);
 }
 
+// keep as reference for now, how bar callback functions should work
 [[maybe_unused]] static ssize_t
 bar0_access(vfu_ctx_t *vfu_ctx, char * const buf, size_t count, __loff_t offset,
             const bool is_write)
@@ -68,10 +69,7 @@ bar0_access(vfu_ctx_t *vfu_ctx, char * const buf, size_t count, __loff_t offset,
 class VfioUserServer {
   public:
     vfu_ctx_t *vfu_ctx;
-    std::string tmpfilename = "/tmp/libvfio-user.XXXXXX";
     std::string sock = "/tmp/peter.sock";
-    // maps indexed by bar index:
-    std::map<int, void*> mem_pages;
    
     VfioUserServer() {
     }
@@ -83,9 +81,6 @@ class VfioUserServer {
       if (ret < 0) {
         warn("Cleanup: Could not delete %s", sock.c_str());
       }
-      for (const auto& [idx, page] : mem_pages) {
-        free(page);
-      }
     }
 
     int add_regions(std::vector<struct vfio_region_info> regions, int device_fd) {
@@ -93,7 +88,7 @@ class VfioUserServer {
 
       if (regions.size() > VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX + 1)
         printf("Warning: got %u mappable regions, but we expect normal PCI to have %d at most\n", (uint)regions.size(), VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX + 1);
-      // TODO update the above check since we only use bar0-5 now
+      // Note, that we only attempt to map bar 0-5
       for (int i = VFU_PCI_DEV_BAR0_REGION_IDX; i <= VFU_PCI_DEV_BAR5_REGION_IDX; i++) {
         ret = this->add_region(&regions[i], device_fd);
         if (ret < 0) {
@@ -175,8 +170,7 @@ int _main() {
   if (ret < 0) {
     die("failed to initialize vfio mmio mappings");
   }
-  printf("Read: 0x%x\n", *(uint32_t*)((char*)(vfioc.mmio[VFU_PCI_DEV_BAR0_REGION_IDX]) + 0x83048));
-  /*return 0;*/
+  printf("Test read: 0x%x\n", *(uint32_t*)((char*)(vfioc.mmio[VFU_PCI_DEV_BAR0_REGION_IDX]) + 0x83048));
 
   // init vfio-user
 
@@ -202,7 +196,7 @@ int _main() {
     die("vfu_pci_init() failed") ;
   }
 
-  vfu_pci_set_id(vfu.vfu_ctx, 0xdead, 0xbeef, 0xcafe, 0xbabe);
+  vfu_pci_set_id(vfu.vfu_ctx, 0xdead, 0xbeef, 0xcafe, 0xbabe); // TODO mirror real one
 
   // set up vfio-user DMA and irqs
 

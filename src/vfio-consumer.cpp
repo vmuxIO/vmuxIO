@@ -12,6 +12,33 @@
 
 #include "src/util.hpp"
 
+VfioConsumer::~VfioConsumer() {
+  printf("vfio consumer destructor called\n");
+  int ret;
+  ret = close(this->container);
+  if (ret < 0) {
+    warn("Cleanup: Cannot close vfio conatiner");
+  }
+  ret = close(this->group);
+  if (ret < 0) {
+    warn("Cleanup: Cannot close vfio group");
+  }
+  ret = close(this->device);
+  if (ret < 0) {
+    warn("Cleanup: Cannot close vfio device");
+  }
+  ret = munmap((void*)dma_map.vaddr, dma_map.size);
+  if (ret < 0) {
+    warn("Cleanup: Cannot unmap dma");
+  }
+  for (auto const& [idx, ptr] : this->mmio) {
+    ret = munmap(ptr, this->regions[idx].size);
+    if (ret < 0) {
+      warn("Cleanup: Cannot unmap BAR regions %d", idx);
+    }
+  }
+}
+
 int VfioConsumer::init() {
   int ret, container, group, device;
   uint32_t i;
@@ -26,6 +53,7 @@ int VfioConsumer::init() {
   if (container < 0) {
     die("Cannot open /dev/vfio/vfio");
   }
+  this->container = container;
 
   if (ioctl(container, VFIO_GET_API_VERSION) != VFIO_API_VERSION) {
     /* Unknown API version */
@@ -42,6 +70,7 @@ int VfioConsumer::init() {
   if (group < 0) {
     die("Cannot open /dev/vfio/29");
   }
+  this->group = group;
 
   /* Test the group is viable and available */
   ret = ioctl(group, VFIO_GROUP_GET_STATUS, &group_status);
@@ -86,11 +115,12 @@ int VfioConsumer::init() {
   if (ret < 0) {
     die("Cannot set dma map");
   }
+  this->dma_map = dma_map;
 
   /* Get a file descriptor for the device */
   device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, "0000:18:00.0");
   if (device < 0) {
-    die("Cannot device id for group %d", group);
+    die("Cannot get/find device id in IOMMU group fd %d", group);
   }
   this->device = device;
 

@@ -1,6 +1,7 @@
 #pragma once
 #include<vector>
 #include <map>
+#include <linux/vfio.h>
 
 /**
  * Endpoint towards kernel
@@ -10,12 +11,15 @@ class VfioConsumer {
     std::vector<struct vfio_region_info> regions;
     std::vector<struct vfio_irq_info> interrupts;
     std::map<int, void*> mmio;
+    struct vfio_iommu_type1_dma_map dma_map;
 
-    // vfio device fd TODO close
+
+    // vfio fds
+    int container;
+    int group;
     int device;
 
-    void* registers;
-
+    ~VfioConsumer();
     int init();
     int init_mmio();
 };
