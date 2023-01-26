@@ -116,20 +116,32 @@
       };
     };
 
-    devShells = {
+    devShells = let 
+      common_deps = with pkgs; [
+        just
+        iperf2
+        nixos-generators.packages.${system}.nixos-generators
+        ccls # c lang serv
+        meson
+        ninja
+        python310.pkgs.mypy # python static typing
+        gdb
+
+        # dependencies for hosts/prepare.py
+        python310.pkgs.pyyaml
+        yq
+        # not available in 22.05 yet
+        # python310.pkgs.types-pyyaml
+        ethtool
+      ] ++ (with self.packages; [
+        dpdk
+        qemu
+      ]);
+    in {
       # use clang over gcc because it has __builtin_dump_struct()
       default = pkgs.clangStdenv.mkDerivation {
         name = "clang-devshell";
         buildInputs = with pkgs; [
-          just
-          iperf2
-          nixos-generators.packages.${system}.nixos-generators
-          ccls # c lang serv
-          meson
-          ninja
-          python310.pkgs.mypy # python static typing
-          gdb
-
           # dependencies for libvfio-user
           meson
           ninja
@@ -137,19 +149,14 @@
           json_c
           cmocka
           pkg-config
-
-          # dependencies for hosts/prepare.py
-          python310.pkgs.pyyaml
-          yq
-          # not available in 22.05 yet
-          # python310.pkgs.types-pyyaml
-          ethtool
-        ] ++ (with self.packages; [
-          dpdk
-          qemu
-        ]);
+        ] ++ common_deps;
         hardeningDisable = [ "all" ];
-        #CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
+      };
+      # nix develop .#default_old
+      default_old = pkgs.mkShell {
+        buildInputs = with pkgs; [
+        ] ++ common_deps;
+        CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
       # nix develop .#qemu
       qemu = pkgs.qemu.overrideAttrs (old: {
