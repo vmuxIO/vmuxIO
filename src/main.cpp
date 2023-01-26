@@ -95,14 +95,14 @@ class VfioUserServer {
       }
     }
 
-    int add_regions(std::vector<struct vfio_region_info> regions) {
+    int add_regions(std::vector<struct vfio_region_info> regions, int device_fd) {
       int ret;
 
       if (regions.size() > VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX + 1)
         printf("Warning: got %u mappable regions, but we expect normal PCI to have %d at most\n", (uint)regions.size(), VFU_PCI_DEV_VGA_REGION_IDX - VFU_PCI_DEV_BAR0_REGION_IDX + 1);
       // TODO update the above check since we only use bar0-5 now
       for (int i = VFU_PCI_DEV_BAR0_REGION_IDX; i <= VFU_PCI_DEV_BAR5_REGION_IDX; i++) {
-        ret = this->add_region(&regions[i]);
+        ret = this->add_region(&regions[i], device_fd);
         if (ret < 0) {
             die("failed to add dma region to vfio-user");
         }
@@ -136,7 +136,7 @@ class VfioUserServer {
       return 0;
     }
 
-    int add_region(struct vfio_region_info *region) {
+    int add_region(struct vfio_region_info *region, int device_fd) {
       int ret;
 
       if (region->size == 0) {
@@ -175,12 +175,12 @@ class VfioUserServer {
                              region->size, &(this->unexpected_access_callback),
                              VFU_REGION_FLAG_RW | VFU_REGION_FLAG_MEM, bar_mmap_areas, 
                              1, // nr. items in bar_mmap_areas
-                             tmpfd, 0);
+                             device_fd, region->offset);
       if (ret < 0) {
           die("failed to setup BAR region %d", region->index);
       }
 
-      printf("Bar region %d (offset 0x%x, size 0x%x) set up.\n", region->index, (uint)region->offset, (uint)region->size);
+      printf("Vfio-user: Bar region %d (offset 0x%x, size 0x%x) set up.\n", region->index, (uint)region->offset, (uint)region->size);
 
       return 0;
     }
@@ -235,7 +235,7 @@ int _main() {
 
   // set up vfio-user DMA and irqs
 
-  ret = vfu.add_regions(vfioc.regions);
+  ret = vfu.add_regions(vfioc.regions, vfioc.device);
   if (ret < 0)
     die("failed to add regions");
 

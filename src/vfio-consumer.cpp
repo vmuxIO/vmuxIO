@@ -148,7 +148,7 @@ int VfioConsumer::init_mmio() {
       die("failed to map mmio region BAR %d via vfio", region.index);
     }
     this->mmio[region.index] = mem;
-    printf("Mapping region BAR %d offset 0x%llx size 0x%llx\n", region.index, region.offset, region.size);
+    printf("Vfio: Mapping region BAR %d offset 0x%llx size 0x%llx\n", region.index, region.offset, region.size);
   }
   return 0;
 }
