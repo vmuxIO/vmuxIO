@@ -72,7 +72,6 @@ class VfioUserServer {
     std::string sock = "/tmp/peter.sock";
     // maps indexed by bar index:
     std::map<int, void*> mem_pages;
-    std::map<int, int> shm_fds;
    
     VfioUserServer() {
     }
@@ -83,12 +82,6 @@ class VfioUserServer {
       ret = unlink(sock.c_str());
       if (ret < 0) {
         warn("Cleanup: Could not delete %s", sock.c_str());
-      }
-      for (const auto& [idx, fd] : shm_fds) {
-        ret = close(fd);
-        if (ret < 0) {
-          warn("Cleanup: Could not close fd %d", fd);
-        }
       }
       for (const auto& [idx, page] : mem_pages) {
         free(page);
@@ -142,28 +135,6 @@ class VfioUserServer {
       if (region->size == 0) {
         printf("Bar region %d skipped.\n", region->index);
         return 0;
-      }
-
-      // create shared memory (file backing the memory and map it)
-      int tmpfd;
-      std::string filename = this->tmpfilename;
-      umask(0022);
-      if ((tmpfd = mkstemp(filename.data())) == -1) {
-          die("failed to create backing file");
-      }
-      this->shm_fds[region->index] = tmpfd;
-      unlink(this->tmpfilename.c_str());
-      //if (fallocate(tmpfd, 0, region->offset, region->size) == -1) {
-          //die("failed to truncate backing file");
-      //}
-      if (ftruncate(tmpfd, region->size) == -1) {
-          die("failed to truncate backing file");
-      }
-      void* sharable_page = mmap(NULL, region->size, PROT_READ | PROT_WRITE,
-                              MAP_SHARED, tmpfd, 0);
-      this->mem_pages[region->index] = sharable_page;
-      if (sharable_page == MAP_FAILED) {
-          die("failed to mmap BAR %d", region->index);
       }
 
       // set up dma VM<->vmux
