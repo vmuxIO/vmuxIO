@@ -78,9 +78,7 @@
         linux = pkgs.linuxPackages_5_10.kernel;
         inherit self;
       };
-      # broken build
       dpdk = mydpdk;
-      # broken build
       pktgen = pkgs.callPackage ./nix/pktgen.nix {
         dpdk = mydpdk;
       };
@@ -149,16 +147,6 @@
       # use clang over gcc because it has __builtin_dump_struct()
       default = pkgs.clangStdenv.mkDerivation {
         name = "clang-devshell";
-        src = ./LICENSE; # stub file to statisfy the build
-        dontUnpack = true;
-        dontPatch = true;
-        dontConfigure = true;
-        dontBuild = true;
-        installPhase = ''
-          mkdir $out
-          touch $out/keepdir
-        '';
-        dontFixup = true;
         buildInputs = with pkgs; [
           # dependencies for libvfio-user
           meson
@@ -169,6 +157,18 @@
           pkg-config
         ] ++ common_deps;
         hardeningDisable = [ "all" ];
+
+        # stub stuff to statisfy the build
+        src = ./LICENSE; 
+        dontUnpack = true;
+        dontPatch = true;
+        dontConfigure = true;
+        dontBuild = true;
+        installPhase = ''
+          mkdir $out
+          touch $out/keepdir
+        '';
+        dontFixup = true;
       };
       # nix develop .#default_old
       default_old = pkgs.mkShell {

@@ -25,7 +25,7 @@ stdenv.mkDerivation rec {
   RTE_SDK = dpdk;
   GUI = lib.optionalString withGtk "true";
 
-  NIX_CFLAGS_COMPILE = "-msse3";
+  NIX_CFLAGS_COMPILE = "-msse3 -Wno-mismatched-dealloc"; # newer gcc produces this dealloc warning now
   # requires symbols from this file
   NIX_LDFLAGS = "-lrte_net_bond";
 

@@ -39,6 +39,10 @@ in stdenv.mkDerivation rec {
     zlib
   ] ++ lib.optionals mod kernel.moduleBuildDependencies;
 
+  patches = [
+    ./dpdk-new-meson.patch
+  ];
+
   postPatch = ''
     patchShebangs config/arm buildtools
     ls -la drivers/net/ice/ice_ethdev.c
