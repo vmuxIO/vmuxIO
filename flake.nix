@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
+    nixpkgs-stable.url = github:NixOS/nixpkgs/nixos-22.11;
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -48,6 +49,7 @@
   outputs = {
     self,
     nixpkgs,
+    nixpkgs-stable,
     flake-utils,
     nixos-generators,
     ...
@@ -56,6 +58,7 @@
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
+    pkgs-stable = nixpkgs-stable.legacyPackages.${system};
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
@@ -86,7 +89,10 @@
       };
 
       #patched qemu
-      qemu = pkgs.callPackage ./nix/qemu-libvfio.nix {};
+      qemu = pkgs.callPackage ./nix/qemu-libvfio.nix { 
+        # needs a nixpkgs with qemu ~7.1.0 for patches to apply.
+        pkgs2211 = pkgs-stable;
+      };
 
       # qemu/kernel (ioregionfd)
       host-image = nixos-generators.nixosGenerate {
@@ -120,7 +126,7 @@
       common_deps = with pkgs; [
         just
         iperf2
-        nixos-generators.packages.${system}.nixos-generators
+        nixos-generators.packages.${system}.nixos-generate
         ccls # c lang serv
         meson
         ninja
@@ -151,6 +157,18 @@
           pkg-config
         ] ++ common_deps;
         hardeningDisable = [ "all" ];
+
+        # stub stuff to statisfy the build
+        src = ./LICENSE; 
+        dontUnpack = true;
+        dontPatch = true;
+        dontConfigure = true;
+        dontBuild = true;
+        installPhase = ''
+          mkdir $out
+          touch $out/keepdir
+        '';
+        dontFixup = true;
       };
       # nix develop .#default_old
       default_old = pkgs.mkShell {
