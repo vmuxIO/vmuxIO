@@ -1338,6 +1338,24 @@ class Host(Server):
         response = json.loads(response_str)
         return response
 
+    def pin_vcpus(self: 'Host') -> None:
+        """
+        Pin the vCPUs to the physical cores.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        # TODO we can get this list dynamically from either the kernel cmdline
+        #      or we read /sys/devices/system/cpu/isolated
+        isolated_cpus = [9, 10, 11, 21, 22, 23]
+        cpus_fast = self.qmp_exec('query-cpus-fast')['return']
+        vcpu_pids = [c['thread-id'] for c in cpus_fast]
+        for pid, cpu in zip(vcpu_pids, isolated_cpus):
+            _ = self.exec(f'taskset -pc {cpu} {pid}')
+
 
 class Guest(Server):
     """
