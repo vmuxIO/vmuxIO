@@ -704,11 +704,7 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
     host: Host = create_servers(conf, guest=False, loadgen=False)['host']
 
     try:
-        host.setup_admin_tap()
-        if args.interface == 'brtap':
-            host.setup_test_br_tap()
-        else:
-            host.setup_test_macvtap()
+        _setup_network(host, args.interface)
 
         disk = args.disk if args.disk else None
 
@@ -750,6 +746,16 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
     host.cleanup_network()
 
 
+def _setup_network(host: Host, interface: str) -> None:
+    host.setup_admin_bridge()
+    host.setup_admin_tap()
+    host.modprobe_test_iface_driver()
+    if interface == 'brtap':
+        host.setup_test_br_tap()
+    else:
+        host.setup_test_macvtap()
+
+
 def setup_network(args: Namespace, conf: ConfigParser) -> None:
     """
     Just setup the network for the guest.
@@ -777,12 +783,7 @@ def setup_network(args: Namespace, conf: ConfigParser) -> None:
     host: Host = create_servers(conf, guest=False, loadgen=False)['host']
 
     try:
-        host.setup_admin_bridge()
-        host.setup_admin_tap()
-        if args.interface == 'brtap':
-            host.setup_test_br_tap()
-        else:
-            host.setup_test_macvtap()
+        _setup_network(host, args.interface)
     except Exception:
         error('Failed to setup network')
         host.cleanup_network()
