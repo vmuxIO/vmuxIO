@@ -903,7 +903,7 @@ class Server(ABC):
         """
         if not iface:
             iface = self.test_iface
-        self.exec(f'sudo ip link set {iface} xdpgeneric off')
+        self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
 
     def upload_moonprogs(self: 'Server', source_dir: str):
         """
