@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sys/poll.h>
+#include <sys/eventfd.h>
 #include <string.h>
 #include <unistd.h>
 #include <map>
@@ -14,6 +16,7 @@
 #include <string>
 #include <exception>
 #include <stdexcept>
+#include <optional>
 
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
@@ -70,6 +73,8 @@ class VfioUserServer {
   public:
     vfu_ctx_t *vfu_ctx;
     std::string sock = "/tmp/peter.sock";
+    std::optional<size_t> run_ctx_pollfd_idx; // index of pollfd in pollfds
+    std::vector<struct pollfd> pollfds;
    
     VfioUserServer() {
     }
@@ -113,6 +118,24 @@ class VfioUserServer {
       }
 
       return 0;
+    }
+
+    void reset_poll_fd() {
+      auto pfd = (struct pollfd) {
+          .fd = vfu_get_poll_fd(vfu_ctx),
+          .events = POLLIN
+          };
+      if (this->run_ctx_pollfd_idx.has_value()) {
+        close(this->pollfds[this->run_ctx_pollfd_idx.value()].fd);
+        this->pollfds[this->run_ctx_pollfd_idx.value()] = pfd;
+      } else {
+        this->run_ctx_pollfd_idx = this->pollfds.size();
+        this->pollfds.push_back(pfd);
+      }
+    }
+
+    struct pollfd* get_poll_fd() {
+        return &this->pollfds[this->run_ctx_pollfd_idx.value()];
     }
 
   private:
@@ -220,19 +243,29 @@ int _main() {
       die("failed to attach device");
   }
 
+  vfu.reset_poll_fd();
+
   // runtime loop
 
   do {
-    ret = vfu_run_ctx(vfu.vfu_ctx);
-    if (ret == -1 && errno == EINTR) {
-      // interrupt happend during run and wants to be processed
+    ret = poll(vfu.pollfds.data(), vfu.pollfds.size(), 500);
+    if (ret < 0) {
+      die("failed to poll(2)");
     }
-  } while (ret == 0 && !quit.load());
-
-  if (ret == -1 &&
-      errno != ENOTCONN && errno != EINTR && errno != ESHUTDOWN) {
-      die("failed to realize device emulation");
-  }
+    if (vfu.get_poll_fd()->revents & (POLLIN)) {
+      ret = vfu_run_ctx(vfu.vfu_ctx);
+      if (ret < 0) {
+        if (errno == EAGAIN) {
+          continue;
+        }
+        if (errno == ENOTCONN) {
+          die("vfu_run_ctx() does not want to run anymore");
+        }
+        // perhaps is there also an ESHUTDOWN case?
+        die("vfu_run_ctx() failed (to realize device emulation)");
+      }
+    }
+  } while (!quit.load());
 
   // destruction is done by ~VfioUserServer
 
