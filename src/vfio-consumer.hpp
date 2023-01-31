@@ -10,8 +10,10 @@ class VfioConsumer {
   public:
     std::vector<struct vfio_region_info> regions;
     std::vector<struct vfio_irq_info> interrupts;
+    std::vector<int> irqfds; // eventfds for MSIX interrupts
     std::map<int, void*> mmio;
     struct vfio_iommu_type1_dma_map dma_map;
+
 
 
     // vfio fds
@@ -22,6 +24,7 @@ class VfioConsumer {
     ~VfioConsumer();
     int init();
     int init_mmio();
+    void init_msix();
 };
 
 #define VFIOC_SECRET 1337

@@ -2,12 +2,16 @@
 #include <linux/vfio.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
+#include <sys/eventfd.h>
+#include <sys/poll.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <signal.h>
 #include <err.h>
 #include <stdlib.h>
+#include <string.h>
+#include <signal.h>
 #include <vector>
 
 #include "src/util.hpp"
@@ -181,4 +185,41 @@ int VfioConsumer::init_mmio() {
     printf("Vfio: Mapping region BAR %d offset 0x%llx size 0x%llx\n", region.index, region.offset, region.size);
   }
   return 0;
+}
+
+void VfioConsumer::init_msix() {
+  int ret;
+
+  uint32_t count = this->interrupts[VFIO_PCI_MSIX_IRQ_INDEX].count;
+  if (count <= 0) {
+    die("We expect devices to use MSIX IRQs/interrupts. This one doesnt right now");
+  }
+
+  auto irq_set_buf_size = sizeof(struct vfio_irq_set) + sizeof(int) * count;
+  auto irq_set = (struct vfio_irq_set*) malloc(irq_set_buf_size);
+  irq_set->argsz = irq_set_buf_size;
+  irq_set->count = count;
+  irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD | VFIO_IRQ_SET_ACTION_TRIGGER;
+  irq_set->index = VFIO_PCI_MSIX_IRQ_INDEX;
+  irq_set->start = 0;
+
+  for (uint64_t i = 0; i < count; i++) {
+    int fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    if (fd < 0) {
+      if (errno == EMFILE) {
+        die("Cant create eventfd nr. %lu. Use `ulimit -n` to set a higher limit", i);
+      }
+      die("Failed to create eventfd");
+    }
+    this->irqfds.push_back(fd);
+  }
+
+  memcpy((int*)&irq_set->data, this->irqfds.data(), sizeof(int) * count);
+  ret = ioctl(this->device, VFIO_DEVICE_SET_IRQS, irq_set);
+  if (ret < 0) {
+    die("Cannot set eventfds for MSIX interrupts for device %d", this->device);
+  }
+
+  printf("Eventfds registered for %d MSIX interrupts.\n", count);
+
 }

@@ -74,6 +74,8 @@ class VfioUserServer {
     vfu_ctx_t *vfu_ctx;
     std::string sock = "/tmp/peter.sock";
     std::optional<size_t> run_ctx_pollfd_idx; // index of pollfd in pollfds
+    size_t irq_pollfd_idx;
+    size_t irq_pollfd_count;
     std::vector<struct pollfd> pollfds;
    
     VfioUserServer() {
@@ -81,7 +83,19 @@ class VfioUserServer {
 
     ~VfioUserServer() {
       int ret;
-      vfu_destroy_ctx(vfu_ctx);
+      vfu_destroy_ctx(vfu_ctx); // this should also close this->run_ctx_pollfd_idx.value()
+      
+      // close remaining fds
+      for (auto fd : this->pollfds) {
+        if (fd.fd == this->get_poll_fd()->fd) {
+          continue;
+        }
+        ret = close(fd.fd);
+        if (ret < 0)
+          warn("Cleanup: Cannot close fd %d", fd.fd);
+      }
+
+      // if vfu_destroy_ctx is successfull, this might not be needed
       ret = unlink(sock.c_str());
       if (ret < 0) {
         warn("Cleanup: Could not delete %s", sock.c_str());
@@ -104,7 +118,7 @@ class VfioUserServer {
       return 0;
     }
 
-    int add_irqs(std::vector<struct vfio_irq_info> irqs) {
+    int add_irqs(std::vector<struct vfio_irq_info> const irqs) {
       int ret;
       if (irqs.size() > VFU_DEV_REQ_IRQ - VFU_DEV_INTX_IRQ + 1)
         printf("Warning: got %u irq types, but we only know %d at most\n", (uint)irqs.size(), VFU_DEV_REQ_IRQ - VFU_DEV_INTX_IRQ + 1);
@@ -114,10 +128,28 @@ class VfioUserServer {
         if (ret < 0) {
           die("Cannot set up vfio-user irq (type %d, num %d)", irqs[i].index, irqs[i].count);
         }
+
+        int fd = eventfd(0, 0); // TODO close
+        if (fd < 0) {
+          die("Cannot create eventfd for irq.");
+        }
+        //ret = vfu_create_ioeventfd(this->vfu_ctx, 
         printf("Interrupt (type %d, num %d) set up.\n", irqs[i].index, irqs[i].count);
       }
 
       return 0;
+    }
+
+    void add_msix_pollfds(std::vector<int> const eventfds) {
+      this->irq_pollfd_idx = this->pollfds.size();
+      this->irq_pollfd_count = eventfds.size();
+      for (auto eventfd : eventfds) {
+        auto pfd = (struct pollfd) {
+            .fd = eventfd,
+            .events = POLLIN
+            };
+        this->pollfds.push_back(pfd);
+      }
     }
 
     void reset_poll_fd() {
@@ -185,10 +217,12 @@ int _main() {
   // init vfio
   
   VfioConsumer vfioc;
+
   ret = vfioc.init();
   if (ret < 0) {
     die("failed to initialize vfio consumer");
   }
+  
   ret = vfioc.init_mmio();
   if (ret < 0) {
     die("failed to initialize vfio mmio mappings");
@@ -221,15 +255,20 @@ int _main() {
 
   vfu_pci_set_id(vfu.vfu_ctx, 0xdead, 0xbeef, 0xcafe, 0xbabe); // TODO mirror real one
 
-  // set up vfio-user DMA and irqs
+  // set up vfio-user DMA
 
   ret = vfu.add_regions(vfioc.regions, vfioc.device);
   if (ret < 0)
     die("failed to add regions");
 
+  // set up irqs 
+
   ret = vfu.add_irqs(vfioc.interrupts);
   if (ret < 0)
     die("failed to add irqs");
+
+  vfioc.init_msix();
+  vfu.add_msix_pollfds(vfioc.irqfds);
 
   // finalize
 
@@ -237,6 +276,8 @@ int _main() {
   if (ret < 0) {
       die("failed to realize device");
   }
+
+  printf("Waiting for qemu to attach...\n");
 
   ret = vfu_attach_ctx(vfu.vfu_ctx);
   if (ret < 0) {
@@ -246,12 +287,16 @@ int _main() {
   vfu.reset_poll_fd();
 
   // runtime loop
+  
+  // in our case this is msix (type 2) interrupts (0-1023)
+  //ret = vfu_irq_trigger(vfu.vfu_ctx, 0xFFFFFFFF);
 
   do {
     ret = poll(vfu.pollfds.data(), vfu.pollfds.size(), 500);
     if (ret < 0) {
       die("failed to poll(2)");
     }
+
     if (vfu.get_poll_fd()->revents & (POLLIN)) {
       ret = vfu_run_ctx(vfu.vfu_ctx);
       if (ret < 0) {
@@ -263,6 +308,20 @@ int _main() {
         }
         // perhaps is there also an ESHUTDOWN case?
         die("vfu_run_ctx() failed (to realize device emulation)");
+      }
+    }
+
+    // check for MSIX interrupts to pass on
+    for (uint64_t i = vfu.irq_pollfd_idx; i < vfu.irq_pollfd_idx + vfu.irq_pollfd_count; i++) {
+      struct pollfd *pfd = &(vfu.pollfds[i]);
+      if (pfd->revents & (POLLIN)) {
+        // pass on (trigger) interrupt
+        size_t irq_subindex = i - vfu.irq_pollfd_idx;
+        ret = vfu_irq_trigger(vfu.vfu_ctx, irq_subindex);
+        if (ret < 0) {
+          die("Cannot trigger MSIX interrupt %lu", irq_subindex);
+        }
+        break;
       }
     }
   } while (!quit.load());
