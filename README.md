@@ -42,6 +42,20 @@ just ssh
 just vm-update host-config
 ```
 
+## vMux demo
+
+Start vmux `sudo ./build/vmux` and qemu using `just vm-libvfio-user`. Connect to the VM `just ssh` and run:
+
+```
+# read reset status (count)
+devmem 0xfa0B8188
+# write to register to trigger device reset
+devmem 0xfa0b8190 32 1
+# reset status has changed (bit 7:6 incremented)
+devmem 0xfa0B8188
+
+```
+
 
 ## Notes on IOMMU/VFs
 
