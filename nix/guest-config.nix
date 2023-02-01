@@ -6,23 +6,41 @@
     address = "192.168.56.20";
     prefixLength = 24;
   } ];
+  networking.interfaces.eth1.useDHCP = false;
   networking.defaultGateway = "192.168.56.1";
+  networking.nameservers = [ "10.156.33.53" ];
   networking.hostName = "guest";
-  networking.domain = "gierens.de";
+  networking.domain = "vmux.dse.in.tum.de";
 
   services.sshd.enable = true;
 
-  networking.firewall.allowedTCPPorts = [22];
+  networking.firewall.enable = false;
+  # networking.firewall.allowedTCPPorts = [22];
 
-  users.users.root.password = "password";
+  users.users.root.password = "ach2Chai8muo";
+  users.users.root.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBevyJ5i0237DNoS29F9aii2AJwrSxXNz3hP61hWXfRl sandro@reaper.gierens.de"
+  ];
   services.openssh.permitRootLogin = lib.mkDefault "yes";
   services.getty.autologinUser = lib.mkDefault "root";
 
-  # fileSystems."/mnt" = {
-  #   device = "home";
-  #   fsType = "9p";
-  #   options = [ "trans=virtio" "nofail" "msize=104857600" ];
+  # users.extraUsers.gierens = {
+  #   isNormalUser = true;
+  #   home = "/home/gierens";
+  #   extraGroups = [ "gierens" "sudo" ];
   # };
+
+  fileSystems."/home/gierens" = {
+    device = "home";
+    fsType = "9p";
+    options = [ "trans=virtio" "nofail" "msize=104857600" ];
+  };
+
+  fileSystems."/nix/store" = {
+    device = "nixstore";
+    fsType = "9p";
+    options = [ "trans=virtio" "nofail" "msize=104857600" ];
+  };
 
   time.timeZone = "Europe/Berlin";
   i18n.defaultLocale = "en_US.UTF-8";
@@ -50,6 +68,10 @@
     htop
     tmux
     busybox
+    iperf
+    dpdk
+    ethtool
+    stress
   ];
 
   # boot.kernelPackages = let
@@ -114,7 +136,15 @@
   boot.kernelParams = [
     "nokaslr"
     "iomem=relaxed"
+    # spdk/dpdk hugepages
+    "default_hugepagesz=2MB"
+    "hugepagesz=2MB"
+    "hugepages=1000"
   ];
+  boot.extraModulePackages = [
+    config.boot.kernelPackages.dpdk-kmods
+  ];
+  boot.kernelModules = ["igb_uio"];
 
   # system.activationScripts = {
   #   linkHome = {
