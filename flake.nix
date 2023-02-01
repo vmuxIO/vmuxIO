@@ -1,6 +1,14 @@
 {
   description = "A very basic flake";
 
+  nixConfig.extra-substituters = [
+    "https://cache.garnix.io"
+  ];
+
+  nixConfig.extra-trusted-public-keys = [
+    "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
+  ];
+
   inputs = {
     nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
     nixpkgs-stable.url = github:NixOS/nixpkgs/nixos-22.11;
