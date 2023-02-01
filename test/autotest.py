@@ -707,9 +707,11 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
         _setup_network(host, args.interface)
 
         disk = args.disk if args.disk else None
+        qemu_path = args.qemu_path \
+            if args.qemu_path else conf['host']['qemu_path']
 
         host.run_guest(args.interface, args.machine, disk, args.debug,
-                       args.ioregionfd, args.qemu_path, args.vhost,
+                       args.ioregionfd, qemu_path, args.vhost,
                        args.rx_queue_size, args.tx_queue_size)
     except Exception:
         host.kill_guest()
