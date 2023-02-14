@@ -113,7 +113,7 @@
         }) ];
         format = "qcow";
       };
-      host-extkern-image = nixos-generators.nixosGenerate {
+      host-extkern-image-old = nixos-generators.nixosGenerate {
         inherit pkgs;
         modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
@@ -121,7 +121,16 @@
           inherit (self) config;
           extkern = true;
         }) ];
-        format = "qcow";
+        #format = "qcow";
+        partitionTableType = "none";
+      };
+      host-extkern-image = pkgs.callPackage ./nix/nixos-image.nix { 
+        configuration = (import ./nix/host-config.nix {
+          inherit pkgs;
+          inherit (pkgs) lib;
+          inherit (self) config;
+          extkern = true;
+        }); 
       };
       guest-image = nixos-generators.nixosGenerate {
         inherit pkgs;
@@ -133,6 +142,7 @@
     devShells = let 
       common_deps = with pkgs; [
         just
+        fzf
         iperf2
         nixos-generators.packages.${system}.nixos-generate
         ccls # c lang serv

@@ -1,5 +1,5 @@
 proot := justfile_directory()
-host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
+host_extkern_image :=  proot + "/VMs/host-extkern-image.img"
 qemu_ssh_port := "2222"
 user := `whoami`
 # vmuxSock := "/tmp/vmux-" + user + ".sock"
@@ -67,13 +67,15 @@ vm-extkern EXTRA_CMDLINE="":
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
-        -hda {{host_extkern_image}} \
-        -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
-        -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
-        -append "root=/dev/sda console=ttyS0 {{EXTRA_CMDLINE}}" \
+        -drive file={{host_extkern_image}},id=mydrive,if=virtio \
+        -kernel {{proot}}/VMs/kernel/bzImage \
+        -append "root=/dev/vda console=ttyS0 {{EXTRA_CMDLINE}}" \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -nographic
+# -hda {{host_extkern_image}} \
+#-kernel /boot/EFI/nixos/c48djs903fn9c6hfp3wnhyv2ashl3h03-linux-6.1.8-bzImage.efi \
+#-initrd /boot/EFI/nixos/2pxdk7rc8rqlcckdvjswbz8pwrc8mckb-initrd-linux-6.0.19-initrd.efi \
 # -drive file={{host_extkern_image}} \
 #-kernel {{proot}}/VMs/kernel/bzImage \
 # -kernel {{APP}} -nographic
@@ -131,7 +133,7 @@ vm-overwrite:
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
   nix build -o {{proot}}/VMs/host-extkern-image-ro .#host-extkern-image # read only
-  install -D -m644 {{proot}}/VMs/host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  install -D -m644 {{proot}}/VMs/host-extkern-image-ro/nixos.img {{host_extkern_image}}
   nix build -o {{proot}}/VMs/host-image-ro .#host-image # read only
   install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image.qcow2
 
