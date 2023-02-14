@@ -5,7 +5,7 @@
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from argcomplete import autocomplete
-from configparser import ConfigParser
+from configparser import ConfigParser, ExtendedInterpolation
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from colorlog import ColoredFormatter, StreamHandler, getLogger
@@ -437,7 +437,7 @@ def setup_and_parse_config(args: Namespace) -> ConfigParser:
     >>> setup_and_parse_config(args)
     ConfigParser(...)
     """
-    conf = ConfigParser()
+    conf = ConfigParser(interpolation=ExtendedInterpolation())
     conf.read(args.config.name)
     debug(f'configuration read from config file: {conf._sections}')
     return conf
