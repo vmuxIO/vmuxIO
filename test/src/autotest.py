@@ -966,6 +966,8 @@ def test_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
         info(f'Running tests from {test_conf_path}')
 
         for section in test_conf.sections():
+            if section == 'DEFAULT':
+                continue
             info(f'Running tests from section {section}')
 
             tconf = test_conf[section]
