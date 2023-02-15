@@ -5,7 +5,7 @@
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from argcomplete import autocomplete
-from configparser import ConfigParser
+from configparser import ConfigParser, ExtendedInterpolation
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from colorlog import ColoredFormatter, StreamHandler, getLogger
@@ -245,8 +245,8 @@ def setup_parser() -> ArgumentParser:
     run_guest_parser.add_argument('-q',
                                   '--qemu-path',
                                   type=str,
-                                  default='/home/gierens/qemu-build',
-                                  help='QEMU build path',
+                                  help='QEMU build path, overwrites the ' +
+                                       'config file setting.',
                                   )
     kill_guest_parser = subparsers.add_parser(
         'kill-guest',
@@ -304,88 +304,6 @@ def setup_parser() -> ArgumentParser:
                                  type=FileType('r'),
                                  help='Test configuration file paths',
                                  )
-    test_cli_parser = subparsers.add_parser(
-        'test-load-lat-cli',
-        formatter_class=ArgumentDefaultsHelpFormatter,
-        help='Run load latency tests defined in the command line.'
-    )
-    test_cli_parser.add_argument('-N',
-                                 '--name',
-                                 type=str,
-                                 default='l2-load-latency',
-                                 help='Test name.',
-                                 )
-    test_cli_parser.add_argument('-i',
-                                 '--interfaces',
-                                 nargs='+',
-                                 default=['pnic'],
-                                 help='Test network interface type. ' +
-                                      'Can be pnic, brtap or macvtap.',
-                                 )
-    test_cli_parser.add_argument('-o',
-                                 '--outdir',
-                                 type=writable_dir,
-                                 default='./outputs',
-                                 help='Test output directory.',
-                                 )
-    test_cli_parser.add_argument('-f',
-                                 '--reflector',
-                                 type=str,
-                                 choices=['xdp', 'moongen'],
-                                 default='xdp',
-                                 help='Test network interface type. ' +
-                                      'Can be pnic, brtap or macvtap.',
-                                 )
-    test_cli_parser.add_argument('-L',
-                                 '--loadprog',
-                                 type=FileType('r'),
-                                 default='./moonprogs/l2-load-latency.lua',
-                                 help='Load generator program.',
-                                 )
-    test_cli_parser.add_argument('-R',
-                                 '--reflprog',
-                                 type=FileType('r'),
-                                 default='./moonprogs/reflector.lua',
-                                 help='Reflector program.',
-                                 )
-    test_cli_parser.add_argument('-r',
-                                 '--rates',
-                                 nargs='+',
-                                 default=[10000],
-                                 help='List of throughput rates.',
-                                 )
-    test_cli_parser.add_argument('-T',
-                                 '--threads',
-                                 nargs='+',
-                                 default=[1],
-                                 help='List of number of threads.',
-                                 )
-    test_cli_parser.add_argument('-u',
-                                 '--runtime',
-                                 type=int,
-                                 default=60,
-                                 help='Test runtime.',
-                                 )
-    test_cli_parser.add_argument('-e',
-                                 '--reps',
-                                 type=int,
-                                 default=1,
-                                 help='Number of repetitions.',
-                                 )
-    test_cli_parser.add_argument('-a',
-                                 '--accumulate',
-                                 action='store_true',
-                                 default=False,
-                                 help='Accumulate the histograms of the ' +
-                                      'repetitions.',
-                                 )
-    test_cli_parser.add_argument('--yes-i-want-to-run-this',
-                                 action='store_true',
-                                 default=False,
-                                 help='''Confirm that you want to run this
-                                      deprecated code.''',
-                                 )
-    # TODO maybe we want to alter test parameters directly via the arguments
     shell_parser = subparsers.add_parser(
         'shell',
         formatter_class=ArgumentDefaultsHelpFormatter,
@@ -519,7 +437,7 @@ def setup_and_parse_config(args: Namespace) -> ConfigParser:
     >>> setup_and_parse_config(args)
     ConfigParser(...)
     """
-    conf = ConfigParser()
+    conf = ConfigParser(interpolation=ExtendedInterpolation())
     conf.read(args.config.name)
     debug(f'configuration read from config file: {conf._sections}')
     return conf
@@ -704,16 +622,14 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
     host: Host = create_servers(conf, guest=False, loadgen=False)['host']
 
     try:
-        host.setup_admin_tap()
-        if args.interface == 'brtap':
-            host.setup_test_br_tap()
-        else:
-            host.setup_test_macvtap()
+        _setup_network(host, args.interface)
 
         disk = args.disk if args.disk else None
+        qemu_path = args.qemu_path \
+            if args.qemu_path else conf['host']['qemu_path']
 
         host.run_guest(args.interface, args.machine, disk, args.debug,
-                       args.ioregionfd, args.qemu_path, args.vhost,
+                       args.ioregionfd, qemu_path, args.vhost,
                        args.rx_queue_size, args.tx_queue_size)
     except Exception:
         host.kill_guest()
@@ -750,6 +666,16 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
     host.cleanup_network()
 
 
+def _setup_network(host: Host, interface: str) -> None:
+    host.setup_admin_bridge()
+    host.setup_admin_tap()
+    host.modprobe_test_iface_driver()
+    if interface == 'brtap':
+        host.setup_test_br_tap()
+    else:
+        host.setup_test_macvtap()
+
+
 def setup_network(args: Namespace, conf: ConfigParser) -> None:
     """
     Just setup the network for the guest.
@@ -777,12 +703,7 @@ def setup_network(args: Namespace, conf: ConfigParser) -> None:
     host: Host = create_servers(conf, guest=False, loadgen=False)['host']
 
     try:
-        host.setup_admin_bridge()
-        host.setup_admin_tap()
-        if args.interface == 'brtap':
-            host.setup_test_br_tap()
-        else:
-            host.setup_test_macvtap()
+        _setup_network(host, args.interface)
     except Exception:
         error('Failed to setup network')
         host.cleanup_network()
@@ -1015,230 +936,6 @@ def accumulate_all_histograms(
                 )
 
 
-def test_load_latency(
-    name: str,
-    interfaces: list[str],
-    outdir: str,
-    reflector: str,
-    loadprog: str,
-    reflprog: str,
-    rates: list[int],
-    threads: list[int],
-    runtime: int,
-    reps: int,
-    accumulate: bool,
-    args: Namespace,
-    conf: ConfigParser
-) -> None:
-    """
-    Run the load latency tests.
-
-    Parameters
-    ----------
-    name : str
-        The name of the test.
-    interfaces : list[str]
-        The interfaces to use.
-    outdir : str
-        The output directory.
-    reflector : str
-        The reflector to use. (xdp or moongen)
-    loadprog : str
-        The moongen load program.
-    reflprog : str
-        The moongen reflector program. (only used with moongen reflector)
-    rates : list[int]
-        The rates to use.
-    threads : list[int]
-        The threads to use.
-    runtime : int
-        The runtime to use.
-    reps : int
-        The number of repetitions to use.
-    accumulate : bool
-        Whether to accumulate the histogram of multiple repetitions.
-
-    Returns
-    -------
-    """
-    # some sanity checks
-    if reflector not in ['xdp', 'moongen']:
-        error(f'Unknown reflector: {reflector}')
-        return
-    # TODO once we also test the host bridge and macvtap we need to check
-    #      that only xdp is used as reflector
-
-    info('Running test:')
-    info(f'  name      : {name}')
-    info(f'  interfaces: {interfaces}')
-    info(f'  outdir    : {outdir}')
-    info(f'  reflector : {reflector}')
-    info(f'  loadprog  : {loadprog}')
-    info(f'  reflprog  : {reflprog}')
-    info(f'  rates     : {rates}')
-    info(f'  threads   : {threads}')
-    info(f'  runtime   : {runtime}')
-    info(f'  reps      : {reps}')
-    info(f'  accumulate: {accumulate}')
-    # TODO name is not used
-    # TODO loadprog is not used
-    # TODO reflprog is not used
-
-    # check which test results are still missing
-    tests_todo = {
-        interface: {
-            rate: {
-                nthreads: {
-                    rep: not test_done(outdir, interface, reflector, rate,
-                                       nthreads, rep)
-                    for rep in range(reps)
-                }
-                for nthreads in (threads if interface != 'macvtap' else [1])
-            }
-            for rate in rates
-        }
-        for interface in interfaces
-    }
-
-    # check which interfaces are still needed
-    interfaces_needed = []
-    for interface in interfaces:
-        needed = False
-        for rate in rates:
-            for nthreads in threads:
-                needed = any(tests_todo[interface][rate][nthreads].values())
-                if needed:
-                    break
-            if needed:
-                break
-        if needed:
-            interfaces_needed.append(interface)
-    if not interfaces_needed:
-        info('All tests are already done.')
-        # accumulate the histogram of multiple repetitions here
-        if accumulate:
-            accumulate_all_histograms(outdir, reflector, tests_todo)
-        return
-
-    # create server
-    host: Host
-    guest: Guest
-    loadgen: LoadGen
-    host, guest, loadgen = create_servers(conf).values()
-
-    # prepare loadgen
-    loadgen.bind_test_iface()
-    loadgen.setup_hugetlbfs()
-
-    # clean up guest and network first
-    try:
-        host.kill_guest()
-    except Exception:
-        pass
-    host.cleanup_network()
-
-    # loop over needed interfaces
-    for interface in interfaces_needed:
-        # setup interface
-        dut: Server
-        mac: str
-        if interface in ['brtap', 'macvtap']:
-            disk = conf['guest']['root_disk_file']
-            host.setup_admin_tap()
-            if interface == 'brtap':
-                host.setup_test_br_tap()
-            else:
-                host.setup_test_macvtap()
-            host.run_guest(net_type=interface, machine_type='pc',
-                           root_disk=disk)
-            dut = guest
-        else:
-            dut = host
-
-        try:
-            dut.wait_for_connection()
-        except TimeoutError:
-            error(f'Waiting for connection to DUT {dut.fqdn} timed out.')
-            return
-
-        dut.detect_test_iface()
-
-        # start the reflector
-        # dut.stop_moongen_reflector()
-        if reflector == 'xdp':
-            dut.start_xdp_reflector()
-        elif reflector == 'moongen':
-            dut.bind_test_iface()
-            dut.setup_hugetlbfs()
-            dut.start_moongen_reflector()
-        sleep(5)
-
-        # run missing tests for interface one by one and download test results
-        for rate in rates:
-            for nthreads in threads:
-                for rep in range(reps):
-                    if not tests_todo[interface][rate][nthreads][rep]:
-                        debug(f'Skipping test: {interface} {reflector} ' +
-                              f'{rate} {nthreads} {rep}, already done')
-                        continue
-                    info(f'Running test: {interface} {reflector} {rate} ' +
-                         f'{nthreads} {rep}')
-                    # run test
-                    remote_output_file = path_join(loadgen.moongen_dir,
-                                                   'output.log')
-                    remote_histogram_file = path_join(loadgen.moongen_dir,
-                                                      'histogram.csv')
-                    try:
-                        loadgen.exec(f'rm -f {remote_output_file} ' +
-                                     f'{remote_histogram_file}')
-                        loadgen.run_l2_load_latency(dut.test_iface_mac,
-                                                    rate, runtime)
-                    except Exception as e:
-                        error(f'Failed to run test: {interface} {reflector} ' +
-                              f'{rate} {nthreads} {rep} due to exception: {e}')
-                        continue
-
-                    sleep(runtime + 5)
-                    try:
-                        loadgen.wait_for_success(f'ls {remote_histogram_file}')
-                    except TimeoutError:
-                        error('Waiting for histogram file to appear timed ' +
-                              f'out for test: {interface} {reflector} ' +
-                              f'{rate} {nthreads} {rep}')
-                        continue
-                    sleep(1)
-                    # TODO here a tmux_exists function would come in handy
-
-                    # TODO stopping still fails when the tmux session
-                    # does not exist
-                    # loadgen.stop_l2_load_latency()
-
-                    # download results
-                    output_file = output_filepath(outdir, interface, reflector,
-                                                  rate, nthreads, rep)
-                    histogram_file = histogram_filepath(outdir, interface,
-                                                        reflector, rate,
-                                                        nthreads, rep)
-                    loadgen.copy_from(remote_output_file, output_file)
-                    loadgen.copy_from(remote_histogram_file, histogram_file)
-
-        # stop the reflector
-        if reflector == 'xdp':
-            dut.stop_xdp_reflector()
-        elif reflector == 'moongen':
-            dut.stop_moongen_reflector()
-        # TODO try again when connection is lost
-
-        # teardown interface
-        if interface in ['brtap', 'macvtap']:
-            host.kill_guest()
-        host.cleanup_network()
-
-    # accumulate the histogram of multiple repetitions here
-    if accumulate:
-        accumulate_all_histograms(outdir, reflector, tests_todo)
-
-
 def test_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
     """
     Run the load latency tests defined in a test config file.
@@ -1269,6 +966,8 @@ def test_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
         info(f'Running tests from {test_conf_path}')
 
         for section in test_conf.sections():
+            if section == 'DEFAULT':
+                continue
             info(f'Running tests from section {section}')
 
             tconf = test_conf[section]
@@ -1335,45 +1034,6 @@ def acc_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
             )
             generator.generate(host)
             generator.force_accumulate()
-
-
-def test_load_lat_cli(args: Namespace, conf: ConfigParser) -> None:
-    """
-    Run the load latency tests defined in the command line.
-
-    This a command function and is therefore called by execute_command().
-
-    Parameters
-    ----------
-    args : Namespace
-        The argparse namespace containing the parsed arguments.
-    conf : ConfigParser
-        The config parser.
-
-    Returns
-    -------
-    """
-    warning('This command uses deprecated code. Please consider using the ' +
-            'test-load-lat-file command instead.')
-    if not args.yes_i_want_to_run_this:
-        error('This command is deprecated and can only be run with ' +
-              '--yes-i-want-to-run-this')
-        return
-    test_load_latency(
-        args.name,
-        args.interfaces,
-        args.outdir,
-        args.reflector,
-        args.loadprog.name,
-        args.reflprog.name,
-        args.rates,
-        args.threads,
-        args.runtime,
-        args.reps,
-        args.accumulate,
-        args,
-        conf
-    )
 
 
 def shell(args: Namespace, conf: ConfigParser) -> None:

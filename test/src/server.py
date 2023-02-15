@@ -903,7 +903,7 @@ class Server(ABC):
         """
         if not iface:
             iface = self.test_iface
-        self.exec(f'sudo ip link set {iface} xdpgeneric off')
+        self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
 
     def upload_moonprogs(self: 'Server', source_dir: str):
         """
@@ -920,6 +920,18 @@ class Server(ABC):
         self.exec(f'mkdir -p {self.moonprogs_dir}')
         for file in listdir(source_dir):
             self.copy_to(path_join(source_dir, file), self.moonprogs_dir)
+
+    def modprobe_test_iface_driver(self):
+        """
+        Modprobe the test interface driver.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.exec(f'sudo modprobe {self.test_iface_driv}')
 
 
 class Host(Server):
