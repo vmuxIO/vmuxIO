@@ -1,4 +1,6 @@
-{ config, lib, pkgs, modulesPath, ... }:
+{ config, lib, pkgs, 
+extkern ? false, # whether to use externally, manually built kernel
+... }:
 {
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = false;
