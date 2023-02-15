@@ -29,3 +29,22 @@ This is vmuxIO's subproject for automated testing (autotest).
   to create iptables NAT rules for guest's internet access and SSH exposure
   via port forwarding. The latter is only necessary if you use autotest
   remotely.
+
+## How To Use It
+
+`autotest` has several commands:
+
+- **ping**: Ping host, loadgen and guest machine.
+- **run-guest**: Run the guest on the host.
+- **kill-guest**: Kill the guest.
+- **setup-network**: Just setup the network for the guest.
+- **teardown-network**: Teardown the guest network, this can sometimes help after
+  some error.
+- **test-load-lat-file**: Run load latency tests defined in the test config file.
+- **acc-load-lat-file**: force accumulation of all load latency test repetitions.
+- **shell**: Enter a Python3 shell with access to the server objects for debugging.
+- **upload-moonprogs**: Upload the MoonGen programs to the servers.
+
+Note that `autotest` and all its commands have a `-h/--help` option to show the
+usage. Also note the `-v/--verbose` argument which can be specified zero to 3
+times to set the verbosity of the output.
