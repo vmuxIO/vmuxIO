@@ -21,4 +21,5 @@ jobs:
     #    signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
     - name: List flake structure
       run: nix flake show
-    - run: nix flake check -vL
+    # takes too long and is made obsolete by garnix.io:
+    # - run: nix flake check -vL

@@ -23,7 +23,10 @@
   # networking.firewall.allowedTCPPorts = [22];
 
   users.users.root.password = "password";
-  services.openssh.permitRootLogin = lib.mkDefault "yes";
+  services.openssh.settings.permitRootLogin = lib.mkDefault "yes";
+  users.users.root.openssh.authorizedKeys.keys = [
+    (builtins.readFile ./ssh_key.pub)
+  ];
   services.getty.autologinUser = lib.mkDefault "root";
 
   fileSystems."/mnt" = {

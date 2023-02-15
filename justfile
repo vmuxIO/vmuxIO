@@ -1,6 +1,9 @@
 proot := justfile_directory()
 host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
 qemu_ssh_port := "2222"
+user := `whoami`
+# vmuxSock := "/tmp/vmux-" + user + ".sock"
+vmuxSock := "/tmp/peter.sock"
 
 default:
   @just --choose
@@ -8,6 +11,9 @@ default:
 # show help
 help:
   just --list
+
+vmux:
+  sudo ./build/vmux {{vmuxSock}}
 
 # connect to `just qemu` vm
 ssh COMMAND="":
@@ -48,7 +54,7 @@ vm-libvfio-user:
         -drive file={{proot}}/VMs/host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
-        -device vfio-user-pci,socket=/tmp/peter.sock \
+        -device vfio-user-pci,socket={{vmuxSock}} \
         -nographic
 
 # not working
@@ -114,7 +120,7 @@ prepare HOSTYAML:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 build:
-  meson build
+  meson build --wipe
   meson compile -C build
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21

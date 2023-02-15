@@ -1,9 +1,11 @@
-{ qemu_full
+{ pkgs2211 
+, qemu_full
 , fetchFromGitHub
 , libndctl
 , json_c
 , cmocka }:
-qemu_full.overrideAttrs ( new: old: {
+with pkgs2211;
+pkgs2211.qemu_full.overrideAttrs ( new: old: {
   src = fetchFromGitHub {
     owner = "oracle";
     repo = "qemu";
