@@ -583,7 +583,7 @@ class Server(ABC):
         >>> server.is_nic_dpdk_bound('enp176s0')
         True
         """
-        return self.get_driver_for_device(self.test_iface_addr) == 'igb_uio'
+        return self.get_driver_for_device(self.test_iface_addr) == 'vfio-pci'
 
     def is_test_iface_bound(self: 'Server') -> bool:
         """
@@ -597,7 +597,7 @@ class Server(ABC):
         bool
             True if the test interface is bound to DPDK.
         """
-        return self.get_driver_for_device(self.test_iface_addr) == 'igb_uio'
+        return self.get_driver_for_device(self.test_iface_addr) == 'vfio-pci'
 
     def bind_device(self: 'Server', dev_addr: str, driver: str) -> None:
         """
@@ -678,7 +678,7 @@ class Server(ABC):
             return
 
         # bind test interface to DPDK
-        self.bind_device(self.test_iface_addr, 'igb_uio')
+        self.bind_device(self.test_iface_addr, 'vfio-pci')
 
         # get the test interface id
         self.detect_test_iface_id()
@@ -705,7 +705,7 @@ class Server(ABC):
         Returns
         -------
         """
-        cmd = "dpdk-devbind.py -s | grep 'drv=igb_uio' || true"
+        cmd = "dpdk-devbind.py -s | grep 'drv=vfio-pci' || true"
         output: str
         if self.nixos:
             output = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
