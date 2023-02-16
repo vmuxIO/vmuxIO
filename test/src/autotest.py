@@ -537,7 +537,8 @@ def create_servers(conf: ConfigParser,
             conf['guest']['test_iface_mac'],
             conf['host']['moongen_dir'],
             conf['host']['moonprogs_dir'],
-            conf['host']['xdp_reflector_dir']
+            conf['host']['xdp_reflector_dir'],
+            ssh_config=conf.get('host', 'ssh_config', fallback=None)
         )
     if guest:
         servers['guest'] = Guest(
@@ -548,7 +549,8 @@ def create_servers(conf: ConfigParser,
             conf['guest']['test_iface_driv'],
             conf['guest']['moongen_dir'],
             conf['guest']['moonprogs_dir'],
-            conf['guest']['xdp_reflector_dir']
+            conf['guest']['xdp_reflector_dir'],
+            ssh_config=conf.get('host', 'ssh_config', fallback=None)
         )
     if loadgen:
         servers['loadgen'] = LoadGen(
@@ -558,7 +560,8 @@ def create_servers(conf: ConfigParser,
             conf['loadgen']['test_iface_mac'],
             conf['loadgen']['test_iface_driv'],
             conf['loadgen']['moongen_dir'],
-            conf['loadgen']['moonprogs_dir']
+            conf['loadgen']['moonprogs_dir'],
+            ssh_config=conf.get('host', 'ssh_config', fallback=None)
         )
     return servers
 

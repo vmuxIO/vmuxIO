@@ -7,6 +7,7 @@ from datetime import datetime
 from abc import ABC
 from os import listdir
 from os.path import join as path_join
+from typing import Optional
 
 
 @dataclass
@@ -77,6 +78,7 @@ class Server(ABC):
     xdp_reflector_dir: str
     localhost: bool = False
     nixos: bool = False
+    ssh_config: Optional[str] = None
 
     def __post_init__(self: 'Server') -> None:
         """
@@ -185,7 +187,11 @@ class Server(ABC):
         exec : Execute command on the server.
         __exec_local : Execute a command on the localhost.
         """
-        return check_output(f"ssh {self.fqdn} '{command}'",
+        options = ""
+        if self.ssh_config is not None:
+            options = f" -F {self.ssh_config}"
+
+        return check_output(f"ssh{options} {self.fqdn} '{command}'",
                             stderr=STDOUT, shell=True).decode('utf-8')
 
     def exec(self: 'Server', command: str) -> str:
@@ -980,7 +986,8 @@ class Host(Server):
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
-                 localhost: bool = False) -> None:
+                 localhost: bool = False,
+                 ssh_config: Optional[str] = None) -> None:
         """
         Initialize the Host class.
 
@@ -1022,6 +1029,8 @@ class Host(Server):
             The directory of the xdp reflector installation.
         localhost : bool
             True if the host is localhost.
+        ssh_config : Optional[str]
+            Path to local ssh config to use to connect with.
 
         Returns
         -------
@@ -1039,7 +1048,7 @@ class Host(Server):
         """
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
                          test_iface_driv, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir, localhost)
+                         xdp_reflector_dir, localhost, ssh_config=ssh_config)
         self.admin_bridge = admin_bridge
         self.admin_bridge_ip_net = admin_bridge_ip_net
         self.admin_tap = admin_tap
@@ -1252,7 +1261,7 @@ class Host(Server):
         disk_path = self.guest_root_disk_path
         if root_disk:
             disk_path = root_disk
-        home = self.gethome()
+        home = "/scratch/okelmann" # TODO make config var in autotest.cfg
         self.tmux_new(
             'qemu',
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
@@ -1260,7 +1269,7 @@ class Host(Server):
             f' -machine {machine_type}' +
             ' -cpu host' +
             ' -smp 4' +
-            ' -m 4096' +
+            ' -m 8100' +
             ' -enable-kvm' +
             f' -drive id=root,format=qcow2,file={disk_path},'
             'if=none,cache=none' +
@@ -1348,6 +1357,7 @@ class Guest(Server):
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
+                 ssh_config: Optional[str] = None,
                  ) -> None:
         """
         Initialize the Guest class.
@@ -1372,6 +1382,8 @@ class Guest(Server):
             The directory of the XDP Reflector installation.
         localhost : bool
             True if the host is localhost.
+        ssh_config : Optional[str]
+            Path to local ssh config to use to connect with.
 
         Returns
         -------
@@ -1389,7 +1401,7 @@ class Guest(Server):
         """
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
                          test_iface_driv, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir)
+                         xdp_reflector_dir, ssh_config=ssh_config)
 
     def __post_init__(self: 'Guest') -> None:
         """
@@ -1443,8 +1455,9 @@ class LoadGen(Server):
                  test_iface_driv: str,
                  moongen_dir: str,
                  moonprogs_dir: str,
-                 xdp_reflector_dir: str = None,
-                 localhost: bool = False) -> None:
+                 xdp_reflector_dir: Optional[str] = None,
+                 localhost: bool = False,
+                 ssh_config: Optional[str] = None) -> None:
         """
         Initialize the LoadGen class.
 
@@ -1468,6 +1481,8 @@ class LoadGen(Server):
             The directory of the XDP Reflector installation.
         localhost : bool
             True if the host is localhost.
+        ssh_config : Optional[str]
+            Path to local ssh config to use to connect with.
 
         Returns
         -------
@@ -1485,7 +1500,7 @@ class LoadGen(Server):
         """
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
                          test_iface_driv, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir, localhost)
+                         xdp_reflector_dir, localhost, ssh_config=ssh_config)
 
     def run_l2_load_latency(self: 'LoadGen',
                             mac: str,
@@ -1528,7 +1543,7 @@ class LoadGen(Server):
                       f'{self.moonprogs_dir}/l2-load-latency.lua ' +
                       f'-r {rate} -f {histfile} -t {runtime} -s {size} ' +
                       f'{self._test_iface_id} {mac} ' +
-                      f'2>&1 > {outfile}')
+                      f'2>&1 | tee {outfile}; sleep 10000') # TODO
 
     def stop_l2_load_latency(self: 'Server'):
         """
