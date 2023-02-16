@@ -1,8 +1,8 @@
-{self, pkgs, ...}: pkgs.clangStdenv.mkDerivation {
+{xdp-reflector-src, pkgs, ...}: pkgs.clangStdenv.mkDerivation {
   pname = "xdp-reflector";
   version = "2022.08.03";
 
-  src = self.inputs.xdp-reflector;
+  src = xdp-reflector-src;
 
   buildInputs = with pkgs; [
     llvm

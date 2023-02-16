@@ -119,21 +119,30 @@ hardware_loopback_test ETH1 ETH2 IP1 IP2 PERFARGS="" PREFIXSIZE="30":
 prepare HOSTYAML:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
+# prepare/configure this project for use
 build:
+  chmod 600 ./nix/ssh_key
   meson build --wipe
   meson compile -C build
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
   nix build -o {{proot}}/mgln .#moongen-lachnit
   nix build -o {{proot}}/qemu .#qemu
+  nix build -o {{proot}}/xdp .#xdp-reflector
+  nix build -o {{proot}}/qemu-ioregionfd .#qemu-ioregionfd
 
 vm-overwrite:
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
+  # host-extkern VM
   nix build -o {{proot}}/VMs/host-extkern-image-ro .#host-extkern-image # read only
   install -D -m644 {{proot}}/VMs/host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  # host VM
   nix build -o {{proot}}/VMs/host-image-ro .#host-image # read only
   install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image.qcow2
+  # guest VM
+  nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
+  install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2
 
 dpdk-setup:
   modprobe vfio-pci

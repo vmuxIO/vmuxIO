@@ -181,13 +181,29 @@
         "type": "github"
       }
     },
-    "nixpkgs-stable": {
+    "nixpkgs-2111": {
       "locked": {
-        "lastModified": 1674407282,
-        "narHash": "sha256-2qwc8mrPINSFdWffPK+ji6nQ9aGnnZyHSItVcYDZDlk=",
+        "lastModified": 1659446231,
+        "narHash": "sha256-hekabNdTdgR/iLsgce5TGWmfIDZ86qjPhxDg/8TlzhE=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "ab1254087f4cdf4af74b552d7fc95175d9bdbb49",
+        "rev": "eabc38219184cc3e04a974fe31857d8e0eac098d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-21.11",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs-2211": {
+      "locked": {
+        "lastModified": 1676375384,
+        "narHash": "sha256-6HI3jZiuJX+KLz05cocYy2mBAWlISEKHU84ftYfxHZ8=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c43f676c938662072772339be6269226c77b51b8",
         "type": "github"
       },
       "original": {
@@ -195,6 +211,25 @@
         "ref": "nixos-22.11",
         "repo": "nixpkgs",
         "type": "github"
+      }
+    },
+    "qemu-ioregionfd-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1672802334,
+        "narHash": "sha256-q2tzcFMuZbrug+B0eQ9YkW4rnh/idVTBzAaWox2/I30=",
+        "ref": "ioregionfd",
+        "rev": "8eee73f75751834395e88c165059e93f18c7a024",
+        "revCount": 92069,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/vmuxIO/qemu.git"
+      },
+      "original": {
+        "ref": "ioregionfd",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/vmuxIO/qemu.git"
       }
     },
     "root": {
@@ -208,11 +243,13 @@
         "moonmux-src": "moonmux-src",
         "nixos-generators": "nixos-generators",
         "nixpkgs": "nixpkgs",
-        "nixpkgs-stable": "nixpkgs-stable",
-        "xdp-reflector": "xdp-reflector"
+        "nixpkgs-2111": "nixpkgs-2111",
+        "nixpkgs-2211": "nixpkgs-2211",
+        "qemu-ioregionfd-src": "qemu-ioregionfd-src",
+        "xdp-reflector-src": "xdp-reflector-src"
       }
     },
-    "xdp-reflector": {
+    "xdp-reflector-src": {
       "flake": false,
       "locked": {
         "lastModified": 1666444048,
