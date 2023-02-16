@@ -148,7 +148,7 @@ class LoadLatencyTest(object):
                 sleep(20)
 
             try:
-                loadgen.exec(f'rm -f {remote_output_file} ' +
+                loadgen.exec(f'sudo rm -f {remote_output_file} ' +
                              f'{remote_histogram_file}')
                 loadgen.run_l2_load_latency(self.mac, self.rate, self.runtime,
                                             self.size, histfile=remote_histogram_file, outfile=remote_output_file)

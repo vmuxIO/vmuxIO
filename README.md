@@ -53,7 +53,6 @@ devmem 0xfa0B8188
 devmem 0xfa0b8190 32 1
 # reset status has changed (bit 7:6 incremented)
 devmem 0xfa0B8188
-
 ```
 
 

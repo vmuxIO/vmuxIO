@@ -2,6 +2,12 @@
 
 This is vmuxIO's subproject for automated testing (autotest).
 
+## Overview
+
+- host: where you run `autotest`
+- guest: runs on the host
+- loadgen: anything
+
 ## Before You Use It
 
 - SSH keys and config should be in place for password-less connection to the

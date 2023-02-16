@@ -1543,7 +1543,7 @@ class LoadGen(Server):
                       f'{self.moonprogs_dir}/l2-load-latency.lua ' +
                       f'-r {rate} -f {histfile} -t {runtime} -s {size} ' +
                       f'{self._test_iface_id} {mac} ' +
-                      f'2>&1 | tee {outfile}; sleep 10000') # TODO
+                      f'2>&1 | tee {outfile}')
 
     def stop_l2_load_latency(self: 'Server'):
         """
