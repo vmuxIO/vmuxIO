@@ -124,11 +124,14 @@ class LoadLatencyTest(object):
     def run(self, loadgen: LoadGen):
         info(f"Running test {self}")
 
+        remote_output_file = "/tmp/output.log"
+        remote_histogram_file = '/tmp/histogram.csv'
+
         if self.warmup:
             # warm-up
             sleep(10)
             try:
-                loadgen.run_l2_load_latency(self.mac, 0, 20)
+                loadgen.run_l2_load_latency(self.mac, 0, 20, histfile=remote_histogram_file, outfile=remote_output_file)
             except Exception as e:
                 error(f'Failed to run warm-up due to exception: {e}')
             sleep(25)
@@ -144,16 +147,11 @@ class LoadLatencyTest(object):
                 # cool-down
                 sleep(20)
 
-            remote_output_file = path_join(loadgen.moongen_dir,
-                                           'output.log')
-            remote_histogram_file = path_join(loadgen.moongen_dir,
-                                              'histogram.csv')
-
             try:
                 loadgen.exec(f'rm -f {remote_output_file} ' +
                              f'{remote_histogram_file}')
                 loadgen.run_l2_load_latency(self.mac, self.rate, self.runtime,
-                                            self.size)
+                                            self.size, histfile=remote_histogram_file, outfile=remote_output_file)
             except Exception as e:
                 error(f'Failed to run test due to exception: {e}')
                 continue
