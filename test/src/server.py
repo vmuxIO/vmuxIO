@@ -31,6 +31,8 @@ class Server(ABC):
         The PCI bus address of the interface to test.
     test_iface_driv : str
         The default driver of the interface to test.
+    test_iface_dpdk_driv : str
+        The DPDK driver of the interface to test.
     test_iface_mac : str
         The MAC address of the interface to test.
     moongen_dir : str
@@ -73,6 +75,7 @@ class Server(ABC):
     _test_iface_id: int = field(default=None, init=False)
     test_iface_mac: str
     test_iface_driv: str
+    test_iface_dpdk_driv: str
     moongen_dir: str
     moonprogs_dir: str
     xdp_reflector_dir: str
@@ -564,27 +567,6 @@ class Server(ABC):
         """
         return self.get_driver_for_device(self.get_nic_pci_address(iface))
 
-    def is_nic_dpdk_bound(self: 'Server', iface: str) -> bool:
-        """
-        Check if a network interface is DPDK bound.
-
-        Parameters
-        ----------
-        iface : str
-            The network interface name.
-
-        Returns
-        -------
-        bool
-            True if the network interface is DPDK bound, False otherwise.
-
-        Examples
-        --------
-        >>> server.is_nic_dpdk_bound('enp176s0')
-        True
-        """
-        return self.get_driver_for_device(self.test_iface_addr) == 'vfio-pci'
-
     def is_test_iface_bound(self: 'Server') -> bool:
         """
         Check if the test interface is bound to DPDK.
@@ -597,7 +579,8 @@ class Server(ABC):
         bool
             True if the test interface is bound to DPDK.
         """
-        return self.get_driver_for_device(self.test_iface_addr) == 'vfio-pci'
+        return (self.get_driver_for_device(self.test_iface_addr)
+                == self.test_iface_dpdk_driv)
 
     def bind_device(self: 'Server', dev_addr: str, driver: str) -> None:
         """
@@ -678,7 +661,7 @@ class Server(ABC):
             return
 
         # bind test interface to DPDK
-        self.bind_device(self.test_iface_addr, 'vfio-pci')
+        self.bind_device(self.test_iface_addr, self.test_iface_dpdk_driv)
 
         # get the test interface id
         self.detect_test_iface_id()
@@ -705,7 +688,8 @@ class Server(ABC):
         Returns
         -------
         """
-        cmd = "dpdk-devbind.py -s | grep 'drv=vfio-pci' || true"
+        cmd = ("dpdk-devbind.py -s | " +
+               f"grep 'drv={self.test_iface_dpdk_driv}' || true")
         output: str
         if self.nixos:
             output = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
@@ -979,6 +963,7 @@ class Host(Server):
                  test_iface_addr: str,
                  test_iface_mac: str,
                  test_iface_driv: str,
+                 test_iface_dpdk_driv: str,
                  test_bridge: str,
                  test_tap: str,
                  test_macvtap: str,
@@ -1013,6 +998,8 @@ class Host(Server):
             The MAC address of the test interface.
         test_iface_driv : str
             The driver of the test interface.
+        test_iface_dpdk_driv : str
+            The DPDK driver of the test interface.
         test_bridge : str
             The network interface identifier of the test bridge interface.
         test_tap : str
@@ -1055,8 +1042,9 @@ class Host(Server):
         Host(fqdn='server.test.de')
         """
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
-                         test_iface_driv, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir, localhost, ssh_config=ssh_config)
+                         test_iface_driv, test_iface_dpdk_driv, moongen_dir,
+                         moonprogs_dir, xdp_reflector_dir, localhost,
+                         ssh_config=ssh_config)
         self.admin_bridge = admin_bridge
         self.admin_bridge_ip_net = admin_bridge_ip_net
         self.admin_tap = admin_tap
@@ -1373,6 +1361,7 @@ class Guest(Server):
                  test_iface_addr: str,
                  test_iface_mac: str,
                  test_iface_driv: str,
+                 test_iface_dpdk_driv: str,
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
@@ -1393,6 +1382,8 @@ class Guest(Server):
             The MAC address of the test interface.
         test_iface_driv : str
             The driver of the test interface.
+        test_iface_dpdk_driv : str
+            The DPDK driver of the test interface.
         moongen_dir : str
             The directory of the MoonGen installation.
         moonprogs_dir : str
@@ -1419,8 +1410,9 @@ class Guest(Server):
         Guest(fqdn='server.test.de')
         """
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
-                         test_iface_driv, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir, ssh_config=ssh_config)
+                         test_iface_driv, test_iface_dpdk_driv, moongen_dir,
+                         moonprogs_dir, xdp_reflector_dir,
+                         ssh_config=ssh_config)
 
     def __post_init__(self: 'Guest') -> None:
         """
