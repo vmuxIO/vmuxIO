@@ -32,7 +32,7 @@
   #   extraGroups = [ "gierens" "sudo" ];
   # };
 
-  fileSystems."/home/gierens" = { # TODO rename
+  fileSystems."/home/host" = {
     device = "home";
     fsType = "9p";
     options = [ "trans=virtio" "nofail" "msize=104857600" ];
