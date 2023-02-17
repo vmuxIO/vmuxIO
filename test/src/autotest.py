@@ -331,7 +331,6 @@ def setup_parser() -> ArgumentParser:
                               dest='loadgen',
                               help='''Do not create the LoadGen object.''',
                               )
-    # TODO command to upload moonprogs
     shell_parser = subparsers.add_parser(
         'upload-moonprogs',
         formatter_class=ArgumentDefaultsHelpFormatter,
