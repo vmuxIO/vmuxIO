@@ -207,6 +207,16 @@ def setup_parser() -> ArgumentParser:
                                   default='pc',
                                   help='Machine type of the guest',
                                   )
+    run_guest_parser.add_argument('-C',
+                                  '--cpus',
+                                  type=int,
+                                  help='Number of vCPUs for the guest.',
+                                  )
+    run_guest_parser.add_argument('-M',
+                                  '--memory',
+                                  type=int,
+                                  help='Memory size for the guest in MiB.',
+                                  )
     run_guest_parser.add_argument('-D',
                                   '--disk',
                                   type=FileType('rw'),
@@ -534,6 +544,8 @@ def create_servers(conf: ConfigParser,
             conf['host']['root_disk_file'],
             conf['guest']['admin_iface_mac'],
             conf['guest']['test_iface_mac'],
+            conf['guest']['vcpus'],
+            conf['guest']['memory'],
             conf['host']['moongen_dir'],
             conf['host']['moonprogs_dir'],
             conf['host']['xdp_reflector_dir'],
@@ -626,12 +638,14 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
     try:
         _setup_network(host, args.interface)
 
+        vcpus = args.cpus if args.cpus else None
+        memory = args.memory if args.memory else None
         disk = args.disk if args.disk else None
         qemu_path = args.qemu_path \
             if args.qemu_path else conf['host']['qemu_path']
 
-        host.run_guest(args.interface, args.machine, disk, args.debug,
-                       args.ioregionfd, qemu_path, args.vhost,
+        host.run_guest(args.interface, args.machine, vcpus, memory, disk,
+                       args.debug, args.ioregionfd, qemu_path, args.vhost,
                        args.rx_queue_size, args.tx_queue_size)
     except Exception:
         host.kill_guest()

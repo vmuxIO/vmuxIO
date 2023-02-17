@@ -967,6 +967,8 @@ class Host(Server):
     guest_admin_iface_mac: str
     guest_test_iface_mac: str
     guest_root_disk_path: str
+    guest_vcpus: int
+    guest_memory: int
 
     def __init__(self: 'Host',
                  fqdn: str,
@@ -983,6 +985,8 @@ class Host(Server):
                  guest_root_disk_path: str,
                  guest_admin_iface_mac: str,
                  guest_test_iface_mac: str,
+                 guest_vcpus: int,
+                 guest_memory: int,
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
@@ -1021,6 +1025,10 @@ class Host(Server):
             The MAC address of the guest admin interface.
         guest_test_iface_mac : str
             The MAC address of the guest test interface.
+        guest_vcpus : int
+            The default number of vCPUs of the guest.
+        guest_memory : int
+            The default memory in MiB of the guest.
         moongen_dir : str
             The directory of the MoonGen installation.
         moonprogs_dir : str
@@ -1058,6 +1066,8 @@ class Host(Server):
         self.guest_test_iface_mac = guest_test_iface_mac
         self.guest_admin_iface_mac = guest_admin_iface_mac
         self.guest_root_disk_path = guest_root_disk_path
+        self.guest_vcpus = guest_vcpus
+        self.guest_memory = guest_memory
 
     def setup_admin_bridge(self: 'Host'):
         """
@@ -1187,6 +1197,8 @@ class Host(Server):
     def run_guest(self: 'Host',
                   net_type: str,
                   machine_type: str,
+                  vcpus: int = None,
+                  memory: int = None,
                   root_disk: str = None,
                   debug_qemu: bool = False,
                   ioregionfd: bool = False,
@@ -1205,6 +1217,11 @@ class Host(Server):
             Test interface network type
         machine_type : str
             Guest machine type
+        vcpus : int
+            Number of vCPUs, overwrites the default value in Host.guest_vcpus.
+        memory : int
+            Amount of memory in MiB, overwrites the default value in
+            Host.guest_memory.
         root_disk : str
             Path to the disk file for guest's root partition
         debug_qemu : bool
@@ -1258,6 +1275,8 @@ class Host(Server):
         qemu_bin_path = 'qemu-system-x86_64'
         if qemu_build_dir:
             qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
+        cpus = vcpus if vcpus else self.guest_vcpus
+        mem = memory if memory else self.guest_memory
         disk_path = self.guest_root_disk_path
         if root_disk:
             disk_path = root_disk
@@ -1268,8 +1287,8 @@ class Host(Server):
             qemu_bin_path +
             f' -machine {machine_type}' +
             ' -cpu host' +
-            ' -smp 4' +
-            ' -m 8100' +
+            f' -smp {cpus}' +
+            f' -m {mem}' +
             ' -enable-kvm' +
             f' -drive id=root,format=qcow2,file={disk_path},'
             'if=none,cache=none' +
