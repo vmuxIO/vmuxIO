@@ -1261,7 +1261,7 @@ class Host(Server):
         disk_path = self.guest_root_disk_path
         if root_disk:
             disk_path = root_disk
-        home = "/scratch/okelmann" # TODO make config var in autotest.cfg
+        home = "/scratch/okelmann"  # TODO make config var in autotest.cfg
         self.tmux_new(
             'qemu',
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
