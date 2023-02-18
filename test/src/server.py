@@ -953,6 +953,7 @@ class Host(Server):
     guest_root_disk_path: str
     guest_vcpus: int
     guest_memory: int
+    fsdevs: dict[str, str]
 
     def __init__(self: 'Host',
                  fqdn: str,
@@ -972,6 +973,7 @@ class Host(Server):
                  guest_test_iface_mac: str,
                  guest_vcpus: int,
                  guest_memory: int,
+                 fsdevs: dict[str, str],
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
@@ -1016,6 +1018,8 @@ class Host(Server):
             The default number of vCPUs of the guest.
         guest_memory : int
             The default memory in MiB of the guest.
+        fsdevs : dict[str, str]
+            The name and path pairs for fs devices to be passed to the guest.
         moongen_dir : str
             The directory of the MoonGen installation.
         moonprogs_dir : str
@@ -1056,6 +1060,7 @@ class Host(Server):
         self.guest_root_disk_path = guest_root_disk_path
         self.guest_vcpus = guest_vcpus
         self.guest_memory = guest_memory
+        self.fsdevs = fsdevs
 
     def setup_admin_bridge(self: 'Host'):
         """
@@ -1268,7 +1273,15 @@ class Host(Server):
         disk_path = self.guest_root_disk_path
         if root_disk:
             disk_path = root_disk
-        home = "/scratch/okelmann"  # TODO make config var in autotest.cfg
+        fsdev_config = ''
+        if self.fsdevs:
+            for name, path in self.fsdevs.items():
+                fsdev_config += (
+                    f' -fsdev local,path={path},security_model=none,' +
+                    f'id={name}fs' +
+                    f' -device virtio-9p-{dev_type},mount_tag={name},' +
+                    f'fsdev={name}fs'
+                )
         self.tmux_new(
             'qemu',
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
@@ -1284,11 +1297,7 @@ class Host(Server):
             (',use-ioregionfd=true' if ioregionfd else '') +
             f',queue-size={rx_queue_size}' +
             # ' -cdrom /home/networkadmin/images/guest_init.iso' +
-            f' -fsdev local,path={home},security_model=none,id=homefs' +
-            f' -device virtio-9p-{dev_type},mount_tag=home,fsdev=homefs' +
-            ' -fsdev local,path=/nix/store,security_model=none,id=nixstorefs' +
-            f' -device virtio-9p-{dev_type},mount_tag=nixstore,' +
-            'fsdev=nixstorefs' +
+            fsdev_config +
             ' -serial stdio' +
             ' -monitor tcp:127.0.0.1:2345,server,nowait' +
             f' -netdev tap,vhost=on,id=admin0,ifname={self.admin_tap},' +

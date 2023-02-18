@@ -499,6 +499,12 @@ def create_servers(conf: ConfigParser,
     """
     servers = {}
     if host:
+        fsdevs = {}
+        if conf['host']['fsdevs']:
+            for fsdev in conf['host']['fsdevs'].split(','):
+                if fsdev:
+                    name, path = fsdev.split(':')
+                    fsdevs[name] = path
         servers['host'] = Host(
             conf['host']['fqdn'],
             conf['host']['admin_bridge'],
@@ -517,6 +523,7 @@ def create_servers(conf: ConfigParser,
             conf['guest']['test_iface_mac'],
             conf['guest']['vcpus'],
             conf['guest']['memory'],
+            fsdevs,
             conf['host']['moongen_dir'],
             conf['host']['moonprogs_dir'],
             conf['host']['xdp_reflector_dir'],

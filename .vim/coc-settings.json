@@ -21,6 +21,7 @@
     "driv",
     "dtree",
     "fsdev",
+    "fsdevs",
     "ftree",
     "gdbserver",
     "getfqdn",
