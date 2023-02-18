@@ -391,36 +391,6 @@ def parse_args(parser: ArgumentParser) -> Namespace:
         print(f'{argv[0]}: error: argument missing.', file=stderr)
         exit(1)
 
-    if args.command == 'run-load-lat-cli':
-        for interface in args.interfaces:
-            if interface not in ['pnic', 'brtap', 'macvtap']:
-                parser.print_usage(stderr)
-                print(f'{argv[0]}: error: invalid interface type. ' +
-                      'Must be one of: pnic, brtap, macvtap', file=stderr)
-                exit(1)
-        for rate in args.rates:
-            if rate < 1:
-                parser.print_usage(stderr)
-                print(f'{argv[0]}: error: invalid rate. Must be >= 1',
-                      file=stderr)
-                exit(1)
-        for thread in args.threads:
-            if thread < 1:
-                parser.print_usage(stderr)
-                print(f'{argv[0]}: error: invalid thread. Must be >= 1',
-                      file=stderr)
-                exit(1)
-        if args.runtime < 1:
-            parser.print_usage(stderr)
-            print(f'{argv[0]}: error: invalid runtime. Must be >= 1',
-                  file=stderr)
-            exit(1)
-        if args.reps < 1:
-            parser.print_usage(stderr)
-            print(f'{argv[0]}: error: invalid number of repetitions. ' +
-                  'Must be >= 1', file=stderr)
-            exit(1)
-
     return args
 
 
