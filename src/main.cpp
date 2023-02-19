@@ -20,6 +20,7 @@
 
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
+#include "src/caps.hpp"
 
 extern "C" {
   #include "libvfio-user.h"
@@ -210,6 +211,7 @@ class VfioUserServer {
 int _main() {
   int ret;
 
+
   printf("hello 0x%X, %d, \n", VFIO_DEVICE_STATE_V1_RESUMING, VFIOC_SECRET);
 
   VfioUserServer vfu = VfioUserServer();
@@ -253,7 +255,9 @@ int _main() {
     die("vfu_pci_init() failed") ;
   }
 
-  vfu_pci_set_id(vfu.vfu_ctx, 0xdead, 0xbeef, 0xcafe, 0xbabe); // TODO mirror real one
+  vfu_pci_set_id(vfu.vfu_ctx, 0x8086, 0x1592, 0x8086, 0x0002);
+  int E810_REVISION = 0x02; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
+  vfu_pci_set_class(vfu.vfu_ctx, 0x00, 0x00, 0x02);
 
   // set up vfio-user DMA
 
@@ -269,6 +273,34 @@ int _main() {
 
   vfioc.init_msix();
   vfu.add_msix_pollfds(vfioc.irqfds);
+
+  // set capabilities
+  Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc.mmio[VFU_PCI_DEV_CFG_REGION_IDX]);
+  void *cap_data;
+  size_t cap_size;
+  cap_data = caps.msix(&cap_size);
+  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
+  if (ret == 0)
+    die("add cap error");
+  
+  // see lspci about which fields mean what https://github.com/pciutils/pciutils/blob/42e6a803bda392e98276b71994db0b0dd285cab1/ls-caps.c#L1469
+  struct msixcap data;
+  data.hdr = {
+    .id = PCI_CAP_ID_MSIX,
+  };
+  data.mxc = {
+    // message control
+  };
+  data.mtab = {
+    // table offset / Table BIR
+  };
+  data.mpba = {
+    // PBA offset / PBA BIR
+  };
+  //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, &data);
+  if (ret < 0) {
+    die("Vfio-user: cannot add MSIX capability");
+  }
 
   // finalize
 

@@ -170,7 +170,7 @@ int VfioConsumer::init() {
 }
 
 int VfioConsumer::init_mmio() {
-  // Only iterate bars 0-5. Bar 6 seems not mappable. 
+  // Only iterate bars 0-5. Bar >=6 seems not mappable. 
   for (int i = 0; i <= 5; i++) { 
     auto region = this->regions[i];
     if (region.size == 0) {
