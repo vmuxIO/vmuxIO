@@ -11,7 +11,8 @@
 
   inputs = {
     nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
-    nixpkgs-stable.url = github:NixOS/nixpkgs/nixos-22.11;
+    nixpkgs-2211.url = github:NixOS/nixpkgs/nixos-22.11;
+    nixpkgs-2111.url = github:NixOS/nixpkgs/nixos-21.11;
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -48,8 +49,12 @@
       flake = false;
     };
 
-    xdp-reflector = {
+    xdp-reflector-src = {
       url = "git+https://github.com/gierens/xdp-reflector?ref=main&submodules=1";
+      flake = false;
+    };
+    qemu-ioregionfd-src = {
+      url = "git+https://github.com/vmuxIO/qemu.git?ref=ioregionfd&submodules=1";
       flake = false;
     };
   };
@@ -57,16 +62,16 @@
   outputs = {
     self,
     nixpkgs,
-    nixpkgs-stable,
     flake-utils,
     nixos-generators,
     ...
-  }: let
+  } @ args: let
   in
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
-    pkgs-stable = nixpkgs-stable.legacyPackages.${system};
+    pkgs2211 = args.nixpkgs-2211.legacyPackages.${system};
+    pkgs2111 = args.nixpkgs-2111.legacyPackages.${system};
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
@@ -93,14 +98,32 @@
 
       # util
       xdp-reflector = pkgs.callPackage ./nix/xdp-reflector.nix {
-        inherit self pkgs;
+        inherit pkgs;
+        inherit (self.inputs) xdp-reflector-src;
       };
 
       #patched qemu
       qemu = pkgs.callPackage ./nix/qemu-libvfio.nix { 
         # needs a nixpkgs with qemu ~7.1.0 for patches to apply.
-        pkgs2211 = pkgs-stable;
+        inherit pkgs2211;
       };
+
+      qemu-ioregionfd = pkgs2211.qemu.overrideAttrs ( new: old: {
+        src = self.inputs.qemu-ioregionfd-src;
+        version = "6.2.0-rc4+";
+        # minimal needed: ./configure --meson=meson --enable-multiprocess --enable-ioregionfd --target-list=x86_64-softmmu
+        configureFlags = old.configureFlags ++ [
+          "--enable-ioregionfd"
+          "--target-list=x86_64-softmmu"
+          "--disable-virtiofsd"
+          "--disable-gtk"
+          "--disable-sdl"
+          "--disable-sdl-image"
+        ];
+        # use patches from old nixpkgs that used similar qemu version (6.1)
+        # only pick first 3 patches. Others are CVE fixes which fail to apply
+        patches = pkgs.lib.lists.sublist 0 3 pkgs2111.qemu.patches;
+      });
 
       # qemu/kernel (ioregionfd)
       host-image = nixos-generators.nixosGenerate {
@@ -147,6 +170,9 @@
         # not available in 22.05 yet
         # python310.pkgs.types-pyyaml
         ethtool
+
+        # deps for tests/autotest
+        python310.pkgs.colorlog
       ] ++ (with self.packages; [
         dpdk
         qemu

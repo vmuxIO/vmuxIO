@@ -119,21 +119,30 @@ hardware_loopback_test ETH1 ETH2 IP1 IP2 PERFARGS="" PREFIXSIZE="30":
 prepare HOSTYAML:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
+# prepare/configure this project for use
 build:
+  chmod 600 ./nix/ssh_key
   meson build --wipe
   meson compile -C build
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
   nix build -o {{proot}}/mgln .#moongen-lachnit
   nix build -o {{proot}}/qemu .#qemu
+  nix build -o {{proot}}/xdp .#xdp-reflector
+  nix build -o {{proot}}/qemu-ioregionfd .#qemu-ioregionfd
 
 vm-overwrite:
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
+  # host-extkern VM
   nix build -o {{proot}}/VMs/host-extkern-image-ro .#host-extkern-image # read only
   install -D -m644 {{proot}}/VMs/host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  # host VM
   nix build -o {{proot}}/VMs/host-image-ro .#host-image # read only
   install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image.qcow2
+  # guest VM
+  nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
+  install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2
 
 dpdk-setup:
   modprobe vfio-pci
@@ -204,3 +213,22 @@ vfio-user-server:
   -nographic \
   -monitor unix:/home/mikilio/rem-sock,server,nowait \
   -object x-vfio-user-server,id=vfioobj1,type=unix,path=/tmp/remotesock,device=ether1
+
+# use autotest tmux sessions: `just autotest-tmux ls`
+autotest-tmux *ARGS:
+  #!/usr/bin/env python3
+  from configparser import ConfigParser, ExtendedInterpolation
+  conf = ConfigParser(interpolation=ExtendedInterpolation())
+  conf.read("{{proot}}/autotest.cfg")
+  import os
+  os.system(f"tmux -L {conf['common']['tmux_socket']} {{ARGS}}")
+
+# connect to the autotest guest
+autotest-ssh *ARGS:
+  #!/usr/bin/env python3
+  from configparser import ConfigParser, ExtendedInterpolation
+  conf = ConfigParser(interpolation=ExtendedInterpolation())
+  conf.read("{{proot}}/autotest.cfg")
+  import os
+  os.system(f"ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
+  

@@ -53,9 +53,19 @@ devmem 0xfa0B8188
 devmem 0xfa0b8190 32 1
 # reset status has changed (bit 7:6 incremented)
 devmem 0xfa0B8188
+```
+## Run benchmarks
+
+See also [autotest](test/README.md) for details.
+
+```bash
+nix develop
+just prepare ./hosts/christina_autotest.yaml
+sln ./test/conf/autotest_okelmann_christina.cfg autotest.cfg
+python3.10 ./test/autotest -vvv test-load-lat-file
+ls output
 
 ```
-
 
 ## Notes on IOMMU/VFs
 
