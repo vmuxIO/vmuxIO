@@ -35,6 +35,8 @@ class Server(ABC):
         The DPDK driver of the interface to test.
     test_iface_mac : str
         The MAC address of the interface to test.
+    tmux_socket : str
+        The name for the tmux socket.
     moongen_dir : str
         The directory of the MoonGen installation.
     moonprogs_dir : str
@@ -76,6 +78,7 @@ class Server(ABC):
     test_iface_mac: str
     test_iface_driv: str
     test_iface_dpdk_driv: str
+    tmux_socket: str
     moongen_dir: str
     moonprogs_dir: str
     xdp_reflector_dir: str
@@ -294,7 +297,8 @@ class Server(ABC):
         tmux_kill : Stop a tmux session on the server.
         tmux_send_keys : Send keys to a tmux session on the server.
         """
-        _ = self.exec(f'tmux new-session -s {session_name} -d "{command}"')
+        _ = self.exec(f'tmux -L {self.tmux_socket}' +
+                      f' new-session -s {session_name} -d "{command}"')
 
     def tmux_kill(self: 'Server', session_name: str) -> None:
         """
@@ -314,8 +318,12 @@ class Server(ABC):
         tmux_new : Start a tmux session on the server.
         tmux_send_keys : Send keys to a tmux session on the server.
         """
-        _ = self.exec('tmux list-sessions | cut -d ":" -f 1 ' +
-                      f'| grep {session_name} | xargs tmux kill-session -t')
+        _ = self.exec(f'tmux -L {self.tmux_socket}' +
+                      ' list-sessions | cut -d ":" -f 1 ' +
+                      f'| grep {session_name} | xargs ' +
+                      f'tmux -L {self.tmux_socket} kill-session -t')
+        # TODO we could add a || true here to ignore cases when there is no
+        #      session to kill
 
     def tmux_send_keys(self: 'Server', session_name: str, keys: str) -> None:
         """
@@ -337,7 +345,8 @@ class Server(ABC):
         tmux_new : Start a tmux session on the server.
         tmux_kill : Stop a tmux session on the server.
         """
-        _ = self.exec(f'tmux send-keys -t {session_name} {keys}')
+        _ = self.exec(f'tmux -L {self.tmux_socket}' +
+                      f' send-keys -t {session_name} {keys}')
 
     def __copy_local(self: 'Server', source: str, destination: str) -> None:
         """
@@ -974,6 +983,7 @@ class Host(Server):
                  guest_vcpus: int,
                  guest_memory: int,
                  fsdevs: dict[str, str],
+                 tmux_socket: str,
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
@@ -1020,6 +1030,8 @@ class Host(Server):
             The default memory in MiB of the guest.
         fsdevs : dict[str, str]
             The name and path pairs for fs devices to be passed to the guest.
+        tmux_socket : str
+            The name for the tmux socket.
         moongen_dir : str
             The directory of the MoonGen installation.
         moonprogs_dir : str
@@ -1046,9 +1058,9 @@ class Host(Server):
         Host(fqdn='server.test.de')
         """
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
-                         test_iface_driv, test_iface_dpdk_driv, moongen_dir,
-                         moonprogs_dir, xdp_reflector_dir, localhost,
-                         ssh_config=ssh_config)
+                         test_iface_driv, test_iface_dpdk_driv,
+                         tmux_socket, moongen_dir, moonprogs_dir,
+                         xdp_reflector_dir, localhost, ssh_config=ssh_config)
         self.admin_bridge = admin_bridge
         self.admin_bridge_ip_net = admin_bridge_ip_net
         self.admin_tap = admin_tap
@@ -1371,6 +1383,7 @@ class Guest(Server):
                  test_iface_mac: str,
                  test_iface_driv: str,
                  test_iface_dpdk_driv: str,
+                 tmux_socket: str,
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
@@ -1393,6 +1406,8 @@ class Guest(Server):
             The driver of the test interface.
         test_iface_dpdk_driv : str
             The DPDK driver of the test interface.
+        tmux_socket : str
+            The name for the tmux socket.
         moongen_dir : str
             The directory of the MoonGen installation.
         moonprogs_dir : str
@@ -1419,9 +1434,9 @@ class Guest(Server):
         Guest(fqdn='server.test.de')
         """
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
-                         test_iface_driv, test_iface_dpdk_driv, moongen_dir,
-                         moonprogs_dir, xdp_reflector_dir,
-                         ssh_config=ssh_config)
+                         test_iface_driv, test_iface_dpdk_driv,
+                         tmux_socket, moongen_dir, moonprogs_dir,
+                         xdp_reflector_dir, ssh_config=ssh_config)
 
     def __post_init__(self: 'Guest') -> None:
         """
@@ -1473,6 +1488,7 @@ class LoadGen(Server):
                  test_iface_addr: str,
                  test_iface_mac: str,
                  test_iface_driv: str,
+                 tmux_socket: str,
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: Optional[str] = None,
@@ -1493,6 +1509,8 @@ class LoadGen(Server):
             The MAC address of the test interface.
         test_iface_driv : str
             The driver of the test interface.
+        tmux_socket : str
+            The name for the tmux socket.
         moongen_dir : str
             The directory of the MoonGen installation.
         moonprogs_dir : str
@@ -1519,8 +1537,9 @@ class LoadGen(Server):
         LoadGen(fqdn='server.test.de')
         """
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
-                         test_iface_driv, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir, localhost, ssh_config=ssh_config)
+                         test_iface_driv, tmux_socket, moongen_dir,
+                         moonprogs_dir, xdp_reflector_dir, localhost,
+                         ssh_config=ssh_config)
 
     def run_l2_load_latency(self: 'LoadGen',
                             mac: str,
