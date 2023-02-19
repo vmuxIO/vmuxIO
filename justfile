@@ -213,3 +213,22 @@ vfio-user-server:
   -nographic \
   -monitor unix:/home/mikilio/rem-sock,server,nowait \
   -object x-vfio-user-server,id=vfioobj1,type=unix,path=/tmp/remotesock,device=ether1
+
+# use autotest tmux sessions: `just autotest-tmux ls`
+autotest-tmux *ARGS:
+  #!/usr/bin/env python3
+  from configparser import ConfigParser, ExtendedInterpolation
+  conf = ConfigParser(interpolation=ExtendedInterpolation())
+  conf.read("{{proot}}/autotest.cfg")
+  import os
+  os.system(f"tmux -L {conf['common']['tmux_socket']} {{ARGS}}")
+
+# connect to the autotest guest
+autotest-ssh *ARGS:
+  #!/usr/bin/env python3
+  from configparser import ConfigParser, ExtendedInterpolation
+  conf = ConfigParser(interpolation=ExtendedInterpolation())
+  conf.read("{{proot}}/autotest.cfg")
+  import os
+  os.system(f"ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
+  
