@@ -7,6 +7,7 @@ from datetime import datetime
 from abc import ABC
 from os import listdir
 from os.path import join as path_join
+from os.path import dirname as path_dirname
 from typing import Optional
 
 
@@ -369,6 +370,7 @@ class Server(ABC):
         copy : Copy a file from the server to the localhost.
         __copy_ssh : Copy a file from the server to the server over SSH.
         """
+        self.__exec_local(f'mkdir -p {path_dirname(destination)}')
         self.__exec_local(f'cp {source} {destination}')
 
     def __scp_to(self: 'Server', source: str, destination: str) -> None:
