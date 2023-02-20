@@ -1259,31 +1259,34 @@ class Host(Server):
         # it should take all the settings from the config file
         # and compile them.
         dev_type = 'pci' if machine_type == 'pc' else 'device'
-        test_net_config = (
-            f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-            f'id=admin1,ifname={self.test_tap},script=no,' +
-            'downscript=no,queues=4' +
-            f' -device virtio-net-{dev_type},id=testif,' +
-            f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
-            (',use-ioregionfd=true' if ioregionfd else '')
-            + f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            # + f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            # f' -device virtio-net-{dev_type},id=testif,' +
-            # ' -device rtl8139,id=testif,' +
-            # 'netdev=admin1,mac=52:54:00:fa:00:60,mq=on' +
-        ) if net_type == 'brtap' else (
-            f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-            'id=admin1,fd=3 3<>/dev/tap$(cat ' +
-            f'/sys/class/net/{self.test_macvtap}/ifindex) ' +
-            f' -device virtio-net-{dev_type},id=testif,' +
-            'netdev=admin1,mac=$(cat ' +
-            f'/sys/class/net/{self.test_macvtap}/address)' +
-            (',use-ioregionfd=true' if ioregionfd else '')
-            + f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            # + f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            # f' -device virtio-net-{dev_type},id=testif,' +
-            # ' -device rtl8139,id=testif,' +
-        )
+        test_net_config = ''
+        if net_type == 'brtap':
+            test_net_config = (
+                f" -netdev tap,vhost={'on' if vhost else 'off'}," +
+                f'id=admin1,ifname={self.test_tap},script=no,' +
+                'downscript=no,queues=4' +
+                f' -device virtio-net-{dev_type},id=testif,' +
+                f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
+                (',use-ioregionfd=true' if ioregionfd else '') +
+                f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
+            )
+        elif net_type == 'macvtap':
+            test_net_config = (
+                f" -netdev tap,vhost={'on' if vhost else 'off'}," +
+                'id=admin1,fd=3 3<>/dev/tap$(cat ' +
+                f'/sys/class/net/{self.test_macvtap}/ifindex) ' +
+                f' -device virtio-net-{dev_type},id=testif,' +
+                'netdev=admin1,mac=$(cat ' +
+                f'/sys/class/net/{self.test_macvtap}/address)' +
+                (',use-ioregionfd=true' if ioregionfd else '') +
+                f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
+            )
+        elif net_type == 'passthrough':
+            test_net_config = f'-device vfio-pci,host={self.test_iface_addr}'
+        elif net_type == 'vmux':
+            test_net_config = \
+                f'-device vfio-user-pci,host={self.vmux_socket_path}'
+
         qemu_bin_path = 'qemu-system-x86_64'
         if qemu_build_dir:
             qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
