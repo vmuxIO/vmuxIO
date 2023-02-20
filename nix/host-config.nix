@@ -37,39 +37,25 @@ extkern ? false, # whether to use externally, manually built kernel
     options = [ "trans=virtio" "nofail" "msize=104857600" ];
   };
 
+  # mount host nix store, but use overlay fs to make it writeable
   fileSystems."/nix/.ro-store" = {
     device = "myNixStore";
     fsType = "9p";
     options = [ "ro" "trans=virtio" "nofail" "msize=104857600" ];
     neededForBoot = true;
   };
-  #fileSystems."/nix/store" = {
-  #  device = "myNixStore";
-  #  fsType = "9p";
-  #  options = [ "ro" "trans=virtio" "nofail" "msize=104857600" ];
-  #  neededForBoot = true;
-  #};
-  #fileSystems."/nix/store" = {
-  #  device = "overlay";
-  #  fsType = "overlay";
-  #  options = [ 
-  #    "lowerdir=/nix/.ro-store"
-  #    "upperdir=/nix/.rw-store/store"
-  #    "workdir=/nix/.rw-store/work"
-  #  ];
-  #  neededForBoot = true;
-  #};
+  fileSystems."/nix/store" = {
+    device = "overlay";
+    fsType = "overlay";
+    options = [ 
+      "lowerdir=/nix/.ro-store"
+      "upperdir=/nix/.rw-store/store"
+      "workdir=/nix/.rw-store/work"
+    ];
+    neededForBoot = true;
+    depends = [ "/nix/.ro-store" ];
+  };
   boot.initrd.availableKernelModules = [ "overlay" ];
-  boot.initrd.postMountCommands = ''
-    #mkdir -p /nix/.ro-store
-    #mkdir -p /nix/.rw-store/store
-    #mkdir -p /nix/.rw-store/work
-
-    echo "mounting overlay filesystem on $targetRoot/nix/store..."
-    mkdir -p 0755 $targetRoot/nix/.rw-store/store $targetRoot/nix/.rw-store/work $targetRoot/nix/store
-    mount -t overlay overlay $targetRoot/nix/store \
-      -o lowerdir=$targetRoot/nix/.ro-store,upperdir=$targetRoot/nix/.rw-store/store,workdir=$targetRoot/nix/.rw-store/work || fail
-  '';
 
   time.timeZone = "Europe/Berlin";
   i18n.defaultLocale = "en_US.UTF-8";
