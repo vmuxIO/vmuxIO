@@ -2,6 +2,9 @@
 #include<vector>
 #include <map>
 #include <linux/vfio.h>
+extern "C" {
+  #include "libvfio-user.h"
+}
 
 /**
  * Endpoint towards kernel
@@ -25,6 +28,7 @@ class VfioConsumer {
     int init();
     int init_mmio();
     void init_msix();
+    void reset_device();
 };
 
 #define VFIOC_SECRET 1337

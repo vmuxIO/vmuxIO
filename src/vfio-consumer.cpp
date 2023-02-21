@@ -223,3 +223,10 @@ void VfioConsumer::init_msix() {
   printf("Eventfds registered for %d MSIX interrupts.\n", count);
 
 }
+
+void VfioConsumer::reset_device() {
+  // TODO check if device supports reset VFIO_DEVICE_FLAGS_RESET
+  int ret = ioctl(this->device, VFIO_DEVICE_RESET, NULL);
+  if (ret < 0)
+    die("failed to reset device");
+}

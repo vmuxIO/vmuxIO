@@ -78,6 +78,7 @@ class VfioUserServer {
     size_t irq_pollfd_idx;
     size_t irq_pollfd_count;
     std::vector<struct pollfd> pollfds;
+    VfioConsumer *callback_context;
    
     VfioUserServer() {
     }
@@ -151,6 +152,8 @@ class VfioUserServer {
             };
         this->pollfds.push_back(pfd);
       }
+      printf("registered fds %d-%d to poll for msix interrupts\n", 
+          eventfds.front(), eventfds.back());
     }
 
     void reset_poll_fd() {
@@ -171,7 +174,25 @@ class VfioUserServer {
         return &this->pollfds[this->run_ctx_pollfd_idx.value()];
     }
 
+    void setup_callbacks(VfioConsumer *callback_context) {
+      this->callback_context = callback_context;
+      vfu_setup_device_reset_cb(this->vfu_ctx, VfioUserServer::reset_device_cb);
+      // TODO ret
+      
+    }
+
+    void reset_device(vfu_reset_type_t type) {
+      printf("resetting device\n"); // TODO this happens at VM boot. implement.
+      this->callback_context->reset_device();
+    }
+
   private:
+    static int reset_device_cb(vfu_ctx_t *vfu_ctx, vfu_reset_type_t type) {
+      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      vfu->reset_device(type);
+      return 0;
+    }
+
     static ssize_t
     unexpected_access_callback([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char * const buf, [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
                 [[maybe_unused]] const bool is_write)
@@ -257,7 +278,7 @@ int _main() {
 
   vfu_pci_set_id(vfu.vfu_ctx, 0x8086, 0x1592, 0x8086, 0x0002);
   int E810_REVISION = 0x02; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
-  vfu_pci_set_class(vfu.vfu_ctx, 0x00, 0x00, 0x02);
+  vfu_pci_set_class(vfu.vfu_ctx, 0x02, 0x00, 0x00);
 
   // set up vfio-user DMA
 
@@ -301,6 +322,12 @@ int _main() {
   if (ret < 0) {
     die("Vfio-user: cannot add MSIX capability");
   }
+
+  // register callbacks
+
+  //int reset_device(vfu_ctx_t *vfu_ctx, vfu_reset_type_t type) {
+  //vfu_setup_device_reset_cb(vfu.vfu_ctx, vfioc.reset_device);
+  vfu.setup_callbacks(&vfioc);
 
   // finalize
 
@@ -350,6 +377,7 @@ int _main() {
         // pass on (trigger) interrupt
         size_t irq_subindex = i - vfu.irq_pollfd_idx;
         ret = vfu_irq_trigger(vfu.vfu_ctx, irq_subindex);
+        printf("Triggered interrupt. ret = %d\n", ret);
         if (ret < 0) {
           die("Cannot trigger MSIX interrupt %lu", irq_subindex);
         }

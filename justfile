@@ -21,6 +21,7 @@ ssh COMMAND="":
   -i {{proot}}/nix/ssh_key \
   -o StrictHostKeyChecking=no \
   -o UserKnownHostsFile=/dev/null \
+  -o IdentityAgent=/dev/null \
   -F /dev/null \
   -p {{qemu_ssh_port}} \
   root@localhost -- "{{COMMAND}}"
@@ -59,6 +60,7 @@ vm-libvfio-user:
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-user-pci,socket={{vmuxSock}} \
+        -s \
         -nographic
 
 # not working

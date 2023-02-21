@@ -66,6 +66,7 @@ Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr
 
 }
 
+// returns void pointer cap_data and writes cap_size
 void *Capabilities::msix(size_t *cap_size) {
   // TODO error handling
   size_t cap_offset = vfu_pci_find_next_capability(this->vfu_ctx_stub, false, 0, PCI_CAP_ID_MSIX);
