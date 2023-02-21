@@ -933,8 +933,6 @@ class Server(ABC):
         -------
         """
         self.exec(f'sudo modprobe {self.test_iface_driv}')
-        self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
-        self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
 
 class Host(Server):
@@ -1119,6 +1117,20 @@ class Host(Server):
                   f' sudo ip link set {self.admin_tap} '
                   f'master {self.admin_bridge}; true)')
         self.exec(f'sudo ip link set {self.admin_tap} up')
+
+    def modprobe_test_iface_drivers(self):
+        """
+        Modprobe the test interface drivers.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.exec(f'sudo modprobe {self.test_iface_driv}')
+        self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
+        self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
     def setup_test_br_tap(self: 'Host'):
         """
