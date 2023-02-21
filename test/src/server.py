@@ -1281,7 +1281,7 @@ class Host(Server):
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
             )
-        elif net_type == 'passthrough':
+        elif net_type == 'vfio':
             test_net_config = f'-device vfio-pci,host={self.test_iface_addr}'
         elif net_type == 'vmux':
             test_net_config = \
