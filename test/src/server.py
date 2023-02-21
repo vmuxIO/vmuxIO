@@ -956,6 +956,7 @@ class Host(Server):
     admin_bridge: str
     admin_bridge_ip_net: str
     admin_tap: str
+    test_iface_vfio_driv: str
     test_bridge: str
     test_tap: str
     test_macvtap: str
@@ -977,6 +978,7 @@ class Host(Server):
                  test_iface_mac: str,
                  test_iface_driv: str,
                  test_iface_dpdk_driv: str,
+                 test_iface_vfio_driv: str,
                  test_bridge: str,
                  test_tap: str,
                  test_macvtap: str,
@@ -1016,6 +1018,8 @@ class Host(Server):
             The driver of the test interface.
         test_iface_dpdk_driv : str
             The DPDK driver of the test interface.
+        test_iface_vfio_driv : str
+            The vfio driver of the test interface.
         test_bridge : str
             The network interface identifier of the test bridge interface.
         test_tap : str
@@ -1070,6 +1074,7 @@ class Host(Server):
         self.admin_bridge = admin_bridge
         self.admin_bridge_ip_net = admin_bridge_ip_net
         self.admin_tap = admin_tap
+        self.test_iface_vfio_driv = test_iface_vfio_driv
         self.test_bridge = test_bridge
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
