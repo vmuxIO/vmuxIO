@@ -1,23 +1,23 @@
 { config, lib, pkgs, 
 extkern ? false, # whether to use externally, manually built kernel
 ... }:
-{
-  networking.useDHCP = false;
-  networking.interfaces.eth0.useDHCP = false;
-  networking.defaultGateway = "192.168.56.1";
-  networking.nameservers = [ "10.156.33.53" ];
-  networking.hostName = "host";
-  networking.domain = "gierens.de";
-  networking.bridges = {
-    "br0" = {
-      interfaces = [ "eth0" ];
-    };
-  };
-  networking.interfaces.br0.useDHCP = false;
-  networking.interfaces.br0.ipv4.addresses = [ {
-    address = "192.168.56.10";
-    prefixLength = 24;
-  } ];
+lib.attrsets.recursiveUpdate ({
+  #networking.useDHCP = false;
+  #networking.interfaces.eth0.useDHCP = false;
+  #networking.defaultGateway = "192.168.56.1";
+  #networking.nameservers = [ "10.156.33.53" ];
+  #networking.hostName = "host";
+  #networking.domain = "gierens.de";
+  #networking.bridges = {
+  #  "br0" = {
+  #    interfaces = [ "eth0" ];
+  #  };
+  #};
+  #networking.interfaces.br0.useDHCP = false;
+  #networking.interfaces.br0.ipv4.addresses = [ {
+  #  address = "192.168.56.10";
+  #  prefixLength = 24;
+  #} ];
 
   services.sshd.enable = true;
 
@@ -64,6 +64,15 @@ extkern ? false, # whether to use externally, manually built kernel
     keyMap = "us";
   };
 
+  system.activationScripts = {
+    linkHome = {
+      text = ''
+        ln -s /mnt /home/gierens
+      '';
+      deps = [];
+    };
+  };
+
   system.stateVersion = "22.05";
 
   nix.extraOptions = ''
@@ -95,6 +104,35 @@ extkern ? false, # whether to use externally, manually built kernel
     gdb
     iperf
     fio
+    pciutils
+    ioport # access port io (pio) via inb and outw commands
+    busybox # for devmem to access physical memory
+    (writeScriptBin "devmem" ''
+      ${busybox}/bin/devmem $@
+    '')
+  ];
+
+  # for libvfio-user testing with simple gpio device
+  boot.kernelModules = [
+    "gpio-pci-idio-16"
+  ];
+  boot.kernelPatches = [
+    {
+      name = "enable gpio fs";
+      patch = null;
+      extraConfig = ''
+        GPIOLIB y
+        EXPERT y
+        GPIO_SYSFS y
+      '';
+    }
+    {
+      name = "enable-debug-symbols";
+      patch = null;
+      extraConfig = ''
+        DEBUG_INFO y
+      '';
+    }
   ];
 
   #boot.kernelPackages = let
@@ -143,9 +181,14 @@ extkern ? false, # whether to use externally, manually built kernel
   #in
   #  pkgs.recurseIntoAttrs (pkgs.linuxPackagesFor linux_ioregfd);
 
-  boot.kernelParams = [ "nokaslr" ];
+  boot.kernelParams = [ 
+    "nokaslr"
+    "debug"
+  ];
 
-} // lib.optionalAttrs extkern {
+})
+# merge the following with the previous. See recursiveUpdate above. 
+( lib.optionalAttrs extkern {
   # incremental build section
   boot.loader.grub.enable = false;
   boot.initrd.enable = false;
@@ -156,14 +199,4 @@ extkern ? false, # whether to use externally, manually built kernel
     serviceConfig.ExecStart = "${pkgs.util-linux}/sbin/agetty  --login-program ${pkgs.shadow}/bin/login --autologin root hvc0 --keep-baud vt100";
   };
   systemd.services."serial-getty@hvc0".enable = false;
-
-
-  system.activationScripts = {
-    linkHome = {
-      text = ''
-        ln -s /mnt /home/gierens
-      '';
-      deps = [];
-    };
-  };
-}
+})
