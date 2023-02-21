@@ -922,9 +922,9 @@ class Server(ABC):
         for file in listdir(source_dir):
             self.copy_to(path_join(source_dir, file), self.moonprogs_dir)
 
-    def modprobe_test_iface_driver(self):
+    def modprobe_test_iface_drivers(self):
         """
-        Modprobe the test interface driver.
+        Modprobe the test interface drivers.
 
         Parameters
         ----------
@@ -933,6 +933,8 @@ class Server(ABC):
         -------
         """
         self.exec(f'sudo modprobe {self.test_iface_driv}')
+        self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
+        self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
 
 class Host(Server):
