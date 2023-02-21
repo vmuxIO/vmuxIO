@@ -29,6 +29,8 @@ class VfioConsumer {
     int init_mmio();
     void init_msix();
     void reset_device();
+    void map_dma(vfio_iommu_type1_dma_map *dma_map);
+    void unmap_dma(vfio_iommu_type1_dma_unmap *dma_unmap);
 };
 
 #define VFIOC_SECRET 1337

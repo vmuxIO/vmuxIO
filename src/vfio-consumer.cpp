@@ -230,3 +230,16 @@ void VfioConsumer::reset_device() {
   if (ret < 0)
     die("failed to reset device");
 }
+
+void VfioConsumer::map_dma(vfio_iommu_type1_dma_map *dma_map) {
+  int ret = ioctl(this->container, VFIO_IOMMU_MAP_DMA, dma_map);
+  if (ret < 0)
+    die("vfio failed to map dma");
+}
+
+void VfioConsumer::unmap_dma(vfio_iommu_type1_dma_unmap *dma_unmap) {
+  int ret = ioctl(this->container, VFIO_IOMMU_UNMAP_DMA, dma_unmap);
+  // TODO check dma_unmap size as well
+  if (ret < 0)
+    die("vfio failed to unmap dma");
+}

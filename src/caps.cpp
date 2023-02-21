@@ -75,7 +75,7 @@ void *Capabilities::msix(size_t *cap_size) {
   void *cap_data = malloc(*cap_size);
   // TODO error handling
   memcpy(cap_data, (char*)this->header_mmap + cap_offset, *cap_size);
-  printf("%zu", cap_offset);
+  printf("msi capability at offset %zu\n", cap_offset);
   //      case PCI_CAP_ID_EXP:
   //      case PCI_CAP_ID_MSIX:
   //      case PCI_CAP_ID_VNDR:

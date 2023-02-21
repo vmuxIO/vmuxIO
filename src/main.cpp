@@ -176,21 +176,85 @@ class VfioUserServer {
 
     void setup_callbacks(VfioConsumer *callback_context) {
       this->callback_context = callback_context;
+      // I think quiescing only applies when using vfu_add_to_sgl and vfu_sgl_read (see libvfio-user/docs/memory-mapping.md
+      //vfu_setup_device_quiesce_cb(this->vfu_ctx, VfioUserServer::quiesce_cb);
       vfu_setup_device_reset_cb(this->vfu_ctx, VfioUserServer::reset_device_cb);
-      // TODO ret
-      
-    }
-
-    void reset_device(vfu_reset_type_t type) {
-      printf("resetting device\n"); // TODO this happens at VM boot. implement.
-      this->callback_context->reset_device();
+      vfu_setup_device_dma(this->vfu_ctx, VfioUserServer::dma_register_cb, VfioUserServer::dma_unregister_cb);
+      for (int type = 0; type < VFU_DEV_NUM_IRQS; type++) {
+        // TODO do loop only for unused irq types and use real callbacks for others
+        vfu_setup_irq_state_callback(this->vfu_ctx, (enum vfu_dev_irq_type) type, VfioUserServer::irq_state_cb);
+      }
+      // TODO check ret vals
     }
 
   private:
-    static int reset_device_cb(vfu_ctx_t *vfu_ctx, vfu_reset_type_t type) {
+    static int reset_device_cb(vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_reset_type_t type) {
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
-      vfu->reset_device(type);
+      printf("resetting device\n"); // TODO this happens at VM boot. implement.
+      vfu->callback_context->reset_device();
       return 0;
+    }
+
+    static int quiesce_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx) {
+      //VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      //vfu_quiesce_done(vfu.vfu_ctx, 0);
+      //die("quiesce_cb unimplemented");
+      printf("quiescing device. Not sure when this ends.\n");
+      return 0;
+    }
+
+    static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_dma_info_t *info) {
+      printf("register dma cb\n");
+      if (info->iova.iov_base == NULL ||
+          info->iova.iov_base == (void*)0xc0000 ||
+          info->iova.iov_base == (void*)0xe0000 )
+        return;
+
+      __builtin_dump_struct(info, &printf);
+      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+
+      uint32_t flags = 0;
+      if (PROT_READ & info->prot)
+        flags |= VFIO_DMA_MAP_FLAG_READ;
+      if (PROT_WRITE & info->prot)
+        flags |= VFIO_DMA_MAP_FLAG_WRITE;
+
+      if (info->vaddr != NULL)
+        die("dont know how to handle this vaddr");
+
+      vfio_iommu_type1_dma_map dma_map = {
+        .argsz = sizeof(vfio_iommu_type1_dma_map),
+        .flags = flags,
+        .vaddr = (uint64_t)(info->vaddr),
+        .iova = (uint64_t)(info->iova.iov_base),
+        .size = info->iova.iov_len,
+      };
+      __builtin_dump_struct(&dma_map, &printf);
+      vfu->callback_context->map_dma(&dma_map);
+    }
+
+    static void dma_unregister_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_dma_info_t *info) {
+      printf("dma_unregister_cb\n");
+      if (info->iova.iov_base == NULL ||
+          info->iova.iov_base == (void*)0xc0000 ||
+          info->iova.iov_base == (void*)0xe0000 )
+        return;
+
+      __builtin_dump_struct(info, &printf);
+      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+
+      vfio_iommu_type1_dma_unmap dma_unmap = {
+        .argsz = sizeof(vfio_iommu_type1_dma_unmap),
+        .flags = 0,
+        .iova = (uint64_t)(info->iova.iov_base),
+        .size = info->iova.iov_len,
+      };
+      vfu->callback_context->unmap_dma(&dma_unmap);
+    }
+
+
+    static void irq_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
+      die("irq_state_cb unimpl");
     }
 
     static ssize_t
@@ -277,7 +341,7 @@ int _main() {
   }
 
   vfu_pci_set_id(vfu.vfu_ctx, 0x8086, 0x1592, 0x8086, 0x0002);
-  int E810_REVISION = 0x02; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
+  [[maybe_unused]] int E810_REVISION = 0x02; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
   vfu_pci_set_class(vfu.vfu_ctx, 0x02, 0x00, 0x00);
 
   // set up vfio-user DMA
