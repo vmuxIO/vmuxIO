@@ -1380,8 +1380,7 @@ class Host(Server):
         Returns
         -------
         """
-        # TODO
-        # self.release_test_iface()
+        self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
         self.destroy_test_macvtap()
