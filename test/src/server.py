@@ -960,6 +960,7 @@ class Host(Server):
     test_bridge: str
     test_tap: str
     test_macvtap: str
+    vmux_path: str
     vmux_socket_path: str
     guest_admin_iface_mac: str
     guest_test_iface_mac: str
@@ -982,6 +983,7 @@ class Host(Server):
                  test_bridge: str,
                  test_tap: str,
                  test_macvtap: str,
+                 vmux_path: str,
                  vmux_socket_path: str,
                  guest_root_disk_path: str,
                  guest_admin_iface_mac: str,
@@ -1026,6 +1028,8 @@ class Host(Server):
             The network interface identifier of the test tap interface.
         test_macvtap : str
             The network interface identifier of the test macvtap interface.
+        vmux_path : str
+            Path to the vmux executable.
         vmux_socket_path : str
             The path to the vmux socket.
         guest_root_disk_path : str
@@ -1078,6 +1082,7 @@ class Host(Server):
         self.test_bridge = test_bridge
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
+        self.vmux_path = vmux_path
         self.vmux_socket_path = vmux_socket_path
         self.guest_test_iface_mac = guest_test_iface_mac
         self.guest_admin_iface_mac = guest_admin_iface_mac
