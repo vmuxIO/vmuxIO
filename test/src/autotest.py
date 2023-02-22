@@ -672,12 +672,16 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
 def _setup_network(host: Host, interface: str) -> None:
     host.setup_admin_bridge()
     host.setup_admin_tap()
-    # TODO implement vfio and vmux interfaces
     host.modprobe_test_iface_drivers()
     if interface == 'brtap':
         host.setup_test_br_tap()
-    else:
+    elif interface == 'macvtap':
         host.setup_test_macvtap()
+    elif interface == 'vfio':
+        host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
+    elif interface == 'vmux':
+        host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
+        # TODO start vmux
 
 
 def setup_network(args: Namespace, conf: ConfigParser) -> None:
