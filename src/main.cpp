@@ -179,8 +179,9 @@ class VfioUserServer {
       // I think quiescing only applies when using vfu_add_to_sgl and vfu_sgl_read (see libvfio-user/docs/memory-mapping.md
       //vfu_setup_device_quiesce_cb(this->vfu_ctx, VfioUserServer::quiesce_cb);
       vfu_setup_device_reset_cb(this->vfu_ctx, VfioUserServer::reset_device_cb);
-      vfu_setup_device_dma(this->vfu_ctx, VfioUserServer::dma_register_cb, VfioUserServer::dma_unregister_cb);
-      for (int type = 0; type < VFU_DEV_NUM_IRQS; type++) {
+      //vfu_setup_device_dma(this->vfu_ctx, VfioUserServer::dma_register_cb, VfioUserServer::dma_unregister_cb);
+      vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_INTX_IRQ, VfioUserServer::intx_state_cb);
+      for (int type = 1; type < VFU_DEV_NUM_IRQS; type++) {
         // TODO do loop only for unused irq types and use real callbacks for others
         vfu_setup_irq_state_callback(this->vfu_ctx, (enum vfu_dev_irq_type) type, VfioUserServer::irq_state_cb);
       }
@@ -252,6 +253,12 @@ class VfioUserServer {
       vfu->callback_context->unmap_dma(&dma_unmap);
     }
 
+    static void intx_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
+      printf("irq_state_cb\n");
+      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      // TODO for this to work, we have to set up INTX irqs with vfio of course
+      vfu->callback_context->mask_irqs(VFIO_PCI_INTX_IRQ_INDEX, start, count, mask);
+    }
 
     static void irq_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
       die("irq_state_cb unimpl");

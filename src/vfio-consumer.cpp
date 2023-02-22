@@ -224,6 +224,28 @@ void VfioConsumer::init_msix() {
 
 }
 
+void VfioConsumer::mask_irqs(uint32_t irq_type, uint32_t start, uint32_t count, bool mask) {
+  uint32_t flags = VFIO_IRQ_SET_DATA_NONE;
+  if (mask) {
+    flags |= VFIO_IRQ_SET_ACTION_MASK;
+  } else {
+    flags |= VFIO_IRQ_SET_ACTION_UNMASK;
+  }
+
+  struct vfio_irq_set irq_set;
+  memset(&irq_set, 0, sizeof(irq_set)); // zero also .data
+  irq_set.argsz = sizeof(irq_set);
+  irq_set.flags = flags;
+  irq_set.index = irq_type;
+  irq_set.start = start;
+  irq_set.count = count;
+  //irq_set.data = { 0, 0 };
+  __builtin_dump_struct(&irq_set, &printf);
+  int ret = ioctl(this->device, VFIO_DEVICE_SET_IRQS, &irq_set);
+  if (ret < 0)
+    die("failed to mask irq");
+}
+
 void VfioConsumer::reset_device() {
   // TODO check if device supports reset VFIO_DEVICE_FLAGS_RESET
   int ret = ioctl(this->device, VFIO_DEVICE_RESET, NULL);
