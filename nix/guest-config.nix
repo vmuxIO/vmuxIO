@@ -67,6 +67,7 @@
     # vde2
     # liburing
     # ninja
+    pciutils
     htop
     tmux
     busybox
