@@ -11,5 +11,8 @@ qemu_full.overrideAttrs ( new: old: {
   version = "7.1.5";
   buildInputs = [ libndctl ] ++ old.buildInputs;
   nativeBuildInputs = [ json_c cmocka ] ++ old.nativeBuildInputs;
-  configureFlags = old.configureFlags ++ [ "--enable-vfio-user-server"];
+  configureFlags = old.configureFlags ++ [
+    "--enable-vfio-user-server"
+    "--disable-gtk"
+  ];
 })
