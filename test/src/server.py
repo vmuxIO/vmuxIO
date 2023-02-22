@@ -1306,6 +1306,7 @@ class Host(Server):
             test_net_config = \
                 f' -device vfio-user-pci,socket={self.vmux_socket_path}'
 
+        # TODO we need a different qemu build dir for vmux
         qemu_bin_path = 'qemu-system-x86_64'
         if qemu_build_dir:
             qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
