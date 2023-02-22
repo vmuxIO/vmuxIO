@@ -147,7 +147,11 @@
   boot.extraModulePackages = [
     config.boot.kernelPackages.dpdk-kmods
   ];
-  boot.kernelModules = ["igb_uio"];
+  boot.kernelModules = [
+    "ice"
+    "igb_uio"
+    "vfio_pci"
+  ];
 
   # system.activationScripts = {
   #   linkHome = {
