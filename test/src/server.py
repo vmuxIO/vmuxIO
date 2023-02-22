@@ -1301,10 +1301,10 @@ class Host(Server):
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
             )
         elif net_type == 'vfio':
-            test_net_config = f'-device vfio-pci,host={self.test_iface_addr}'
+            test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
         elif net_type == 'vmux':
             test_net_config = \
-                f'-device vfio-user-pci,host={self.vmux_socket_path}'
+                f' -device vfio-user-pci,host={self.vmux_socket_path}'
 
         qemu_bin_path = 'qemu-system-x86_64'
         if qemu_build_dir:
