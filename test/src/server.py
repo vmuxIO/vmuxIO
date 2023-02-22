@@ -1304,7 +1304,7 @@ class Host(Server):
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
         elif net_type == 'vmux':
             test_net_config = \
-                f' -device vfio-user-pci,host={self.vmux_socket_path}'
+                f' -device vfio-user-pci,socket={self.vmux_socket_path}'
 
         qemu_bin_path = 'qemu-system-x86_64'
         if qemu_build_dir:
