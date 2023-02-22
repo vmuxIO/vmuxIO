@@ -682,7 +682,7 @@ def _setup_network(host: Host, interface: str) -> None:
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
     elif interface == 'vmux':
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
-        # TODO start vmux in a tmux session
+        host.start_vmux()
 
 
 def setup_network(args: Namespace, conf: ConfigParser) -> None:

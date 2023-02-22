@@ -1376,6 +1376,30 @@ class Host(Server):
         """
         self.tmux_kill('qemu')
 
+    def start_vmux(self: 'Host') -> None:
+        """
+        Start vmux in a tmux session.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.tmux_new('vmux', f'ulimit -n 4096; sudo {self.vmux_path}')
+
+    def stop_vmux(self: 'Host') -> None:
+        """
+        Stop vmux.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.tmux_kill('vmux')
+
     def cleanup_network(self: 'Host') -> None:
         """
         Cleanup the network setup.
@@ -1386,6 +1410,10 @@ class Host(Server):
         Returns
         -------
         """
+        try:
+            self.stop_vmux()
+        except:
+            pass
         self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
