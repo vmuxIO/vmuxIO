@@ -75,8 +75,12 @@ class VfioUserServer {
     vfu_ctx_t *vfu_ctx;
     std::string sock = "/tmp/peter.sock";
     std::optional<size_t> run_ctx_pollfd_idx; // index of pollfd in pollfds
-    size_t irq_pollfd_idx;
-    size_t irq_pollfd_count;
+    size_t irq_intx_pollfd_idx; // only one
+    size_t irq_msi_pollfd_idx; // only one
+    size_t irq_msix_pollfd_idx; // multiple
+    size_t irq_msix_pollfd_count;
+    size_t irq_err_pollfd_idx; // only one
+    size_t irq_req_pollfd_idx; // only one
     std::vector<struct pollfd> pollfds;
     VfioConsumer *callback_context;
    
@@ -89,7 +93,7 @@ class VfioUserServer {
       
       // close remaining fds
       for (auto fd : this->pollfds) {
-        if (fd.fd == this->get_poll_fd()->fd) {
+        if (fd.fd == this->get_run_ctx_poll_fd()->fd) {
           continue;
         }
         ret = close(fd.fd);
@@ -143,8 +147,8 @@ class VfioUserServer {
     }
 
     void add_msix_pollfds(std::vector<int> const eventfds) {
-      this->irq_pollfd_idx = this->pollfds.size();
-      this->irq_pollfd_count = eventfds.size();
+      this->irq_msix_pollfd_idx = this->pollfds.size();
+      this->irq_msix_pollfd_count = eventfds.size();
       for (auto eventfd : eventfds) {
         auto pfd = (struct pollfd) {
             .fd = eventfd,
@@ -156,7 +160,29 @@ class VfioUserServer {
           eventfds.front(), eventfds.back());
     }
 
-    void reset_poll_fd() {
+    void add_legacy_irq_pollfds(const int intx, const int msi, const int err, const int req) {
+      struct pollfd pfd; 
+
+      this->irq_intx_pollfd_idx = this->pollfds.size();
+      pfd = (struct pollfd) { .fd = intx, .events = POLLIN };
+      this->pollfds.push_back(pfd);
+
+      this->irq_msi_pollfd_idx = this->pollfds.size();
+      pfd = (struct pollfd) { .fd = msi, .events = POLLIN };
+      this->pollfds.push_back(pfd);
+
+      this->irq_err_pollfd_idx = this->pollfds.size();
+      pfd = (struct pollfd) { .fd = err, .events = POLLIN };
+      this->pollfds.push_back(pfd);
+
+      this->irq_req_pollfd_idx = this->pollfds.size();
+      pfd = (struct pollfd) { .fd = req, .events = POLLIN };
+      this->pollfds.push_back(pfd);
+
+      printf("register interrupt fds: intx %d, msi %d, err %d, req %d\n", intx, msi, err, req);
+    }
+
+    void reset_run_ctx_poll_fd() {
       auto pfd = (struct pollfd) {
           .fd = vfu_get_poll_fd(vfu_ctx),
           .events = POLLIN
@@ -170,7 +196,7 @@ class VfioUserServer {
       }
     }
 
-    struct pollfd* get_poll_fd() {
+    struct pollfd* get_run_ctx_poll_fd() {
         return &this->pollfds[this->run_ctx_pollfd_idx.value()];
     }
 
@@ -363,8 +389,10 @@ int _main() {
   if (ret < 0)
     die("failed to add irqs");
 
-  vfioc.init_msix();
-  vfu.add_msix_pollfds(vfioc.irqfds);
+  vfioc.init_legacy_irqs();
+  vfu.add_legacy_irq_pollfds(vfioc.irqfd_intx, vfioc.irqfd_msi, vfioc.irqfd_err, vfioc.irqfd_req);
+  //vfioc.init_msix();
+  //vfu.add_msix_pollfds(vfioc.irqfds);
 
   // set capabilities
   Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc.mmio[VFU_PCI_DEV_CFG_REGION_IDX]);
@@ -414,7 +442,7 @@ int _main() {
       die("failed to attach device");
   }
 
-  vfu.reset_poll_fd();
+  vfu.reset_run_ctx_poll_fd();
 
   // runtime loop
   
@@ -427,7 +455,7 @@ int _main() {
       die("failed to poll(2)");
     }
 
-    if (vfu.get_poll_fd()->revents & (POLLIN)) {
+    if (vfu.get_run_ctx_poll_fd()->revents & (POLLIN)) {
       ret = vfu_run_ctx(vfu.vfu_ctx);
       if (ret < 0) {
         if (errno == EAGAIN) {
@@ -441,12 +469,30 @@ int _main() {
       }
     }
 
+
+    struct pollfd *pfd = &(vfu.pollfds[vfu.irq_intx_pollfd_idx]);
+    if (pfd->revents & POLLIN) {
+      printf("intx interrupt! unimplemented\n");
+    }
+    pfd = &(vfu.pollfds[vfu.irq_msi_pollfd_idx]);
+    if (pfd->revents & POLLIN) {
+      printf("msi interrupt! unimplemented\n");
+    }
+    pfd = &(vfu.pollfds[vfu.irq_err_pollfd_idx]);
+    if (pfd->revents & POLLIN) {
+      printf("err interrupt! unimplemented\n");
+    }
+    pfd = &(vfu.pollfds[vfu.irq_req_pollfd_idx]);
+    if (pfd->revents & POLLIN) {
+      printf("req interrupt! unimplemented\n");
+    }
+
     // check for MSIX interrupts to pass on
-    for (uint64_t i = vfu.irq_pollfd_idx; i < vfu.irq_pollfd_idx + vfu.irq_pollfd_count; i++) {
+    for (uint64_t i = vfu.irq_msix_pollfd_idx; i < vfu.irq_msix_pollfd_idx + vfu.irq_msix_pollfd_count; i++) {
       struct pollfd *pfd = &(vfu.pollfds[i]);
       if (pfd->revents & (POLLIN)) {
         // pass on (trigger) interrupt
-        size_t irq_subindex = i - vfu.irq_pollfd_idx;
+        size_t irq_subindex = i - vfu.irq_msix_pollfd_idx;
         ret = vfu_irq_trigger(vfu.vfu_ctx, irq_subindex);
         printf("Triggered interrupt. ret = %d\n", ret);
         if (ret < 0) {

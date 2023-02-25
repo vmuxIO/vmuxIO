@@ -187,20 +187,15 @@ int VfioConsumer::init_mmio() {
   return 0;
 }
 
-void VfioConsumer::init_msix() {
+void vfio_set_irqs(const int irq_type, const size_t count, std::vector<int> *irqfds, int device_fd) {
   int ret;
-
-  uint32_t count = this->interrupts[VFIO_PCI_MSIX_IRQ_INDEX].count;
-  if (count <= 0) {
-    die("We expect devices to use MSIX IRQs/interrupts. This one doesnt right now");
-  }
 
   auto irq_set_buf_size = sizeof(struct vfio_irq_set) + sizeof(int) * count;
   auto irq_set = (struct vfio_irq_set*) malloc(irq_set_buf_size);
   irq_set->argsz = irq_set_buf_size;
   irq_set->count = count;
   irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD | VFIO_IRQ_SET_ACTION_TRIGGER;
-  irq_set->index = VFIO_PCI_MSIX_IRQ_INDEX;
+  irq_set->index = irq_type;
   irq_set->start = 0;
 
   for (uint64_t i = 0; i < count; i++) {
@@ -211,17 +206,45 @@ void VfioConsumer::init_msix() {
       }
       die("Failed to create eventfd");
     }
-    this->irqfds.push_back(fd);
+    irqfds->push_back(fd);
   }
 
-  memcpy((int*)&irq_set->data, this->irqfds.data(), sizeof(int) * count);
-  ret = ioctl(this->device, VFIO_DEVICE_SET_IRQS, irq_set);
+  memcpy((int*)&irq_set->data, irqfds->data(), sizeof(int) * count);
+  __builtin_dump_struct(irq_set, &printf);
+  printf("irqfds %d-%d (#%zu)\n", irqfds->front(), irqfds->back(), irqfds->size());
+  ret = ioctl(device_fd, VFIO_DEVICE_SET_IRQS, irq_set);
   if (ret < 0) {
-    die("Cannot set eventfds for MSIX interrupts for device %d", this->device);
+    die("Cannot set eventfds for interrupts type %d for device %d", irq_type, device_fd);
   }
+}
+
+void VfioConsumer::init_msix() {
+
+  uint32_t count = this->interrupts[VFIO_PCI_MSIX_IRQ_INDEX].count;
+  if (count <= 0) {
+    die("We expect devices to use MSIX IRQs/interrupts. This one doesnt right now");
+  }
+
+  vfio_set_irqs(VFIO_PCI_MSIX_IRQ_INDEX, count, &this->irqfds, this->device);
 
   printf("Eventfds registered for %d MSIX interrupts.\n", count);
 
+}
+
+void VfioConsumer::init_legacy_irqs() {
+  std::vector<int> irqfds;
+  // registering INTX and MSI fails with EINVAL. Experimentation shows, that only one of INTX, MSI or MSIX can be registered. 
+  vfio_set_irqs(VFIO_PCI_INTX_IRQ_INDEX, 1, &irqfds, this->device);
+  this->irqfd_intx = irqfds.back();
+  irqfds.clear();
+  //vfio_set_irqs(VFIO_PCI_MSI_IRQ_INDEX, 1, &irqfds, this->device);
+  //this->irqfd_msi = irqfds.back();
+  //irqfds.clear();
+  vfio_set_irqs(VFIO_PCI_ERR_IRQ_INDEX, 1, &irqfds, this->device);
+  this->irqfd_err = irqfds.back();
+  irqfds.clear();
+  vfio_set_irqs(VFIO_PCI_REQ_IRQ_INDEX, 1, &irqfds, this->device);
+  this->irqfd_req = irqfds.back();
 }
 
 void VfioConsumer::mask_irqs(uint32_t irq_type, uint32_t start, uint32_t count, bool mask) {
