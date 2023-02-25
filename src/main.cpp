@@ -455,21 +455,7 @@ int _main() {
       die("failed to poll(2)");
     }
 
-    if (vfu.get_run_ctx_poll_fd()->revents & (POLLIN)) {
-      ret = vfu_run_ctx(vfu.vfu_ctx);
-      if (ret < 0) {
-        if (errno == EAGAIN) {
-          continue;
-        }
-        if (errno == ENOTCONN) {
-          die("vfu_run_ctx() does not want to run anymore");
-        }
-        // perhaps is there also an ESHUTDOWN case?
-        die("vfu_run_ctx() failed (to realize device emulation)");
-      }
-    }
-
-
+    // check for interrupts to pass on
     struct pollfd *pfd = &(vfu.pollfds[vfu.irq_intx_pollfd_idx]);
     if (pfd->revents & POLLIN) {
       printf("intx interrupt! unimplemented\n");
@@ -486,8 +472,6 @@ int _main() {
     if (pfd->revents & POLLIN) {
       printf("req interrupt! unimplemented\n");
     }
-
-    // check for MSIX interrupts to pass on
     for (uint64_t i = vfu.irq_msix_pollfd_idx; i < vfu.irq_msix_pollfd_idx + vfu.irq_msix_pollfd_count; i++) {
       struct pollfd *pfd = &(vfu.pollfds[i]);
       if (pfd->revents & (POLLIN)) {
@@ -499,6 +483,21 @@ int _main() {
           die("Cannot trigger MSIX interrupt %lu", irq_subindex);
         }
         break;
+      }
+    }
+
+    // continue running
+    if (vfu.get_run_ctx_poll_fd()->revents & POLLIN) {
+      ret = vfu_run_ctx(vfu.vfu_ctx);
+      if (ret < 0) {
+        if (errno == EAGAIN) {
+          continue;
+        }
+        if (errno == ENOTCONN) {
+          die("vfu_run_ctx() does not want to run anymore");
+        }
+        // perhaps is there also an ESHUTDOWN case?
+        die("vfu_run_ctx() failed (to realize device emulation)");
       }
     }
   } while (!quit.load());
