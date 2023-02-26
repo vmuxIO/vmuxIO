@@ -320,6 +320,13 @@ class VfioUserServer {
           die("failed to setup BAR region %d", region->index);
       }
 
+      // init some flags that are also set with qemu passthrough
+      vfu_pci_config_space_t *config_space = vfu_pci_get_config_space(this->vfu_ctx);
+      vfu_bar_t *bar_config = &(config_space->hdr.bars[region->index]);
+      // see pci spec sec 7.5.1.2.1 for meaning of bits:
+      bar_config->mem.prefetchable = 1; // prefetchable
+      bar_config->mem.locatable = 0b10; // 64 bit
+
       printf("Vfio-user: Bar region %d (offset 0x%x, size 0x%x) set up.\n", region->index, (uint)region->offset, (uint)region->size);
 
       return 0;

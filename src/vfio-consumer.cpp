@@ -70,9 +70,9 @@ int VfioConsumer::init() {
   }
 
   /* Open the group */
-  group = open("/dev/vfio/29", O_RDWR);
+  group = open("/dev/vfio/10", O_RDWR);
   if (group < 0) {
-    die("Cannot open /dev/vfio/29");
+    die("Cannot open /dev/vfio/10");
   }
   this->group = group;
 
@@ -234,6 +234,8 @@ void VfioConsumer::init_msix() {
 void VfioConsumer::init_legacy_irqs() {
   std::vector<int> irqfds;
   // registering INTX and MSI fails with EINVAL. Experimentation shows, that only one of INTX, MSI or MSIX can be registered. 
+  // MSI and MSIX must indeed not be used simultaniousely by software (pci 4.0 section 6.1.4 MSI and MSI-X Operation).
+  // Simultaneous use of INTX and MSI(X) seems to be a shortcoming in libvfio-user right now. See https://github.com/nutanix/libvfio-user/issues/388 about insufficient irq impl and https://github.com/nutanix/libvfio-user/issues/387 about no way to trigger ERR or REQ irqs.
   vfio_set_irqs(VFIO_PCI_INTX_IRQ_INDEX, 1, &irqfds, this->device);
   this->irqfd_intx = irqfds.back();
   irqfds.clear();
