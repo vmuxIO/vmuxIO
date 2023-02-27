@@ -67,17 +67,37 @@ Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr
 }
 
 // returns void pointer cap_data and writes cap_size
-void *Capabilities::msix(size_t *cap_size) {
+void *Capabilities::capa(const char name[], int id, size_t size) {
   // TODO error handling
-  size_t cap_offset = vfu_pci_find_next_capability(this->vfu_ctx_stub, false, 0, PCI_CAP_ID_MSIX);
+  size_t cap_offset = vfu_pci_find_next_capability(this->vfu_ctx_stub, false, 0, id);
   //size_t cap_size = cap_size( vfu_ctx, data, extended )
-  *cap_size = PCI_CAP_ID_MSIX;
-  void *cap_data = malloc(*cap_size);
+  size_t cap_size = size;
+  void *cap_data = malloc(cap_size);
   // TODO error handling
-  memcpy(cap_data, (char*)this->header_mmap + cap_offset, *cap_size);
-  printf("msi capability at offset %zu\n", cap_offset);
+  memcpy(cap_data, (char*)this->header_mmap + cap_offset, cap_size);
+  printf("%s capability at offset %zu\n", name, cap_offset);
   //      case PCI_CAP_ID_EXP:
   //      case PCI_CAP_ID_MSIX:
   //      case PCI_CAP_ID_VNDR:
   return cap_data;
+};
+
+void *Capabilities::pm() {
+  return this->capa("power management", PCI_CAP_ID_PM, PCI_PM_SIZEOF);
+};
+
+void *Capabilities::msi() {
+  return this->capa("msi", PCI_CAP_ID_MSI, PCI_CAP_MSIX_SIZEOF); // TODO can be up to 0x18 long as per spec sec 7.7.1
+};
+
+void *Capabilities::msix() {
+  return this->capa("msix", PCI_CAP_ID_MSIX, PCI_CAP_MSIX_SIZEOF); // TODO we dont copy tables here
+};
+
+void *Capabilities::exp() {
+  return this->capa("PCI Express (spec sec 6.5.3)", PCI_CAP_ID_EXP, 0x34); // slot registers at 0x34, ... and 0x3a are reserved
+};
+
+void *Capabilities::vpd() {
+  return this->capa("vital product data", PCI_CAP_ID_VPD, PCI_CAP_VPD_SIZEOF);
 };

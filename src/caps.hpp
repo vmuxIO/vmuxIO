@@ -10,7 +10,12 @@ class Capabilities {
 
     Capabilities(const vfio_region_info *config_info, void *config_ptr);
 
-    void *msix(size_t *cap_size);
+    void *capa(const char name[], int id, size_t size);
+    void *pm();
+    void *msi();
+    void *msix();
+    void *exp();
+    void *vpd();
 
   private:
     void *header_mmap;
