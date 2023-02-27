@@ -47,6 +47,9 @@ just vm-update host-config
 Start vmux `sudo ./build/vmux` and qemu using `just vm-libvfio-user`. Connect to the VM `just ssh` and run:
 
 ```
+# loading the ice driver still fails sadly: ice 0000:00:07.0: ice_init_hw failed: -105
+dmesg | grep "ice 0000"
+# but reading/writing registers works:
 # read reset status (count)
 devmem 0xfa0B8188
 # write to register to trigger device reset

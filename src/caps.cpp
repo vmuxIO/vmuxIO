@@ -36,6 +36,7 @@ void Capabilities::map_header() {
 }
 
 Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr) {
+  (void)(config_ptr); // unused. TODO
   this->vfu_ctx_stub = (vfu_ctx_t*) malloc(sizeof(vfu_ctx_t));
   if (this->vfu_ctx_stub == NULL)
     die("malloc failed");
@@ -76,9 +77,6 @@ void *Capabilities::capa(const char name[], int id, size_t size) {
   // TODO error handling
   memcpy(cap_data, (char*)this->header_mmap + cap_offset, cap_size);
   printf("%s capability at offset %zu\n", name, cap_offset);
-  //      case PCI_CAP_ID_EXP:
-  //      case PCI_CAP_ID_MSIX:
-  //      case PCI_CAP_ID_VNDR:
   return cap_data;
 };
 
