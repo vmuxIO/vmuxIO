@@ -156,8 +156,9 @@ class VfioUserServer {
             };
         this->pollfds.push_back(pfd);
       }
-      printf("registered fds %d-%d to poll for msix interrupts\n", 
-          eventfds.front(), eventfds.back());
+      if (!eventfds.empty())
+        printf("registered fds %d-%d to poll for msix interrupts\n", 
+            eventfds.front(), eventfds.back());
     }
 
     void add_legacy_irq_pollfds(const int intx, const int msi, const int err, const int req) {
@@ -280,7 +281,6 @@ class VfioUserServer {
     }
 
     static void intx_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
-      printf("irq_state_cb\n");
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
       // TODO for this to work, we have to set up INTX irqs with vfio of course
       vfu->callback_context->mask_irqs(VFIO_PCI_INTX_IRQ_INDEX, start, count, mask);
@@ -400,8 +400,8 @@ int _main() {
 
   vfioc.init_legacy_irqs();
   vfu.add_legacy_irq_pollfds(vfioc.irqfd_intx, vfioc.irqfd_msi, vfioc.irqfd_err, vfioc.irqfd_req);
-  //vfioc.init_msix();
-  //vfu.add_msix_pollfds(vfioc.irqfds);
+  vfioc.init_msix();
+  vfu.add_msix_pollfds(vfioc.irqfds);
 
   // set capabilities
   Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc.mmio[VFU_PCI_DEV_CFG_REGION_IDX]);

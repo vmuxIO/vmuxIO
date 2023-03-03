@@ -219,6 +219,10 @@ void vfio_set_irqs(const int irq_type, const size_t count, std::vector<int> *irq
 }
 
 void VfioConsumer::init_msix() {
+  if (!this->use_msix) {
+    printf("init for msix skipped because we run in intx mode\n");
+    return; 
+  }
 
   uint32_t count = this->interrupts[VFIO_PCI_MSIX_IRQ_INDEX].count;
   if (count <= 0) {
@@ -236,9 +240,11 @@ void VfioConsumer::init_legacy_irqs() {
   // registering INTX and MSI fails with EINVAL. Experimentation shows, that only one of INTX, MSI or MSIX can be registered. 
   // MSI and MSIX must indeed not be used simultaniousely by software (pci 4.0 section 6.1.4 MSI and MSI-X Operation).
   // Simultaneous use of INTX and MSI(X) seems to be a shortcoming in libvfio-user right now. See https://github.com/nutanix/libvfio-user/issues/388 about insufficient irq impl and https://github.com/nutanix/libvfio-user/issues/387 about no way to trigger ERR or REQ irqs.
-  vfio_set_irqs(VFIO_PCI_INTX_IRQ_INDEX, 1, &irqfds, this->device);
-  this->irqfd_intx = irqfds.back();
-  irqfds.clear();
+  if (!this->use_msix) {
+    vfio_set_irqs(VFIO_PCI_INTX_IRQ_INDEX, 1, &irqfds, this->device);
+    this->irqfd_intx = irqfds.back();
+    irqfds.clear();
+  }
   //vfio_set_irqs(VFIO_PCI_MSI_IRQ_INDEX, 1, &irqfds, this->device);
   //this->irqfd_msi = irqfds.back();
   //irqfds.clear();
@@ -250,6 +256,11 @@ void VfioConsumer::init_legacy_irqs() {
 }
 
 void VfioConsumer::mask_irqs(uint32_t irq_type, uint32_t start, uint32_t count, bool mask) {
+  if (irq_type == VFIO_PCI_INTX_IRQ_INDEX && this->use_msix) {
+    printf("irq_state_cb for intx ignored because we run in msi-x mode\n");
+    return; 
+  }
+
   uint32_t flags = VFIO_IRQ_SET_DATA_NONE;
   if (mask) {
     flags |= VFIO_IRQ_SET_ACTION_MASK;
