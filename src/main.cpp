@@ -375,7 +375,7 @@ int _main() {
   }
 
   ret = vfu_pci_init(vfu.vfu_ctx, VFU_PCI_TYPE_EXPRESS, // TODO express
-                     PCI_HEADER_TYPE_NORMAL, 0); // TODO 4?
+                     PCI_HEADER_TYPE_NORMAL, 3); // TODO 4?
   if (ret < 0) {
     die("vfu_pci_init() failed") ;
   }
@@ -438,6 +438,12 @@ int _main() {
   //if (ret < 0)
   //  die("add cap error");
   //// free the data
+  
+  cap_data = caps.dsn();
+  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY | VFU_CAP_FLAG_EXTENDED, cap_data);
+  if (ret < 0)
+    die("add cap error");
+  // TODO free the data
 
   // see lspci about which fields mean what https://github.com/pciutils/pciutils/blob/42e6a803bda392e98276b71994db0b0dd285cab1/ls-caps.c#L1469
   //struct msixcap data;

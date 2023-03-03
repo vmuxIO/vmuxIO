@@ -68,9 +68,9 @@ Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr
 }
 
 // returns void pointer cap_data and writes cap_size
-void *Capabilities::capa(const char name[], int id, size_t size) {
+void *Capabilities::capa(const char name[], int id, size_t size, bool extended) {
   // TODO error handling
-  size_t cap_offset = vfu_pci_find_next_capability(this->vfu_ctx_stub, false, 0, id);
+  size_t cap_offset = vfu_pci_find_next_capability(this->vfu_ctx_stub, extended, 0, id);
   //size_t cap_size = cap_size( vfu_ctx, data, extended )
   size_t cap_size = size;
   void *cap_data = malloc(cap_size);
@@ -80,22 +80,26 @@ void *Capabilities::capa(const char name[], int id, size_t size) {
   return cap_data;
 };
 
+void *Capabilities::dsn() {
+  return this->capa("device serial number (ext)", PCI_EXT_CAP_ID_DSN, PCI_EXT_CAP_DSN_SIZEOF, true);
+};
+
 void *Capabilities::pm() {
-  return this->capa("power management", PCI_CAP_ID_PM, PCI_PM_SIZEOF);
+  return this->capa("power management", PCI_CAP_ID_PM, PCI_PM_SIZEOF, false);
 };
 
 void *Capabilities::msi() {
-  return this->capa("msi", PCI_CAP_ID_MSI, PCI_CAP_MSIX_SIZEOF); // TODO can be up to 0x18 long as per spec sec 7.7.1
+  return this->capa("msi", PCI_CAP_ID_MSI, PCI_CAP_MSIX_SIZEOF, false); // TODO can be up to 0x18 long as per spec sec 7.7.1
 };
 
 void *Capabilities::msix() {
-  return this->capa("msix", PCI_CAP_ID_MSIX, PCI_CAP_MSIX_SIZEOF); // TODO we dont copy tables here
+  return this->capa("msix", PCI_CAP_ID_MSIX, PCI_CAP_MSIX_SIZEOF, false); // TODO we dont copy tables here
 };
 
 void *Capabilities::exp() {
-  return this->capa("PCI Express (spec sec 6.5.3)", PCI_CAP_ID_EXP, 0x34); // slot registers at 0x34, ... and 0x3a are reserved
+  return this->capa("PCI Express (spec sec 6.5.3)", PCI_CAP_ID_EXP, 0x34, false); // slot registers at 0x34, ... and 0x3a are reserved
 };
 
 void *Capabilities::vpd() {
-  return this->capa("vital product data", PCI_CAP_ID_VPD, PCI_CAP_VPD_SIZEOF);
+  return this->capa("vital product data", PCI_CAP_ID_VPD, PCI_CAP_VPD_SIZEOF, false);
 };

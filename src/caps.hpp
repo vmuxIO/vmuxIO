@@ -10,7 +10,8 @@ class Capabilities {
 
     Capabilities(const vfio_region_info *config_info, void *config_ptr);
 
-    void *capa(const char name[], int id, size_t size);
+    void *capa(const char name[], int id, size_t size, bool extended);
+    void *dsn();
     void *pm();
     void *msi();
     void *msix();
