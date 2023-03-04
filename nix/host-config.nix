@@ -19,6 +19,10 @@ lib.attrsets.recursiveUpdate ({
   #  prefixLength = 24;
   #} ];
 
+  imports = [
+    #./nix/gpio.nix # enable gpio sysfs (breaks make/insmod kmods though because of CONFIG_EXPERT
+  ];
+
   services.sshd.enable = true;
 
   networking.firewall.enable = false;
@@ -112,20 +116,7 @@ lib.attrsets.recursiveUpdate ({
     '')
   ];
 
-  # for libvfio-user testing with simple gpio device
-  boot.kernelModules = [
-    "gpio-pci-idio-16"
-  ];
   boot.kernelPatches = [
-    {
-      name = "enable gpio fs";
-      patch = null;
-      extraConfig = ''
-        GPIOLIB y
-        EXPERT y
-        GPIO_SYSFS y
-      '';
-    }
     {
       name = "enable-debug-symbols";
       patch = null;
