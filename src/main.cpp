@@ -386,7 +386,12 @@ int _main(int argc, char** argv) {
         break;
       }
   }
-  printf("0x%04x,0x%04x,0x%04x,0x%04x\n",pci_ids[0],pci_ids[1],pci_ids[2],pci_ids[3]);
+  printf("PCI-Device: %s\nIOMMU-Group: %s\nE810 Revision: 0x%02X\nIDs: 0x%04X,0x%04X,0x%04X,0x%04X\nSocket: %s\n",
+        device.c_str(),
+        group_arg.c_str(),
+        E810_REVISION,
+        pci_ids[0],pci_ids[1],pci_ids[2],pci_ids[3],
+        socket.c_str());
 
   printf("hello 0x%X, %d, \n", VFIO_DEVICE_STATE_V1_RESUMING, VFIOC_SECRET);
 
