@@ -17,7 +17,7 @@ _log([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] int level, char const
 }
 
 void Capabilities::map_header(std::string device) {
-  std::string config_path = "/sys/bus/pci/devices/" + std::string(device) + "/config"; // TODO dont hardcode id
+  std::string config_path = "/sys/bus/pci/devices/" + device + "/config";
   //int fd = open(config_path.c_str(), O_RDONLY);
   FILE *fd = fopen(config_path.c_str(), "rb");
   if (fd == NULL)
