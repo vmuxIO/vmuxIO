@@ -346,6 +346,7 @@ int _main(int argc, char** argv) {
   while ((ch = getopt(argc,argv,"hd:g:r:i:s:")) != -1){
     std::string ids;
     size_t string_pos = 0;
+    int counter;
     switch(ch)
       {
       case 'd':
@@ -362,13 +363,17 @@ int _main(int argc, char** argv) {
         break;
       case 'i':
         ids = optarg;
+        counter = 0;
         while ((string_pos = ids.find(",")) != std::string::npos){
           std::string tmp = ids.substr(0,string_pos);
-          pci_ids.push_back((int)strtol(tmp.c_str(),NULL,0));
+          pci_ids[counter] = (int)strtol(tmp.c_str(),NULL,0);
           ids.erase(0,string_pos + strlen(","));
+          counter++;
         }
-        if(!(pci_ids.size() < 4))
+        if(!(counter != 3)){
+          pci_ids[counter] = (int)strtol(ids.c_str(),NULL,0);
           break;
+        }
       case '?':
       case 'h':
         std::cout << "-d 0000:18:00.0                        PCI-Device\n"
@@ -381,7 +386,7 @@ int _main(int argc, char** argv) {
         break;
       }
   }
-
+  printf("0x%04x,0x%04x,0x%04x,0x%04x\n",pci_ids[0],pci_ids[1],pci_ids[2],pci_ids[3]);
 
   printf("hello 0x%X, %d, \n", VFIO_DEVICE_STATE_V1_RESUMING, VFIOC_SECRET);
 
