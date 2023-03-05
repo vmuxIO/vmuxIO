@@ -73,7 +73,7 @@ bar0_access(vfu_ctx_t *vfu_ctx, char * const buf, size_t count, __loff_t offset,
 class VfioUserServer {
   public:
     vfu_ctx_t *vfu_ctx;
-    std::string sock = "/tmp/peter.sock";
+    std::string sock;
     std::optional<size_t> run_ctx_pollfd_idx; // index of pollfd in pollfds
     size_t irq_intx_pollfd_idx; // only one
     size_t irq_msi_pollfd_idx; // only one
@@ -84,7 +84,8 @@ class VfioUserServer {
     std::vector<struct pollfd> pollfds;
     VfioConsumer *callback_context;
    
-    VfioUserServer() {
+    VfioUserServer(std::string sock) {
+      this->sock = sock;
     }
 
     ~VfioUserServer() {
@@ -333,17 +334,62 @@ class VfioUserServer {
     }
 };
 
-int _main() {
+int _main(int argc, char** argv) {
   int ret;
+  
+  int ch;
+  std::string device = "0000:18:00.0";
+  std::string group_arg = "22";
+  int E810_REVISION = 0x02; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
+  std::vector<int> pci_ids = {0x8086, 0x1592, 0x8086, 0x0002};
+  std::string socket = "/tmp/vmux.sock";
+  while ((ch = getopt(argc,argv,"hd:g:r:i:s:")) != -1){
+    std::string ids;
+    size_t string_pos = 0;
+    switch(ch)
+      {
+      case 'd':
+        device = optarg;
+        break;
+      case 'g':
+        group_arg = optarg;
+        break;
+      case 'r':
+        E810_REVISION = (int)strtol(optarg,NULL,0);
+        break;
+      case 's':
+        socket = optarg;
+        break;
+      case 'i':
+        ids = optarg;
+        while ((string_pos = ids.find(",")) != std::string::npos){
+          std::string tmp = ids.substr(0,string_pos);
+          pci_ids.push_back((int)strtol(tmp.c_str(),NULL,0));
+          ids.erase(0,string_pos + strlen(","));
+        }
+        if(!(pci_ids.size() < 4))
+          break;
+      case '?':
+      case 'h':
+        std::cout << "-d 0000:18:00.0                        PCI-Device\n"
+                  << "-g 22                                  IOMMU group of PCI-Device\n"
+                  << "-r 0x02                                E810 Revision\n"
+                  << "-i 0x8086,0x1592,0x8086,0x0002         Vendor ID, Device ID, Subsystem Vendor ID, Subsystem ID\n"
+                  << "-s /tmp/vmux.sock                      Path of the socket\n";
+        return 0;
+      default:
+        break;
+      }
+  }
 
 
   printf("hello 0x%X, %d, \n", VFIO_DEVICE_STATE_V1_RESUMING, VFIOC_SECRET);
 
-  VfioUserServer vfu = VfioUserServer();
+  VfioUserServer vfu = VfioUserServer(socket);
 
   // init vfio
   
-  VfioConsumer vfioc;
+  VfioConsumer vfioc(group_arg,device);
 
   ret = vfioc.init();
   if (ret < 0) {
@@ -380,8 +426,7 @@ int _main() {
     die("vfu_pci_init() failed") ;
   }
 
-  vfu_pci_set_id(vfu.vfu_ctx, 0x8086, 0x1592, 0x8086, 0x0002);
-  [[maybe_unused]] int E810_REVISION = 0x02; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
+  vfu_pci_set_id(vfu.vfu_ctx, pci_ids[0], pci_ids[1], pci_ids[2], pci_ids[3]);
   vfu_pci_config_space_t *config_space = vfu_pci_get_config_space(vfu.vfu_ctx);
   config_space->hdr.rid = E810_REVISION;
   vfu_pci_set_class(vfu.vfu_ctx, 0x02, 0x00, 0x00);
@@ -404,7 +449,7 @@ int _main() {
   vfu.add_msix_pollfds(vfioc.irqfds);
 
   // set capabilities
-  Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc.mmio[VFU_PCI_DEV_CFG_REGION_IDX]);
+  Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc.mmio[VFU_PCI_DEV_CFG_REGION_IDX], device);
   void *cap_data;
 
   cap_data = caps.pm();
@@ -553,7 +598,7 @@ void signal_handler(int) {
   quit.store(true);
 }
 
-int main() {
+int main(int argc, char** argv) {
   // register signal handler to handle SIGINT gracefully to call destructors
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
@@ -562,7 +607,7 @@ int main() {
   sigaction(SIGINT, &sa, NULL);
 
   try {
-    return _main();
+    return _main(argc, argv);
   } catch (...) {
     // we seem to need this catch everyting so that our destructors work
     return EXIT_FAILURE;

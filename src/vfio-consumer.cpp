@@ -16,6 +16,12 @@
 
 #include "src/util.hpp"
 
+VfioConsumer::VfioConsumer(std::string group_str, std::string device_name){
+  this->group_str = "/dev/vfio/" + group_str;
+  this->device_name = device_name;
+}
+
+
 VfioConsumer::~VfioConsumer() {
   printf("vfio consumer destructor called\n");
   int ret;
@@ -70,9 +76,9 @@ int VfioConsumer::init() {
   }
 
   /* Open the group */
-  group = open("/dev/vfio/10", O_RDWR);
+  group = open(group_str.c_str(), O_RDWR);
   if (group < 0) {
-    die("Cannot open /dev/vfio/10");
+    die("Cannot open %s",group_str.c_str());
   }
   this->group = group;
 
@@ -122,7 +128,7 @@ int VfioConsumer::init() {
   this->dma_map = dma_map;
 
   /* Get a file descriptor for the device */
-  device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, "0000:18:00.0");
+  device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, device_name.c_str());
   if (device < 0) {
     die("Cannot get/find device id in IOMMU group fd %d", group);
   }
