@@ -373,6 +373,8 @@ class LoadLatencyTestGenerator(object):
         for m in self.machines - {Machine.HOST}:
             tree[m] = {}
             for i in self.interfaces - {Interface.PNIC}:
+                if (m == Machine.MICROVM and i == Interface.VFIO):
+                    continue
                 tree[m][i] = {}
                 for q in self.qemus:
                     qemu, _ = q.split(':')
