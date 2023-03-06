@@ -17,6 +17,7 @@
 #include <exception>
 #include <stdexcept>
 #include <optional>
+#include <dirent.h>
 
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
@@ -334,62 +335,111 @@ class VfioUserServer {
     }
 };
 
+
+std::string get_iommu_group(std::string pci_device){
+  std::string path = "/sys/kernel/iommu_groups/";
+  struct dirent *iommu_group;
+  DIR *iommu_dir = opendir(path.c_str());
+  if (iommu_dir == NULL){
+          return "";
+  }
+  while((iommu_group = readdir(iommu_dir)) != NULL) {
+          if(strcmp(iommu_group->d_name,".") != 0 && strcmp(iommu_group->d_name,"..") != 0){
+                  std::string iommu_group_str = iommu_group->d_name;
+                  struct dirent *iommu_group_dir;
+                  DIR *pci = opendir((path + iommu_group->d_name + "/devices").c_str());
+                  while((iommu_group_dir = readdir(pci)) != NULL){
+                          if(pci_device == iommu_group_dir->d_name){
+                            closedir(pci);
+                            closedir(iommu_dir);
+                            return iommu_group_str;
+                          }
+                                    
+
+                  }
+                  closedir(pci);
+          }
+  }
+  closedir(iommu_dir);
+  return "";
+}
+
+std::vector<int>  get_hardware_ids(std::string pci_device,std::string iommu_group){
+  std::string path = "/sys/kernel/iommu_groups/" + iommu_group +"/devices/" + pci_device + "/";
+  std::vector<std::string> values = {"revision", "vendor", "device", "subsystem_vendor", "subsystem_device"};
+  std::vector<int> result;
+  int bytes_read;
+  char id_buffer[7];
+  FILE* id;
+  
+  for(size_t i = 0; i < values.size(); i++ ){
+    id = fopen((path + values[i]).c_str(), "r");
+    if(id == NULL){
+      result.clear();
+      printf("Failed ot open %s\n",(path + values[i]).c_str());
+      return result;
+    }
+    bytes_read = fread(id_buffer, 1, sizeof(id_buffer) / sizeof(id_buffer[0]) - 1, id);
+    if(bytes_read < 1){
+      result.clear();
+      printf("Failed to read %s, got %s\n", values[i].c_str(),id_buffer);
+      return result;
+    }
+    result.push_back((int)strtol(id_buffer,NULL,0));
+    fclose(id);
+  }   
+
+  return result;
+}
+
+
+
 int _main(int argc, char** argv) {
   int ret;
-  
+
   int ch;
   std::string device = "0000:18:00.0";
-  std::string group_arg = "22";
-  int E810_REVISION = 0x02; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
-  std::vector<int> pci_ids = {0x8086, 0x1592, 0x8086, 0x0002};
+  std::string group_arg;
+  int HARDWARE_REVISION; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
+  std::vector<int> pci_ids;
   std::string socket = "/tmp/vmux.sock";
-  while ((ch = getopt(argc,argv,"hd:g:r:i:s:")) != -1){
-    std::string ids;
-    size_t string_pos = 0;
-    int counter;
+  while ((ch = getopt(argc,argv,"hd:s:")) != -1){
     switch(ch)
       {
       case 'd':
         device = optarg;
         break;
-      case 'g':
-        group_arg = optarg;
-        break;
-      case 'r':
-        E810_REVISION = (int)strtol(optarg,NULL,0);
-        break;
       case 's':
         socket = optarg;
         break;
-      case 'i':
-        ids = optarg;
-        counter = 0;
-        while ((string_pos = ids.find(",")) != std::string::npos){
-          std::string tmp = ids.substr(0,string_pos);
-          pci_ids[counter] = (int)strtol(tmp.c_str(),NULL,0);
-          ids.erase(0,string_pos + strlen(","));
-          counter++;
-        }
-        if(!(counter != 3)){
-          pci_ids[counter] = (int)strtol(ids.c_str(),NULL,0);
-          break;
-        }
       case '?':
       case 'h':
         std::cout << "-d 0000:18:00.0                        PCI-Device\n"
-                  << "-g 22                                  IOMMU group of PCI-Device\n"
-                  << "-r 0x02                                E810 Revision\n"
-                  << "-i 0x8086,0x1592,0x8086,0x0002         Vendor ID, Device ID, Subsystem Vendor ID, Subsystem ID\n"
                   << "-s /tmp/vmux.sock                      Path of the socket\n";
         return 0;
       default:
         break;
       }
   }
-  printf("PCI-Device: %s\nIOMMU-Group: %s\nE810 Revision: 0x%02X\nIDs: 0x%04X,0x%04X,0x%04X,0x%04X\nSocket: %s\n",
+  //Get IOMMU Group from the PCI device
+  group_arg = get_iommu_group(device);
+  if(group_arg == ""){
+    printf("Failed to map PCI device %s to IOMMU-Group\n",device.c_str());
+    return -1;
+  }
+  //Get Hardware Information from Device
+  pci_ids = get_hardware_ids(device,group_arg);
+  if(pci_ids.size() != 5){
+    printf("Failed to parse Hardware Information, expected %d IDs got %zu\n",5,pci_ids.size());
+    return -1;
+  }
+  HARDWARE_REVISION = pci_ids[0];
+  pci_ids.erase(pci_ids.begin()); //Only contains Vendor ID, Device ID, Subsystem Vendor ID, Subsystem ID now
+
+  printf("PCI-Device: %s\nIOMMU-Group: %s\nRevision: 0x%02X\nIDs: 0x%04X,0x%04X,0x%04X,0x%04X\nSocket: %s\n",
         device.c_str(),
         group_arg.c_str(),
-        E810_REVISION,
+        HARDWARE_REVISION,
         pci_ids[0],pci_ids[1],pci_ids[2],pci_ids[3],
         socket.c_str());
 
@@ -438,7 +488,7 @@ int _main(int argc, char** argv) {
 
   vfu_pci_set_id(vfu.vfu_ctx, pci_ids[0], pci_ids[1], pci_ids[2], pci_ids[3]);
   vfu_pci_config_space_t *config_space = vfu_pci_get_config_space(vfu.vfu_ctx);
-  config_space->hdr.rid = E810_REVISION;
+  config_space->hdr.rid = HARDWARE_REVISION;
   vfu_pci_set_class(vfu.vfu_ctx, 0x02, 0x00, 0x00);
 
   // set up vfio-user DMA
