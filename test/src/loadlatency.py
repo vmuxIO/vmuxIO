@@ -35,7 +35,10 @@ class Interface(Enum):
     # connected to it
     MACVTAP = "macvtap"
 
-    # TODO implement vfio and vmux interfaces 
+    # VFIO-passthrough to physical NIC for the VM
+    VFIO = "vfio"
+
+    # TODO implement vmux interfaces 
 
 
 class Reflector(Enum):
@@ -265,6 +268,8 @@ class LoadLatencyTestGenerator(object):
                 host.setup_test_br_tap()
         elif interface == Interface.MACVTAP:
             host.setup_test_macvtap()
+        elif interface == Interface.VFIO:
+            host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
 
     def start_reflector(self, server: Server, reflector: Reflector,
                         iface: str = None):
@@ -287,8 +292,15 @@ class LoadLatencyTestGenerator(object):
     def run_guest(self, host: Host, machine: Machine,
                   interface: Interface, qemu: str, vhost: bool,
                   ioregionfd: bool):
+        net_type = None
+        if interface == Interface.BRIDGE:
+            net_type = 'brtap'
+        elif interface == Interface.MACVTAP:
+            net_type = 'macvtap'
+        elif interface == Interface.VFIO:
+            net_type = 'vfio'
         host.run_guest(
-            net_type='brtap' if interface == Interface.BRIDGE else 'macvtap',
+            net_type=net_type,
             machine_type='pc' if machine == Machine.PCVM else 'microvm',
             root_disk=None,
             debug_qemu=False,
@@ -538,7 +550,8 @@ class LoadLatencyTestGenerator(object):
 
 if __name__ == "__main__":
     machines = {Machine.HOST, Machine.PCVM, Machine.MICROVM}
-    interfaces = {Interface.PNIC, Interface.BRIDGE, Interface.MACVTAP}
+    interfaces = {Interface.PNIC, Interface.BRIDGE, Interface.MACVTAP,
+                  Interface.VFIO}
     qemus = {"/home/networkadmin/qemu-build/qemu-system-x86_64",
              "/home/networkadmin/qemu-build2/qemu-system-x86_64"}
     vhosts = {True, False}
