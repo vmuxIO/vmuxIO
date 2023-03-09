@@ -20,7 +20,7 @@ lib.attrsets.recursiveUpdate ({
   #} ];
 
   imports = [
-    #./nix/gpio.nix # enable gpio sysfs (breaks make/insmod kmods though because of CONFIG_EXPERT
+    ./gpio.nix # enable gpio sysfs
   ];
 
   services.sshd.enable = true;
