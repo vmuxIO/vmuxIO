@@ -20,7 +20,7 @@ class VfioConsumer {
     int irqfd_req;
     std::map<int, void*> mmio;
     struct vfio_iommu_type1_dma_map dma_map;
-    bool use_msix = false;
+    bool use_msix = true;
 
 
 

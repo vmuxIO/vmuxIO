@@ -408,7 +408,13 @@ int _main() {
   void *cap_data;
 
   cap_data = caps.pm();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
+  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
+  if (ret < 0)
+    die("add cap error");
+  // TODO free the data
+
+  cap_data = caps.msix();
+  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
   if (ret < 0)
     die("add cap error");
   // TODO free the data
@@ -420,12 +426,6 @@ int _main() {
   //  die("add cap error");
   //// free the data
   
-  cap_data = caps.msix();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  // TODO free the data
-
   cap_data = caps.exp();
   ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
   if (ret < 0)

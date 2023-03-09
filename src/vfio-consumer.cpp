@@ -241,6 +241,9 @@ void VfioConsumer::init_legacy_irqs() {
   // MSI and MSIX must indeed not be used simultaniousely by software (pci 4.0 section 6.1.4 MSI and MSI-X Operation).
   // Simultaneous use of INTX and MSI(X) seems to be a shortcoming in libvfio-user right now. See https://github.com/nutanix/libvfio-user/issues/388 about insufficient irq impl and https://github.com/nutanix/libvfio-user/issues/387 about no way to trigger ERR or REQ irqs.
   if (!this->use_msix) {
+    if (this->interrupts[VFIO_PCI_INTX_IRQ_INDEX].count != 1) {
+      die("This device does not support legacy INTx");
+    }
     vfio_set_irqs(VFIO_PCI_INTX_IRQ_INDEX, 1, &irqfds, this->device);
     this->irqfd_intx = irqfds.back();
     irqfds.clear();
