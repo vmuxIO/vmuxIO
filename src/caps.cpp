@@ -18,14 +18,16 @@ _log([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] int level, char const
 
 void Capabilities::map_header(std::string device) {
   std::string config_path = "/sys/bus/pci/devices/" + device + "/config";
-  //int fd = open(config_path.c_str(), O_RDONLY);
   FILE *fd = fopen(config_path.c_str(), "rb");
   if (fd == NULL)
     die("Cannot open %s", config_path.c_str());
-  this->header_size = 4096;// TODO dont hardcode size of this file
+  this->header_size = 4096; // PCI config headers can only be this big. Later we check if we can actually read this much
+  // For some reason we can't mmap this file, so we read it instad.
   //this->header_mmap = mmap(NULL, this->header_size, PROT_READ, MAP_PRIVATE, fd, 0);
   //if (this->header_mmap == MAP_FAILED)
     //die("mmap failed");
+  if (this->header_mmap != NULL)
+    die("header_mmap has already been set");
   this->header_mmap = malloc(this->header_size);
   if (this->header_mmap == NULL)
     die("malloc failed");
@@ -33,10 +35,20 @@ void Capabilities::map_header(std::string device) {
   size_t ret = fread(this->header_mmap, sizeof(char), this->header_size, fd);
   if (ret != this->header_size)
     die("only %zu bytes read", ret);
+
+  fclose(fd);
 }
 
-Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr, std::string device) {
-  (void)(config_ptr); // unused. TODO
+Capabilities::~Capabilities() {
+  free(this->header_mmap);
+  free(this->vfu_ctx_stub->reg_info);
+  free(this->vfu_ctx_stub);
+}
+
+Capabilities::Capabilities(const vfio_region_info *config_info, std::string device) {
+  // set up a fake vfu_ctx. We dont actually do any libvfio-user stuff here,
+  // but just create a stub context so we can use libvfio-users pci capability
+  // parsing functionality.
   this->vfu_ctx_stub = (vfu_ctx_t*) malloc(sizeof(vfu_ctx_t));
   if (this->vfu_ctx_stub == NULL)
     die("malloc failed");
@@ -54,7 +66,6 @@ Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr
 
   this->map_header(device);
 
-  //this->vfu_ctx_stub->pci.config_space = (vfu_pci_config_space_t *)config_ptr;
   this->vfu_ctx_stub->pci.config_space = (vfu_pci_config_space_t *)this->header_mmap;
 
   vfu_reg_info_t *config_info_stub = &(this->vfu_ctx_stub->reg_info[VFU_PCI_DEV_CFG_REGION_IDX]);
@@ -64,17 +75,18 @@ Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr
 
   if (config_info_stub->size != this->header_size)
     die("Inconsistent pci config space size found");
-
 }
 
-// returns void pointer cap_data and writes cap_size
+// allocates void pointer filled with cap_data
 void *Capabilities::capa(const char name[], int id, size_t size, bool extended) {
-  // TODO error handling
   size_t cap_offset = vfu_pci_find_next_capability(this->vfu_ctx_stub, extended, 0, id);
-  //size_t cap_size = cap_size( vfu_ctx, data, extended )
+  if (!cap_offset)
+    die("capability %s not found", name);
+  //size_t cap_size = cap_size( vfu_ctx, data, extended ); we rather set our own sizes
   size_t cap_size = size;
   void *cap_data = malloc(cap_size);
-  // TODO error handling
+  if (cap_data == NULL)
+    die("malloc failed");
   memcpy(cap_data, (char*)this->header_mmap + cap_offset, cap_size);
   printf("%s capability at offset %zu\n", name, cap_offset);
   return cap_data;
@@ -89,11 +101,11 @@ void *Capabilities::pm() {
 };
 
 void *Capabilities::msi() {
-  return this->capa("msi", PCI_CAP_ID_MSI, PCI_CAP_MSIX_SIZEOF, false); // TODO can be up to 0x18 long as per spec sec 7.7.1
+  return this->capa("msi", PCI_CAP_ID_MSI, PCI_CAP_MSIX_SIZEOF, false); // can be longer?! Up to 0x18 long as per spec sec 7.7.1
 };
 
 void *Capabilities::msix() {
-  return this->capa("msix", PCI_CAP_ID_MSIX, PCI_CAP_MSIX_SIZEOF, false); // TODO we dont copy tables here
+  return this->capa("msix", PCI_CAP_ID_MSIX, PCI_CAP_MSIX_SIZEOF, false); // We dont copy tables here. But i think they are written by libvfio-user
 };
 
 void *Capabilities::exp() {

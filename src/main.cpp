@@ -204,28 +204,35 @@ class VfioUserServer {
     }
 
     void setup_callbacks(VfioConsumer *callback_context) {
+      int ret;
       this->callback_context = callback_context;
       // I think quiescing only applies when using vfu_add_to_sgl and vfu_sgl_read (see libvfio-user/docs/memory-mapping.md
       //vfu_setup_device_quiesce_cb(this->vfu_ctx, VfioUserServer::quiesce_cb);
-      vfu_setup_device_reset_cb(this->vfu_ctx, VfioUserServer::reset_device_cb);
+      ret = vfu_setup_device_reset_cb(this->vfu_ctx, VfioUserServer::reset_device_cb);
+      if (ret)
+        die("setting up reset callback for libvfio-user failed %d", ret);
       //vfu_setup_device_dma(this->vfu_ctx, VfioUserServer::dma_register_cb, VfioUserServer::dma_unregister_cb);
-      vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_INTX_IRQ, VfioUserServer::intx_state_cb);
+      ret = vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_INTX_IRQ, VfioUserServer::intx_state_cb);
+      if (ret)
+        die("setting up intx state callback for libvfio-user failed");
       for (int type = 1; type < VFU_DEV_NUM_IRQS; type++) {
-        // TODO do loop only for unused irq types and use real callbacks for others
-        vfu_setup_irq_state_callback(this->vfu_ctx, (enum vfu_dev_irq_type) type, VfioUserServer::irq_state_cb);
+        // register callbacks for all since it is only called for used IRQs
+        ret = vfu_setup_irq_state_callback(this->vfu_ctx, (enum vfu_dev_irq_type) type, VfioUserServer::irq_state_cb);
+        if (ret)
+          die("setting up irq type %d callback for libvfio-user failed", type);
       }
-      // TODO check ret vals
     }
 
   private:
     static int reset_device_cb(vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_reset_type_t type) {
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
-      printf("resetting device\n"); // TODO this happens at VM boot. implement.
+      printf("resetting device\n"); // this happens at VM boot
       vfu->callback_context->reset_device();
       return 0;
     }
 
     static int quiesce_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx) {
+      // See vfu_setup_device_quiesce_cb().
       //VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
       //vfu_quiesce_done(vfu.vfu_ctx, 0);
       //die("quiesce_cb unimplemented");
@@ -284,7 +291,6 @@ class VfioUserServer {
 
     static void intx_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
-      // TODO for this to work, we have to set up INTX irqs with vfio of course
       vfu->callback_context->mask_irqs(VFIO_PCI_INTX_IRQ_INDEX, start, count, mask);
     }
 
@@ -480,8 +486,8 @@ int _main(int argc, char** argv) {
     die("failed to setup log");
   }
 
-  ret = vfu_pci_init(vfu.vfu_ctx, VFU_PCI_TYPE_EXPRESS, // TODO express
-                     PCI_HEADER_TYPE_NORMAL, 3); // TODO 4?
+  ret = vfu_pci_init(vfu.vfu_ctx, VFU_PCI_TYPE_EXPRESS,
+                     PCI_HEADER_TYPE_NORMAL, 3); // maybe 4?
   if (ret < 0) {
     die("vfu_pci_init() failed") ;
   }
@@ -509,46 +515,46 @@ int _main(int argc, char** argv) {
   vfu.add_msix_pollfds(vfioc.irqfds);
 
   // set capabilities
-  Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc.mmio[VFU_PCI_DEV_CFG_REGION_IDX], device);
+  Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), device);
   void *cap_data;
 
   cap_data = caps.pm();
   ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
   if (ret < 0)
     die("add cap error");
-  // TODO free the data
+  free(cap_data);
 
   cap_data = caps.msix();
   ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
   if (ret < 0)
     die("add cap error");
-  // TODO free the data
+  free(cap_data);
 
   // not supported by libvfio-user:
   //cap_data = caps.msi();
   //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
   //if (ret < 0)
   //  die("add cap error");
-  //// free the data
+  //free(cap_data);
   
   cap_data = caps.exp();
   ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
   if (ret < 0)
     die("add cap error");
-  // TODO free the data
+  free(cap_data);
  
   // not supported by upstream libvfio-user, not used by linux ice driver
   //cap_data = caps.vpd();
   //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
   //if (ret < 0)
   //  die("add cap error");
-  //// free the data
+  //free(cap_data);
   
   cap_data = caps.dsn();
   ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY | VFU_CAP_FLAG_EXTENDED, cap_data);
   if (ret < 0)
     die("add cap error");
-  // TODO free the data
+  free(cap_data);
 
   // see lspci about which fields mean what https://github.com/pciutils/pciutils/blob/42e6a803bda392e98276b71994db0b0dd285cab1/ls-caps.c#L1469
   //struct msixcap data;

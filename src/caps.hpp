@@ -8,7 +8,8 @@ class Capabilities {
   public:
     vfu_ctx_t *vfu_ctx_stub;
 
-    Capabilities(const vfio_region_info *config_info, void *config_ptr, std::string device);
+    ~Capabilities();
+    Capabilities(const vfio_region_info *config_info, std::string device);
 
     void *capa(const char name[], int id, size_t size, bool extended);
     void *dsn();
@@ -19,7 +20,7 @@ class Capabilities {
     void *vpd();
 
   private:
-    void *header_mmap;
+    void *header_mmap = NULL;
     size_t header_size;
 
     void map_header(std::string device);
