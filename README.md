@@ -44,7 +44,7 @@ just vm-update host-config
 
 ## vMux demo
 
-Start vmux `sudo ./build/vmux` and qemu using `just vm-libvfio-user`. Connect to the VM `just ssh` and run:
+Start vmux `just vmux` and qemu using `just vm-libvfio-user`. Connect to the VM `just ssh` and run:
 
 ```
 # loading the ice driver still fails sadly: ice 0000:00:07.0: ice_init_hw failed: -105
@@ -57,6 +57,9 @@ devmem 0xfa0b8190 32 1
 # reset status has changed (bit 7:6 incremented)
 devmem 0xfa0B8188
 ```
+
+If you read too much `FFFFFFFF` or `DEADBEEF`, you probably need to reboot the machine/NIC.
+
 ## Run benchmarks
 
 See also [autotest](test/README.md) for details.
