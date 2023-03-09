@@ -94,3 +94,17 @@ sudo sh -c "echo 4 > /sys/class/net/enp24s0f0/device/sriov_numvfs"
 bind vfio-pci on vf nics
 
 boot vm with it
+
+## Guest kernel modules:
+
+```
+nix develop .#host-kernel
+tar -xvf $src
+cd linux-*
+cp $KERNELDIR/lib/modules/*/build/.config .config
+make LOCALVERSION= scripts prepare modules_prepare
+# build whatever module you want: (M=yourmodule)
+make -C . M=drivers/block/null_blk
+```
+
+read more at (Hacking on Kernel Modules in NixOS)[https://blog.thalheim.io/2022/12/17/hacking-on-kernel-modules-in-nixos/]

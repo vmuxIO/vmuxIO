@@ -40,7 +40,7 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -drive file={{proot}}/VMs/host-image2.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-pci,host={{PASSTHROUGH}} \
@@ -148,6 +148,7 @@ vm-overwrite:
   # host VM
   nix build -o {{proot}}/VMs/host-image-ro .#host-image # read only
   install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image.qcow2
+  install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image2.qcow2
   # guest VM
   nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
   install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2

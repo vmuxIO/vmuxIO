@@ -3,3 +3,5 @@ result
 VMs/
 __pycache__/
 outputs/
+.cache/
+linux-*/

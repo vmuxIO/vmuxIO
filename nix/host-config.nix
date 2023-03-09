@@ -114,8 +114,15 @@ lib.attrsets.recursiveUpdate ({
     (writeScriptBin "devmem" ''
       ${busybox}/bin/devmem $@
     '')
+    ethtool
+    bpftrace
   ];
 
+  # this breaks make/insmod kmods though:
+  #boot.extraModprobeConfig = ''
+  #  blacklist ice
+  #  blacklist ixgbe
+  #'';
   boot.kernelPatches = [
     {
       name = "enable-debug-symbols";
@@ -124,6 +131,10 @@ lib.attrsets.recursiveUpdate ({
         DEBUG_INFO y
       '';
     }
+    #{
+    #  name = "ixgbe-use-vmux-capability-offset-instead-of-hardware";
+    #  patch = ./0001-ixgbe-vmux-capa.patch;
+    #}
   ];
 
   #boot.kernelPackages = let
