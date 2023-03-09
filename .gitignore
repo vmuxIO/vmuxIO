@@ -2,3 +2,6 @@ result
 .ccls-cache/
 VMs/
 __pycache__/
+outputs/
+.cache/
+linux-*/

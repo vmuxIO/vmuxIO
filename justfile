@@ -2,8 +2,8 @@ proot := justfile_directory()
 host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
 qemu_ssh_port := "2222"
 user := `whoami`
-# vmuxSock := "/tmp/vmux-" + user + ".sock"
-vmuxSock := "/tmp/peter.sock"
+vmuxSock := "/tmp/vmux-" + user + ".sock"
+#vmuxSock := "/tmp/vmux.sock"
 
 default:
   @just --choose
@@ -12,8 +12,8 @@ default:
 help:
   just --list
 
-vmux:
-  sudo ./build/vmux {{vmuxSock}}
+vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
+  sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
 # connect to `just qemu` vm
 ssh COMMAND="":
@@ -21,6 +21,7 @@ ssh COMMAND="":
   -i {{proot}}/nix/ssh_key \
   -o StrictHostKeyChecking=no \
   -o UserKnownHostsFile=/dev/null \
+  -o IdentityAgent=/dev/null \
   -F /dev/null \
   -p {{qemu_ssh_port}} \
   root@localhost -- "{{COMMAND}}"
@@ -37,7 +38,9 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
-        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/host-image2.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-pci,host={{PASSTHROUGH}} \
@@ -51,10 +54,13 @@ vm-libvfio-user:
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
         -drive file={{proot}}/VMs/host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-user-pci,socket={{vmuxSock}} \
+        -s \
         -nographic
 
 # not working
@@ -67,6 +73,8 @@ vm-extkern EXTRA_CMDLINE="":
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
         -hda {{host_extkern_image}} \
         -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
         -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
@@ -140,6 +148,7 @@ vm-overwrite:
   # host VM
   nix build -o {{proot}}/VMs/host-image-ro .#host-image # read only
   install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image.qcow2
+  install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image2.qcow2
   # guest VM
   nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
   install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2

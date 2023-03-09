@@ -163,6 +163,9 @@
         ninja
         python310.pkgs.mypy # python static typing
         gdb
+        (writeScriptBin "devmem" ''
+          ${busybox}/bin/devmem $@
+        '')
 
         # dependencies for hosts/prepare.py
         python310.pkgs.pyyaml
@@ -218,6 +221,9 @@
         shellHook = ''
           unset CPP # intereferes with dependency calculation
         '';
+      });
+      host-kernel = self.nixosConfigurations.host.config.boot.kernelPackages.kernel.overrideAttrs (finalAttrs: previousAttrs: {
+        KERNELDIR="${self.nixosConfigurations.host.config.boot.kernelPackages.kernel.dev}";
       });
     };
   })) // {
