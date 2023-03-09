@@ -16,8 +16,8 @@ _log([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] int level, char const
     fprintf(stderr, "capabilies[%d]: %s\n", getpid(), msg);
 }
 
-void Capabilities::map_header() {
-  std::string config_path = "/sys/bus/pci/devices/0000:18:00.0/config"; // TODO dont hardcode id
+void Capabilities::map_header(std::string device) {
+  std::string config_path = "/sys/bus/pci/devices/" + device + "/config";
   //int fd = open(config_path.c_str(), O_RDONLY);
   FILE *fd = fopen(config_path.c_str(), "rb");
   if (fd == NULL)
@@ -35,7 +35,7 @@ void Capabilities::map_header() {
     die("only %zu bytes read", ret);
 }
 
-Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr) {
+Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr, std::string device) {
   (void)(config_ptr); // unused. TODO
   this->vfu_ctx_stub = (vfu_ctx_t*) malloc(sizeof(vfu_ctx_t));
   if (this->vfu_ctx_stub == NULL)
@@ -52,7 +52,7 @@ Capabilities::Capabilities(const vfio_region_info *config_info, void *config_ptr
     die("failed to setup log");
   }
 
-  this->map_header();
+  this->map_header(device);
 
   //this->vfu_ctx_stub->pci.config_space = (vfu_pci_config_space_t *)config_ptr;
   this->vfu_ctx_stub->pci.config_space = (vfu_pci_config_space_t *)this->header_mmap;

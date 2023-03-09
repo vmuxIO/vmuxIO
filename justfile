@@ -2,8 +2,8 @@ proot := justfile_directory()
 host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
 qemu_ssh_port := "2222"
 user := `whoami`
-# vmuxSock := "/tmp/vmux-" + user + ".sock"
-vmuxSock := "/tmp/peter.sock"
+vmuxSock := "/tmp/vmux-" + user + ".sock"
+#vmuxSock := "/tmp/vmux.sock"
 
 default:
   @just --choose
@@ -12,8 +12,8 @@ default:
 help:
   just --list
 
-vmux:
-  sudo ./build/vmux {{vmuxSock}}
+vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
+  sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
 # connect to `just qemu` vm
 ssh COMMAND="":

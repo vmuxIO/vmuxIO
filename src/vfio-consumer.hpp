@@ -2,6 +2,7 @@
 #include<vector>
 #include <map>
 #include <linux/vfio.h>
+#include <string>
 extern "C" {
   #include "libvfio-user.h"
 }
@@ -22,7 +23,8 @@ class VfioConsumer {
     struct vfio_iommu_type1_dma_map dma_map;
     bool use_msix = true;
 
-
+    std::string group_str;
+    std::string device_name;
 
     // vfio fds
     int container;
@@ -30,6 +32,7 @@ class VfioConsumer {
     int device;
 
     ~VfioConsumer();
+    VfioConsumer(std::string group_str, std::string device_name);
     int init();
     int init_mmio();
     void init_msix();
