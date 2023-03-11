@@ -1,0 +1,61 @@
+diff --git a/hw/vfio/common.c b/hw/vfio/common.c
+index 2b1f78fdfa..0e972af439 100644
+--- a/hw/vfio/common.c
++++ b/hw/vfio/common.c
+@@ -510,6 +510,7 @@ static int vfio_dma_map(VFIOContainer *container, hwaddr iova,
+      * again.  This shouldn't be necessary, but we sometimes see it in
+      * the VGA ROM space.
+      */
++    return 0;
+     if (ioctl(container->fd, VFIO_IOMMU_MAP_DMA, &map) == 0 ||
+         (errno == EBUSY && vfio_dma_unmap(container, iova, size, NULL) == 0 &&
+          ioctl(container->fd, VFIO_IOMMU_MAP_DMA, &map) == 0)) {
+@@ -677,6 +678,7 @@ static void vfio_iommu_map_notify(IOMMUNotifier *n, IOMMUTLBEntry *iotlb)
+     }
+ 
+     rcu_read_lock();
++    goto out;
+ 
+     if ((iotlb->perm & IOMMU_RW) != IOMMU_NONE) {
+         bool read_only;
+@@ -1060,6 +1062,8 @@ static void vfio_listener_region_add(MemoryListener *listener,
+         }
+     }
+ 
++    return;
++
+     ret = vfio_dma_map(container, iova, int128_get64(llsize),
+                        vaddr, section->readonly);
+     if (ret) {
+@@ -1182,7 +1186,8 @@ static void vfio_listener_region_del(MemoryListener *listener,
+         try_unmap = false;
+     }
+ 
+-    if (try_unmap) {
++    /*if (try_unmap) {*/
++    if (false) {
+         if (int128_eq(llsize, int128_2_64())) {
+             /* The unmap ioctl doesn't accept a full 64-bit span. */
+             llsize = int128_rshift(llsize, 1);
+diff --git a/hw/vfio/pci.c b/hw/vfio/pci.c
+index 9fd9faee1d..1c00b951fd 100644
+--- a/hw/vfio/pci.c
++++ b/hw/vfio/pci.c
+@@ -2224,7 +2224,7 @@ static int vfio_pci_hot_reset(VFIOPCIDevice *vdev, bool single)
+     info = g_malloc0(sizeof(*info));
+     info->argsz = sizeof(*info);
+ 
+-    ret = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_GET_PCI_HOT_RESET_INFO, info);
++    ret = ioctl(vdev->vbasedev.fd, VFIO_DEVICE_GET_PCI_HOT_RESET_INFO, info); // MARKER i feel like we should take a look at HOT_RESET for vmux
+     if (ret && errno != ENOSPC) {
+         ret = -errno;
+         if (!vdev->has_pm_reset) {
+@@ -2800,7 +2800,7 @@ static void vfio_unregister_req_notifier(VFIOPCIDevice *vdev)
+     vdev->req_enabled = false;
+ }
+ 
+-static void vfio_realize(PCIDevice *pdev, Error **errp)
++static void vfio_realize(PCIDevice *pdev, Error **errp) // MARKER entry point?
+ {
+     VFIOPCIDevice *vdev = VFIO_PCI(pdev);
+     VFIODevice *vbasedev_iter;

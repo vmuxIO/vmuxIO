@@ -1,6 +1,6 @@
 { pkgs2211 }:
 with pkgs2211;
-qemu_full.overrideAttrs ( new: old: {
+qemu.overrideAttrs ( new: old: {
   src = fetchFromGitHub {
     owner = "oracle";
     repo = "qemu";
@@ -8,8 +8,11 @@ qemu_full.overrideAttrs ( new: old: {
     hash = "sha256-kCX2ByuJxERLY2nHjPndVoo7TQm1j4qrpLjRcs42HU4=";
     fetchSubmodules = true;
   };
-  version = "7.1.5";
+  version = "7.1.5-libvfio-user";
   buildInputs = [ libndctl ] ++ old.buildInputs;
   nativeBuildInputs = [ json_c cmocka ] ++ old.nativeBuildInputs;
   configureFlags = old.configureFlags ++ [ "--enable-vfio-user-server"];
+  patches = old.patches ++ [
+    ./0002-qemu-libvfio-user-no-dma.patch
+  ];
 })
