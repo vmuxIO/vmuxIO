@@ -381,10 +381,13 @@ class LoadLatencyTestGenerator(object):
                     qemu, _ = q.split(':')
                     tree[m][i][q] = {}
                     for v in self.vhosts:
+                        if v and i == Interface.VFIO:
+                            continue
                         tree[m][i][q][v] = {}
                         # for io in reversed(list(self.ioregionfds)):
                         for io in self.ioregionfds:
-                            if io and m != Machine.MICROVM:
+                            if io and (m != Machine.MICROVM
+                                       or i == Interface.VFIO):
                                 continue
                             tree[m][i][q][v][io] = {}
                             for r in self.reflectors:
