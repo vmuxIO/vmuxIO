@@ -211,7 +211,7 @@ class VfioUserServer {
       ret = vfu_setup_device_reset_cb(this->vfu_ctx, VfioUserServer::reset_device_cb);
       if (ret)
         die("setting up reset callback for libvfio-user failed %d", ret);
-      //vfu_setup_device_dma(this->vfu_ctx, VfioUserServer::dma_register_cb, VfioUserServer::dma_unregister_cb);
+      vfu_setup_device_dma(this->vfu_ctx, VfioUserServer::dma_register_cb, VfioUserServer::dma_unregister_cb);
       ret = vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_INTX_IRQ, VfioUserServer::intx_state_cb);
       if (ret)
         die("setting up intx state callback for libvfio-user failed");
@@ -241,13 +241,14 @@ class VfioUserServer {
     }
 
     static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_dma_info_t *info) {
+      __builtin_dump_struct(info, &printf);
       printf("register dma cb\n");
       if (info->iova.iov_base == NULL ||
           info->iova.iov_base == (void*)0xc0000 ||
           info->iova.iov_base == (void*)0xe0000 )
         return;
 
-      __builtin_dump_struct(info, &printf);
+      //__builtin_dump_struct(info, &printf);
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
 
       uint32_t flags = 0;
@@ -256,15 +257,34 @@ class VfioUserServer {
       if (PROT_WRITE & info->prot)
         flags |= VFIO_DMA_MAP_FLAG_WRITE;
 
-      if (info->vaddr != NULL)
-        die("dont know how to handle this vaddr");
+      if (!info->vaddr){
+        //vfu_sgl_get failes if vaddr is NULL
+        printf("Region not mappable\n");
+        return;
+      }
 
+      //Map the region into the vmux Address Space
+      struct iovec* mapping = (struct iovec*)calloc(1,sizeof(struct iovec));
+      dma_sg_t *sgl = (dma_sg_t*)calloc(1, dma_sg_size());
+      int ret = vfu_addr_to_sgl(vfu_ctx,info->iova.iov_base,info->iova.iov_len,sgl,1,flags);
+      if(ret < 0){
+        die("Failed to get sgl for DMA\n");
+      }
+  
+      if(vfu_sgl_get(vfu_ctx ,sgl,mapping,1,0)){
+        die("Failed to populate iovec array");
+      }
+
+      __builtin_dump_struct(info, &printf);
+      __builtin_dump_struct(mapping, &printf);
+      
+      
       vfio_iommu_type1_dma_map dma_map = {
         .argsz = sizeof(vfio_iommu_type1_dma_map),
         .flags = flags,
         .vaddr = (uint64_t)(info->vaddr),
-        .iova = (uint64_t)(info->iova.iov_base),
-        .size = info->iova.iov_len,
+        .iova = (uint64_t)(mapping->iov_base),
+        .size =  mapping->iov_len,
       };
       __builtin_dump_struct(&dma_map, &printf);
       vfu->callback_context->map_dma(&dma_map);
@@ -278,6 +298,13 @@ class VfioUserServer {
         return;
 
       __builtin_dump_struct(info, &printf);
+
+      //info->mapping indicates if mapped
+      if(!info->mapping.iov_base){
+        printf("Region not mapped, nothing to do\n");
+        return;
+      }
+
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
 
       vfio_iommu_type1_dma_unmap dma_unmap = {
