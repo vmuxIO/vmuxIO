@@ -370,13 +370,14 @@ class LoadLatencyTestGenerator(object):
                         )
                     count += interface_test_count
         # vm part
-        mac = host.guest_test_iface_mac
         for m in self.machines - {Machine.HOST}:
             tree[m] = {}
             for i in self.interfaces - {Interface.PNIC}:
                 if (m == Machine.MICROVM and i == Interface.VFIO):
                     continue
                 tree[m][i] = {}
+                mac = host.test_iface_mac \
+                    if i == Interface.VFIO else host.guest_test_iface_mac
                 for q in self.qemus:
                     qemu, _ = q.split(':')
                     tree[m][i][q] = {}
