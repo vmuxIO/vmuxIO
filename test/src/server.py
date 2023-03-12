@@ -835,6 +835,28 @@ class Server(ABC):
         """
         return self.exec(f'cat /sys/class/net/{iface}/address')
 
+    def get_nic_ip_addresses(self: 'Server', iface: str) -> list[str]:
+        """
+        Get the IP addresses for a network interface.
+
+        Parameters
+        ----------
+        iface : str
+            The network interface identifier.
+
+        Returns
+        -------
+        List[str]
+            The IP addresses.
+
+        Example
+        -------
+        >>> server.get_nic_ip_addresses('enp176s0')
+        ['192.168.0.1/24']
+        """
+        return self.exec(f'ip addr show dev {iface}' +
+                         ' | grep inet | awk "{print \\$2}"').splitlines()
+
     def start_moongen_reflector(self: 'Server'):
         """
         Start the libmoon L2 reflector.
