@@ -283,10 +283,16 @@ class LoadLatencyTestGenerator(object):
         sleep(5)
 
     def stop_reflector(self, server: Server, reflector: Reflector,
-                       iface: str = None):
+                       interface: Interface, iface: str = None):
         if reflector == Reflector.MOONGEN:
             server.stop_moongen_reflector()
-            server.release_test_iface()
+            if interface == Interface.VFIO:
+                server.unbind_device(server.test_iface_addr)
+                # TODO: The hardcoded driver is a dirty workaround,
+                #       we need to fix this later on
+                server.bind_device(server.test_iface_addr, 'ice')
+            else:
+                server.release_test_iface()
         else:
             server.stop_xdp_reflector(iface)
 
@@ -528,7 +534,7 @@ class LoadLatencyTestGenerator(object):
                                             test.accumulate()
 
                                 debug(f"Stopping reflector {reflector.value}")
-                                self.stop_reflector(dut, reflector)
+                                self.stop_reflector(dut, reflector, interface)
 
                             if machine != Machine.HOST:
                                 debug(f"Killing guest {machine.value} " +
