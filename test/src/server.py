@@ -857,6 +857,25 @@ class Server(ABC):
         return self.exec(f'ip addr show dev {iface}' +
                          ' | grep inet | awk "{print \\$2}"').splitlines()
 
+    def delete_nic_ip_addresses(self: 'Server', iface: str) -> None:
+        """
+        Delete the IP addresses for a network interface.
+
+        Parameters
+        ----------
+        iface : str
+            The network interface identifier.
+
+        Returns
+        -------
+
+        Example
+        -------
+        >>> server.delete_nic_ip_addresses('enp176s0')
+        """
+        for addr in self.get_nic_ip_addresses(iface):
+            self.exec(f'sudo ip addr del {addr} dev {iface}')
+
     def start_moongen_reflector(self: 'Server'):
         """
         Start the libmoon L2 reflector.
