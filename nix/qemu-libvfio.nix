@@ -53,5 +53,8 @@ qemu_full.overrideAttrs ( new: old: {
     "--disable-vvfat"
     "--disable-qed"
     "--disable-parallels"
+  ] ++ [ "--enable-vfio-user-server"];
+  patches = old.patches ++ [
+    ./print.patch
   ];
 })

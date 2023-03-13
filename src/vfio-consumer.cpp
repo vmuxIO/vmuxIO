@@ -294,14 +294,22 @@ void VfioConsumer::mask_irqs(uint32_t irq_type, uint32_t start, uint32_t count, 
 void VfioConsumer::reset_device() {
   // TODO check if device supports reset VFIO_DEVICE_FLAGS_RESET
   int ret = ioctl(this->device, VFIO_DEVICE_RESET, NULL);
+  
   if (ret < 0)
     die("failed to reset device");
 }
 
 void VfioConsumer::map_dma(vfio_iommu_type1_dma_map *dma_map) {
   int ret = ioctl(this->container, VFIO_IOMMU_MAP_DMA, dma_map);
-  if (ret < 0)
-    die("vfio failed to map dma");
+  if (ret < 0){
+    	printf("\033[31mvifo failed to map dma, %d: %s\033[0m\n",errno, strerror(errno));
+	printf("\033[31m");
+	__builtin_dump_struct(dma_map, &printf);
+	printf("\033[0m");
+	return;
+	die("vfio failed to map dma, %d",errno);
+	
+  }
 }
 
 void VfioConsumer::unmap_dma(vfio_iommu_type1_dma_unmap *dma_unmap) {

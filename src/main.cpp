@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <optional>
 #include <dirent.h>
+#include <set>
 
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
@@ -84,7 +85,8 @@ class VfioUserServer {
     size_t irq_req_pollfd_idx; // only one
     std::vector<struct pollfd> pollfds;
     VfioConsumer *callback_context;
-   
+    std::set<void*> mapped;
+    std::map<void*, dma_sg_t*> sgs;
     VfioUserServer(std::string sock) {
       this->sock = sock;
     }
@@ -241,8 +243,9 @@ class VfioUserServer {
     }
 
     static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_dma_info_t *info) {
-      __builtin_dump_struct(info, &printf);
+      
       printf("register dma cb\n");
+      
       if (info->iova.iov_base == NULL ||
           info->iova.iov_base == (void*)0xc0000 ||
           info->iova.iov_base == (void*)0xe0000 )
@@ -250,13 +253,18 @@ class VfioUserServer {
 
       //__builtin_dump_struct(info, &printf);
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
-
+      printf("{\n");
+      for(void* const& p: vfu->mapped){
+        printf("%p\n",p);
+      }
+      printf("}\n");
       uint32_t flags = 0;
       if (PROT_READ & info->prot)
         flags |= VFIO_DMA_MAP_FLAG_READ;
       if (PROT_WRITE & info->prot)
         flags |= VFIO_DMA_MAP_FLAG_WRITE;
-
+      __builtin_dump_struct(info, &printf);
+  
       if (!info->vaddr){
         //vfu_sgl_get failes if vaddr is NULL
         printf("Region not mappable\n");
@@ -275,6 +283,12 @@ class VfioUserServer {
         die("Failed to populate iovec array");
       }
 
+      
+
+
+      printf("Add Address to mapped addresses\n");
+      vfu->sgs[info->vaddr] = sgl; 
+      vfu->mapped.insert(info->vaddr);
       __builtin_dump_struct(info, &printf);
       __builtin_dump_struct(mapping, &printf);
       
@@ -283,8 +297,8 @@ class VfioUserServer {
         .argsz = sizeof(vfio_iommu_type1_dma_map),
         .flags = flags,
         .vaddr = (uint64_t)(info->vaddr),
-        .iova = (uint64_t)(mapping->iov_base),
-        .size =  mapping->iov_len,
+        .iova = (uint64_t)(info->iova.iov_base),
+        .size =  info->iova.iov_len,
       };
       __builtin_dump_struct(&dma_map, &printf);
       vfu->callback_context->map_dma(&dma_map);
@@ -299,13 +313,33 @@ class VfioUserServer {
 
       __builtin_dump_struct(info, &printf);
 
+      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      printf("{\n");
+      for(void* const& p: vfu->mapped){
+        printf("%p\n",p);
+      }
+      printf("}\n");
+
+
       //info->mapping indicates if mapped
       if(!info->mapping.iov_base){
         printf("Region not mapped, nothing to do\n");
         return;
       }
 
-      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+
+      if(!vfu->mapped.count(info->iova.iov_base)){
+        printf("Region seems not to be mapped\n");
+        return;
+      }
+      if(vfu->sgs.count(info->vaddr)==1){
+        printf("dealloc sgl\n");
+      }
+      if(vfu->sgs.count(info->vaddr)>1){
+        printf("Why?\n");
+        return;
+      }
+
 
       vfio_iommu_type1_dma_unmap dma_unmap = {
         .argsz = sizeof(vfio_iommu_type1_dma_unmap),

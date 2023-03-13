@@ -47,10 +47,27 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -nographic
 
 vm-libvfio-user:
-    sudo {{proot}}/qemu/bin/qemu-system-x86_64 \
+    sudo qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
         -m 8G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=8G,share=on -numa node,memdev=bm \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -device vfio-user-pci,socket={{vmuxSock}} \
+        -s \
+        -nographic
+
+vm-libvfio-user-not-shared:
+    sudo qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 8G \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -241,3 +258,4 @@ autotest-ssh *ARGS:
   import os
   os.system(f"ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
   
+
