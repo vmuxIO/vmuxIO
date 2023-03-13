@@ -327,24 +327,26 @@ class LoadLatencyTestGenerator(object):
         tree = {}
         for rate in self.rates:
             tree[rate] = {}
-            for runtime in self.runtimes:
-                test = LoadLatencyTest(
-                    machine=machine,
-                    interface=interface,
-                    mac=mac,
-                    qemu=qemu,
-                    vhost=vhost,
-                    ioregionfd=ioregionfd,
-                    reflector=reflector,
-                    rate=rate,
-                    size=self.size,
-                    runtime=runtime,
-                    repetitions=self.repetitions,
-                    warmup=self.warmup,
-                    cooldown=self.cooldown,
-                    outputdir=self.outputdir,
-                )
-                tree[rate][runtime] = test
+            for size in self.sizes:
+                tree[rate][size] = {}
+                for runtime in self.runtimes:
+                    test = LoadLatencyTest(
+                        machine=machine,
+                        interface=interface,
+                        mac=mac,
+                        qemu=qemu,
+                        vhost=vhost,
+                        ioregionfd=ioregionfd,
+                        reflector=reflector,
+                        rate=rate,
+                        size=size,
+                        runtime=runtime,
+                        repetitions=self.repetitions,
+                        warmup=self.warmup,
+                        cooldown=self.cooldown,
+                        outputdir=self.outputdir,
+                    )
+                    tree[rate][size][runtime] = test
         return tree
 
     def create_test_tree(self, host: Host):
