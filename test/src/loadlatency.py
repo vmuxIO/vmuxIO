@@ -533,14 +533,15 @@ class LoadLatencyTestGenerator(object):
                                 self.start_reflector(dut, reflector)
 
                                 for rate, atree in rtree.items():
-                                    for runtime, test in atree.items():
-                                        test.run(loadgen)
-                                        if self.accumulate:
-                                            # TODO we probably need to put
-                                            # this somewhere else to
-                                            # make sure it runs even if the
-                                            # tests are already done
-                                            test.accumulate()
+                                    for size, stree in atree.items():
+                                        for runtime, test in stree.items():
+                                            test.run(loadgen)
+                                            if self.accumulate:
+                                                # TODO we probably need to put
+                                                # this somewhere else to
+                                                # make sure it runs even if the
+                                                # tests are already done
+                                                test.accumulate()
 
                                 debug(f"Stopping reflector {reflector.value}")
                                 self.stop_reflector(dut, reflector, interface)
