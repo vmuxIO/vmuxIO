@@ -136,7 +136,9 @@ class LoadLatencyTest(object):
             # warm-up
             sleep(10)
             try:
-                loadgen.run_l2_load_latency(self.mac, 0, 20, histfile=remote_histogram_file, outfile=remote_output_file)
+                loadgen.run_l2_load_latency(self.mac, 0, 20,
+                                            histfile=remote_histogram_file,
+                                            outfile=remote_output_file)
             except Exception as e:
                 error(f'Failed to run warm-up due to exception: {e}')
             sleep(25)
@@ -155,8 +157,10 @@ class LoadLatencyTest(object):
             try:
                 loadgen.exec(f'sudo rm -f {remote_output_file} ' +
                              f'{remote_histogram_file}')
-                loadgen.run_l2_load_latency(self.mac, self.rate, self.runtime,
-                                            self.size, histfile=remote_histogram_file, outfile=remote_output_file)
+                loadgen.run_l2_load_latency(self.mac, self.rate,
+                                            self.runtime, self.size,
+                                            histfile=remote_histogram_file,
+                                            outfile=remote_output_file)
             except Exception as e:
                 error(f'Failed to run test due to exception: {e}')
                 continue
