@@ -432,11 +432,14 @@ class LoadLatencyTestGenerator(object):
                         for f, ftree in vtree.items():
                             for r, rtree in ftree.items():
                                 for a, atree in rtree.items():
-                                    for t, test in atree.items():
-                                        if not test.needed():
-                                            del(needed[m][i][q][v][f][r][a][t])
-                                        else:
-                                            count += 1
+                                    for s, stree in atree.items():
+                                        for t, test in stree.items():
+                                            if not test.needed():
+                                                del(needed[m][i][q][v][f][r][a][s][t])
+                                            else:
+                                                count += 1
+                                        if not needed[m][i][q][v][f][r][a][s]:
+                                            del(needed[m][i][q][v][f][r][a][s])
                                     if not needed[m][i][q][v][f][r][a]:
                                         del(needed[m][i][q][v][f][r][a])
                                 if not needed[m][i][q][v][f][r]:
