@@ -565,24 +565,24 @@ class LoadLatencyTestGenerator(object):
                                             test.accumulate(force=True)
 
 
-if __name__ == "__main__":
-    machines = {Machine.HOST, Machine.PCVM, Machine.MICROVM}
-    interfaces = {Interface.PNIC, Interface.BRIDGE, Interface.MACVTAP,
-                  Interface.VFIO}
-    qemus = {"/home/networkadmin/qemu-build/qemu-system-x86_64",
-             "/home/networkadmin/qemu-build2/qemu-system-x86_64"}
-    vhosts = {True, False}
-    ioregionfds = {True, False}
-    reflectors = {Reflector.MOONGEN, Reflector.XDP}
-    rates = {1, 10, 100}
-    runtimes = {30, 60}
-    repetitions = 3
-    warmup = False
-    cooldown = False
-    accumulate = True
-    outputdir = "/home/networkadmin/loadlatency"
-
-    generator = LoadLatencyTestGenerator(
-        machines, interfaces, qemus, vhosts, ioregionfds, reflectors,
-        rates, runtimes, repetitions, warmup, cooldown, accumulate, outputdir
-    )
+# if __name__ == "__main__":
+#     machines = {Machine.HOST, Machine.PCVM, Machine.MICROVM}
+#     interfaces = {Interface.PNIC, Interface.BRIDGE, Interface.MACVTAP,
+#                   Interface.VFIO}
+#     qemus = {"/home/networkadmin/qemu-build/qemu-system-x86_64",
+#              "/home/networkadmin/qemu-build2/qemu-system-x86_64"}
+#     vhosts = {True, False}
+#     ioregionfds = {True, False}
+#     reflectors = {Reflector.MOONGEN, Reflector.XDP}
+#     rates = {1, 10, 100}
+#     runtimes = {30, 60}
+#     repetitions = 3
+#     warmup = False
+#     cooldown = False
+#     accumulate = True
+#     outputdir = "/home/networkadmin/loadlatency"
+# 
+#     generator = LoadLatencyTestGenerator(
+#         machines, interfaces, qemus, vhosts, ioregionfds, reflectors,
+#         rates, runtimes, repetitions, warmup, cooldown, accumulate, outputdir
+#     )
