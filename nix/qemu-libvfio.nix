@@ -12,4 +12,7 @@ qemu_full.overrideAttrs ( new: old: {
   buildInputs = [ libndctl ] ++ old.buildInputs;
   nativeBuildInputs = [ json_c cmocka ] ++ old.nativeBuildInputs;
   configureFlags = old.configureFlags ++ [ "--enable-vfio-user-server"];
+  patches = old.patches ++ [
+    ./print.patch
+  ];
 })

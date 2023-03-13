@@ -178,7 +178,7 @@
         python310.pkgs.colorlog
       ] ++ (with self.packages; [
         dpdk
-        qemu
+        self.packages.x86_64-linux.qemu
       ]);
     in {
       # use clang over gcc because it has __builtin_dump_struct()
