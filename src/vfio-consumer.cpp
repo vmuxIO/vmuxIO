@@ -70,9 +70,9 @@ int VfioConsumer::init() {
   }
 
   /* Open the group */
-  group = open("/dev/vfio/29", O_RDWR);
+  group = open("/dev/vfio/36", O_RDWR);
   if (group < 0) {
-    die("Cannot open /dev/vfio/29");
+    die("Cannot open /dev/vfio/36");
   }
   this->group = group;
 
@@ -122,7 +122,7 @@ int VfioConsumer::init() {
   this->dma_map = dma_map;
 
   /* Get a file descriptor for the device */
-  device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, "0000:18:00.0");
+  device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, "0000:51:00.0");
   if (device < 0) {
     die("Cannot get/find device id in IOMMU group fd %d", group);
   }

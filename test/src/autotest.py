@@ -196,7 +196,8 @@ def setup_parser() -> ArgumentParser:
     run_guest_parser.add_argument('-i',
                                   '--interface',
                                   type=str,
-                                  choices=['brtap', 'macvtap'],
+                                  choices=['brtap', 'macvtap',
+                                           'vfio', 'vmux'],
                                   default='brtap',
                                   help='Test network interface type.',
                                   )
@@ -272,7 +273,8 @@ def setup_parser() -> ArgumentParser:
     setup_network_parser.add_argument('-i',
                                       '--interface',
                                       type=str,
-                                      choices=['brtap', 'macvtap'],
+                                      choices=['brtap', 'macvtap',
+                                               'vfio', 'vmux'],
                                       default='brtap',
                                       help='Test network interface type.',
                                       )
@@ -515,9 +517,12 @@ def create_servers(conf: ConfigParser,
             conf['host']['test_iface_mac'],
             conf['host']['test_iface_driv'],
             conf['host']['test_iface_dpdk_driv'],
+            conf['host']['test_iface_vfio_driv'],
             conf['host']['test_bridge'],
             conf['host']['test_tap'],
             conf['host']['test_macvtap'],
+            conf['host']['vmux_path'],
+            conf['host']['vmux_socket_path'],
             conf['host']['root_disk_file'],
             conf['guest']['admin_iface_mac'],
             conf['guest']['test_iface_mac'],
@@ -668,11 +673,17 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
 def _setup_network(host: Host, interface: str) -> None:
     host.setup_admin_bridge()
     host.setup_admin_tap()
-    host.modprobe_test_iface_driver()
+    host.modprobe_test_iface_drivers()
     if interface == 'brtap':
         host.setup_test_br_tap()
-    else:
+    elif interface == 'macvtap':
         host.setup_test_macvtap()
+    elif interface == 'vfio':
+        host.delete_nic_ip_addresses(host.test_iface)
+        host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
+    elif interface == 'vmux':
+        host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
+        host.start_vmux()
 
 
 def setup_network(args: Namespace, conf: ConfigParser) -> None:

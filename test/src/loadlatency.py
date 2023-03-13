@@ -35,6 +35,11 @@ class Interface(Enum):
     # connected to it
     MACVTAP = "macvtap"
 
+    # VFIO-passthrough to physical NIC for the VM
+    VFIO = "vfio"
+
+    # TODO implement vmux interfaces 
+
 
 class Reflector(Enum):
     # Reflector types
@@ -255,7 +260,7 @@ class LoadLatencyTestGenerator(object):
         if machine != Machine.HOST:
             host.setup_admin_bridge()
             host.setup_admin_tap()
-            host.modprobe_test_iface_driver()
+            host.modprobe_test_iface_drivers()
         if interface == Interface.BRIDGE:
             if machine == Machine.HOST:
                 host.setup_test_bridge()
@@ -263,6 +268,9 @@ class LoadLatencyTestGenerator(object):
                 host.setup_test_br_tap()
         elif interface == Interface.MACVTAP:
             host.setup_test_macvtap()
+        elif interface == Interface.VFIO:
+            host.delete_nic_ip_addresses(host.test_iface)
+            host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
 
     def start_reflector(self, server: Server, reflector: Reflector,
                         iface: str = None):
@@ -275,18 +283,31 @@ class LoadLatencyTestGenerator(object):
         sleep(5)
 
     def stop_reflector(self, server: Server, reflector: Reflector,
-                       iface: str = None):
+                       interface: Interface, iface: str = None):
         if reflector == Reflector.MOONGEN:
             server.stop_moongen_reflector()
-            server.release_test_iface()
+            if interface == Interface.VFIO:
+                server.unbind_device(server.test_iface_addr)
+                # TODO: The hardcoded driver is a dirty workaround,
+                #       we need to fix this later on
+                server.bind_device(server.test_iface_addr, 'ice')
+            else:
+                server.release_test_iface()
         else:
             server.stop_xdp_reflector(iface)
 
     def run_guest(self, host: Host, machine: Machine,
                   interface: Interface, qemu: str, vhost: bool,
                   ioregionfd: bool):
+        net_type = None
+        if interface == Interface.BRIDGE:
+            net_type = 'brtap'
+        elif interface == Interface.MACVTAP:
+            net_type = 'macvtap'
+        elif interface == Interface.VFIO:
+            net_type = 'vfio'
         host.run_guest(
-            net_type='brtap' if interface == Interface.BRIDGE else 'macvtap',
+            net_type=net_type,
             machine_type='pc' if machine == Machine.PCVM else 'microvm',
             root_disk=None,
             debug_qemu=False,
@@ -355,19 +376,25 @@ class LoadLatencyTestGenerator(object):
                         )
                     count += interface_test_count
         # vm part
-        mac = host.guest_test_iface_mac
         for m in self.machines - {Machine.HOST}:
             tree[m] = {}
             for i in self.interfaces - {Interface.PNIC}:
+                if (m == Machine.MICROVM and i == Interface.VFIO):
+                    continue
                 tree[m][i] = {}
+                mac = host.test_iface_mac \
+                    if i == Interface.VFIO else host.guest_test_iface_mac
                 for q in self.qemus:
                     qemu, _ = q.split(':')
                     tree[m][i][q] = {}
                     for v in self.vhosts:
+                        if v and i == Interface.VFIO:
+                            continue
                         tree[m][i][q][v] = {}
                         # for io in reversed(list(self.ioregionfds)):
                         for io in self.ioregionfds:
-                            if io and m != Machine.MICROVM:
+                            if io and (m != Machine.MICROVM
+                                       or i == Interface.VFIO):
                                 continue
                             tree[m][i][q][v][io] = {}
                             for r in self.reflectors:
@@ -507,7 +534,7 @@ class LoadLatencyTestGenerator(object):
                                             test.accumulate()
 
                                 debug(f"Stopping reflector {reflector.value}")
-                                self.stop_reflector(dut, reflector)
+                                self.stop_reflector(dut, reflector, interface)
 
                             if machine != Machine.HOST:
                                 debug(f"Killing guest {machine.value} " +
@@ -536,7 +563,8 @@ class LoadLatencyTestGenerator(object):
 
 if __name__ == "__main__":
     machines = {Machine.HOST, Machine.PCVM, Machine.MICROVM}
-    interfaces = {Interface.PNIC, Interface.BRIDGE, Interface.MACVTAP}
+    interfaces = {Interface.PNIC, Interface.BRIDGE, Interface.MACVTAP,
+                  Interface.VFIO}
     qemus = {"/home/networkadmin/qemu-build/qemu-system-x86_64",
              "/home/networkadmin/qemu-build2/qemu-system-x86_64"}
     vhosts = {True, False}

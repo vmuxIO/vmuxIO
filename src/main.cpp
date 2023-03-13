@@ -72,7 +72,7 @@ bar0_access(vfu_ctx_t *vfu_ctx, char * const buf, size_t count, __loff_t offset,
 class VfioUserServer {
   public:
     vfu_ctx_t *vfu_ctx;
-    std::string sock = "/tmp/peter.sock";
+    std::string sock = "/tmp/vmux_gierens.sock";
     std::optional<size_t> run_ctx_pollfd_idx; // index of pollfd in pollfds
     size_t irq_pollfd_idx;
     size_t irq_pollfd_count;
