@@ -38,7 +38,7 @@ class Interface(Enum):
     # VFIO-passthrough to physical NIC for the VM
     VFIO = "vfio"
 
-    # TODO implement vmux interfaces 
+    # TODO implement vmux interfaces
 
 
 class Reflector(Enum):
@@ -581,7 +581,7 @@ class LoadLatencyTestGenerator(object):
 #     cooldown = False
 #     accumulate = True
 #     outputdir = "/home/networkadmin/loadlatency"
-# 
+#
 #     generator = LoadLatencyTestGenerator(
 #         machines, interfaces, qemus, vhosts, ioregionfds, reflectors,
 #         rates, runtimes, repetitions, warmup, cooldown, accumulate, outputdir
