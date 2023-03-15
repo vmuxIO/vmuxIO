@@ -16,6 +16,12 @@
 
 #include "src/util.hpp"
 
+VfioConsumer::VfioConsumer(std::string group_str, std::string device_name){
+  this->group_str = "/dev/vfio/" + group_str;
+  this->device_name = device_name;
+}
+
+
 VfioConsumer::~VfioConsumer() {
   printf("vfio consumer destructor called\n");
   int ret;
@@ -70,9 +76,9 @@ int VfioConsumer::init() {
   }
 
   /* Open the group */
-  group = open("/dev/vfio/29", O_RDWR);
+  group = open(group_str.c_str(), O_RDWR);
   if (group < 0) {
-    die("Cannot open /dev/vfio/29");
+    die("Cannot open %s",group_str.c_str());
   }
   this->group = group;
 
@@ -122,7 +128,11 @@ int VfioConsumer::init() {
   this->dma_map = dma_map;
 
   /* Get a file descriptor for the device */
-  device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, "0000:18:00.0");
+<<<<<<< HEAD
+  device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, "0000:51:00.0");
+=======
+  device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, device_name.c_str());
+>>>>>>> main
   if (device < 0) {
     die("Cannot get/find device id in IOMMU group fd %d", group);
   }
@@ -170,7 +180,7 @@ int VfioConsumer::init() {
 }
 
 int VfioConsumer::init_mmio() {
-  // Only iterate bars 0-5. Bar 6 seems not mappable. 
+  // Only iterate bars 0-5. Bar >=6 seems not mappable. 
   for (int i = 0; i <= 5; i++) { 
     auto region = this->regions[i];
     if (region.size == 0) {
@@ -187,20 +197,15 @@ int VfioConsumer::init_mmio() {
   return 0;
 }
 
-void VfioConsumer::init_msix() {
+void vfio_set_irqs(const int irq_type, const size_t count, std::vector<int> *irqfds, int device_fd) {
   int ret;
-
-  uint32_t count = this->interrupts[VFIO_PCI_MSIX_IRQ_INDEX].count;
-  if (count <= 0) {
-    die("We expect devices to use MSIX IRQs/interrupts. This one doesnt right now");
-  }
 
   auto irq_set_buf_size = sizeof(struct vfio_irq_set) + sizeof(int) * count;
   auto irq_set = (struct vfio_irq_set*) malloc(irq_set_buf_size);
   irq_set->argsz = irq_set_buf_size;
   irq_set->count = count;
   irq_set->flags = VFIO_IRQ_SET_DATA_EVENTFD | VFIO_IRQ_SET_ACTION_TRIGGER;
-  irq_set->index = VFIO_PCI_MSIX_IRQ_INDEX;
+  irq_set->index = irq_type;
   irq_set->start = 0;
 
   for (uint64_t i = 0; i < count; i++) {
@@ -211,15 +216,101 @@ void VfioConsumer::init_msix() {
       }
       die("Failed to create eventfd");
     }
-    this->irqfds.push_back(fd);
+    irqfds->push_back(fd);
   }
 
-  memcpy((int*)&irq_set->data, this->irqfds.data(), sizeof(int) * count);
-  ret = ioctl(this->device, VFIO_DEVICE_SET_IRQS, irq_set);
+  memcpy((int*)&irq_set->data, irqfds->data(), sizeof(int) * count);
+  __builtin_dump_struct(irq_set, &printf);
+  printf("irqfds %d-%d (#%zu)\n", irqfds->front(), irqfds->back(), irqfds->size());
+  ret = ioctl(device_fd, VFIO_DEVICE_SET_IRQS, irq_set);
   if (ret < 0) {
-    die("Cannot set eventfds for MSIX interrupts for device %d", this->device);
+    die("Cannot set eventfds for interrupts type %d for device %d", irq_type, device_fd);
   }
+}
+
+void VfioConsumer::init_msix() {
+  if (!this->use_msix) {
+    printf("init for msix skipped because we run in intx mode\n");
+    return; 
+  }
+
+  uint32_t count = this->interrupts[VFIO_PCI_MSIX_IRQ_INDEX].count;
+  if (count <= 0) {
+    die("We expect devices to use MSIX IRQs/interrupts. This one doesnt right now");
+  }
+
+  vfio_set_irqs(VFIO_PCI_MSIX_IRQ_INDEX, count, &this->irqfds, this->device);
 
   printf("Eventfds registered for %d MSIX interrupts.\n", count);
 
+}
+
+void VfioConsumer::init_legacy_irqs() {
+  std::vector<int> irqfds;
+  // registering INTX and MSI fails with EINVAL. Experimentation shows, that only one of INTX, MSI or MSIX can be registered. 
+  // MSI and MSIX must indeed not be used simultaniousely by software (pci 4.0 section 6.1.4 MSI and MSI-X Operation).
+  // Simultaneous use of INTX and MSI(X) seems to be a shortcoming in libvfio-user right now. See https://github.com/nutanix/libvfio-user/issues/388 about insufficient irq impl and https://github.com/nutanix/libvfio-user/issues/387 about no way to trigger ERR or REQ irqs.
+  if (!this->use_msix) {
+    if (this->interrupts[VFIO_PCI_INTX_IRQ_INDEX].count != 1) {
+      die("This device does not support legacy INTx");
+    }
+    vfio_set_irqs(VFIO_PCI_INTX_IRQ_INDEX, 1, &irqfds, this->device);
+    this->irqfd_intx = irqfds.back();
+    irqfds.clear();
+  }
+  //vfio_set_irqs(VFIO_PCI_MSI_IRQ_INDEX, 1, &irqfds, this->device);
+  //this->irqfd_msi = irqfds.back();
+  //irqfds.clear();
+  vfio_set_irqs(VFIO_PCI_ERR_IRQ_INDEX, 1, &irqfds, this->device);
+  this->irqfd_err = irqfds.back();
+  irqfds.clear();
+  vfio_set_irqs(VFIO_PCI_REQ_IRQ_INDEX, 1, &irqfds, this->device);
+  this->irqfd_req = irqfds.back();
+}
+
+void VfioConsumer::mask_irqs(uint32_t irq_type, uint32_t start, uint32_t count, bool mask) {
+  if (irq_type == VFIO_PCI_INTX_IRQ_INDEX && this->use_msix) {
+    printf("irq_state_cb for intx ignored because we run in msi-x mode\n");
+    return; 
+  }
+
+  uint32_t flags = VFIO_IRQ_SET_DATA_NONE;
+  if (mask) {
+    flags |= VFIO_IRQ_SET_ACTION_MASK;
+  } else {
+    flags |= VFIO_IRQ_SET_ACTION_UNMASK;
+  }
+
+  struct vfio_irq_set irq_set;
+  memset(&irq_set, 0, sizeof(irq_set)); // zero also .data
+  irq_set.argsz = sizeof(irq_set);
+  irq_set.flags = flags;
+  irq_set.index = irq_type;
+  irq_set.start = start;
+  irq_set.count = count;
+  //irq_set.data = { 0, 0 };
+  __builtin_dump_struct(&irq_set, &printf);
+  int ret = ioctl(this->device, VFIO_DEVICE_SET_IRQS, &irq_set);
+  if (ret < 0)
+    die("failed to mask irq");
+}
+
+void VfioConsumer::reset_device() {
+  // TODO check if device supports reset VFIO_DEVICE_FLAGS_RESET
+  int ret = ioctl(this->device, VFIO_DEVICE_RESET, NULL);
+  if (ret < 0)
+    die("failed to reset device");
+}
+
+void VfioConsumer::map_dma(vfio_iommu_type1_dma_map *dma_map) {
+  int ret = ioctl(this->container, VFIO_IOMMU_MAP_DMA, dma_map);
+  if (ret < 0)
+    die("vfio failed to map dma");
+}
+
+void VfioConsumer::unmap_dma(vfio_iommu_type1_dma_unmap *dma_unmap) {
+  int ret = ioctl(this->container, VFIO_IOMMU_UNMAP_DMA, dma_unmap);
+  // TODO check dma_unmap size as well
+  if (ret < 0)
+    die("vfio failed to unmap dma");
 }

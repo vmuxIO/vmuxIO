@@ -322,9 +322,7 @@ class Server(ABC):
         _ = self.exec(f'tmux -L {self.tmux_socket}' +
                       ' list-sessions | cut -d ":" -f 1 ' +
                       f'| grep {session_name} | xargs ' +
-                      f'tmux -L {self.tmux_socket} kill-session -t')
-        # TODO we could add a || true here to ignore cases when there is no
-        #      session to kill
+                      f'tmux -L {self.tmux_socket} kill-session -t || true')
 
     def tmux_send_keys(self: 'Server', session_name: str, keys: str) -> None:
         """
@@ -837,6 +835,47 @@ class Server(ABC):
         """
         return self.exec(f'cat /sys/class/net/{iface}/address')
 
+    def get_nic_ip_addresses(self: 'Server', iface: str) -> list[str]:
+        """
+        Get the IP addresses for a network interface.
+
+        Parameters
+        ----------
+        iface : str
+            The network interface identifier.
+
+        Returns
+        -------
+        List[str]
+            The IP addresses.
+
+        Example
+        -------
+        >>> server.get_nic_ip_addresses('enp176s0')
+        ['192.168.0.1/24']
+        """
+        return self.exec(f'ip addr show dev {iface}' +
+                         ' | grep inet | awk "{print \\$2}"').splitlines()
+
+    def delete_nic_ip_addresses(self: 'Server', iface: str) -> None:
+        """
+        Delete the IP addresses for a network interface.
+
+        Parameters
+        ----------
+        iface : str
+            The network interface identifier.
+
+        Returns
+        -------
+
+        Example
+        -------
+        >>> server.delete_nic_ip_addresses('enp176s0')
+        """
+        for addr in self.get_nic_ip_addresses(iface):
+            self.exec(f'sudo ip addr del {addr} dev {iface}')
+
     def start_moongen_reflector(self: 'Server'):
         """
         Start the libmoon L2 reflector.
@@ -922,9 +961,9 @@ class Server(ABC):
         for file in listdir(source_dir):
             self.copy_to(path_join(source_dir, file), self.moonprogs_dir)
 
-    def modprobe_test_iface_driver(self):
+    def modprobe_test_iface_drivers(self):
         """
-        Modprobe the test interface driver.
+        Modprobe the test interface drivers.
 
         Parameters
         ----------
@@ -956,9 +995,12 @@ class Host(Server):
     admin_bridge: str
     admin_bridge_ip_net: str
     admin_tap: str
+    test_iface_vfio_driv: str
     test_bridge: str
     test_tap: str
     test_macvtap: str
+    vmux_path: str
+    vmux_socket_path: str
     guest_admin_iface_mac: str
     guest_test_iface_mac: str
     guest_root_disk_path: str
@@ -976,9 +1018,12 @@ class Host(Server):
                  test_iface_mac: str,
                  test_iface_driv: str,
                  test_iface_dpdk_driv: str,
+                 test_iface_vfio_driv: str,
                  test_bridge: str,
                  test_tap: str,
                  test_macvtap: str,
+                 vmux_path: str,
+                 vmux_socket_path: str,
                  guest_root_disk_path: str,
                  guest_admin_iface_mac: str,
                  guest_test_iface_mac: str,
@@ -1014,12 +1059,18 @@ class Host(Server):
             The driver of the test interface.
         test_iface_dpdk_driv : str
             The DPDK driver of the test interface.
+        test_iface_vfio_driv : str
+            The vfio driver of the test interface.
         test_bridge : str
             The network interface identifier of the test bridge interface.
         test_tap : str
             The network interface identifier of the test tap interface.
         test_macvtap : str
             The network interface identifier of the test macvtap interface.
+        vmux_path : str
+            Path to the vmux executable.
+        vmux_socket_path : str
+            The path to the vmux socket.
         guest_root_disk_path : str
             The path to the root disk of the guest.
         guest_admin_iface_mac : str
@@ -1066,9 +1117,12 @@ class Host(Server):
         self.admin_bridge = admin_bridge
         self.admin_bridge_ip_net = admin_bridge_ip_net
         self.admin_tap = admin_tap
+        self.test_iface_vfio_driv = test_iface_vfio_driv
         self.test_bridge = test_bridge
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
+        self.vmux_path = vmux_path
+        self.vmux_socket_path = vmux_socket_path
         self.guest_test_iface_mac = guest_test_iface_mac
         self.guest_admin_iface_mac = guest_admin_iface_mac
         self.guest_root_disk_path = guest_root_disk_path
@@ -1112,6 +1166,20 @@ class Host(Server):
                   f' sudo ip link set {self.admin_tap} '
                   f'master {self.admin_bridge}; true)')
         self.exec(f'sudo ip link set {self.admin_tap} up')
+
+    def modprobe_test_iface_drivers(self):
+        """
+        Modprobe the test interface drivers.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.exec(f'sudo modprobe {self.test_iface_driv}')
+        self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
+        self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
     def setup_test_br_tap(self: 'Host'):
         """
@@ -1254,31 +1322,35 @@ class Host(Server):
         # it should take all the settings from the config file
         # and compile them.
         dev_type = 'pci' if machine_type == 'pc' else 'device'
-        test_net_config = (
-            f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-            f'id=admin1,ifname={self.test_tap},script=no,' +
-            'downscript=no,queues=4' +
-            f' -device virtio-net-{dev_type},id=testif,' +
-            f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
-            (',use-ioregionfd=true' if ioregionfd else '')
-            + f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            # + f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            # f' -device virtio-net-{dev_type},id=testif,' +
-            # ' -device rtl8139,id=testif,' +
-            # 'netdev=admin1,mac=52:54:00:fa:00:60,mq=on' +
-        ) if net_type == 'brtap' else (
-            f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-            'id=admin1,fd=3 3<>/dev/tap$(cat ' +
-            f'/sys/class/net/{self.test_macvtap}/ifindex) ' +
-            f' -device virtio-net-{dev_type},id=testif,' +
-            'netdev=admin1,mac=$(cat ' +
-            f'/sys/class/net/{self.test_macvtap}/address)' +
-            (',use-ioregionfd=true' if ioregionfd else '')
-            + f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            # + f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            # f' -device virtio-net-{dev_type},id=testif,' +
-            # ' -device rtl8139,id=testif,' +
-        )
+        test_net_config = ''
+        if net_type == 'brtap':
+            test_net_config = (
+                f" -netdev tap,vhost={'on' if vhost else 'off'}," +
+                f'id=admin1,ifname={self.test_tap},script=no,' +
+                'downscript=no,queues=4' +
+                f' -device virtio-net-{dev_type},id=testif,' +
+                f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
+                (',use-ioregionfd=true' if ioregionfd else '') +
+                f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
+            )
+        elif net_type == 'macvtap':
+            test_net_config = (
+                f" -netdev tap,vhost={'on' if vhost else 'off'}," +
+                'id=admin1,fd=3 3<>/dev/tap$(cat ' +
+                f'/sys/class/net/{self.test_macvtap}/ifindex) ' +
+                f' -device virtio-net-{dev_type},id=testif,' +
+                'netdev=admin1,mac=$(cat ' +
+                f'/sys/class/net/{self.test_macvtap}/address)' +
+                (',use-ioregionfd=true' if ioregionfd else '') +
+                f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
+            )
+        elif net_type == 'vfio':
+            test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
+        elif net_type == 'vmux':
+            test_net_config = \
+                f' -device vfio-user-pci,socket={self.vmux_socket_path}'
+
+        # TODO we need a different qemu build dir for vmux
         qemu_bin_path = 'qemu-system-x86_64'
         if qemu_build_dir:
             qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
@@ -1343,6 +1415,30 @@ class Host(Server):
         """
         self.tmux_kill('qemu')
 
+    def start_vmux(self: 'Host') -> None:
+        """
+        Start vmux in a tmux session.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.tmux_new('vmux', f'ulimit -n 4096; sudo {self.vmux_path}')
+
+    def stop_vmux(self: 'Host') -> None:
+        """
+        Stop vmux.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.tmux_kill('vmux')
+
     def cleanup_network(self: 'Host') -> None:
         """
         Cleanup the network setup.
@@ -1353,8 +1449,11 @@ class Host(Server):
         Returns
         -------
         """
-        # TODO
-        # self.release_test_iface()
+        try:
+            self.stop_vmux()
+        except:
+            pass
+        self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
         self.destroy_test_macvtap()

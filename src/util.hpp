@@ -2,6 +2,7 @@
 #pragma once
 
 #include <stdexcept>
+#include <err.h>
 
 // exit() and err() breaks invariants for RAII (destructors). Therefore we use
 // warn() instead to printf an error and throw afterwards to exit.

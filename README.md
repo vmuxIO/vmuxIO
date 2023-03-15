@@ -44,9 +44,12 @@ just vm-update host-config
 
 ## vMux demo
 
-Start vmux `sudo ./build/vmux` and qemu using `just vm-libvfio-user`. Connect to the VM `just ssh` and run:
+Start vmux `just vmux` and qemu using `just vm-libvfio-user`. Connect to the VM `just ssh` and run:
 
 ```
+# loading the ice driver still fails sadly: ice 0000:00:07.0: ice_init_hw failed: -105
+dmesg | grep "ice 0000"
+# but reading/writing registers works:
 # read reset status (count)
 devmem 0xfa0B8188
 # write to register to trigger device reset
@@ -54,6 +57,9 @@ devmem 0xfa0b8190 32 1
 # reset status has changed (bit 7:6 incremented)
 devmem 0xfa0B8188
 ```
+
+If you read too much `FFFFFFFF` or `DEADBEEF`, you probably need to reboot the machine/NIC.
+
 ## Run benchmarks
 
 See also [autotest](test/README.md) for details.
@@ -91,3 +97,17 @@ sudo sh -c "echo 4 > /sys/class/net/enp24s0f0/device/sriov_numvfs"
 bind vfio-pci on vf nics
 
 boot vm with it
+
+## Guest kernel modules:
+
+```
+nix develop .#host-kernel
+tar -xvf $src
+cd linux-*
+cp $KERNELDIR/lib/modules/*/build/.config .config
+make LOCALVERSION= scripts prepare modules_prepare
+# build whatever module you want: (M=yourmodule)
+make -C . M=drivers/block/null_blk
+```
+
+read more at (Hacking on Kernel Modules in NixOS)[https://blog.thalheim.io/2022/12/17/hacking-on-kernel-modules-in-nixos/]
