@@ -52,6 +52,7 @@
     "qemus",
     "qtree",
     "rtree",
+    "stree",
     "tbbmalloc",
     "tconf",
     "testif",
