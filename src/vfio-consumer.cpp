@@ -128,11 +128,7 @@ int VfioConsumer::init() {
   this->dma_map = dma_map;
 
   /* Get a file descriptor for the device */
-<<<<<<< HEAD
-  device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, "0000:51:00.0");
-=======
   device = ioctl(group, VFIO_GROUP_GET_DEVICE_FD, device_name.c_str());
->>>>>>> main
   if (device < 0) {
     die("Cannot get/find device id in IOMMU group fd %d", group);
   }
