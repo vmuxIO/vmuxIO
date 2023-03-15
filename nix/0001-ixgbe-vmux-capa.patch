@@ -1,0 +1,25 @@
+From b9daeab6ed0258316dab85de72aea4f54c15452f Mon Sep 17 00:00:00 2001
+From: Pogobanane <aenderboy@gmx.de>
+Date: Wed, 8 Mar 2023 12:41:08 +0000
+Subject: [PATCH] ixgbe: use vmux capability offset instead of hardware one
+
+---
+ drivers/net/ethernet/intel/ixgbe/ixgbe_common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/intel/ixgbe/ixgbe_common.c b/drivers/net/ethernet/intel/ixgbe/ixgbe_common.c
+index e90b5047e..8d364a5ea 100644
+--- a/drivers/net/ethernet/intel/ixgbe/ixgbe_common.c
++++ b/drivers/net/ethernet/intel/ixgbe/ixgbe_common.c
+@@ -2928,7 +2928,7 @@ u16 ixgbe_get_pcie_msix_count_generic(struct ixgbe_hw *hw)
+ 	case ixgbe_mac_X550:
+ 	case ixgbe_mac_X550EM_x:
+ 	case ixgbe_mac_x550em_a:
+-		pcie_offset = IXGBE_PCIE_MSIX_82599_CAPS;
++		pcie_offset = 0x4a; // IXGBE_PCIE_MSIX_82599_CAPS;
+ 		max_msix_count = IXGBE_MAX_MSIX_VECTORS_82599;
+ 		break;
+ 	default:
+-- 
+2.38.3
+

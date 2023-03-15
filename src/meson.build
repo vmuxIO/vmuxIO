@@ -1,4 +1,5 @@
 sources += files(
   'main.cpp',
-  'vfio-consumer.cpp'
+  'vfio-consumer.cpp',
+  'caps.cpp'
   )
