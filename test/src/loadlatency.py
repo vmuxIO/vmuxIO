@@ -38,7 +38,7 @@ class Interface(Enum):
     # VFIO-passthrough to physical NIC for the VM
     VFIO = "vfio"
 
-    # TODO implement vmux interfaces 
+    # TODO implement vmux interfaces
 
 
 class Reflector(Enum):
@@ -136,7 +136,9 @@ class LoadLatencyTest(object):
             # warm-up
             sleep(10)
             try:
-                loadgen.run_l2_load_latency(self.mac, 0, 20, histfile=remote_histogram_file, outfile=remote_output_file)
+                loadgen.run_l2_load_latency(self.mac, 0, 20,
+                                            histfile=remote_histogram_file,
+                                            outfile=remote_output_file)
             except Exception as e:
                 error(f'Failed to run warm-up due to exception: {e}')
             sleep(25)
@@ -155,8 +157,10 @@ class LoadLatencyTest(object):
             try:
                 loadgen.exec(f'sudo rm -f {remote_output_file} ' +
                              f'{remote_histogram_file}')
-                loadgen.run_l2_load_latency(self.mac, self.rate, self.runtime,
-                                            self.size, histfile=remote_histogram_file, outfile=remote_output_file)
+                loadgen.run_l2_load_latency(self.mac, self.rate,
+                                            self.runtime, self.size,
+                                            histfile=remote_histogram_file,
+                                            outfile=remote_output_file)
             except Exception as e:
                 error(f'Failed to run test due to exception: {e}')
                 continue
@@ -223,7 +227,7 @@ class LoadLatencyTestGenerator(object):
     ioregionfds: set[bool]
     reflectors: set[Reflector]
     rates: set[int]
-    size: int
+    sizes: set[int]
     runtimes: set[int]
     repetitions: int
     warmup: bool
@@ -243,7 +247,7 @@ class LoadLatencyTestGenerator(object):
         info(f'  ioregionfds: {self.ioregionfds}')
         info(f'  reflectors : {set(r.value for r in self.reflectors)}')
         info(f'  rates      : {self.rates}')
-        info(f'  size       : {self.size}')
+        info(f'  size       : {self.sizes}')
         info(f'  runtimes   : {self.runtimes}')
         info(f'  repetitions: {self.repetitions}')
         info(f'  warmup     : {self.warmup}')
@@ -323,24 +327,26 @@ class LoadLatencyTestGenerator(object):
         tree = {}
         for rate in self.rates:
             tree[rate] = {}
-            for runtime in self.runtimes:
-                test = LoadLatencyTest(
-                    machine=machine,
-                    interface=interface,
-                    mac=mac,
-                    qemu=qemu,
-                    vhost=vhost,
-                    ioregionfd=ioregionfd,
-                    reflector=reflector,
-                    rate=rate,
-                    size=self.size,
-                    runtime=runtime,
-                    repetitions=self.repetitions,
-                    warmup=self.warmup,
-                    cooldown=self.cooldown,
-                    outputdir=self.outputdir,
-                )
-                tree[rate][runtime] = test
+            for size in self.sizes:
+                tree[rate][size] = {}
+                for runtime in self.runtimes:
+                    test = LoadLatencyTest(
+                        machine=machine,
+                        interface=interface,
+                        mac=mac,
+                        qemu=qemu,
+                        vhost=vhost,
+                        ioregionfd=ioregionfd,
+                        reflector=reflector,
+                        rate=rate,
+                        size=size,
+                        runtime=runtime,
+                        repetitions=self.repetitions,
+                        warmup=self.warmup,
+                        cooldown=self.cooldown,
+                        outputdir=self.outputdir,
+                    )
+                    tree[rate][size][runtime] = test
         return tree
 
     def create_test_tree(self, host: Host):
@@ -426,11 +432,14 @@ class LoadLatencyTestGenerator(object):
                         for f, ftree in vtree.items():
                             for r, rtree in ftree.items():
                                 for a, atree in rtree.items():
-                                    for t, test in atree.items():
-                                        if not test.needed():
-                                            del(needed[m][i][q][v][f][r][a][t])
-                                        else:
-                                            count += 1
+                                    for s, stree in atree.items():
+                                        for t, test in stree.items():
+                                            if not test.needed():
+                                                del(needed[m][i][q][v][f][r][a][s][t])
+                                            else:
+                                                count += 1
+                                        if not needed[m][i][q][v][f][r][a][s]:
+                                            del(needed[m][i][q][v][f][r][a][s])
                                     if not needed[m][i][q][v][f][r][a]:
                                         del(needed[m][i][q][v][f][r][a])
                                 if not needed[m][i][q][v][f][r]:
@@ -524,14 +533,15 @@ class LoadLatencyTestGenerator(object):
                                 self.start_reflector(dut, reflector)
 
                                 for rate, atree in rtree.items():
-                                    for runtime, test in atree.items():
-                                        test.run(loadgen)
-                                        if self.accumulate:
-                                            # TODO we probably need to put
-                                            # this somewhere else to
-                                            # make sure it runs even if the
-                                            # tests are already done
-                                            test.accumulate()
+                                    for size, stree in atree.items():
+                                        for runtime, test in stree.items():
+                                            test.run(loadgen)
+                                            if self.accumulate:
+                                                # TODO we probably need to put
+                                                # this somewhere else to
+                                                # make sure it runs even if the
+                                                # tests are already done
+                                                test.accumulate()
 
                                 debug(f"Stopping reflector {reflector.value}")
                                 self.stop_reflector(dut, reflector, interface)
@@ -561,24 +571,24 @@ class LoadLatencyTestGenerator(object):
                                             test.accumulate(force=True)
 
 
-if __name__ == "__main__":
-    machines = {Machine.HOST, Machine.PCVM, Machine.MICROVM}
-    interfaces = {Interface.PNIC, Interface.BRIDGE, Interface.MACVTAP,
-                  Interface.VFIO}
-    qemus = {"/home/networkadmin/qemu-build/qemu-system-x86_64",
-             "/home/networkadmin/qemu-build2/qemu-system-x86_64"}
-    vhosts = {True, False}
-    ioregionfds = {True, False}
-    reflectors = {Reflector.MOONGEN, Reflector.XDP}
-    rates = {1, 10, 100}
-    runtimes = {30, 60}
-    repetitions = 3
-    warmup = False
-    cooldown = False
-    accumulate = True
-    outputdir = "/home/networkadmin/loadlatency"
-
-    generator = LoadLatencyTestGenerator(
-        machines, interfaces, qemus, vhosts, ioregionfds, reflectors,
-        rates, runtimes, repetitions, warmup, cooldown, accumulate, outputdir
-    )
+# if __name__ == "__main__":
+#     machines = {Machine.HOST, Machine.PCVM, Machine.MICROVM}
+#     interfaces = {Interface.PNIC, Interface.BRIDGE, Interface.MACVTAP,
+#                   Interface.VFIO}
+#     qemus = {"/home/networkadmin/qemu-build/qemu-system-x86_64",
+#              "/home/networkadmin/qemu-build2/qemu-system-x86_64"}
+#     vhosts = {True, False}
+#     ioregionfds = {True, False}
+#     reflectors = {Reflector.MOONGEN, Reflector.XDP}
+#     rates = {1, 10, 100}
+#     runtimes = {30, 60}
+#     repetitions = 3
+#     warmup = False
+#     cooldown = False
+#     accumulate = True
+#     outputdir = "/home/networkadmin/loadlatency"
+#
+#     generator = LoadLatencyTestGenerator(
+#         machines, interfaces, qemus, vhosts, ioregionfds, reflectors,
+#         rates, runtimes, repetitions, warmup, cooldown, accumulate, outputdir
+#     )
