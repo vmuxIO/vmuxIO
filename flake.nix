@@ -114,6 +114,9 @@
         version = "8a2d81";
         outputHash = "sha256-dVvfwgto9Pgpkukf/IoJ298MUYzcsV1G/0jTxVcdFGw=";
       }));
+      kmod-tools = pkgs.callPackage ./nix/kmod-tools.nix {
+        inherit pkgs;
+      };
 
       #patched qemu
       qemu = pkgs.callPackage ./nix/qemu-libvfio.nix { 
@@ -179,8 +182,9 @@
         gdb
         (writeScriptBin "devmem" ''
           ${busybox}/bin/devmem $@
-          '')
+        '')
         bridge-utils
+        self.packages.x86_64-linux.kmod-tools
 
         # dependencies for hosts/prepare.py
         python310.pkgs.pyyaml
