@@ -72,6 +72,7 @@ python3.10 ./test/autotest -vvv test-load-lat-file
 ls output
 
 ```
+# Debugging
 
 ## Notes on IOMMU/VFs
 
@@ -88,7 +89,13 @@ $ dmesg | grep IOMMU
 
 and find its groups at `/sys/kernel/iommu_groups`
 
-pass through VFs:
+check IOMMU state at `sudo cat /sys/kernel/debug/iommu/intel/dmar_translation_struct`
+
+check IOMMU page table at `sudo cat /sys/kernel/debug/iommu/intel/domain_translation_struct` where `IOVA_PFN` is the IOVA (io virtual address) used by the device, and `PTE` is the corresponding host pysical address.
+
+Use `kmod-tools-virt_to_phys_user` from `nix/kmod-tools.nix` to check if your userspace actually maps the expected physical address.
+
+## Pass through VFs
 
 bind ice on pnic
 
@@ -97,6 +104,7 @@ sudo sh -c "echo 4 > /sys/class/net/enp24s0f0/device/sriov_numvfs"
 bind vfio-pci on vf nics
 
 boot vm with it
+
 
 ## Guest kernel modules:
 
@@ -111,3 +119,18 @@ make -C . M=drivers/block/null_blk
 ```
 
 read more at (Hacking on Kernel Modules in NixOS)[https://blog.thalheim.io/2022/12/17/hacking-on-kernel-modules-in-nixos/]
+
+To use manually built linux kernels in nixos guest configs, have a look at [ktest](https://github.com/YellowOnion/ktest/blob/73fadcff949236927133141fcba4bfd76df632e7/kernel_install.nix)
+
+## Debugging with qemus e1000
+
+To do nested virtualisation with a simple, qemu emulated NIC:
+
+```just vm-libvfio-user-iommu
+#In VM 
+just prepare-guest
+just vmux-guest
+just vm-libvfio-user-iommu-guest
+```
+
+
