@@ -172,12 +172,43 @@ int VfioConsumer::init() {
   /* Gratuitous device reset and go... */
   ioctl(device, VFIO_DEVICE_RESET);
 
+  //Get Header size to determine if the device is PCI or PCIe
+  std::string config_path = "/sys/bus/pci/devices/" + this->device_name + "/config";
+  FILE *fd = fopen(config_path.c_str(), "rb");
+  if (fd == NULL)
+    die("Cannot open %s", config_path.c_str());
+
+  
+  char* tmp[PCIE_HEADER_LENGTH];
+  size_t size = fread(tmp, sizeof(char), PCIE_HEADER_LENGTH, fd);
+  switch (size)
+  {
+  case 256:
+    printf("Device is PCI only\n");
+    this->is_pcie = false;
+    this->use_msix = false;
+    break;
+  case PCIE_HEADER_LENGTH:
+    printf("Device is PCIe\n");
+    this->is_pcie = true;
+    this->use_msix = true;
+    break;  
+  default:
+    die("only %zu bytes read", size);
+    break;
+  }
+  fclose(fd);
+
   return 0;
 }
 
 int VfioConsumer::init_mmio() {
   // Only iterate bars 0-5. Bar >=6 seems not mappable. 
-  for (int i = 0; i <= 5; i++) { 
+  int num_regions = 5;
+  if(!this->is_pcie){
+    num_regions = 0;
+  }
+  for (int i = 0; i <= num_regions; i++) { 
     auto region = this->regions[i];
     if (region.size == 0) {
       printf("Mapping region BAR %d skipped\n", region.index);
@@ -220,7 +251,8 @@ void vfio_set_irqs(const int irq_type, const size_t count, std::vector<int> *irq
   printf("irqfds %d-%d (#%zu)\n", irqfds->front(), irqfds->back(), irqfds->size());
   ret = ioctl(device_fd, VFIO_DEVICE_SET_IRQS, irq_set);
   if (ret < 0) {
-    die("Cannot set eventfds for interrupts type %d for device %d", irq_type, device_fd);
+    //TODO: IRQs don't work properly on the e1000 yet
+    printf("Cannot set eventfds for interrupts type %d for device %d", irq_type, device_fd);
   }
 }
 
@@ -296,7 +328,8 @@ void VfioConsumer::reset_device() {
   int ret = ioctl(this->device, VFIO_DEVICE_RESET, NULL);
   
   if (ret < 0)
-    die("failed to reset device");
+    printf("failed to reset device\n");
+    //TODO
 }
 
 void VfioConsumer::map_dma(vfio_iommu_type1_dma_map *dma_map) {
