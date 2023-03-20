@@ -87,6 +87,7 @@ class VfioUserServer {
     VfioConsumer *callback_context;
     std::set<void*> mapped;
     std::map<void*, dma_sg_t*> sgs;
+
     VfioUserServer(std::string sock) {
       this->sock = sock;
     }
@@ -548,7 +549,7 @@ int _main(int argc, char** argv) {
   }
 
   ret = vfu_pci_init(vfu.vfu_ctx, VFU_PCI_TYPE_EXPRESS,
-                     PCI_HEADER_TYPE_NORMAL, 3); // maybe 4?
+                     PCI_HEADER_TYPE_NORMAL, 0); // maybe 4?
   if (ret < 0) {
     die("vfu_pci_init() failed") ;
   }
@@ -569,73 +570,74 @@ int _main(int argc, char** argv) {
   ret = vfu.add_irqs(vfioc.interrupts);
   if (ret < 0)
     die("failed to add irqs");
-
+  
   vfioc.init_legacy_irqs();
   vfu.add_legacy_irq_pollfds(vfioc.irqfd_intx, vfioc.irqfd_msi, vfioc.irqfd_err, vfioc.irqfd_req);
   vfioc.init_msix();
   vfu.add_msix_pollfds(vfioc.irqfds);
 
   // set capabilities
-  Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), device);
-  void *cap_data;
+  if(vfioc.is_pcie){
+    Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), device);
+    void *cap_data;
 
-  cap_data = caps.pm();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  free(cap_data);
+    cap_data = caps.pm();
+    ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
+    if (ret < 0)
+      die("add cap error");
+    free(cap_data);
 
-  cap_data = caps.msix();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  free(cap_data);
+    cap_data = caps.msix();
+    ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
+    if (ret < 0)
+      die("add cap error");
+    free(cap_data);
 
-  // not supported by libvfio-user:
-  //cap_data = caps.msi();
-  //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
-  //if (ret < 0)
-  //  die("add cap error");
-  //free(cap_data);
+    // not supported by libvfio-user:
+    //cap_data = caps.msi();
+    //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
+    //if (ret < 0)
+    //  die("add cap error");
+    //free(cap_data);
+    
+    cap_data = caps.exp();
+    ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
+    if (ret < 0)
+      die("add cap error");
+    free(cap_data);
   
-  cap_data = caps.exp();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  free(cap_data);
- 
-  // not supported by upstream libvfio-user, not used by linux ice driver
-  //cap_data = caps.vpd();
-  //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
-  //if (ret < 0)
-  //  die("add cap error");
-  //free(cap_data);
-  
-  cap_data = caps.dsn();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY | VFU_CAP_FLAG_EXTENDED, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  free(cap_data);
+    // not supported by upstream libvfio-user, not used by linux ice driver
+    //cap_data = caps.vpd();
+    //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
+    //if (ret < 0)
+    //  die("add cap error");
+    //free(cap_data);
+    
+    cap_data = caps.dsn();
+    ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY | VFU_CAP_FLAG_EXTENDED, cap_data);
+    if (ret < 0)
+      die("add cap error");
+    free(cap_data);
 
-  // see lspci about which fields mean what https://github.com/pciutils/pciutils/blob/42e6a803bda392e98276b71994db0b0dd285cab1/ls-caps.c#L1469
-  //struct msixcap data;
-  //data.hdr = {
-  //  .id = PCI_CAP_ID_MSIX,
-  //};
-  //data.mxc = {
-  //  // message control
-  //};
-  //data.mtab = {
-  //  // table offset / Table BIR
-  //};
-  //data.mpba = {
-  //  // PBA offset / PBA BIR
-  //};
-  ////ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, &data);
-  //if (ret < 0) {
-  //  die("Vfio-user: cannot add MSIX capability");
-  //}
-
+    // see lspci about which fields mean what https://github.com/pciutils/pciutils/blob/42e6a803bda392e98276b71994db0b0dd285cab1/ls-caps.c#L1469
+    //struct msixcap data;
+    //data.hdr = {
+    //  .id = PCI_CAP_ID_MSIX,
+    //};
+    //data.mxc = {
+    //  // message control
+    //};
+    //data.mtab = {
+    //  // table offset / Table BIR
+    //};
+    //data.mpba = {
+    //  // PBA offset / PBA BIR
+    //};
+    ////ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, &data);
+    //if (ret < 0) {
+    //  die("Vfio-user: cannot add MSIX capability");
+    //}
+  }
   // register callbacks
 
   //int reset_device(vfu_ctx_t *vfu_ctx, vfu_reset_type_t type) {
