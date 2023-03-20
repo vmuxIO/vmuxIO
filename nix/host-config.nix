@@ -119,10 +119,12 @@ lib.attrsets.recursiveUpdate ({
   ];
 
   # this breaks make/insmod kmods though:
-  #boot.extraModprobeConfig = ''
-  #  blacklist ice
-  #  blacklist ixgbe
-  #'';
+  boot.extraModprobeConfig = ''
+    blacklist ice
+    blacklist ixgbe
+    blacklist e1000
+    blacklist e1000e
+  '';
   boot.kernelPatches = [
     {
       name = "enable-debug-symbols";
@@ -186,6 +188,7 @@ lib.attrsets.recursiveUpdate ({
   boot.kernelParams = [ 
     "nokaslr"
     "debug"
+    "intel_iommu=on"
   ];
 
 })

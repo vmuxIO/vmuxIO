@@ -11,7 +11,6 @@ default:
 # show help
 help:
   just --list
-
 vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
@@ -60,6 +59,78 @@ vm-libvfio-user:
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-user-pci,socket={{vmuxSock}} \
+        -s \
+        -nographic
+
+
+@vm-libvfio-user-iommu:
+    #!/usr/bin/env bash
+    ln -sf $(which qemu-system-x86_64) qemu-system-x86_64 
+    sudo ip tuntap add mode tap tap0
+    sudo ip link set dev tap0 up
+    sudo ip a add 10.0.0.1/24 dev tap0
+    sudo qemu-system-x86_64 \
+        -cpu host \
+        -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
+        -device e1000,netdev=net0 \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on \
+        -m 16G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -s \
+        -nographic
+      sudo ip link del tap0
+      rm qemu-system-x86_64
+
+prepare-guest:
+    modprobe vfio-pci
+    echo 8086 100e > /sys/bus/pci/drivers/virtio-pci/new_id
+    echo "vfio-pci" > /sys/bus/pci/devices/0000\:00\:03.0/driver_override 
+    echo 0000:00:03.0 > /sys/bus/pci/drivers/vfio-pci/bind 
+
+vmux-guest:
+    ./build/vmux -d 0000:00:03.0
+
+vm-libvfio-user-iommu-guest:
+    sudo ./qemu-system-x86_64 \
+        -cpu host \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on \
+        -m 4G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=4G,share=on -numa node,memdev=bm \
+        -device virtio-serial \
+        -fsdev local,id=myid,path=/mnt,security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file=/mnt/VMs/host-image2.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -device vfio-user-pci,socket="/tmp/vmux.sock" \
+        -s \
+        -nographic
+
+vm-libvfio-user-iommu-guest-passthrough:
+    sudo ./qemu-system-x86_64 \
+        -cpu host \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -m 4G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=4G,share=on -numa node,memdev=bm \
+        -device virtio-serial \
+        -fsdev local,id=myid,path=/mnt,security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file=/mnt/VMs/host-image2.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -device vfio-pci,host="0000:00:03.0" \
         -s \
         -nographic
 
