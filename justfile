@@ -91,9 +91,9 @@ vm-libvfio-user:
 
 prepare-guest:
     modprobe vfio-pci
-    echo 8086 100e > /sys/bus/pci/drivers/virtio-pci/new_id
-    echo "vfio-pci" > /sys/bus/pci/devices/0000\:00\:03.0/driver_override 
-    echo 0000:00:03.0 > /sys/bus/pci/drivers/vfio-pci/bind 
+    echo 8086 100e > /sys/bus/pci/drivers/vfio-pci/new_id
+    #echo "vfio-pci" > /sys/bus/pci/devices/0000\:00\:03.0/driver_override 
+    #echo 0000:00:03.0 > /sys/bus/pci/drivers/vfio-pci/bind 
 
 vmux-guest:
     ./build/vmux -d 0000:00:03.0
