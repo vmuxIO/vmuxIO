@@ -1430,6 +1430,7 @@ class Host(Server):
             f'ulimit -n 4096; sudo {self.vmux_path}'
             f' -d {self.test_iface_addr} -s {self.vmux_socket_path}'
         )
+        self.exec(f'sudo chmod 777 {self.vmux_socket_path}')
 
     def stop_vmux(self: 'Host') -> None:
         """
