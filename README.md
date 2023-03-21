@@ -122,11 +122,24 @@ read more at (Hacking on Kernel Modules in NixOS)[https://blog.thalheim.io/2022/
 
 To use manually built linux kernels in nixos guest configs, have a look at [ktest](https://github.com/YellowOnion/ktest/blob/73fadcff949236927133141fcba4bfd76df632e7/kernel_install.nix)
 
+## Qemu debug build
+
+make sure you clone the correct qemu build
+```
+nix develop path/to/vmux#qemu-dev
+```
+
+use the `./configure` cmdline from `Makefile` and build with `make -j 12`
+
+manually built, qemu needs to be started with an additional parameter: `-L /qemu-srcs/pc-bios`
+
+
 ## Debugging with qemus e1000
 
 To do nested virtualisation with a simple, qemu emulated NIC:
 
-```just vm-libvfio-user-iommu
+```
+just vm-libvfio-user-iommu
 #In VM 
 just prepare-guest
 just vmux-guest
