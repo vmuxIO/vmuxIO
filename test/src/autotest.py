@@ -682,6 +682,7 @@ def _setup_network(host: Host, interface: str) -> None:
         host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
     elif interface == 'vmux':
+        host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
         host.start_vmux()
 
