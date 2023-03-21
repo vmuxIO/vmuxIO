@@ -1425,7 +1425,11 @@ class Host(Server):
         Returns
         -------
         """
-        self.tmux_new('vmux', f'ulimit -n 4096; sudo {self.vmux_path}')
+        self.tmux_new(
+            'vmux',
+            f'ulimit -n 4096; sudo {self.vmux_path}'
+            f' -d {self.test_iface_addr} -s {self.vmux_socket_path}'
+        )
 
     def stop_vmux(self: 'Host') -> None:
         """
