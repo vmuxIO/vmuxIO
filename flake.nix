@@ -213,11 +213,12 @@
         ] ++ common_deps;
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
-      # nix develop .#qemu
-      qemu = pkgs.qemu.overrideAttrs (old: {
+      # nix develop .#qemu-dev
+        inherit pkgs2211;
+      qemu-dev = pkgs2211.qemu.overrideAttrs (old: {
         buildInputs = [ pkgs.libndctl pkgs.libtasn1 ] ++ old.buildInputs;
         nativeBuildInputs = [ pkgs.meson pkgs.ninja ] ++ old.nativeBuildInputs;
-        hardeningDisable = [ "stackprotector" ];
+        hardeningDisable = [ "all" ]; # [ "stackprotector" ];
         shellHook = ''
           unset CPP # intereferes with dependency calculation
         '';
