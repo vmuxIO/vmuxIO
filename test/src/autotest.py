@@ -630,7 +630,10 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
         memory = args.memory if args.memory else None
         disk = args.disk if args.disk else None
         qemu_path = args.qemu_path \
-            if args.qemu_path else conf['host']['qemu_path']
+            if args.qemu_path \
+            else (conf['host']['vmux_qemu_path']
+                  if args.interface in ['vfio', 'vmux']
+                  else conf['host']['qemu_path'])
 
         host.run_guest(args.interface, args.machine, vcpus, memory, disk,
                        args.debug, args.ioregionfd, qemu_path, args.vhost,
