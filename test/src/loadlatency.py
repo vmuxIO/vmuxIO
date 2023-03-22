@@ -291,7 +291,7 @@ class LoadLatencyTestGenerator(object):
                        interface: Interface, iface: str = None):
         if reflector == Reflector.MOONGEN:
             server.stop_moongen_reflector()
-            if interface == Interface.VFIO:
+            if interface in [Interface.VFIO, Interface.VMUX]:
                 server.unbind_device(server.test_iface_addr)
                 # TODO: The hardcoded driver is a dirty workaround,
                 #       we need to fix this later on
@@ -388,22 +388,24 @@ class LoadLatencyTestGenerator(object):
         for m in self.machines - {Machine.HOST}:
             tree[m] = {}
             for i in self.interfaces - {Interface.PNIC}:
-                if (m == Machine.MICROVM and i == Interface.VFIO):
+                if (m == Machine.MICROVM
+                        and i in [Interface.VFIO, Interface.VMUX]):
                     continue
                 tree[m][i] = {}
                 mac = host.test_iface_mac \
-                    if i == Interface.VFIO else host.guest_test_iface_mac
+                    if i in [Interface.VFIO, Interface.VMUX] \
+                    else host.guest_test_iface_mac
                 for q in self.qemus:
                     qemu, _ = q.split(':')
                     tree[m][i][q] = {}
                     for v in self.vhosts:
-                        if v and i == Interface.VFIO:
+                        if (v and i in [Interface.VFIO, Interface.VMUX]):
                             continue
                         tree[m][i][q][v] = {}
                         # for io in reversed(list(self.ioregionfds)):
                         for io in self.ioregionfds:
-                            if io and (m != Machine.MICROVM
-                                       or i == Interface.VFIO):
+                            if io and (m != Machine.MICROVM or
+                                       i in [Interface.VFIO, Interface.VMUX]):
                                 continue
                             tree[m][i][q][v][io] = {}
                             for r in self.reflectors:
