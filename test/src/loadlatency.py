@@ -486,6 +486,10 @@ class LoadLatencyTestGenerator(object):
         host.cleanup_network()
 
         debug('Binding loadgen interface')
+        try:
+            loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+        except Exception:
+            pass
         loadgen.bind_test_iface()
         loadgen.setup_hugetlbfs()
 
