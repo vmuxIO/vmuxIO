@@ -266,7 +266,9 @@ class LoadLatencyTestGenerator(object):
             host.setup_admin_bridge()
             host.setup_admin_tap()
             host.modprobe_test_iface_drivers()
-        if interface == Interface.BRIDGE:
+        if interface == Interface.PNIC:
+            host.delete_nic_ip_addresses(host.test_iface)
+        elif interface == Interface.BRIDGE:
             if machine == Machine.HOST:
                 host.setup_test_bridge()
             else:
