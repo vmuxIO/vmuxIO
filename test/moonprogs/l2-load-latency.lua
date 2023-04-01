@@ -24,16 +24,19 @@ function configure(parser)
 	parser:option("-r --rate", "Transmit rate in kpps."):default(14000):convert(tonumber)
     parser:option("-s --size", "Packet size in bytes."):default(60):convert(tonumber)
 	parser:option("-f --file", "Filename of the latency histogram."):default("histogram.csv")
+	parser:option("-t --threads", "Number of threads per device."):args(1):convert(tonumber):default(1)
 	parser:option("-T --time", "Time to transmit for in seconds."):default(60):convert(tonumber)
 end
 
 function master(args)
-	local dev = device.config({port = args.dev, rxQueues = 2, txQueues = 2})
+	local dev = device.config({port = args.dev, rxQueues = args.threads + 1, txQueues = args.threads + 1})
 	device.waitForLinks()
-	dev:getTxQueue(0):setRate(args.rate * (args.size + 4) * 8 / 1000)
-	mg.startTask("loadSlave", dev:getTxQueue(0), dev:getMac(true), args.mac, args.size)
+	for i = 0, args.threads - 1 do
+	    dev:getTxQueue(i):setRate(args.rate * (args.size + 4) * 8 / 1000)
+	    mg.startTask("loadSlave", dev:getTxQueue(i), dev:getMac(true), args.mac, args.size)
+    end
 	stats.startStatsTask{dev}
-	mg.startSharedTask("timerSlave", dev:getTxQueue(1), dev:getRxQueue(1), args.mac, args.file)
+	mg.startSharedTask("timerSlave", dev:getTxQueue(args.threads), dev:getRxQueue(args.threads), args.mac, args.file)
 	if args.time >= 0 then
 		runtime = timer:new(args.time)
 		runtime:wait()
