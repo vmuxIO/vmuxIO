@@ -24,7 +24,7 @@ function configure(parser)
 	parser:option("-r --rate", "Transmit rate in kpps."):default(14000):convert(tonumber)
     parser:option("-s --size", "Packet size in bytes."):default(60):convert(tonumber)
 	parser:option("-f --file", "Filename of the latency histogram."):default("histogram.csv")
-	parser:option("-t --time", "Time to transmit for in seconds."):default(60):convert(tonumber)
+	parser:option("-T --time", "Time to transmit for in seconds."):default(60):convert(tonumber)
 end
 
 function master(args)
