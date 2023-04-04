@@ -75,65 +75,66 @@
     stress
   ];
 
-  boot.kernelPackages = let
-    linux_ioregfd_pkg = { fetchurl, buildLinux, ... } @ args:
-
-      buildLinux (args // rec {
-        version = "5.12.14-ioregionfd";
-        modDirVersion = "5.12.14";
-
-        src = fetchurl {
-          url = "https://github.com/vmuxIO/linux/archive/refs/tags/v5.12.14-ioregionfd.tar.gz";
-          sha256 = "3fe587a240c8d29a1bae73d27ccfb7dc332f7bf716e48dbdbabffd05f090481c";
-        };
-        kernelPatches = [{
-          name = "enable-debug-symbols";
-          patch = null;
-          extraConfig = ''
-            DEBUG_INFO y
-          '';
-        } {
-          name = "build-kvm-into-base-kernel";
-          patch = null;
-          extraConfig = ''
-            KVM y
-          '';
-        } {
-          name = "enable-kvm-ioregionfd";
-          patch = null;
-          extraConfig = ''
-            KVM_IOREGION y
-          '';
-        } {
-          name = "remove-useless-stuff";
-          patch = null;
-          extraConfig = ''
-            CONFIG_USB n
-            CONFIG_WLAN n
-          '';
-        } ];
-
-        extraMeta.branch = "5.12";
-        ignoreConfigErrors = true;
-      } // (args.argsOverride or {}));
-    linux_ioregfd = pkgs.callPackage linux_ioregfd_pkg{};
-  in
-    pkgs.recurseIntoAttrs (pkgs.linuxPackagesFor linux_ioregfd);
-  boot.kernelPatches = [ {
-    name = "devmem-config";
-    patch = null;
-    extraConfig = ''
-      STRICT_DEVMEM n
-    '';
-  } {
-    name = "remove-useless-stuff";
-    patch = null;
-    extraConfig = ''
-      USB n
-      WLAN n
-    '';
-  } ];
   hardware.firmware = [ linux-firmware-pinned ];
+
+  #boot.kernelPackages = let
+  #  linux_ioregfd_pkg = { fetchurl, buildLinux, ... } @ args:
+
+  #    buildLinux (args // rec {
+  #      version = "5.12.14-ioregionfd";
+  #      modDirVersion = "5.12.14";
+
+  #      src = fetchurl {
+  #        url = "https://github.com/vmuxIO/linux/archive/refs/tags/v5.12.14-ioregionfd.tar.gz";
+  #        sha256 = "3fe587a240c8d29a1bae73d27ccfb7dc332f7bf716e48dbdbabffd05f090481c";
+  #      };
+  #      kernelPatches = [{
+  #        name = "enable-debug-symbols";
+  #        patch = null;
+  #        extraConfig = ''
+  #          DEBUG_INFO y
+  #        '';
+  #      } {
+  #        name = "build-kvm-into-base-kernel";
+  #        patch = null;
+  #        extraConfig = ''
+  #          KVM y
+  #        '';
+  #      } {
+  #        name = "enable-kvm-ioregionfd";
+  #        patch = null;
+  #        extraConfig = ''
+  #          KVM_IOREGION y
+  #        '';
+  #      } {
+  #        name = "remove-useless-stuff";
+  #        patch = null;
+  #        extraConfig = ''
+  #          CONFIG_USB n
+  #          CONFIG_WLAN n
+  #        '';
+  #      } ];
+
+  #      extraMeta.branch = "5.12";
+  #      ignoreConfigErrors = true;
+  #    } // (args.argsOverride or {}));
+  #  linux_ioregfd = pkgs.callPackage linux_ioregfd_pkg{};
+  #in
+  #  pkgs.recurseIntoAttrs (pkgs.linuxPackagesFor linux_ioregfd);
+  #boot.kernelPatches = [ {
+  #  name = "devmem-config";
+  #  patch = null;
+  #  extraConfig = ''
+  #    STRICT_DEVMEM n
+  #  '';
+  #} {
+  #  name = "remove-useless-stuff";
+  #  patch = null;
+  #  extraConfig = ''
+  #    USB n
+  #    WLAN n
+  #  '';
+  #} ];
 
   boot.kernelParams = [
     "nokaslr"
