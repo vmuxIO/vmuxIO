@@ -75,20 +75,24 @@
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
+    selfpkgs = self.packages.${system};
   in  {
     packages = {
-      default = self.packages.${system}.moongen;
+      default = selfpkgs.moongen;
 
       # moongen/dpdk
       moongen = pkgs.callPackage ./nix/moongen.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
+        inherit (selfpkgs) linux-firmware-pinned;
       };
       moongen21 = pkgs.callPackage ./nix/moongen21.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
+        inherit (selfpkgs) linux-firmware-pinned;
         inherit self;
       };
       moongen-lachnit = pkgs.callPackage ./nix/moongen-lachnit.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
+        inherit (selfpkgs) linux-firmware-pinned;
         inherit self;
       };
       dpdk = mydpdk;
@@ -101,6 +105,15 @@
         inherit pkgs;
         inherit (self.inputs) xdp-reflector-src;
       };
+      linux-firmware-pinned = (pkgs.linux-firmware.overrideAttrs (old: new: {
+        src = fetchGit {
+          url = "git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git";
+          ref = "main";
+          rev = "8a2d811764e7fcc9e2862549f91487770b70563b";
+        };
+        version = "8a2d81";
+        outputHash = "sha256-dVvfwgto9Pgpkukf/IoJ298MUYzcsV1G/0jTxVcdFGw=";
+      }));
 
       #patched qemu
       qemu = pkgs.callPackage ./nix/qemu-libvfio.nix { 
@@ -128,27 +141,28 @@
       # qemu/kernel (ioregionfd)
       host-image = nixos-generators.nixosGenerate {
         inherit pkgs;
-        modules = [ (import ./nix/host-config.nix {
-          inherit pkgs;
-          inherit (pkgs) lib;
-          inherit (self) config;
+        modules = [ ./nix/host-config.nix ];
+        specialArgs = {
+          inherit (selfpkgs) linux-firmware-pinned;
           extkern = false;
-        }) ];
+        };
         format = "qcow";
       };
       host-extkern-image = nixos-generators.nixosGenerate {
         inherit pkgs;
-        modules = [ (import ./nix/host-config.nix {
-          inherit pkgs;
-          inherit (pkgs) lib;
-          inherit (self) config;
+        modules = [ ./nix/host-config.nix ];
+        specialArgs = {
+          inherit (selfpkgs) linux-firmware-pinned;
           extkern = true;
-        }) ];
+        };
         format = "qcow";
       };
       guest-image = nixos-generators.nixosGenerate {
         inherit pkgs;
         modules = [ ./nix/guest-config.nix ];
+        specialArgs = {
+          inherit (selfpkgs) linux-firmware-pinned;
+        };
         format = "qcow";
       };
     };
@@ -229,6 +243,7 @@
   })) // {
     nixosConfigurations = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      selfpkgs = self.packages.x86_64-linux;
     in {
       host = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
@@ -236,6 +251,7 @@
             inherit pkgs;
             inherit (pkgs) lib;
             inherit (self) config;
+            inherit (selfpkgs) linux-firmware-pinned;
             extkern = false;
           })
           ./nix/nixos-generators-qcow.nix
@@ -247,6 +263,7 @@
           inherit pkgs;
           inherit (pkgs) lib;
           inherit (self) config;
+          inherit (selfpkgs) linux-firmware-pinned;
           extkern = true;
         }) ];
       };
