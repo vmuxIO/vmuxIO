@@ -1,4 +1,4 @@
-{ config, lib, pkgs, modulesPath, ... }:
+{ config, lib, pkgs, modulesPath, linux-firmware-pinned, ... }:
 {
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = false;
@@ -133,6 +133,7 @@
       WLAN n
     '';
   } ];
+  hardware.firmware = [ linux-firmware-pinned ];
 
   boot.kernelParams = [
     "nokaslr"
