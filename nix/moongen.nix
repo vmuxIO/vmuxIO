@@ -84,7 +84,7 @@ gcc8Stdenv.mkDerivation {
       --replace "./bind-interfaces.sh \''${FLAGS}" "echo skipping bind-interfaces.sh"
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.c \
       --replace '#define ICE_DFLT_PKG_FILE "/lib/firmware/intel/ice/ddp/ice.pkg"' \
-      '#define ICE_DFLT_PKG_FILE "${linux-firmware-pinned}/intel/ice/ddp/ice-1.3.26.0.pkg"'
+      '#define ICE_DFLT_PKG_FILE "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
   '';
 
   buildPhase = "./build.sh";

@@ -21,7 +21,7 @@
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBevyJ5i0237DNoS29F9aii2AJwrSxXNz3hP61hWXfRl sandro@reaper.gierens.de"
   ];
-  services.openssh.permitRootLogin = lib.mkDefault "yes";
+  services.openssh.settings.PermitRootLogin = lib.mkDefault "yes";
   services.getty.autologinUser = lib.mkDefault "root";
 
   # users.extraUsers.gierens = {
