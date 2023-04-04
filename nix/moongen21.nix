@@ -17,17 +17,13 @@
 , gcc8Stdenv
 , libpcap
 , python3Packages
+, linux-firmware-pinned
 }:
 let 
   srcpack = {
     moongen = self.inputs.moonmux-src;
     libmoon = self.inputs.libmoon-src;
     dpdk = self.inputs.dpdk-src;
-    linux-firmware = fetchGit {
-      url = "git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git";
-      ref = "main";
-      rev = "8a2d811764e7fcc9e2862549f91487770b70563b";
-    };
   };
 in
 stdenv.mkDerivation {
@@ -75,10 +71,10 @@ stdenv.mkDerivation {
       --replace "./bind-interfaces.sh \''${FLAGS}" "echo skipping bind-interfaces.sh"
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_DEFAULT "/lib/firmware/intel/ice/ddp/ice.pkg"' \
-      '#define ICE_PKG_FILE_DEFAULT "${srcpack.linux-firmware}/intel/ice/ddp/ice-1.3.26.0.pkg"'
+      '#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/intel/ice/ddp/ice-1.3.26.0.pkg"'
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/lib/firmware/intel/ice/ddp/"' \
-      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${srcpack.linux-firmware}/intel/ice/ddp/"'
+      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/intel/ice/ddp/"'
   '';
 
   buildPhase = "./build.sh";

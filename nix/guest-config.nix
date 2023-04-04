@@ -1,4 +1,4 @@
-{ config, lib, pkgs, modulesPath, ... }:
+{ config, lib, pkgs, modulesPath, linux-firmware-pinned, ... }:
 {
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = false;
@@ -19,10 +19,9 @@
 
   users.users.root.password = "ach2Chai8muo";
   users.users.root.openssh.authorizedKeys.keys = [
-    (builtins.readFile ./ssh_key.pub)
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBevyJ5i0237DNoS29F9aii2AJwrSxXNz3hP61hWXfRl sandro@reaper.gierens.de"
   ];
-  services.openssh.settings.PermitRootLogin = lib.mkDefault "yes";
+  services.openssh.permitRootLogin = lib.mkDefault "yes";
   services.getty.autologinUser = lib.mkDefault "root";
 
   # users.extraUsers.gierens = {
@@ -66,6 +65,7 @@
     # vde2
     # liburing
     # ninja
+    pciutils
     htop
     tmux
     busybox
@@ -75,64 +75,66 @@
     stress
   ];
 
-  # boot.kernelPackages = let
-  #   linux_ioregfd_pkg = { fetchurl, buildLinux, ... } @ args:
+  hardware.firmware = [ linux-firmware-pinned ];
 
-  #     buildLinux (args // rec {
-  #       version = "5.12.14-ioregionfd";
-  #       modDirVersion = "5.12.14";
+  #boot.kernelPackages = let
+  #  linux_ioregfd_pkg = { fetchurl, buildLinux, ... } @ args:
 
-  #       src = fetchurl {
-  #         url = "https://github.com/vmuxIO/linux/archive/refs/tags/v5.12.14-ioregionfd.tar.gz";
-  #         sha256 = "3fe587a240c8d29a1bae73d27ccfb7dc332f7bf716e48dbdbabffd05f090481c";
-  #       };
-  #       kernelPatches = [{
-  #         name = "enable-debug-symbols";
-  #         patch = null;
-  #         extraConfig = ''
-  #           DEBUG_INFO y
-  #         '';
-  #       } {
-  #         name = "build-kvm-into-base-kernel";
-  #         patch = null;
-  #         extraConfig = ''
-  #           KVM y
-  #         '';
-  #       } {
-  #         name = "enable-kvm-ioregionfd";
-  #         patch = null;
-  #         extraConfig = ''
-  #           KVM_IOREGION y
-  #         '';
-  #       } {
-  #         name = "remove-useless-stuff";
-  #         patch = null;
-  #         extraConfig = ''
-  #           CONFIG_USB n
-  #           CONFIG_WLAN n
-  #         '';
-  #       } ];
+  #    buildLinux (args // rec {
+  #      version = "5.12.14-ioregionfd";
+  #      modDirVersion = "5.12.14";
 
-  #       extraMeta.branch = "5.12";
-  #       ignoreConfigErrors = true;
-  #     } // (args.argsOverride or {}));
-  #   linux_ioregfd = pkgs.callPackage linux_ioregfd_pkg{};
-  # in
-  #   pkgs.recurseIntoAttrs (pkgs.linuxPackagesFor linux_ioregfd);
-  # boot.kernelPatches = [ {
-  #   name = "devmem-config";
-  #   patch = null;
-  #   extraConfig = ''
-  #     STRICT_DEVMEM n
-  #   '';
-  # } {
-  #   name = "remove-useless-stuff";
-  #   patch = null;
-  #   extraConfig = ''
-  #     USB n
-  #     WLAN n
-  #   '';
-  # } ];
+  #      src = fetchurl {
+  #        url = "https://github.com/vmuxIO/linux/archive/refs/tags/v5.12.14-ioregionfd.tar.gz";
+  #        sha256 = "3fe587a240c8d29a1bae73d27ccfb7dc332f7bf716e48dbdbabffd05f090481c";
+  #      };
+  #      kernelPatches = [{
+  #        name = "enable-debug-symbols";
+  #        patch = null;
+  #        extraConfig = ''
+  #          DEBUG_INFO y
+  #        '';
+  #      } {
+  #        name = "build-kvm-into-base-kernel";
+  #        patch = null;
+  #        extraConfig = ''
+  #          KVM y
+  #        '';
+  #      } {
+  #        name = "enable-kvm-ioregionfd";
+  #        patch = null;
+  #        extraConfig = ''
+  #          KVM_IOREGION y
+  #        '';
+  #      } {
+  #        name = "remove-useless-stuff";
+  #        patch = null;
+  #        extraConfig = ''
+  #          CONFIG_USB n
+  #          CONFIG_WLAN n
+  #        '';
+  #      } ];
+
+  #      extraMeta.branch = "5.12";
+  #      ignoreConfigErrors = true;
+  #    } // (args.argsOverride or {}));
+  #  linux_ioregfd = pkgs.callPackage linux_ioregfd_pkg{};
+  #in
+  #  pkgs.recurseIntoAttrs (pkgs.linuxPackagesFor linux_ioregfd);
+  #boot.kernelPatches = [ {
+  #  name = "devmem-config";
+  #  patch = null;
+  #  extraConfig = ''
+  #    STRICT_DEVMEM n
+  #  '';
+  #} {
+  #  name = "remove-useless-stuff";
+  #  patch = null;
+  #  extraConfig = ''
+  #    USB n
+  #    WLAN n
+  #  '';
+  #} ];
 
   boot.kernelParams = [
     "nokaslr"
@@ -145,7 +147,11 @@
   boot.extraModulePackages = [
     config.boot.kernelPackages.dpdk-kmods
   ];
-  boot.kernelModules = ["igb_uio"];
+  boot.kernelModules = [
+    "ice"
+    "igb_uio"
+    "vfio_pci"
+  ];
 
   # system.activationScripts = {
   #   linkHome = {
