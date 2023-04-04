@@ -144,7 +144,7 @@
         modules = [ ./nix/host-config.nix ];
         specialArgs = {
           inherit (selfpkgs) linux-firmware-pinned;
-          extkern = true;
+          extkern = false;
         };
         format = "qcow";
       };
