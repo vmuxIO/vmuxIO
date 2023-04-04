@@ -71,10 +71,10 @@ stdenv.mkDerivation {
       --replace "./bind-interfaces.sh \''${FLAGS}" "echo skipping bind-interfaces.sh"
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_DEFAULT "/lib/firmware/intel/ice/ddp/ice.pkg"' \
-      '#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/intel/ice/ddp/ice-1.3.26.0.pkg"'
+      '#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/lib/firmware/intel/ice/ddp/"' \
-      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/intel/ice/ddp/"'
+      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"'
   '';
 
   buildPhase = "./build.sh";
