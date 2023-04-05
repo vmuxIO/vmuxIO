@@ -1182,6 +1182,8 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
     def setup_test_br_tap(self: 'Host'):
+        # TODO - split into setup_test_bridge and setup_test_tap
+        #      - second function needs to take a guest object
         """
         Setup the bridged test tap device.
 
@@ -1222,6 +1224,8 @@ class Host(Server):
                   f'&& sudo ip link set {self.test_tap} up')
 
     def destroy_test_br_tap(self: 'Host'):
+        # TODO - split into destroy_test_tap and destroy_test_bridge
+        #      - first function takes a guest object
         """
         Destroy the bridged test tap device.
 
@@ -1235,6 +1239,7 @@ class Host(Server):
         self.exec(f'sudo ip link delete {self.test_bridge} || true')
 
     def setup_test_macvtap(self: 'Host'):
+        # TODO should take a guest object
         """
         Setup the macvtap test interface.
 
@@ -1258,6 +1263,7 @@ class Host(Server):
                   )
 
     def destroy_test_macvtap(self: 'Host'):
+        # TODO should take a guest object
         """
         Destroy the macvtap test interface.
 
@@ -1369,6 +1375,7 @@ class Host(Server):
                     f'fsdev={name}fs'
                 )
         self.tmux_new(
+            # TODO tmux session needs a guest specific name
             'qemu',
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
             qemu_bin_path +
@@ -1404,6 +1411,7 @@ class Host(Server):
             )
 
     def kill_guest(self: 'Host') -> None:
+        # TODO should take a guest object
         """
         Kill a guest VM.
 
@@ -1413,6 +1421,7 @@ class Host(Server):
         Returns
         -------
         """
+        # TODO tmux session needs a guest specific name
         self.tmux_kill('qemu')
 
     def start_vmux(self: 'Host') -> None:
