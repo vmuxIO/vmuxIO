@@ -121,10 +121,10 @@ int VfioConsumer::init() {
   dma_map.iova = 0; /* 1MB starting at 0x0 from device view */
   dma_map.flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE;
 
-  ret = ioctl(container, VFIO_IOMMU_MAP_DMA, &dma_map);
-  if (ret < 0) {
-    die("Cannot set dma map");
-  }
+  //ret = ioctl(container, VFIO_IOMMU_MAP_DMA, &dma_map);
+  //if (ret < 0) {
+    //die("Cannot set dma map");
+  //}
   this->dma_map = dma_map;
 
   /* Get a file descriptor for the device */
