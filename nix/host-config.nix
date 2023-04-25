@@ -109,6 +109,7 @@ lib.attrsets.recursiveUpdate ({
     iperf
     fio
     pciutils
+    just
     ioport # access port io (pio) via inb and outw commands
     busybox # for devmem to access physical memory
     (writeScriptBin "devmem" ''
@@ -133,6 +134,14 @@ lib.attrsets.recursiveUpdate ({
       patch = null;
       extraConfig = ''
         DEBUG_INFO y
+      '';
+    }
+    {
+      name = "enable-iommu-debugfs";
+      patch = null;
+      extraConfig = ''
+        IOMMU_DEBUGFS y
+        INTEL_IOMMU_DEBUGFS y
       '';
     }
     #{
