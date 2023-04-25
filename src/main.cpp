@@ -247,8 +247,8 @@ class VfioUserServer {
       
       printf("register dma cb\n");
       
-      if (info->iova.iov_base == NULL ||
-          info->iova.iov_base == (void*)0xc0000 ||
+      if ( //info->iova.iov_base == NULL ||
+          info->iova.iov_base == (void*)0xc0000 || // TODO remove these checks as well
           info->iova.iov_base == (void*)0xe0000 )
         return;
 
