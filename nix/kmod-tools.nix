@@ -2,7 +2,7 @@
   name = "kmod-tools";
 
   src = builtins.fetchGit {
-    url = "git@github.com:cirosantilli/linux-kernel-module-cheat.git";
+    url = "https://github.com/cirosantilli/linux-kernel-module-cheat.git";
     rev = "25f9913e0c1c5b4a3d350ad14d1de9ac06bfd4be";
   };
 
