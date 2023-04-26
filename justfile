@@ -333,3 +333,69 @@ autotest-ssh *ARGS:
   os.system(f"ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
   
 
+# read list of hexvalues from stdin and find between which consecutive pairs arg1 lies
+rangefinder *ARGS:
+  #!/usr/bin/env python3
+  import fileinput
+  import argparse
+  import shlex
+
+  # parse args
+  parser = argparse.ArgumentParser(
+      prog='rangefinder',
+      description='read list of hexvalues from stdin and find between which consecutive pairs arg1 lies'
+      )
+  parser.add_argument('key',
+      help='key value to search a range for in which it falls (in hex)'
+      )
+  parser.add_argument('-c', '--column',
+      default=0,
+      type=int,
+      help='choose a column from stdin (space separated, starts counting at 0)'
+      )
+  parser.add_argument('-i', '--inline',
+      action='store_true',
+      help='input ranges are specified inline as `fffa-fffb`'
+      )
+  args = parser.parse_args(shlex.split("{{ARGS}}"))
+
+  # settings
+  base = 16
+  key = int(args.key, base=base)
+  def sizeof_fmt(num, suffix="B"):
+    for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
+        if abs(num) < 1024.0:
+            return f"{num:3.1f}{unit}{suffix}"
+        num /= 1024.0
+    return f"{num:.1f}Yi{suffix}"
+
+  # state
+  prev = 0
+  current = 0
+
+  # main:
+  for line in fileinput.input():
+    if args.inline:
+      try:
+        column = line.split(" ")[args.column]
+        range = column.split("-") # throw meaningful error when this is not a 1-2 range
+        prev = int(range[0], base=base)
+        current = int(range[1], base=base)
+      except Exception as e:
+        print(e)
+        continue
+    else:
+      try:
+        column = line.split(" ")[args.column]
+        # print(f"echo: {column}")
+        integer = int(column, base=base)
+      except Exception as e:
+        print(e)
+        continue
+      prev = current
+      current = integer
+
+    # print(f"{prev}-{current}")
+    if prev <= key and key < current:
+      size = sizeof_fmt(current-prev)
+      print(f"{prev:x} <= {key:x} <= {current:x} - size {size}")
