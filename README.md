@@ -91,9 +91,9 @@ and find its groups at `/sys/kernel/iommu_groups`
 
 check IOMMU state at `sudo cat /sys/kernel/debug/iommu/intel/dmar_translation_struct`
 
-check IOMMU page table at `sudo cat /sys/kernel/debug/iommu/intel/domain_translation_struct` where `IOVA_PFN` is the IOVA (io virtual address) used by the device, and `PTE` is the corresponding host pysical address.
+check IOMMU page table at `sudo cat /sys/kernel/debug/iommu/intel/domain_translation_struct` where `IOVA_PFN` is the IOVA (io virtual address; page aligned, so multiply with 0x1000) used by the device, and `PTE` is the corresponding host pysical address.
 
-Use `kmod-tools-virt_to_phys_user` from `nix/kmod-tools.nix` to check if your userspace actually maps the expected physical address.
+Use `kmod-tools-virt_to_phys_user` or `kmod-tools-pagemap_dump` from `nix/kmod-tools.nix` to check if your userspace actually maps the expected physical address.
 
 ## Pass through VFs
 
@@ -145,5 +145,7 @@ just prepare-guest
 just vmux-guest
 just vm-libvfio-user-iommu-guest
 ```
+
+Use with mmisono/vfio-e1000: `gcc -o e1000 e1000.c -DPOLL -DECHO`
 
 

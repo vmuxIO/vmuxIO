@@ -142,6 +142,13 @@ lib.attrsets.recursiveUpdate ({
         INTEL_IOMMU_DEBUGFS y
       '';
     }
+    {
+      name = "fix-bpf-tools";
+      patch = null;
+      extraConfig = ''
+        IKHEADERS y
+      '';
+    }
     #{
     #  name = "ixgbe-use-vmux-capability-offset-instead-of-hardware";
     #  patch = ./0001-ixgbe-vmux-capa.patch;

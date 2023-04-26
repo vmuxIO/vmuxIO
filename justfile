@@ -1,5 +1,6 @@
 proot := justfile_directory()
 host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
+qemu_libvfiouser_bin := proot + "/qemu-manual/build/qemu-system-x86_64"
 qemu_ssh_port := "2222"
 user := `whoami`
 vmuxSock := "/tmp/vmux-" + user + ".sock"
@@ -46,7 +47,7 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -nographic
 
 vm-libvfio-user:
-    sudo qemu-system-x86_64 \
+    sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
         -m 8G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=8G,share=on -numa node,memdev=bm \
@@ -65,11 +66,11 @@ vm-libvfio-user:
 
 @vm-libvfio-user-iommu:
     #!/usr/bin/env bash
-    ln -sf $(which qemu-system-x86_64) qemu-system-x86_64 
     sudo ip tuntap add mode tap tap0
     sudo ip link set dev tap0 up
     sudo ip a add 10.0.0.1/24 dev tap0
-    sudo qemu-system-x86_64 \
+    sudo {{qemu_libvfiouser_bin}}  \
+        -L / \
         -cpu host \
         -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
         -device e1000,netdev=net0 \
@@ -87,7 +88,6 @@ vm-libvfio-user:
         -s \
         -nographic
       sudo ip link del tap0
-      rm qemu-system-x86_64
 
 prepare-guest:
     modprobe vfio-pci
@@ -99,11 +99,12 @@ vmux-guest:
     ./build/vmux -d 0000:00:03.0
 
 vm-libvfio-user-iommu-guest:
-    sudo ./qemu-system-x86_64 \
+    sudo {{qemu_libvfiouser_bin}}  \
+        -L {{proot}}/qemu-manual/pc-bios/ \
         -cpu host \
         -machine q35,accel=kvm,kernel-irqchip=split \
-        -device intel-iommu,intremap=on,device-iotlb=on \
-        -m 4G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=4G,share=on -numa node,memdev=bm \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -m 1G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
         -device virtio-serial \
         -fsdev local,id=myid,path=/mnt,security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -117,7 +118,8 @@ vm-libvfio-user-iommu-guest:
         -nographic
 
 vm-libvfio-user-iommu-guest-passthrough:
-    sudo ./qemu-system-x86_64 \
+    sudo {{qemu_libvfiouser_bin}}  \
+        -L {{proot}}/qemu-manual/pc-bios/ \
         -cpu host \
         -machine q35,accel=kvm,kernel-irqchip=split \
         -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
@@ -240,6 +242,7 @@ vm-overwrite:
   # guest VM
   nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
   install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2
+  qemu-img resize {{proot}}/VMs/guest-image.qcow2 +8G
 
 dpdk-setup:
   modprobe vfio-pci
