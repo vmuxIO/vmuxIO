@@ -95,6 +95,8 @@ check IOMMU page table at `sudo cat /sys/kernel/debug/iommu/intel/domain_transla
 
 Use `kmod-tools-virt_to_phys_user` or `kmod-tools-pagemap_dump` from `nix/kmod-tools.nix` to check if your userspace actually maps the expected physical address.
 
+Use qemus monitor (`Ctrl+A c` or exposable for automation via `-monitor tcp:127.0.0.1:2345,server,nowait`) to translate hva2gpa (with our patched qemu-libvfio.nix) or gpa2hva via monitor commands.
+
 ## Pass through VFs
 
 bind ice on pnic
