@@ -1,6 +1,6 @@
 proot := justfile_directory()
 host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
-qemu_libvfiouser_bin := proot + "/qemu-manual/build/qemu-system-x86_64"
+qemu_libvfiouser_bin := proot + "/qemu/bin/qemu-system-x86_64"
 qemu_ssh_port := "2222"
 user := `whoami`
 vmuxSock := "/tmp/vmux-" + user + ".sock"

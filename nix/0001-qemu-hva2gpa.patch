@@ -1,0 +1,156 @@
+diff --git a/hmp-commands.hx b/hmp-commands.hx
+index dd4006d355..f4ee45faaf 100644
+--- a/hmp-commands.hx
++++ b/hmp-commands.hx
+@@ -517,6 +517,22 @@ SRST
+   is mapped.
+ ERST
+ 
++
++{
++  .name       = "hva2gpa",
++  .args_type  = "addr:l",
++  .params     = "addr",
++  .help       = "print the guest physical address corresponding to a host virtual address",
++  .cmd        = hmp_hva2gpa,
++},
++
++SRST
++``hva2gpa`` *addr*
++Print the guest physical address at which the host virtual address *addr*
++is mapped.
++ERST
++
++
+ #ifdef CONFIG_LINUX
+     {
+         .name       = "gpa2hpa",
+diff --git a/include/exec/memory.h b/include/exec/memory.h
+index a6a0f4d8ad..415662c291 100644
+--- a/include/exec/memory.h
++++ b/include/exec/memory.h
+@@ -2369,7 +2369,8 @@ void memory_region_set_ram_discard_manager(MemoryRegion *mr,
+  */
+ MemoryRegionSection memory_region_find(MemoryRegion *mr,
+                                        hwaddr addr, uint64_t size);
+-
++void* memory_region_find_hhaddr(MemoryRegion* mr,
++                                hwaddr addr, uint64_t size);
+ /**
+  * memory_global_dirty_log_sync: synchronize the dirty log for all memory
+  *
+diff --git a/include/monitor/hmp-target.h b/include/monitor/hmp-target.h
+index 1891a19b21..8472354997 100644
+--- a/include/monitor/hmp-target.h
++++ b/include/monitor/hmp-target.h
+@@ -51,5 +51,6 @@ void hmp_info_local_apic(Monitor *mon, const QDict *qdict);
+ void hmp_info_sev(Monitor *mon, const QDict *qdict);
+ void hmp_info_sgx(Monitor *mon, const QDict *qdict);
+ void hmp_info_via(Monitor *mon, const QDict *qdict);
++void hmp_hva2gpa(Monitor *mon, const QDict *qdict);
+ 
+ #endif /* MONITOR_HMP_TARGET_H */
+diff --git a/include/monitor/monitor.h b/include/monitor/monitor.h
+index a4b40e8391..ecf19659d6 100644
+--- a/include/monitor/monitor.h
++++ b/include/monitor/monitor.h
+@@ -39,6 +39,7 @@ int monitor_set_cpu(Monitor *mon, int cpu_index);
+ int monitor_get_cpu_index(Monitor *mon);
+ 
+ void *gpa2hva(MemoryRegion **p_mr, hwaddr addr, uint64_t size, Error **errp);
++void *hva2gpa(MemoryRegion **p_mr, hwaddr addr, uint64_t size, Error **errp);
+ 
+ void monitor_read_command(MonitorHMP *mon, int show_prompt);
+ int monitor_read_password(MonitorHMP *mon, ReadLineFunc *readline_func,
+diff --git a/monitor/hmp-cmds.c b/monitor/hmp-cmds.c
+index 634968498b..ad21477898 100644
+--- a/monitor/hmp-cmds.c
++++ b/monitor/hmp-cmds.c
+@@ -1169,7 +1169,6 @@ void hmp_migrate_pause(Monitor *mon, const QDict *qdict)
+     hmp_handle_error(mon, err);
+ }
+ 
+-
+ void hmp_migrate_set_capability(Monitor *mon, const QDict *qdict)
+ {
+     const char *cap = qdict_get_str(qdict, "capability");
+diff --git a/monitor/misc.c b/monitor/misc.c
+index 6c5bb82d3b..045051ab61 100644
+--- a/monitor/misc.c
++++ b/monitor/misc.c
+@@ -646,6 +646,35 @@ static void hmp_physical_memory_dump(Monitor *mon, const QDict *qdict)
+     memory_dump(mon, count, format, size, addr, 1);
+ }
+ 
++void *hva2gpa(MemoryRegion **p_mr, hwaddr addr, uint64_t size, Error **errp)
++{
++    MemoryRegion* m = get_system_memory();
++    return memory_region_find_hhaddr(m,addr,1);
++}
++
++void hmp_hva2gpa(Monitor *mon, const QDict *qdict)
++{
++    hwaddr addr = qdict_get_int(qdict, "addr");
++    Error *local_err = NULL;
++    MemoryRegion *mr = NULL;
++    void *ptr;
++
++    ptr = hva2gpa(&mr, addr, 1, &local_err);
++    if (local_err) {
++        error_report_err(local_err);
++        return;
++    }
++
++    monitor_printf(mon, "Guest physical address for 0x%" HWADDR_PRIx
++                   " is %p\n",
++                   addr , ptr);
++
++    
++}
++
++
++
++
+ void *gpa2hva(MemoryRegion **p_mr, hwaddr addr, uint64_t size, Error **errp)
+ {
+     Int128 gpa_region_size;
+diff --git a/softmmu/memory.c b/softmmu/memory.c
+index 7ba2048836..cc5d1c391c 100644
+--- a/softmmu/memory.c
++++ b/softmmu/memory.c
+@@ -2743,6 +2743,35 @@ MemoryRegionSection memory_region_find(MemoryRegion *mr,
+     return ret;
+ }
+ 
++void* memory_region_find_hhaddr(MemoryRegion* mr,
++                                hwaddr addr, uint64_t size)
++{
++
++    RCU_READ_LOCK_GUARD();
++    AddressSpace* as;
++    as = memory_region_to_address_space(mr);
++    FlatView *view = address_space_to_flatview(as);
++    FlatRange* r = NULL;
++    for(int i = 0; i < view->nr; i++){
++        r = &view->ranges[i];
++        if(!r || !r->mr || !r->mr->ram_block){
++            continue;
++        }
++        hwaddr hva = (hwaddr)r->mr->ram_block->host;
++        hwaddr ram_block_length = r->mr->ram_block->max_length;
++        if( hva <= addr && (hva+ram_block_length) > addr){
++
++            hwaddr offset = addr - hva;
++            return (void*)(r->mr->addr + offset);
++        }
++
++    }
++
++    return NULL;
++}
++
++
++
+ MemoryRegionSection *memory_region_section_new_copy(MemoryRegionSection *s)
+ {
+     MemoryRegionSection *tmp = g_new(MemoryRegionSection, 1);
