@@ -1,5 +1,5 @@
 {
-  description = "A very basic flake";
+  description = "vMux - flexible and fast software-multiplexing of devices for VMs";
 
   nixConfig.extra-substituters = [
     "https://cache.garnix.io"
