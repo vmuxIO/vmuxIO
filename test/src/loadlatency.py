@@ -266,10 +266,9 @@ class LoadLatencyTestGenerator(object):
             host.setup_admin_tap(guest)
             host.modprobe_test_iface_drivers()
         if interface == Interface.BRIDGE:
-            if machine == Machine.HOST:
-                host.setup_test_bridge()
-            else:
-                host.setup_test_br_tap()
+            host.setup_test_bridge()
+            if machine != Machine.HOST:
+                host.setup_test_br_tap(guest)
         elif interface == Interface.MACVTAP:
             host.setup_test_macvtap()
         elif interface == Interface.VFIO:

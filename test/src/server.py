@@ -1182,9 +1182,31 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host'):
-        # TODO - split into setup_test_bridge and setup_test_tap
-        #      - second function needs to take a guest object
+    def setup_test_bridge(self: 'Host'):
+        """
+        Setup the bridge for test bridge tap device.
+
+        This sets up the bridge for the test tap interface of the guest VM.
+        So the VirtIO device.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        # load kernel modules
+        self.exec('sudo modprobe bridge tun tap')
+
+        # create bridge and tap device
+        self.exec(f'sudo ip link show {self.test_bridge} 2>/dev/null ' +
+                  f' || (sudo ip link add {self.test_bridge} type bridge; ' +
+                  'true)')
+
+        # bring up test interface and bridge
+        self.exec(f'sudo ip link set {self.test_iface} up')
+
+    def setup_test_br_tap(self: 'Host', guest: 'Guest'):
         """
         Setup the bridged test tap device.
 
@@ -1197,6 +1219,8 @@ class Host(Server):
         Returns
         -------
         """
+        # TODO this should use guest information
+
         # load kernel modules
         self.exec('sudo modprobe bridge tun tap')
 
