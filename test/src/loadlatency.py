@@ -247,7 +247,7 @@ class LoadLatencyTestGenerator(object):
         info(f'  ioregionfds: {self.ioregionfds}')
         info(f'  reflectors : {set(r.value for r in self.reflectors)}')
         info(f'  rates      : {self.rates}')
-        info(f'  size       : {self.sizes}')
+        info(f'  sizes      : {self.sizes}')
         info(f'  runtimes   : {self.runtimes}')
         info(f'  repetitions: {self.repetitions}')
         info(f'  warmup     : {self.warmup}')
