@@ -1147,8 +1147,7 @@ class Host(Server):
                   f'dev {self.admin_bridge}; true)')
         self.exec(f'sudo ip link set {self.admin_bridge} up')
 
-    def setup_admin_tap(self: 'Host'):
-        # TODO this needs to take a guest object
+    def setup_admin_tap(self: 'Host', guest: 'Guest'):
         """
         Setup the admin tap.
 
@@ -1161,6 +1160,7 @@ class Host(Server):
         Returns
         -------
         """
+        # TODO this should use guest information
         self.exec('sudo modprobe tun tap')
         self.exec(f'sudo ip link show {self.admin_tap} 2>/dev/null' +
                   f' || (sudo ip tuntap add {self.admin_tap} mode tap;' +

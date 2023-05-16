@@ -621,10 +621,12 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
     -------
     >>> run_guest(args, conf)
     """
-    host: Host = create_servers(conf, guest=False, loadgen=False)['host']
+    host: Host
+    guest: Guest
+    host, guest = create_servers(conf, loadgen=False).values()
 
     try:
-        _setup_network(host, args.interface)
+        _setup_network(host, guest, args.interface)
 
         vcpus = args.cpus if args.cpus else None
         memory = args.memory if args.memory else None
@@ -670,9 +672,9 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
     host.cleanup_network()
 
 
-def _setup_network(host: Host, interface: str) -> None:
+def _setup_network(host: Host, guest: Guest, interface: str) -> None:
     host.setup_admin_bridge()
-    host.setup_admin_tap()
+    host.setup_admin_tap(guest)
     host.modprobe_test_iface_drivers()
     if interface == 'brtap':
         host.setup_test_br_tap()
@@ -710,10 +712,12 @@ def setup_network(args: Namespace, conf: ConfigParser) -> None:
     -------
     >>> run_guest(args, conf)
     """
-    host: Host = create_servers(conf, guest=False, loadgen=False)['host']
+    host: Host
+    guest: Guest
+    host, guest = create_servers(conf, loadgen=False).values()
 
     try:
-        _setup_network(host, args.interface)
+        _setup_network(host, guest, args.interface)
     except Exception:
         error('Failed to setup network')
         host.cleanup_network()

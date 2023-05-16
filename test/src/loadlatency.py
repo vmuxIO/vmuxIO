@@ -259,11 +259,11 @@ class LoadLatencyTestGenerator(object):
         self.full_test_tree = self.create_test_tree(host)
         self.todo_test_tree = self.create_needed_test_tree(self.full_test_tree)
 
-    def setup_interface(self, host: Host, machine: Machine,
+    def setup_interface(self, host: Host, guest: Guest, machine: Machine,
                         interface: Interface, bridge_mac: str = None):
         if machine != Machine.HOST:
             host.setup_admin_bridge()
-            host.setup_admin_tap()
+            host.setup_admin_tap(guest)
             host.modprobe_test_iface_drivers()
         if interface == Interface.BRIDGE:
             if machine == Machine.HOST:
@@ -492,7 +492,7 @@ class LoadLatencyTestGenerator(object):
 
             for interface, itree in mtree.items():
                 debug(f"Setting up interface {interface.value}")
-                self.setup_interface(host, machine, interface)
+                self.setup_interface(host, guest, machine, interface)
 
                 for qemu, qtree in itree.items():
                     qemu_name = None
