@@ -1206,7 +1206,7 @@ class Host(Server):
         # bring up test interface and bridge
         self.exec(f'sudo ip link set {self.test_iface} up')
 
-    def setup_test_br_tap(self: 'Host', guest: 'Guest'):
+    def setup_test_tap(self: 'Host', guest: 'Guest'):
         """
         Setup the bridged test tap device.
 

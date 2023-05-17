@@ -678,7 +678,7 @@ def _setup_network(host: Host, guest: Guest, interface: str) -> None:
     host.modprobe_test_iface_drivers()
     if interface == 'brtap':
         host.setup_test_bridge()
-        host.setup_test_br_tap(guest)
+        host.setup_test_tap(guest)
     elif interface == 'macvtap':
         host.setup_test_macvtap()
     elif interface == 'vfio':
