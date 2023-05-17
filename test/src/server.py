@@ -1248,9 +1248,7 @@ class Host(Server):
                   f'&& sudo ip link set {self.test_bridge} up ' +
                   f'&& sudo ip link set {self.test_tap} up')
 
-    def destroy_test_br_tap(self: 'Host'):
-        # TODO - split into destroy_test_tap and destroy_test_bridge
-        #      - first function takes a guest object
+    def destroy_test_tap(self: 'Host', guest: 'Guest'):
         """
         Destroy the bridged test tap device.
 
@@ -1260,7 +1258,19 @@ class Host(Server):
         Returns
         -------
         """
+        # TODO this function should use guest information
         self.exec(f'sudo ip link delete {self.test_tap} || true')
+
+    def destroy_test_bridge(self: 'Host'):
+        """
+        Destroy the test bridge.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
         self.exec(f'sudo ip link delete {self.test_bridge} || true')
 
     def setup_test_macvtap(self: 'Host'):
@@ -1473,7 +1483,7 @@ class Host(Server):
         """
         self.tmux_kill('vmux')
 
-    def cleanup_network(self: 'Host') -> None:
+    def cleanup_network(self: 'Host', guest: 'Guest') -> None:
         """
         Cleanup the network setup.
 
@@ -1489,7 +1499,8 @@ class Host(Server):
             pass
         self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
-        self.destroy_test_br_tap()
+        self.destroy_test_tap(guest)
+        self.destroy_test_bridge()
         self.destroy_test_macvtap()
 
 

@@ -639,7 +639,7 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
                        args.rx_queue_size, args.tx_queue_size)
     except Exception:
         host.kill_guest()
-        host.cleanup_network()
+        host.cleanup_network(guest)
 
 
 def kill_guest(args: Namespace, conf: ConfigParser) -> None:
@@ -666,10 +666,12 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
     -------
     >>> kill_guest(args, conf)
     """
-    host: Host = create_servers(conf, guest=False, loadgen=False)['host']
+    host: Host
+    guest: Guest
+    host, guest = create_servers(conf, guest=False, loadgen=False).values()
 
     host.kill_guest()
-    host.cleanup_network()
+    host.cleanup_network(guest)
 
 
 def _setup_network(host: Host, guest: Guest, interface: str) -> None:
@@ -721,7 +723,7 @@ def setup_network(args: Namespace, conf: ConfigParser) -> None:
         _setup_network(host, guest, args.interface)
     except Exception:
         error('Failed to setup network')
-        host.cleanup_network()
+        host.cleanup_network(guest)
 
 
 def teardown_network(args: Namespace, conf: ConfigParser) -> None:
@@ -748,9 +750,11 @@ def teardown_network(args: Namespace, conf: ConfigParser) -> None:
     -------
     >>> kill_guest(args, conf)
     """
-    host: Host = create_servers(conf, guest=False, loadgen=False)['host']
+    host: Host
+    guest: Guest
+    host, guest = create_servers(conf, guest=False, loadgen=False).values()
 
-    host.cleanup_network()
+    host.cleanup_network(guest)
 
 
 def test_infix(interface: str, reflector: str, rate: int, nthreads: int,

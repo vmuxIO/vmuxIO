@@ -478,7 +478,7 @@ class LoadLatencyTestGenerator(object):
             host.kill_guest()
         except Exception:
             pass
-        host.cleanup_network()
+        host.cleanup_network(guest)
 
         debug('Binding loadgen interface')
         loadgen.bind_test_iface()
@@ -553,7 +553,7 @@ class LoadLatencyTestGenerator(object):
                                 host.kill_guest()
 
                 debug(f"Tearing down interface {interface.value}")
-                host.cleanup_network()
+                host.cleanup_network(guest)
 
     def force_accumulate(self):
         """
