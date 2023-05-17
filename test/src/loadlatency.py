@@ -270,7 +270,7 @@ class LoadLatencyTestGenerator(object):
             if machine != Machine.HOST:
                 host.setup_test_tap(guest)
         elif interface == Interface.MACVTAP:
-            host.setup_test_macvtap()
+            host.setup_test_macvtap(guest)
         elif interface == Interface.VFIO:
             host.delete_nic_ip_addresses(host.test_iface)
             host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)

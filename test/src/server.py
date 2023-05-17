@@ -1273,8 +1273,7 @@ class Host(Server):
         """
         self.exec(f'sudo ip link delete {self.test_bridge} || true')
 
-    def setup_test_macvtap(self: 'Host'):
-        # TODO should take a guest object
+    def setup_test_macvtap(self: 'Host', guest: 'Guest'):
         """
         Setup the macvtap test interface.
 
@@ -1287,6 +1286,7 @@ class Host(Server):
         Returns
         -------
         """
+        # TODO this should use guest information
         self.exec('sudo modprobe macvlan')
         self.exec(f'sudo ip link show {self.test_macvtap} 2>/dev/null' +
                   f' || sudo ip link add link {self.test_iface}' +
