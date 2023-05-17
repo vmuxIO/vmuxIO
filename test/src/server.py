@@ -1297,8 +1297,7 @@ class Host(Server):
                   f' /dev/tap$(cat /sys/class/net/{self.test_macvtap}/ifindex)'
                   )
 
-    def destroy_test_macvtap(self: 'Host'):
-        # TODO should take a guest object
+    def destroy_test_macvtap(self: 'Host', guest: 'Guest'):
         """
         Destroy the macvtap test interface.
 
@@ -1308,6 +1307,7 @@ class Host(Server):
         Returns
         -------
         """
+        # TODO this should use guest information
         self.exec(f'sudo ip link delete {self.test_macvtap} || true')
 
     def run_guest(self: 'Host',
@@ -1501,7 +1501,7 @@ class Host(Server):
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_tap(guest)
         self.destroy_test_bridge()
-        self.destroy_test_macvtap()
+        self.destroy_test_macvtap(guest)
 
 
 class Guest(Server):
