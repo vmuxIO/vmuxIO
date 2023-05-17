@@ -668,7 +668,7 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
     """
     host: Host
     guest: Guest
-    host, guest = create_servers(conf, guest=False, loadgen=False).values()
+    host, guest = create_servers(conf, loadgen=False).values()
 
     host.kill_guest()
     host.cleanup_network(guest)
