@@ -299,7 +299,7 @@ class LoadLatencyTestGenerator(object):
         else:
             server.stop_xdp_reflector(iface)
 
-    def run_guest(self, host: Host, machine: Machine,
+    def run_guest(self, host: Host, guest: Guest, machine: Machine,
                   interface: Interface, qemu: str, vhost: bool,
                   ioregionfd: bool):
         net_type = None
@@ -310,6 +310,7 @@ class LoadLatencyTestGenerator(object):
         elif interface == Interface.VFIO:
             net_type = 'vfio'
         host.run_guest(
+            guest=guest,
             net_type=net_type,
             machine_type='pc' if machine == Machine.PCVM else 'microvm',
             root_disk=None,
@@ -511,7 +512,7 @@ class LoadLatencyTestGenerator(object):
                                 debug(f"Running guest {machine.value} " +
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
-                                self.run_guest(host, machine, interface,
+                                self.run_guest(host, guest, machine, interface,
                                                qemu_path, vhost, ioregionfd)
                                 # TODO maybe check if tmux session running
 

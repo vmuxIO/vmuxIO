@@ -1311,6 +1311,7 @@ class Host(Server):
         self.exec(f'sudo ip link delete {self.test_macvtap} || true')
 
     def run_guest(self: 'Host',
+                  guest: 'Guest',
                   net_type: str,
                   machine_type: str,
                   vcpus: int = None,
@@ -1323,7 +1324,6 @@ class Host(Server):
                   rx_queue_size: int = 256,
                   tx_queue_size: int = 256,
                   ) -> None:
-        # TODO this function should get a Guest object as argument
         """
         Run a guest VM.
 
@@ -1359,6 +1359,7 @@ class Host(Server):
         Returns
         -------
         """
+        # TODO this should use guest information
         # TODO this command should be build by the Guest object
         # it should take all the settings from the config file
         # and compile them.
