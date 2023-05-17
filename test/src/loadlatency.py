@@ -476,7 +476,7 @@ class LoadLatencyTestGenerator(object):
 
         debug('Initial cleanup')
         try:
-            host.kill_guest()
+            host.kill_guest(guest)
         except Exception:
             pass
         host.cleanup_network(guest)
@@ -551,7 +551,7 @@ class LoadLatencyTestGenerator(object):
                                 debug(f"Killing guest {machine.value} " +
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
-                                host.kill_guest()
+                                host.kill_guest(guest)
 
                 debug(f"Tearing down interface {interface.value}")
                 host.cleanup_network(guest)

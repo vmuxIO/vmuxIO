@@ -638,7 +638,7 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
                        disk, args.debug, args.ioregionfd, qemu_path,
                        args.vhost, args.rx_queue_size, args.tx_queue_size)
     except Exception:
-        host.kill_guest()
+        host.kill_guest(guest)
         host.cleanup_network(guest)
 
 
@@ -670,7 +670,7 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
     guest: Guest
     host, guest = create_servers(conf, loadgen=False).values()
 
-    host.kill_guest()
+    host.kill_guest(guest)
     host.cleanup_network(guest)
 
 

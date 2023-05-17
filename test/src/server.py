@@ -1446,8 +1446,7 @@ class Host(Server):
             # ' 2>trace.log'
             )
 
-    def kill_guest(self: 'Host') -> None:
-        # TODO should take a guest object
+    def kill_guest(self: 'Host', guest: 'Guest') -> None:
         """
         Kill a guest VM.
 
@@ -1457,6 +1456,7 @@ class Host(Server):
         Returns
         -------
         """
+        # TODO this should use guest information
         # TODO tmux session needs a guest specific name
         self.tmux_kill('qemu')
 
