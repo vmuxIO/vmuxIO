@@ -1,0 +1,59 @@
+struct vfio_iommu_type1_dma_map {
+	__u32	argsz;
+	__u32	flags;
+#define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
+#define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
+#define VFIO_DMA_MAP_FLAG_VADDR (1 << 2)
+	__u64	vaddr;				/* Process virtual address */
+	__u64	iova;				/* IO virtual address */
+	__u64	size;				/* Size of mapping (bytes) */
+};
+
+tracepoint:syscalls:sys_enter_ioctl / args->cmd == 15217 / { 
+  $a = (struct vfio_iommu_type1_dma_map*)(args->arg);
+  printf("%s: DMA_MAP ioctl (fd %u): argsz %x, flags %x, vaddr %llx, iova %llx, size %llx\n", comm, args->fd, $a->argsz, $a->flags, $a->vaddr, $a->iova, $a->size);
+  // fd should be /dev/vfio/vfio according to /proc/$(pgrep vmux)/fd/$fd
+  //printf("ustack:\n%skstack:\n%s\n", ustack, kstack); 
+  //printf("iova %u\n", $a->iova);
+}
+
+//kprobe:vfio_device_fops_unl_ioctl { 
+//  //static long vfio_device_fops_unl_ioctl(struct file *filep,
+//  //               unsigned int cmd, unsigned long arg)
+//  $a = (struct vfio_iommu_type1_dma_map*)(arg2);
+//  printf("!!!!! %s: DMA_MAP ioctl (fd %llx): argsz %x, flags %x, vaddr %llx, iova %llx, size %llx\n", comm, arg0, $a->argsz, $a->flags, $a->vaddr, $a->iova, $a->size);
+//
+//}
+//
+//// kprobe:__x64_sys_ioctl // dispatches vfio_iommu_type1_ioctl
+//kprobe:vfio_iommu_type1_ioctl {
+//  printf("vfio_iommu_type1_ioctl %llx\n", arg1);
+//  //printf("ustack:\n%skstack:\n%s\n", ustack, kstack); 
+//  $a = (struct vfio_iommu_type1_dma_map*)(arg1);
+//  printf("%s: (struct vfio_iommu %llx; user mappable vfio_iommu_type1_ioctl %llx)\n", comm, arg0, arg1);
+//}
+
+kprobe:iommu_dma_mmap {
+  printf("iommu_dma_mmap\n");
+}
+
+// vfio_dma_do_map seems to map it, but also seems not to contain any tracepoints
+// vfio_pin_map_dma seems to do the magic
+// vfio_iommu_map
+// iommu_map
+
+kprobe:iommu_map {
+  printf("iommu_map\n");
+}
+
+//tracepoint:syscalls:sys_enter_ioctl { 
+//  if (comm == "qemu-system-x86") { 
+//    /*printf(".");*/
+//  if (args->cmd == 15217) { // VFIO_IOMMU_MAP_DMA
+//    printf(
+//      "%s: fd: 0x%08lx, cmd: 0x%08lx, arg: ^C%08lx\n", 
+//      comm, args->fd, args->cmd, args->arg
+//    ); 
+//  }
+//  }
+//}
