@@ -43,7 +43,9 @@ kprobe:iommu_dma_mmap {
 // iommu_map
 
 kprobe:iommu_map {
-  printf("iommu_map\n");
+  // struct iommu_domain *domain, unsigned long iova,
+  //     phys_addr_t paddr, size_t size, int prot
+  printf("iommu_map(iommu_domain %xll, iova %xll, phys_addr_t %xll, size %xll, prot %u)\n", arg0, arg1, arg2, arg3, arg4);
 }
 
 //tracepoint:syscalls:sys_enter_ioctl { 
@@ -57,3 +59,132 @@ kprobe:iommu_map {
 //  }
 //  }
 //}
+
+
+// output 24.05.23
+//[root@nixos:/mnt]# bpftrace ioctl.bt
+//Attaching 3 probes...
+//
+// // start VM
+//
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe0925c9000, iova 0, size a0000
+//iommu_map(iommu_domain ff78b0ll, iova 0ll, phys_addr_t 3c715000ll, size 6b000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 6b000ll, phys_addr_t 3c800000ll, size 35000ll, prot 3)
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe0526c9000, iova 100000, size 3ff00000
+//iommu_map(iommu_domain ff78b0ll, iova 100000ll, phys_addr_t 3c695000ll, size 6b000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 16b000ll, phys_addr_t 3c280000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 26b000ll, phys_addr_t 3b880000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 2eb000ll, phys_addr_t 3b400000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 36b000ll, phys_addr_t 4d300000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 3eb000ll, phys_addr_t 48b00000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 46b000ll, phys_addr_t 44580000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 4eb000ll, phys_addr_t 3d180000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 56b000ll, phys_addr_t 3b000000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 5eb000ll, phys_addr_t 3b100000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 66b000ll, phys_addr_t 4fc80000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 6eb000ll, phys_addr_t 4d080000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 76b000ll, phys_addr_t 3ba80000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 7eb000ll, phys_addr_t 49e00000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 86b000ll, phys_addr_t 4a480000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 8eb000ll, phys_addr_t 4a900000ll, size 80000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 96b000ll, phys_addr_t 4ae00000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova a6b000ll, phys_addr_t 4a700000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova c6b000ll, phys_addr_t 4a500000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova d6b000ll, phys_addr_t 4a000000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova e6b000ll, phys_addr_t 49a00000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova f6b000ll, phys_addr_t 49800000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 106b000ll, phys_addr_t 42100000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 116b000ll, phys_addr_t 41200000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 126b000ll, phys_addr_t 40f00000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 146b000ll, phys_addr_t 3f200000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 156b000ll, phys_addr_t 3c400000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 166b000ll, phys_addr_t 3b900000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 176b000ll, phys_addr_t 3bb00000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 186b000ll, phys_addr_t 3b300000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 196b000ll, phys_addr_t 3b600000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1a6b000ll, phys_addr_t 4d200000ll, size c000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1a77000ll, phys_addr_t 4d2a1000ll, size 5f000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1ad6000ll, phys_addr_t 4d100000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1bd6000ll, phys_addr_t 48a00000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1cd6000ll, phys_addr_t 3dd00000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1dd6000ll, phys_addr_t 4fd00000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1ed6000ll, phys_addr_t 49700000ll, size 72000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1f48000ll, phys_addr_t 49773000ll, size 8d000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 1fd5000ll, phys_addr_t 49f00000ll, size 100000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 20d5000ll, phys_addr_t 4aa00000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 22d5000ll, phys_addr_t 4a200000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 24d5000ll, phys_addr_t 49c00000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 26d5000ll, phys_addr_t 49400000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 28d5000ll, phys_addr_t 42200000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 2ad5000ll, phys_addr_t 3e000000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 2cd5000ll, phys_addr_t 3c000000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 2ed5000ll, phys_addr_t 48800000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 30d5000ll, phys_addr_t 44600000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 32d5000ll, phys_addr_t 3de00000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 34d5000ll, phys_addr_t 3d200000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 36d5000ll, phys_addr_t 4fe00000ll, size 200000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 38d5000ll, phys_addr_t 49000000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 3cd5000ll, phys_addr_t 3bc00000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 40d5000ll, phys_addr_t 3a400000ll, size 800000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 48d5000ll, phys_addr_t 48c00000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 4cd5000ll, phys_addr_t 48400000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 50d5000ll, phys_addr_t 48000000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 54d5000ll, phys_addr_t 47c00000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 58d5000ll, phys_addr_t 47800000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 5cd5000ll, phys_addr_t 47400000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 60d5000ll, phys_addr_t 47000000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 64d5000ll, phys_addr_t 46c00000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 68d5000ll, phys_addr_t 46800000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 6cd5000ll, phys_addr_t 46400000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 70d5000ll, phys_addr_t 46000000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 74d5000ll, phys_addr_t 45c00000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 78d5000ll, phys_addr_t 45800000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 7cd5000ll, phys_addr_t 45400000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 80d5000ll, phys_addr_t 45000000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 84d5000ll, phys_addr_t 44c00000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 88d5000ll, phys_addr_t 44800000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 8cd5000ll, phys_addr_t 3d400000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 90d5000ll, phys_addr_t 3ac00000ll, size 400000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova 94d5000ll, phys_addr_t 50000000ll, size 36b2b000ll, prot 3)
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe0526a1000, iova f0000, size 3ff10000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe052669000, iova 0, size 40000000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe0925c9000, iova 0, size a0000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe0925bb000, iova cb000, size 3000
+//iommu_map(iommu_domain ff78b0ll, iova cb000ll, phys_addr_t 3c860000ll, size 3000ll, prot 3)
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 1, vaddr 7fe0925b1000, iova ce000, size a000
+//iommu_map(iommu_domain ff78b0ll, iova ce000ll, phys_addr_t 3c863000ll, size a000ll, prot 1)
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092599000, iova d8000, size 18000
+//iommu_map(iommu_domain ff78b0ll, iova d8000ll, phys_addr_t 3c86d000ll, size 13000ll, prot 3)
+//iommu_map(iommu_domain ff78b0ll, iova eb000ll, phys_addr_t 3c680000ll, size 5000ll, prot 3)
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 1, vaddr 7fe092589000, iova f0000, size 10000
+//iommu_map(iommu_domain ff78b0ll, iova f0000ll, phys_addr_t 3c685000ll, size 10000ll, prot 1)
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe052689000, iova 100000, size 3ff00000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 1, vaddr 7fe0925a1000, iova ce000, size 1a000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092599000, iova e8000, size 8000
+//
+// // start vfio-e1000 in VM
+//
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092668000, iova 0, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092667000, iova 1000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092668000, iova 1000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092667000, iova 2000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092666000, iova 3000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092665000, iova 4000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092664000, iova 5000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092663000, iova 6000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092662000, iova 7000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092661000, iova 8000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092660000, iova 9000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe09265f000, iova a000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe09265e000, iova b000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe09265d000, iova c000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe09265c000, iova d000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe09265b000, iova e000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe09265a000, iova f000, size 1000
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092659000, iova 10000, size 1000
+//
+// // restart vfio-e1000 VM
+//
+//vmux: DMA_MAP ioctl (fd 4): argsz 20, flags 3, vaddr 7fe092668000, iova 1000, size 1000
+//
+//
