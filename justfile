@@ -117,6 +117,41 @@ vm-libvfio-user-iommu-guest:
         -s \
         -nographic
 
+vm-noiommu-guest:
+    sudo {{qemu_libvfiouser_bin}}  \
+        -L {{proot}}/qemu-manual/pc-bios/ \
+        -cpu host \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -m 1G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
+        -device virtio-serial \
+        -fsdev local,id=myid,path=/mnt,security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file=/mnt/VMs/host-image2.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -s \
+        -nographic
+
+vm-libvfio-user-noiommu-guest:
+    sudo {{qemu_libvfiouser_bin}}  \
+        -L {{proot}}/qemu-manual/pc-bios/ \
+        -cpu host \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -m 1G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
+        -device virtio-serial \
+        -fsdev local,id=myid,path=/mnt,security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file=/mnt/VMs/host-image2.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -device vfio-user-pci,socket="/tmp/vmux.sock" \
+        -s \
+        -nographic
+
 vm-libvfio-user-iommu-guest-passthrough:
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
