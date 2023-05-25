@@ -154,6 +154,17 @@
         modules = [ ./nix/guest-config.nix ];
         format = "qcow";
       };
+      nested-guest-image = nixos-generators.nixosGenerate {
+        inherit pkgs;
+        modules = [ (import ./nix/host-config.nix {
+          inherit pkgs;
+          inherit (pkgs) lib;
+          inherit (self) config;
+          extkern = false;
+          nested = true;
+        }) ];
+        format = "qcow";
+      };
     };
 
     devShells = let 
