@@ -28,6 +28,31 @@ struct vfio_user_dma_map {
     __u64 size;
 };
 
+struct vfio_iommu_type1_dma_map {
+    __u32   argsz;
+    __u32   flags;
+#define VFIO_DMA_MAP_FLAG_READ (1 << 0)     /* readable from device */
+#define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)    /* writable from device */
+#define VFIO_DMA_MAP_FLAG_VADDR (1 << 2)
+    __u64   vaddr;              /* Process virtual address */
+    __u64   iova;               /* IO virtual address */
+    __u64   size;               /* Size of mapping (bytes) */
+};
+
+struct vfio_iommu_type1_dma_unmap {
+    __u32   argsz;
+    __u32   flags;
+#define VFIO_DMA_UNMAP_FLAG_GET_DIRTY_BITMAP (1 << 0)
+#define VFIO_DMA_UNMAP_FLAG_ALL          (1 << 1)
+#define VFIO_DMA_UNMAP_FLAG_VADDR        (1 << 2)
+    __u64   iova;               /* IO virtual address */
+    __u64   size;               /* Size of mapping (bytes) */
+    __u8    data[];
+};
+
+#define VFIO_IOMMU_MAP_DMA 15217
+#define VFIO_IOMMU_UNMAP_DMA 15218
+
 BEGIN {
     @VFIO_CMD[1]  =  "VFIO_USER_VERSION";
     @VFIO_CMD[2]  =  "VFIO_USER_DMA_MAP";
@@ -54,12 +79,31 @@ u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_request {
     // this does not work; bug?
     // $header = (struct vfio_user_header*)arg1;
     $header = (struct vfio_user_header_mini*)arg1;
-    printf("[%d] cmd: %s\n", nsecs, @VFIO_CMD[$header->cmd]);
+    printf("[%lu] [%s] handle_request: %s\n",
+            nsecs, comm, @VFIO_CMD[$header->cmd]);
 }
 
 // int handle_dma_map(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_map *dma_map)
 u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_map {
     $dma_map = (struct vfio_user_dma_map*)arg2;
-    printf("[%d] [dma_map] offset: %x, addr: %x, size: %x\n", nsecs,
+    printf("[%lu] [%s] handle_dma_map: offset: %x, addr: %x, size: %x\n", 
+            nsecs, comm,
             $dma_map->offset, $dma_map->addr, $dma_map->size);
+}
+
+
+// ioctl
+
+tracepoint:syscalls:sys_enter_ioctl / args->cmd == VFIO_IOMMU_MAP_DMA / {
+  $a = (struct vfio_iommu_type1_dma_map*)(args->arg);
+  printf("[%lu] [%s] VFIO_IOMMU_DMA_MAP (fd %u): argsz %x, flags %x, vaddr %llx, iova %llx, size %llx\n",
+           nsecs, comm, args->fd, $a->argsz, $a->flags, $a->vaddr, $a->iova, $a->size);
+  // fd should be /dev/vfio/vfio according to /proc/$(pgrep vmux)/fd/$fd
+}
+
+tracepoint:syscalls:sys_enter_ioctl / args->cmd == VFIO_IOMMU_UNMAP_DMA / {
+  $a = (struct vfio_iommu_type1_dma_unmap*)(args->arg);
+  printf("[%lu] [%s] VFIO_IOMMU_UNMAP_DMA (fd %u): argsz %x, flags %x, iova %llx, size %llx\n", 
+          nsecs, comm, args->fd, $a->argsz, $a->flags, $a->iova, $a->size);
+  // fd should be /dev/vfio/vfio according to /proc/$(pgrep vmux)/fd/$fd
 }
