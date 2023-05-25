@@ -307,7 +307,7 @@ class VfioUserServer {
 
     static void dma_unregister_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_dma_info_t *info) {
       printf("dma_unregister_cb\n");
-      if (info->iova.iov_base == NULL ||
+      if (// info->iova.iov_base == NULL ||
           info->iova.iov_base == (void*)0xc0000 ||
           info->iova.iov_base == (void*)0xe0000 )
         return;
@@ -331,14 +331,14 @@ class VfioUserServer {
 
       if(!vfu->mapped.count(info->iova.iov_base)){
         printf("Region seems not to be mapped\n");
-        return;
+        //return;
       }
       if(vfu->sgs.count(info->vaddr)==1){
         printf("dealloc sgl\n");
       }
       if(vfu->sgs.count(info->vaddr)>1){
         printf("Why?\n");
-        return;
+        //return;
       }
 
 
