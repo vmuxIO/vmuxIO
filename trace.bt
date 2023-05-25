@@ -1,0 +1,65 @@
+struct vfio_user_header {
+    __u16    msg_id;
+    __u16    cmd;
+    __u32    msg_size;
+    struct {
+        __u32    type     : 4;
+#define VFIO_USER_F_TYPE_COMMAND    0
+#define VFIO_USER_F_TYPE_REPLY      1
+        __u32    no_reply : 1;
+        __u32    error    : 1;
+        __u32    resvd    : 26;
+    } flags;
+    __u32    error_no;
+};
+
+struct vfio_user_header_mini {
+    __u16    msg_id;
+    __u16    cmd;
+};
+
+struct vfio_user_dma_map {
+    __u32 argsz;
+#define VFIO_USER_F_DMA_REGION_READ     (1 << 0)
+#define VFIO_USER_F_DMA_REGION_WRITE    (1 << 1)
+    __u32 flags;
+    __u64 offset;
+    __u64 addr;
+    __u64 size;
+};
+
+BEGIN {
+    @VFIO_CMD[1]  =  "VFIO_USER_VERSION";
+    @VFIO_CMD[2]  =  "VFIO_USER_DMA_MAP";
+    @VFIO_CMD[3]  =  "VFIO_USER_DMA_UNMAP";
+    @VFIO_CMD[4]  =  "VFIO_USER_DEVICE_GET_INFO";
+    @VFIO_CMD[5]  =  "VFIO_USER_DEVICE_GET_REGION_INFO";
+    @VFIO_CMD[6]  =  "VFIO_USER_DEVICE_GET_REGION_IO_FDS";
+    @VFIO_CMD[7]  =  "VFIO_USER_DEVICE_GET_IRQ_INFO";
+    @VFIO_CMD[8]  =  "VFIO_USER_DEVICE_SET_IRQS";
+    @VFIO_CMD[9]  =  "VFIO_USER_REGION_READ";
+    @VFIO_CMD[10] =  "VFIO_USER_REGION_WRITE";
+    @VFIO_CMD[11] =  "VFIO_USER_DMA_READ";
+    @VFIO_CMD[12] =  "VFIO_USER_DMA_WRITE";
+    @VFIO_CMD[13] =  "VFIO_USER_DEVICE_RESET";
+    @VFIO_CMD[14] =  "VFIO_USER_DIRTY_PAGES";
+}
+
+END {
+    clear(@VFIO_CMD);
+}
+
+// static int handle_request(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg)
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_request {
+    // this does not work; bug?
+    // $header = (struct vfio_user_header*)arg1;
+    $header = (struct vfio_user_header_mini*)arg1;
+    printf("[%d] cmd: %s\n", nsecs, @VFIO_CMD[$header->cmd]);
+}
+
+// int handle_dma_map(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_map *dma_map)
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_map {
+    $dma_map = (struct vfio_user_dma_map*)arg2;
+    printf("[%d] [dma_map] offset: %x, addr: %x, size: %x\n", nsecs,
+            $dma_map->offset, $dma_map->addr, $dma_map->size);
+}
