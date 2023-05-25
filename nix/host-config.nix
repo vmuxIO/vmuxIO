@@ -1,5 +1,6 @@
 { config, lib, pkgs, linux-firmware-pinned, 
 extkern ? false, # whether to use externally, manually built kernel
+nested ? false, # whether this is the config variant for the nested guest
 ... }:
 lib.attrsets.recursiveUpdate ({
   #networking.useDHCP = false;
@@ -152,6 +153,13 @@ lib.attrsets.recursiveUpdate ({
         IKHEADERS y
       '';
     }
+    {
+      name = "enable-vfio-noiommu";
+      patch = null;
+      extraConfig = ''
+        VFIO_NOIOMMU y
+      '';
+    }
     #{
     #  name = "ixgbe-use-vmux-capability-offset-instead-of-hardware";
     #  patch = ./0001-ixgbe-vmux-capa.patch;
@@ -207,8 +215,15 @@ lib.attrsets.recursiveUpdate ({
   boot.kernelParams = [ 
     "nokaslr"
     "debug"
+  ] ++ lib.lists.optionals (!nested) [
     "intel_iommu=on"
+  ] ++ lib.lists.optionals nested [
+    "intel_iommu=off"
+    "vfio.enable_unsafe_noiommu_mode=1"
+    "vfio-pci.ids=8086:100e"
   ];
+
+  boot.kernelModules = lib.lists.optionals nested ["vfio" "vfio-pci"];
 
 })
 # merge the following with the previous. See recursiveUpdate above. 
