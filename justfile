@@ -128,7 +128,7 @@ vm-noiommu-guest:
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file=/mnt/VMs/host-image2.qcow2 \
+        -drive file=/mnt/VMs/nested-guest-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -s \
@@ -145,7 +145,7 @@ vm-libvfio-user-noiommu-guest:
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file=/mnt/VMs/host-image2.qcow2 \
+        -drive file=/mnt/VMs/nested-guest-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-user-pci,socket="/tmp/vmux.sock" \
@@ -277,7 +277,11 @@ vm-overwrite:
   # guest VM
   nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
   install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2
-  qemu-img resize {{proot}}/VMs/guest-image.qcow2 +8G
+  qemu-img resize {{proot}}/VMs/guest-image.qcow2 +8g
+  # nested guest VM
+  nix build -o {{proot}}/VMs/nested-guest-image-ro .#nested-guest-image # read only
+  install -D -m644 {{proot}}/VMs/nested-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nested-guest-image.qcow2
+  qemu-img resize {{proot}}/VMs/nested-guest-image.qcow2 +8g
 
 dpdk-setup:
   modprobe vfio-pci
