@@ -994,7 +994,6 @@ class Host(Server):
     """
     admin_bridge: str
     admin_bridge_ip_net: str
-    admin_tap: str
     test_iface_vfio_driv: str
     test_bridge: str
     test_tap: str
@@ -1012,7 +1011,6 @@ class Host(Server):
                  fqdn: str,
                  admin_bridge: str,
                  admin_bridge_ip_net: str,
-                 admin_tap: str,
                  test_iface: str,
                  test_iface_addr: str,
                  test_iface_mac: str,
@@ -1047,8 +1045,6 @@ class Host(Server):
             The network interface identifier of the admin bridge interface.
         admin_bridge_ip_net : str
             The IP address and subnet mask of the admin bridge interface.
-        admin_tap : str
-            The network interface identifier of the admin tap interface.
         test_iface : str
             The name of the test interface.
         test_iface_addr : str
@@ -1116,7 +1112,6 @@ class Host(Server):
                          xdp_reflector_dir, localhost, ssh_config=ssh_config)
         self.admin_bridge = admin_bridge
         self.admin_bridge_ip_net = admin_bridge_ip_net
-        self.admin_tap = admin_tap
         self.test_iface_vfio_driv = test_iface_vfio_driv
         self.test_bridge = test_bridge
         self.test_tap = test_tap
@@ -1162,11 +1157,11 @@ class Host(Server):
         """
         # TODO this should use guest information
         self.exec('sudo modprobe tun tap')
-        self.exec(f'sudo ip link show {self.admin_tap} 2>/dev/null' +
-                  f' || (sudo ip tuntap add {self.admin_tap} mode tap;' +
-                  f' sudo ip link set {self.admin_tap} '
+        self.exec(f'sudo ip link show {guest.admin_tap} 2>/dev/null' +
+                  f' || (sudo ip tuntap add {guest.admin_tap} mode tap;' +
+                  f' sudo ip link set {guest.admin_tap} '
                   f'master {self.admin_bridge}; true)')
-        self.exec(f'sudo ip link set {self.admin_tap} up')
+        self.exec(f'sudo ip link set {guest.admin_tap} up')
 
     def modprobe_test_iface_drivers(self):
         """
@@ -1429,7 +1424,7 @@ class Host(Server):
             fsdev_config +
             ' -serial stdio' +
             ' -monitor tcp:127.0.0.1:2345,server,nowait' +
-            f' -netdev tap,vhost=on,id=admin0,ifname={self.admin_tap},' +
+            f' -netdev tap,vhost=on,id=admin0,ifname={guest.admin_tap},' +
             'script=no,downscript=no' +
             f' -device virtio-net-{dev_type},id=admif,netdev=admin0,' +
             f'mac={self.guest_admin_iface_mac}' +
@@ -1522,9 +1517,11 @@ class Guest(Server):
     >>> Guest('server.test.de')
     Guest(fqdn='server.test.de')
     """
+    admin_tap: str
 
     def __init__(self: 'Guest',
                  fqdn: str,
+                 admin_tap: str,
                  test_iface: str,
                  test_iface_addr: str,
                  test_iface_mac: str,
@@ -1543,6 +1540,8 @@ class Guest(Server):
         ----------
         fqdn : str
             The fully qualified domain name of the guest.
+        admin_tap : str
+            The network interface identifier of the admin tap interface.
         test_iface : str
             The name of the test interface.
         test_iface_addr : str
@@ -1584,6 +1583,7 @@ class Guest(Server):
                          test_iface_driv, test_iface_dpdk_driv,
                          tmux_socket, moongen_dir, moonprogs_dir,
                          xdp_reflector_dir, ssh_config=ssh_config)
+        self.admin_tap = admin_tap
 
     def __post_init__(self: 'Guest') -> None:
         """
