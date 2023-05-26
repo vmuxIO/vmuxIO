@@ -998,10 +998,15 @@ class Host(Server):
     test_bridge: str
     vmux_path: str
     vmux_socket_path: str
+    # TODO move to guest
     guest_admin_iface_mac: str
+    # TODO move to guest
     guest_test_iface_mac: str
+    # TODO move to guest
     guest_vcpus: int
+    # TODO move to guest
     guest_memory: int
+    # TODO maybe move to guest
     fsdevs: dict[str, str]
 
     def __init__(self: 'Host',
