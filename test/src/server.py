@@ -996,7 +996,6 @@ class Host(Server):
     admin_bridge_ip_net: str
     test_iface_vfio_driv: str
     test_bridge: str
-    test_tap: str
     test_macvtap: str
     vmux_path: str
     vmux_socket_path: str
@@ -1018,7 +1017,6 @@ class Host(Server):
                  test_iface_dpdk_driv: str,
                  test_iface_vfio_driv: str,
                  test_bridge: str,
-                 test_tap: str,
                  test_macvtap: str,
                  vmux_path: str,
                  vmux_socket_path: str,
@@ -1059,8 +1057,6 @@ class Host(Server):
             The vfio driver of the test interface.
         test_bridge : str
             The network interface identifier of the test bridge interface.
-        test_tap : str
-            The network interface identifier of the test tap interface.
         test_macvtap : str
             The network interface identifier of the test macvtap interface.
         vmux_path : str
@@ -1114,7 +1110,6 @@ class Host(Server):
         self.admin_bridge_ip_net = admin_bridge_ip_net
         self.test_iface_vfio_driv = test_iface_vfio_driv
         self.test_bridge = test_bridge
-        self.test_tap = test_tap
         self.test_macvtap = test_macvtap
         self.vmux_path = vmux_path
         self.vmux_socket_path = vmux_socket_path
@@ -1224,14 +1219,14 @@ class Host(Server):
                   f' || (sudo ip link add {self.test_bridge} type bridge; ' +
                   'true)')
         username = self.whoami()
-        self.exec(f'sudo ip link show {self.test_tap} 2>/dev/null || ' +
-                  f'(sudo ip tuntap add dev {self.test_tap} mode tap ' +
+        self.exec(f'sudo ip link show {guest.test_tap} 2>/dev/null || ' +
+                  f'(sudo ip tuntap add dev {guest.test_tap} mode tap ' +
                   f'user {username} multi_queue; true)')
 
         # add tap device and physical nic to bridge
-        tap_output = self.exec(f'sudo ip link show {self.test_tap}')
+        tap_output = self.exec(f'sudo ip link show {guest.test_tap}')
         if f'master {self.test_bridge}' not in tap_output:
-            self.exec(f'sudo ip link set {self.test_tap} ' +
+            self.exec(f'sudo ip link set {guest.test_tap} ' +
                       f'master {self.test_bridge}')
         test_iface_output = self.exec(f'sudo ip link show {self.test_iface}')
         if f'master {self.test_bridge}' not in test_iface_output:
@@ -1241,7 +1236,7 @@ class Host(Server):
         # bring up all interfaces (nic, bridge and tap)
         self.exec(f'sudo ip link set {self.test_iface} up ' +
                   f'&& sudo ip link set {self.test_bridge} up ' +
-                  f'&& sudo ip link set {self.test_tap} up')
+                  f'&& sudo ip link set {guest.test_tap} up')
 
     def destroy_test_tap(self: 'Host', guest: 'Guest'):
         """
@@ -1254,7 +1249,7 @@ class Host(Server):
         -------
         """
         # TODO this function should use guest information
-        self.exec(f'sudo ip link delete {self.test_tap} || true')
+        self.exec(f'sudo ip link delete {guest.test_tap} || true')
 
     def destroy_test_bridge(self: 'Host'):
         """
@@ -1363,7 +1358,7 @@ class Host(Server):
         if net_type == 'brtap':
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-                f'id=admin1,ifname={self.test_tap},script=no,' +
+                f'id=admin1,ifname={guest.test_tap},script=no,' +
                 'downscript=no,queues=4' +
                 f' -device virtio-net-{dev_type},id=testif,' +
                 f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
@@ -1518,6 +1513,7 @@ class Guest(Server):
     Guest(fqdn='server.test.de')
     """
     admin_tap: str
+    test_tap: str
 
     def __init__(self: 'Guest',
                  fqdn: str,
@@ -1527,6 +1523,7 @@ class Guest(Server):
                  test_iface_mac: str,
                  test_iface_driv: str,
                  test_iface_dpdk_driv: str,
+                 test_tap: str,
                  tmux_socket: str,
                  moongen_dir: str,
                  moonprogs_dir: str,
@@ -1552,6 +1549,8 @@ class Guest(Server):
             The driver of the test interface.
         test_iface_dpdk_driv : str
             The DPDK driver of the test interface.
+        test_tap : str
+            The network interface identifier of the test tap interface.
         tmux_socket : str
             The name for the tmux socket.
         moongen_dir : str
@@ -1584,6 +1583,7 @@ class Guest(Server):
                          tmux_socket, moongen_dir, moonprogs_dir,
                          xdp_reflector_dir, ssh_config=ssh_config)
         self.admin_tap = admin_tap
+        self.test_tap = test_tap
 
     def __post_init__(self: 'Guest') -> None:
         """
