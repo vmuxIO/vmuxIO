@@ -1000,7 +1000,6 @@ class Host(Server):
     vmux_socket_path: str
     guest_admin_iface_mac: str
     guest_test_iface_mac: str
-    guest_root_disk_path: str
     guest_vcpus: int
     guest_memory: int
     fsdevs: dict[str, str]
@@ -1018,7 +1017,6 @@ class Host(Server):
                  test_bridge: str,
                  vmux_path: str,
                  vmux_socket_path: str,
-                 guest_root_disk_path: str,
                  guest_admin_iface_mac: str,
                  guest_test_iface_mac: str,
                  guest_vcpus: int,
@@ -1059,8 +1057,6 @@ class Host(Server):
             Path to the vmux executable.
         vmux_socket_path : str
             The path to the vmux socket.
-        guest_root_disk_path : str
-            The path to the root disk of the guest.
         guest_admin_iface_mac : str
             The MAC address of the guest admin interface.
         guest_test_iface_mac : str
@@ -1110,7 +1106,6 @@ class Host(Server):
         self.vmux_socket_path = vmux_socket_path
         self.guest_test_iface_mac = guest_test_iface_mac
         self.guest_admin_iface_mac = guest_admin_iface_mac
-        self.guest_root_disk_path = guest_root_disk_path
         self.guest_vcpus = guest_vcpus
         self.guest_memory = guest_memory
         self.fsdevs = fsdevs
@@ -1382,7 +1377,7 @@ class Host(Server):
             qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
         cpus = vcpus if vcpus else self.guest_vcpus
         mem = memory if memory else self.guest_memory
-        disk_path = self.guest_root_disk_path
+        disk_path = guest.root_disk_path
         if root_disk:
             disk_path = root_disk
         fsdev_config = ''
@@ -1509,6 +1504,7 @@ class Guest(Server):
     admin_tap: str
     test_tap: str
     test_macvtap: str
+    root_disk_path: str
 
     def __init__(self: 'Guest',
                  fqdn: str,
@@ -1520,6 +1516,7 @@ class Guest(Server):
                  test_iface_dpdk_driv: str,
                  test_tap: str,
                  test_macvtap: str,
+                 root_disk_path: str,
                  tmux_socket: str,
                  moongen_dir: str,
                  moonprogs_dir: str,
@@ -1549,6 +1546,8 @@ class Guest(Server):
             The network interface identifier of the test tap interface.
         test_macvtap : str
             The network interface identifier of the test macvtap interface.
+        root_disk_path : str
+            The path to the root disk of the guest.
         tmux_socket : str
             The name for the tmux socket.
         moongen_dir : str
@@ -1583,6 +1582,7 @@ class Guest(Server):
         self.admin_tap = admin_tap
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
+        self.root_disk_path = root_disk_path
 
     def __post_init__(self: 'Guest') -> None:
         """
