@@ -998,8 +998,6 @@ class Host(Server):
     test_bridge: str
     vmux_path: str
     vmux_socket_path: str
-    # TODO maybe move to guest
-    fsdevs: dict[str, str]
 
     def __init__(self: 'Host',
                  fqdn: str,
@@ -1014,7 +1012,6 @@ class Host(Server):
                  test_bridge: str,
                  vmux_path: str,
                  vmux_socket_path: str,
-                 fsdevs: dict[str, str],
                  tmux_socket: str,
                  moongen_dir: str,
                  moonprogs_dir: str,
@@ -1050,8 +1047,6 @@ class Host(Server):
             Path to the vmux executable.
         vmux_socket_path : str
             The path to the vmux socket.
-        fsdevs : dict[str, str]
-            The name and path pairs for fs devices to be passed to the guest.
         tmux_socket : str
             The name for the tmux socket.
         moongen_dir : str
@@ -1089,7 +1084,6 @@ class Host(Server):
         self.test_bridge = test_bridge
         self.vmux_path = vmux_path
         self.vmux_socket_path = vmux_socket_path
-        self.fsdevs = fsdevs
 
     def setup_admin_bridge(self: 'Host'):
         """
@@ -1362,8 +1356,8 @@ class Host(Server):
         if root_disk:
             disk_path = root_disk
         fsdev_config = ''
-        if self.fsdevs:
-            for name, path in self.fsdevs.items():
+        if guest.fsdevs:
+            for name, path in guest.fsdevs.items():
                 fsdev_config += (
                     f' -fsdev local,path={path},security_model=none,' +
                     f'id={name}fs' +
@@ -1489,6 +1483,7 @@ class Guest(Server):
     test_tap: str
     test_macvtap: str
     root_disk_path: str
+    fsdevs: dict[str, str]
 
     def __init__(self: 'Guest',
                  fqdn: str,
@@ -1508,6 +1503,7 @@ class Guest(Server):
                  moongen_dir: str,
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
+                 fsdevs: dict[str, str],
                  ssh_config: Optional[str] = None,
                  ) -> None:
         """
@@ -1549,6 +1545,8 @@ class Guest(Server):
             The directory with the MoonGen Lua programs.
         xdp_reflector_dir : str
             The directory of the XDP Reflector installation.
+        fsdevs : dict[str, str]
+            The name and path pairs for fs devices to be passed to the guest.
         localhost : bool
             True if the host is localhost.
         ssh_config : Optional[str]
@@ -1579,6 +1577,7 @@ class Guest(Server):
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
         self.root_disk_path = root_disk_path
+        self.fsdevs = fsdevs
 
     def __post_init__(self: 'Guest') -> None:
         """

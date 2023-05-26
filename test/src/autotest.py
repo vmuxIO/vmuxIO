@@ -501,12 +501,6 @@ def create_servers(conf: ConfigParser,
     """
     servers = {}
     if host:
-        fsdevs = {}
-        if conf['host']['fsdevs']:
-            for fsdev in conf['host']['fsdevs'].split(','):
-                if fsdev:
-                    name, path = fsdev.split(':')
-                    fsdevs[name] = path
         servers['host'] = Host(
             conf['host']['fqdn'],
             conf['host']['admin_bridge'],
@@ -520,7 +514,6 @@ def create_servers(conf: ConfigParser,
             conf['host']['test_bridge'],
             conf['host']['vmux_path'],
             conf['host']['vmux_socket_path'],
-            fsdevs,
             conf['host']['tmux_socket'],
             conf['host']['moongen_dir'],
             conf['host']['moonprogs_dir'],
@@ -528,6 +521,12 @@ def create_servers(conf: ConfigParser,
             ssh_config=conf.get('host', 'ssh_config', fallback=None)
         )
     if guest:
+        fsdevs = {}
+        if conf['guest']['fsdevs']:
+            for fsdev in conf['guest']['fsdevs'].split(','):
+                if fsdev:
+                    name, path = fsdev.split(':')
+                    fsdevs[name] = path
         servers['guest'] = Guest(
             conf['guest']['fqdn'],
             conf['guest']['vcpus'],
@@ -546,6 +545,7 @@ def create_servers(conf: ConfigParser,
             conf['guest']['moongen_dir'],
             conf['guest']['moonprogs_dir'],
             conf['guest']['xdp_reflector_dir'],
+            fsdevs,
             ssh_config=conf.get('host', 'ssh_config', fallback=None)
         )
     if loadgen:
