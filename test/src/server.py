@@ -1002,10 +1002,6 @@ class Host(Server):
     guest_admin_iface_mac: str
     # TODO move to guest
     guest_test_iface_mac: str
-    # TODO move to guest
-    guest_vcpus: int
-    # TODO move to guest
-    guest_memory: int
     # TODO maybe move to guest
     fsdevs: dict[str, str]
 
@@ -1024,8 +1020,6 @@ class Host(Server):
                  vmux_socket_path: str,
                  guest_admin_iface_mac: str,
                  guest_test_iface_mac: str,
-                 guest_vcpus: int,
-                 guest_memory: int,
                  fsdevs: dict[str, str],
                  tmux_socket: str,
                  moongen_dir: str,
@@ -1066,10 +1060,6 @@ class Host(Server):
             The MAC address of the guest admin interface.
         guest_test_iface_mac : str
             The MAC address of the guest test interface.
-        guest_vcpus : int
-            The default number of vCPUs of the guest.
-        guest_memory : int
-            The default memory in MiB of the guest.
         fsdevs : dict[str, str]
             The name and path pairs for fs devices to be passed to the guest.
         tmux_socket : str
@@ -1111,8 +1101,6 @@ class Host(Server):
         self.vmux_socket_path = vmux_socket_path
         self.guest_test_iface_mac = guest_test_iface_mac
         self.guest_admin_iface_mac = guest_admin_iface_mac
-        self.guest_vcpus = guest_vcpus
-        self.guest_memory = guest_memory
         self.fsdevs = fsdevs
 
     def setup_admin_bridge(self: 'Host'):
@@ -1380,8 +1368,8 @@ class Host(Server):
         qemu_bin_path = 'qemu-system-x86_64'
         if qemu_build_dir:
             qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
-        cpus = vcpus if vcpus else self.guest_vcpus
-        mem = memory if memory else self.guest_memory
+        cpus = vcpus if vcpus else guest.vcpus
+        mem = memory if memory else guest.memory
         disk_path = guest.root_disk_path
         if root_disk:
             disk_path = root_disk
@@ -1506,6 +1494,8 @@ class Guest(Server):
     >>> Guest('server.test.de')
     Guest(fqdn='server.test.de')
     """
+    vcpus: int
+    memory: int
     admin_tap: str
     test_tap: str
     test_macvtap: str
@@ -1513,6 +1503,8 @@ class Guest(Server):
 
     def __init__(self: 'Guest',
                  fqdn: str,
+                 vcpus: int,
+                 memory: int,
                  admin_tap: str,
                  test_iface: str,
                  test_iface_addr: str,
@@ -1535,6 +1527,10 @@ class Guest(Server):
         ----------
         fqdn : str
             The fully qualified domain name of the guest.
+        vcpus : int
+            The default number of vCPUs of the guest.
+        memory : int
+            The default memory in MiB of the guest.
         admin_tap : str
             The network interface identifier of the admin tap interface.
         test_iface : str
@@ -1584,6 +1580,8 @@ class Guest(Server):
                          test_iface_driv, test_iface_dpdk_driv,
                          tmux_socket, moongen_dir, moonprogs_dir,
                          xdp_reflector_dir, ssh_config=ssh_config)
+        self.vcpus = vcpus
+        self.memory = memory
         self.admin_tap = admin_tap
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
