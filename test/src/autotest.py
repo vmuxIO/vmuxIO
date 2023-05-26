@@ -520,8 +520,6 @@ def create_servers(conf: ConfigParser,
             conf['host']['test_bridge'],
             conf['host']['vmux_path'],
             conf['host']['vmux_socket_path'],
-            conf['guest']['admin_iface_mac'],
-            conf['guest']['test_iface_mac'],
             fsdevs,
             conf['host']['tmux_socket'],
             conf['host']['moongen_dir'],
@@ -535,6 +533,7 @@ def create_servers(conf: ConfigParser,
             conf['guest']['vcpus'],
             conf['guest']['memory'],
             conf['guest']['admin_tap'],
+            conf['guest']['admin_iface_mac'],
             conf['guest']['test_iface'],
             conf['guest']['test_iface_addr'],
             conf['guest']['test_iface_mac'],
@@ -1008,7 +1007,7 @@ def test_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
                 tconf['accumulate'] == 'true',
                 tconf['outputdir']
             )
-            generator.generate(host)
+            generator.generate(host, guest)
             if args.dry_run:
                 info('Dry run, not running tests.')
             else:
@@ -1051,7 +1050,7 @@ def acc_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
                 tconf['accumulate'] == 'true',
                 tconf['outputdir']
             )
-            generator.generate(host)
+            generator.generate(host, guest)
             generator.force_accumulate()
 
 

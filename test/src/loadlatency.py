@@ -255,8 +255,8 @@ class LoadLatencyTestGenerator(object):
         info(f'  accumulate : {self.accumulate}')
         info(f'  outputdir  : {self.outputdir}')
 
-    def generate(self, host: Host):
-        self.full_test_tree = self.create_test_tree(host)
+    def generate(self, host: Host, guest: Guest):
+        self.full_test_tree = self.create_test_tree(host, guest)
         self.todo_test_tree = self.create_needed_test_tree(self.full_test_tree)
 
     def setup_interface(self, host: Host, guest: Guest, machine: Machine,
@@ -349,7 +349,7 @@ class LoadLatencyTestGenerator(object):
                     tree[rate][size][runtime] = test
         return tree
 
-    def create_test_tree(self, host: Host):
+    def create_test_tree(self, host: Host, guest: Guest):
         tree = {}
         count = 0
         interface_test_count = \
@@ -390,7 +390,7 @@ class LoadLatencyTestGenerator(object):
                     continue
                 tree[m][i] = {}
                 mac = host.test_iface_mac \
-                    if i == Interface.VFIO else host.guest_test_iface_mac
+                    if i == Interface.VFIO else guest.test_iface_mac
                 for q in self.qemus:
                     qemu, _ = q.split(':')
                     tree[m][i][q] = {}

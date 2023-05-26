@@ -998,10 +998,6 @@ class Host(Server):
     test_bridge: str
     vmux_path: str
     vmux_socket_path: str
-    # TODO move to guest
-    guest_admin_iface_mac: str
-    # TODO move to guest
-    guest_test_iface_mac: str
     # TODO maybe move to guest
     fsdevs: dict[str, str]
 
@@ -1018,8 +1014,6 @@ class Host(Server):
                  test_bridge: str,
                  vmux_path: str,
                  vmux_socket_path: str,
-                 guest_admin_iface_mac: str,
-                 guest_test_iface_mac: str,
                  fsdevs: dict[str, str],
                  tmux_socket: str,
                  moongen_dir: str,
@@ -1056,10 +1050,6 @@ class Host(Server):
             Path to the vmux executable.
         vmux_socket_path : str
             The path to the vmux socket.
-        guest_admin_iface_mac : str
-            The MAC address of the guest admin interface.
-        guest_test_iface_mac : str
-            The MAC address of the guest test interface.
         fsdevs : dict[str, str]
             The name and path pairs for fs devices to be passed to the guest.
         tmux_socket : str
@@ -1099,8 +1089,6 @@ class Host(Server):
         self.test_bridge = test_bridge
         self.vmux_path = vmux_path
         self.vmux_socket_path = vmux_socket_path
-        self.guest_test_iface_mac = guest_test_iface_mac
-        self.guest_admin_iface_mac = guest_admin_iface_mac
         self.fsdevs = fsdevs
 
     def setup_admin_bridge(self: 'Host'):
@@ -1265,7 +1253,7 @@ class Host(Server):
                   f' || sudo ip link add link {self.test_iface}' +
                   f' name {guest.test_macvtap} type macvtap')
         self.exec(f'sudo ip link set {guest.test_macvtap} address ' +
-                  f'{self.guest_test_iface_mac} up')
+                  f'{guest.test_iface_mac} up')
         self.exec('sudo chmod 666 /dev/tap$(cat ' +
                   f'/sys/class/net/{guest.test_macvtap}/ifindex)')
 
@@ -1343,7 +1331,7 @@ class Host(Server):
                 f'id=admin1,ifname={guest.test_tap},script=no,' +
                 'downscript=no,queues=4' +
                 f' -device virtio-net-{dev_type},id=testif,' +
-                f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
+                f'netdev=admin1,mac={guest.test_iface_mac},mq=on' +
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
             )
@@ -1404,7 +1392,7 @@ class Host(Server):
             f' -netdev tap,vhost=on,id=admin0,ifname={guest.admin_tap},' +
             'script=no,downscript=no' +
             f' -device virtio-net-{dev_type},id=admif,netdev=admin0,' +
-            f'mac={self.guest_admin_iface_mac}' +
+            f'mac={guest.admin_iface_mac}' +
             test_net_config
             # +
             # ' -drive id=test1,format=raw,file=/dev/ssd/test1,if=none,' +
@@ -1497,6 +1485,7 @@ class Guest(Server):
     vcpus: int
     memory: int
     admin_tap: str
+    admin_iface_mac: str
     test_tap: str
     test_macvtap: str
     root_disk_path: str
@@ -1506,6 +1495,7 @@ class Guest(Server):
                  vcpus: int,
                  memory: int,
                  admin_tap: str,
+                 admin_iface_mac: str,
                  test_iface: str,
                  test_iface_addr: str,
                  test_iface_mac: str,
@@ -1533,6 +1523,8 @@ class Guest(Server):
             The default memory in MiB of the guest.
         admin_tap : str
             The network interface identifier of the admin tap interface.
+        admin_iface_mac : str
+            The MAC address of the guest admin interface.
         test_iface : str
             The name of the test interface.
         test_iface_addr : str
@@ -1583,6 +1575,7 @@ class Guest(Server):
         self.vcpus = vcpus
         self.memory = memory
         self.admin_tap = admin_tap
+        self.admin_iface_mac = admin_iface_mac
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
         self.root_disk_path = root_disk_path
