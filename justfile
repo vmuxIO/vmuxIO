@@ -399,3 +399,16 @@ rangefinder *ARGS:
     if prev <= key and key < current:
       size = sizeof_fmt(current-prev)
       print(f"{prev:x} <= {key:x} <= {current:x} - size {size}")
+
+read PID ADDR:
+  #!/usr/bin/env python
+  a = open("/proc/{{PID}}/mem", 'rb', 0)
+  a.seek(0x{{ADDR}})
+  r = int.from_bytes(a.read(8), byteorder="big")
+  print(f"0x{r:016x}")
+
+write PID ADDR VALUE:
+  #!/usr/bin/env python
+  a = open("/proc/{{PID}}/mem", 'wb', 0)
+  a.seek(0x{{ADDR}})
+  a.write(int.to_bytes(8, 0x{{VALUE}}, byteorder="big"))
