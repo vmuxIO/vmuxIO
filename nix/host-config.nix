@@ -110,6 +110,7 @@ lib.attrsets.recursiveUpdate ({
     fio
     pciutils
     just
+    python3
     ioport # access port io (pio) via inb and outw commands
     busybox # for devmem to access physical memory
     (writeScriptBin "devmem" ''
