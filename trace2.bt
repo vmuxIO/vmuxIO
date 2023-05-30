@@ -1,0 +1,183 @@
+// vfio-user
+
+struct vfio_user_header {
+    __u16    msg_id;
+    __u16    cmd;
+    __u32    msg_size;
+    struct {
+        __u32    type     : 4;
+#define VFIO_USER_F_TYPE_COMMAND    0
+#define VFIO_USER_F_TYPE_REPLY      1
+        __u32    no_reply : 1;
+        __u32    error    : 1;
+        __u32    resvd    : 26;
+    } flags;
+    __u32    error_no;
+};
+
+struct vfio_user_header_mini {
+    __u16    msg_id;
+    __u16    cmd;
+};
+
+struct vfio_user_dma_map {
+    __u32 argsz;
+#define VFIO_USER_F_DMA_REGION_READ     (1 << 0)
+#define VFIO_USER_F_DMA_REGION_WRITE    (1 << 1)
+    __u32 flags;
+    __u64 offset;
+    __u64 addr;
+    __u64 size;
+};
+
+struct vfio_user_dma_unmap {
+    uint32_t argsz;
+#ifndef VFIO_DMA_UNMAP_FLAG_GET_DIRTY_BITMAP
+#define VFIO_DMA_UNMAP_FLAG_GET_DIRTY_BITMAP (1 << 0)
+#endif
+#ifndef VFIO_DMA_UNMAP_FLAG_ALL
+#define VFIO_DMA_UNMAP_FLAG_ALL (1 << 1)
+#endif
+    uint32_t flags;
+    uint64_t addr;
+    uint64_t size;
+    // struct vfio_user_bitmap bitmap[];
+};
+
+// VFIO ioctl
+
+struct vfio_iommu_type1_dma_map {
+    __u32   argsz;
+    __u32   flags;
+#define VFIO_DMA_MAP_FLAG_READ (1 << 0)     /* readable from device */
+#define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)    /* writable from device */
+#define VFIO_DMA_MAP_FLAG_VADDR (1 << 2)
+    __u64   vaddr;              /* Process virtual address */
+    __u64   iova;               /* IO virtual address */
+    __u64   size;               /* Size of mapping (bytes) */
+};
+
+struct vfio_iommu_type1_dma_unmap {
+    __u32   argsz;
+    __u32   flags;
+#define VFIO_DMA_UNMAP_FLAG_GET_DIRTY_BITMAP (1 << 0)
+#define VFIO_DMA_UNMAP_FLAG_ALL          (1 << 1)
+#define VFIO_DMA_UNMAP_FLAG_VADDR        (1 << 2)
+    __u64   iova;               /* IO virtual address */
+    __u64   size;               /* Size of mapping (bytes) */
+    __u8    data[];
+};
+
+#define VFIO_IOMMU_MAP_DMA 15217
+#define VFIO_IOMMU_UNMAP_DMA 15218
+
+#define EINTR 4
+
+BEGIN {
+    @VFIO_CMD[1]  =  "VFIO_USER_VERSION";
+    @VFIO_CMD[2]  =  "VFIO_USER_DMA_MAP";
+    @VFIO_CMD[3]  =  "VFIO_USER_DMA_UNMAP";
+    @VFIO_CMD[4]  =  "VFIO_USER_DEVICE_GET_INFO";
+    @VFIO_CMD[5]  =  "VFIO_USER_DEVICE_GET_REGION_INFO";
+    @VFIO_CMD[6]  =  "VFIO_USER_DEVICE_GET_REGION_IO_FDS";
+    @VFIO_CMD[7]  =  "VFIO_USER_DEVICE_GET_IRQ_INFO";
+    @VFIO_CMD[8]  =  "VFIO_USER_DEVICE_SET_IRQS";
+    @VFIO_CMD[9]  =  "VFIO_USER_REGION_READ";
+    @VFIO_CMD[10] =  "VFIO_USER_REGION_WRITE";
+    @VFIO_CMD[11] =  "VFIO_USER_DMA_READ";
+    @VFIO_CMD[12] =  "VFIO_USER_DMA_WRITE";
+    @VFIO_CMD[13] =  "VFIO_USER_DEVICE_RESET";
+    @VFIO_CMD[14] =  "VFIO_USER_DIRTY_PAGES";
+}
+
+END {
+    clear(@VFIO_CMD);
+    clear(@);
+}
+
+// static int handle_request(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg)
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_request {
+    // this does not work; bug?
+    // $header = (struct vfio_user_header*)arg1;
+    $header = (struct vfio_user_header_mini*)arg1;
+    printf("[%lu] [%s] [libvfio] handle_request: %s\n",
+            nsecs, comm, @VFIO_CMD[$header->cmd]);
+}
+
+// int handle_dma_map(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_map *dma_map)
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_map {
+    $dma_map = (struct vfio_user_dma_map*)arg2;
+    printf("[%lu] [%s] [libvfio] handle_dma_map: offset: %x, addr: %x, size: %x\n",
+            nsecs, comm,
+            $dma_map->offset, $dma_map->addr, $dma_map->size);
+}
+
+ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_map {
+    if (retval != 0) {
+      printf("[%lu] [%s] [libvfio] handle_dma_unmap failed: ret: %d\n",
+              nsecs, comm, retval);
+    }
+}
+
+// int handle_dma_unmap(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_unmap *dma_map)
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_unmap {
+    $dma_unmap = (struct vfio_user_dma_unmap*)arg2;
+    printf("[%lu] [%s] [libvfio] handle_dma_unmap: addr: %x, size: %x\n",
+            nsecs, comm, $dma_unmap->addr, $dma_unmap->size);
+}
+
+ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_unmap {
+    if (retval != 0) {
+      printf("[%lu] [%s] [libvfio] handle_dma_unmap failed: ret: %d\n",
+              nsecs, comm, retval);
+    }
+}
+
+// ioctl
+
+tracepoint:syscalls:sys_enter_ioctl / args->cmd == VFIO_IOMMU_MAP_DMA / {
+  @[tid] = args->cmd;
+  $a = (struct vfio_iommu_type1_dma_map*)(args->arg);
+  printf("[%lu] [%s] [ioctl] VFIO_IOMMU_MAP_DMA (fd %u): argsz %x, flags %x, vaddr %llx, iova %llx, size %llx\n",
+           nsecs, comm, args->fd, $a->argsz, $a->flags, $a->vaddr, $a->iova, $a->size);
+  // fd should be /dev/vfio/vfio according to /proc/$(pgrep vmux)/fd/$fd
+}
+
+tracepoint:syscalls:sys_exit_ioctl / @[tid] == VFIO_IOMMU_MAP_DMA / {
+  if (args->ret < 0 && args->ret != -EINTR) {
+    printf("[%lu] [%s] [ioctl] VFIO_IOMMU_MAP_DMA failed: ret=%d\n",
+             nsecs, comm, args->ret);
+  }
+}
+
+tracepoint:syscalls:sys_enter_ioctl / args->cmd == VFIO_IOMMU_UNMAP_DMA / {
+  @[tid] = args->cmd;
+  $a = (struct vfio_iommu_type1_dma_unmap*)(args->arg);
+  printf("[%lu] [%s] [ioctl] VFIO_IOMMU_UNMAP_DMA (fd %u): argsz %x, flags %x, iova %llx, size %llx\n", 
+          nsecs, comm, args->fd, $a->argsz, $a->flags, $a->iova, $a->size);
+  // fd should be /dev/vfio/vfio according to /proc/$(pgrep vmux)/fd/$fd
+}
+
+tracepoint:syscalls:sys_exit_ioctl / @[tid] == VFIO_IOMMU_UNMAP_DMA / {
+  if (args->ret < 0 && args->ret != -EINTR) {
+    printf("[%lu] [%s] [ioctl] VFIO_IOMMU_UNMAP_DMA failed: ret=%d\n",
+             nsecs, comm, args->ret);
+  }
+}
+
+// iommu
+kfunc:iommu_map {
+  printf("[%lu] [%s] [kernel] iommu_map: iova %llx, paddr %llx, size %llx\n",
+          nsecs, comm, args->iova, args->paddr, args->size);
+}
+
+kfunc:iommu_unmap {
+  printf("[%lu] [%s] [kernel] iommu_unmap: iova %llx, size %llx\n",
+          nsecs, comm, args->iova, args->size);
+}
+
+kfunc:iommu_unmap_fast {
+  printf("[%lu] [%s] [kernel] iommu_unmap_fast: iova %llx, size %llx\n",
+          nsecs, comm, args->iova, args->size);
+}
+
