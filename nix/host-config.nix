@@ -217,6 +217,7 @@ lib.attrsets.recursiveUpdate ({
     "debug"
   ] ++ lib.lists.optionals (!nested) [
     "intel_iommu=on"
+    "iommu=pt"
   ] ++ lib.lists.optionals nested [
     "intel_iommu=off"
     "vfio.enable_unsafe_noiommu_mode=1"
