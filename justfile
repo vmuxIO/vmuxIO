@@ -64,6 +64,8 @@ vm-libvfio-user:
         -nographic
 
 
+# Launch a VM to test libvfio-user in a VM
+# We pass-through an e1000 device (0000:00:03.0) with vmux (or vfio)
 @vm-libvfio-user-iommu:
     #!/usr/bin/env bash
     sudo ip tuntap add mode tap tap0
@@ -95,9 +97,16 @@ prepare-guest:
     #echo "vfio-pci" > /sys/bus/pci/devices/0000\:00\:03.0/driver_override 
     #echo 0000:00:03.0 > /sys/bus/pci/drivers/vfio-pci/bind 
 
+prepare-nested-guest:
+    modprobe vfio-pci
+    #echo "0000:00:06.0" > /sys/bus/pci/devices/0000\:00\:06.0/driver/unbind
+    echo 8086 100e > /sys/bus/pci/drivers/vfio-pci/new_id
+
+# start vmux in a VM
 vmux-guest:
     ./build/vmux -d 0000:00:03.0
 
+# start nested guest w/ viommu, w/ vmux (lib-vfio) device
 vm-libvfio-user-iommu-guest:
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
@@ -117,6 +126,7 @@ vm-libvfio-user-iommu-guest:
         -s \
         -nographic
 
+# start nested guest w/o viommu, w/o vmux (libvfio) device
 vm-noiommu-guest:
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
@@ -134,6 +144,7 @@ vm-noiommu-guest:
         -s \
         -nographic
 
+# start nested guest w/o viommu, w/ vmux (libvfio) device
 vm-libvfio-user-noiommu-guest:
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
@@ -152,6 +163,7 @@ vm-libvfio-user-noiommu-guest:
         -s \
         -nographic
 
+# start nested guest w/ viommu, w/ vfio (not vmux) device
 vm-libvfio-user-iommu-guest-passthrough:
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
