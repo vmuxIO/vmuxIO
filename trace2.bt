@@ -88,11 +88,14 @@ BEGIN {
     @VFIO_CMD[12] =  "VFIO_USER_DMA_WRITE";
     @VFIO_CMD[13] =  "VFIO_USER_DEVICE_RESET";
     @VFIO_CMD[14] =  "VFIO_USER_DIRTY_PAGES";
+
+    @indent = 0;
 }
 
 END {
     clear(@VFIO_CMD);
     clear(@);
+    clear(@indent);
 }
 
 // static int handle_request(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg)
@@ -100,84 +103,130 @@ u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_request {
     // this does not work; bug?
     // $header = (struct vfio_user_header*)arg1;
     $header = (struct vfio_user_header_mini*)arg1;
-    printf("[%lu] [%s] [libvfio] handle_request: %s\n",
-            nsecs, comm, @VFIO_CMD[$header->cmd]);
+    // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+    printf("[%d] [%lu] [%u] [%s] [libvfio] handle_request: %s\n",
+            @indent, nsecs, tid, comm, @VFIO_CMD[$header->cmd]);
+    @indent += 1;
+}
+
+ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_request {
+    @indent -= 1;
 }
 
 // int handle_dma_map(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_map *dma_map)
 u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_map {
     $dma_map = (struct vfio_user_dma_map*)arg2;
-    printf("[%lu] [%s] [libvfio] handle_dma_map: offset: %x, addr: %x, size: %x\n",
-            nsecs, comm,
+    // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+    printf("[%d] [%lu] [%u] [%s] [libvfio] handle_dma_map: offset: %x, addr: %x, size: %x\n",
+            @indent, nsecs, tid, comm,
             $dma_map->offset, $dma_map->addr, $dma_map->size);
+    @indent += 1;
 }
 
 ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_map {
     if (retval != 0) {
-      printf("[%lu] [%s] [libvfio] handle_dma_unmap failed: ret: %d\n",
-              nsecs, comm, retval);
+      // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+      printf("[%d] [%lu] [%u] [%s] [libvfio] handle_dma_unmap failed: ret: %d\n",
+              @indent, nsecs, tid, comm, retval);
     }
+    @indent -= 1;
 }
 
 // int handle_dma_unmap(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_unmap *dma_map)
 u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_unmap {
     $dma_unmap = (struct vfio_user_dma_unmap*)arg2;
-    printf("[%lu] [%s] [libvfio] handle_dma_unmap: addr: %x, size: %x\n",
-            nsecs, comm, $dma_unmap->addr, $dma_unmap->size);
+    // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+    printf("[%d] [%lu] [%u] [%s] [libvfio] handle_dma_unmap: addr: %x, size: %x\n",
+            @indent, nsecs, tid, comm, $dma_unmap->addr, $dma_unmap->size);
+    @indent += 1;
 }
 
 ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_unmap {
     if (retval != 0) {
-      printf("[%lu] [%s] [libvfio] handle_dma_unmap failed: ret: %d\n",
-              nsecs, comm, retval);
+      // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+      printf("[%d] [%lu] [%u] [%s] [libvfio] handle_dma_unmap failed: ret: %d\n",
+              @indent, nsecs, tid, comm, retval);
     }
+    @indent -= 1;
 }
 
 // ioctl
 
-tracepoint:syscalls:sys_enter_ioctl / args->cmd == VFIO_IOMMU_MAP_DMA / {
+tracepoint:syscalls:sys_enter_ioctl {
   @[tid] = args->cmd;
+  if (args->cmd != VFIO_IOMMU_MAP_DMA) {
+    return;
+  }
   $a = (struct vfio_iommu_type1_dma_map*)(args->arg);
-  printf("[%lu] [%s] [ioctl] VFIO_IOMMU_MAP_DMA (fd %u): argsz %x, flags %x, vaddr %llx, iova %llx, size %llx\n",
-           nsecs, comm, args->fd, $a->argsz, $a->flags, $a->vaddr, $a->iova, $a->size);
+  // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+  printf("[%d] [%lu] [%u] [%s] [ioctl] VFIO_IOMMU_MAP_DMA (fd %u): argsz %x, flags %x, vaddr %llx, iova %llx, size %llx\n",
+           @indent, nsecs, tid, comm, args->fd, $a->argsz, $a->flags, $a->vaddr, $a->iova, $a->size);
   // fd should be /dev/vfio/vfio according to /proc/$(pgrep vmux)/fd/$fd
+  @indent += 1;
 }
 
 tracepoint:syscalls:sys_exit_ioctl / @[tid] == VFIO_IOMMU_MAP_DMA / {
   if (args->ret < 0 && args->ret != -EINTR) {
-    printf("[%lu] [%s] [ioctl] VFIO_IOMMU_MAP_DMA failed: ret=%d\n",
-             nsecs, comm, args->ret);
+    // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+    printf("[%d] [%lu] [%u] [%s] [ioctl] VFIO_IOMMU_MAP_DMA failed: ret=%d\n",
+             @indent, nsecs, tid, comm, args->ret);
   }
+  @indent -= 1;
 }
 
-tracepoint:syscalls:sys_enter_ioctl / args->cmd == VFIO_IOMMU_UNMAP_DMA / {
+tracepoint:syscalls:sys_enter_ioctl {
   @[tid] = args->cmd;
+  if (args->cmd != VFIO_IOMMU_UNMAP_DMA) {
+    return;
+  }
   $a = (struct vfio_iommu_type1_dma_unmap*)(args->arg);
-  printf("[%lu] [%s] [ioctl] VFIO_IOMMU_UNMAP_DMA (fd %u): argsz %x, flags %x, iova %llx, size %llx\n", 
-          nsecs, comm, args->fd, $a->argsz, $a->flags, $a->iova, $a->size);
+  // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+  printf("[%d] [%lu] [%u] [%s] [ioctl] VFIO_IOMMU_UNMAP_DMA (fd %u): argsz %x, flags %x, iova %llx, size %llx\n", 
+          @indent, nsecs, tid, comm, args->fd, $a->argsz, $a->flags, $a->iova, $a->size);
   // fd should be /dev/vfio/vfio according to /proc/$(pgrep vmux)/fd/$fd
+  @indent += 1;
 }
 
 tracepoint:syscalls:sys_exit_ioctl / @[tid] == VFIO_IOMMU_UNMAP_DMA / {
   if (args->ret < 0 && args->ret != -EINTR) {
-    printf("[%lu] [%s] [ioctl] VFIO_IOMMU_UNMAP_DMA failed: ret=%d\n",
-             nsecs, comm, args->ret);
+    // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+    printf("[%d] [%lu] [%u] [%s] [ioctl] VFIO_IOMMU_UNMAP_DMA failed: ret=%d\n",
+            @indent, nsecs, tid, comm, args->ret);
   }
+  @indent -= 1;
 }
 
 // iommu
 kfunc:iommu_map {
-  printf("[%lu] [%s] [kernel] iommu_map: iova %llx, paddr %llx, size %llx\n",
-          nsecs, comm, args->iova, args->paddr, args->size);
+  // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+  printf("[%d] [%lu] [%u] [%s] [kernel] iommu_map: iova %llx, paddr %llx, size %llx\n",
+          @indent, nsecs, tid, comm, args->iova, args->paddr, args->size);
+  @indent += 1;
+}
+
+kr:iommu_map {
+  @indent -= 1;
 }
 
 kfunc:iommu_unmap {
-  printf("[%lu] [%s] [kernel] iommu_unmap: iova %llx, size %llx\n",
-          nsecs, comm, args->iova, args->size);
+  // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+  printf("[%d] [%lu] [%u] [%s] [kernel] iommu_unmap: iova %llx, size %llx\n",
+          @indent, nsecs, tid, comm, args->iova, args->size);
+  @indent += 1;
+}
+
+kr:iommu_unmap {
+  @indent -= 1;
 }
 
 kfunc:iommu_unmap_fast {
-  printf("[%lu] [%s] [kernel] iommu_unmap_fast: iova %llx, size %llx\n",
-          nsecs, comm, args->iova, args->size);
+  // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+  printf("[%d] [%lu] [%u] [%s] [kernel] iommu_unmap_fast: iova %llx, size %llx\n",
+          @indent, nsecs, tid, comm, args->iova, args->size);
+  @indent += 1;
+}
+
+kr:iommu_unmap_fast {
+  @indent -= 1;
 }
 
