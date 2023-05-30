@@ -28,6 +28,7 @@ struct vfio_user_dma_map {
     __u64 offset;
     __u64 addr;
     __u64 size;
+    __u64 pad;
 };
 
 struct vfio_user_dma_unmap {
@@ -43,6 +44,28 @@ struct vfio_user_dma_unmap {
     uint64_t size;
     // struct vfio_user_bitmap bitmap[];
 };
+
+/*
+struct iovec {
+    void  *iov_base;
+    size_t iov_len;
+};
+
+struct vfu_msg {
+    struct vfio_user_header hdr;
+
+    bool processed_cmd;
+
+    struct {
+       int *fds;
+       size_t nr_fds;
+       struct iovec iov;
+    } in, out;
+
+    struct iovec *out_iovecs;
+    size_t nr_out_iovecs;
+};
+*/
 
 // VFIO ioctl
 
@@ -115,6 +138,7 @@ ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_request {
 
 // int handle_dma_map(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_map *dma_map)
 u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_map {
+    // $msg = (struct vfu_msg*)arg1;
     $dma_map = (struct vfio_user_dma_map*)arg2;
     // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
     printf("[%d] [%lu] [%u] [%s] [libvfio] handle_dma_map: offset: %x, addr: %x, size: %x\n",
@@ -148,6 +172,32 @@ ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_unmap {
               @indent, nsecs, tid, comm, retval);
     }
     @indent -= 1;
+}
+
+
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:dma_map_region {
+    printf("[%d] [%lu] [%u] [%s] [libvfio] dma_map_region\n",
+              @indent, nsecs, tid, comm);
+    // @indent += 1;
+}
+
+ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:dma_map_region {
+  if (retval != 0) {
+    printf("[%d] [%lu] [%u] [%s] [libvfio] dma_map_region failed: ret: %d\n",
+            @indent, nsecs, tid, comm, retval);
+  }
+  // @indent -= 1;
+}
+
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:dma_controller_add_region {
+  printf("[%d] [%lu] [%u] [%s] [libvfio] dma_controller_add_region: dma_addr=%lx, size=%lx, fd=%d, offset=%lx, prot=%d\n",
+          @indent, nsecs, tid, comm, arg1, arg2, arg3, arg4, arg5);
+}
+
+ur:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:dma_controller_add_region {
+  printf("[%d] [%lu] [%u] [%s] [libvfio] dma_controller_add_region: ret: %d\n",
+          @indent, nsecs, tid, comm, retval);
+  // @indent -= 1;
 }
 
 // ioctl
