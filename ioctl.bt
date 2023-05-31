@@ -20,6 +20,14 @@ struct vfio_iommu_type1_dma_unmap {
 	__u8    data[];
 };
 
+BEGIN {
+  @indent = 0;
+}
+
+END {
+  clear(@indent);
+}
+
 tracepoint:syscalls:sys_enter_ioctl / args->cmd == 15217 / { 
   $a = (struct vfio_iommu_type1_dma_map*)(args->arg);
   printf("%s: DMA_MAP ioctl (fd %u): argsz %x, flags %x, vaddr %llx, iova %llx, size %llx\n", comm, args->fd, $a->argsz, $a->flags, $a->vaddr, $a->iova, $a->size);
@@ -65,6 +73,24 @@ kprobe:iommu_map {
   // struct iommu_domain *domain, unsigned long iova,
   //     phys_addr_t paddr, size_t size, int prot
   printf("%s: iommu_map(iommu_domain %llx, iova %llx, phys_addr_t %llx, size %llx, prot %u)\n", comm, arg0, arg1, arg2, arg3, arg4);
+}
+
+
+// int handle_dma_map(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_map *dma_map)
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_map {
+    $dma_map = (struct vfio_user_dma_map*)arg2;
+    // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+    printf("[%d] [%lu] [%u] [%s] [libvfio] handle_dma_map: offset: %x, addr: %x, size: %x\n",
+            @indent, nsecs, tid, comm,
+            $dma_map->offset, $dma_map->addr, $dma_map->size);
+}
+
+// int handle_dma_unmap(vfu_ctx_t *vfu_ctx, vfu_msg_t *msg, struct vfio_user_dma_unmap *dma_map)
+u:./build/subprojects/libvfio-user/lib/libvfio-user.so.0:handle_dma_unmap {
+    $dma_unmap = (struct vfio_user_dma_unmap*)arg2;
+    // $i = 0; unroll(5) { if ($i < @indent) { printf(" "); $i += 1; } }
+    printf("[%d] [%lu] [%u] [%s] [libvfio] handle_dma_unmap: addr: %x, size: %x\n",
+            @indent, nsecs, tid, comm, $dma_unmap->addr, $dma_unmap->size);
 }
 
 // not useful because it can not really print interesting info (phys_addr_t)
