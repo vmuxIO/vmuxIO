@@ -142,6 +142,17 @@
         patches = pkgs.lib.lists.sublist 0 3 pkgs2111.qemu.patches;
       });
 
+      devShellGcRoot = pkgs.writeShellApplication {
+        name = "stub_app";
+        runtimeInputs = self.outputs.devShells.${system}.default.buildInputs;
+        text = ''
+          echo "This app does not actually do anything. It just makes sure all packages for the dev shell are already loaded in the store."
+          # Actually we should not do this workaround but place an actual garbage
+          # collection root for the dev shell (also including compilers etc), but
+          # i don't know how to do so. 
+        '';
+      };
+
       # qemu/kernel (ioregionfd)
       nesting-host-image = nixos-generators.nixosGenerate {
         inherit pkgs;

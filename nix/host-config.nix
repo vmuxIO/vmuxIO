@@ -124,6 +124,7 @@ lib.attrsets.recursiveUpdate ({
     '')
     ethtool
     bpftrace
+    flakepkgs.devShellGcRoot
   ];
 
   hardware.firmware = [ flakepkgs.linux-firmware-pinned ];
