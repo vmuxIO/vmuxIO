@@ -1,4 +1,30 @@
-# vmuxIO
+# vMux
+
+> Flexible and fast software-multiplexing of NICs for qemu VMs using vfio-user
+
+
+Virtual Machines (VMs) are not only widely used in clouds to isolate tenant workloads, but increasingly also to deploy Virtual Network Functions (VNF).
+From these use-cases emerges a need for flexible, scalable _and_ fast IO.
+The current industry standard is however either not flexible nor scalable (passthrough + SR-IOV), or has high overheads (software switch + vhost).
+To address these issues, we propose a novel architecture that can implement sophisticated multiplexing strategies in software without compromising in performance, dependability or security.
+Our implementation, vMux, uses libvfio-user to implement device handling (emulation, mediation and passthrough) outside the hypervisor and Virtual Machine Monitor (VMM).
+Our implementation is limited to qemu/KVM, but it is also applicable to all VMMs implementing the vfio-user interface (such as cloud-hypervisor).
+Our vMux device multiplexer targets modern Network Interface Cards (NICs), in particular the Intel E810, but is generally applicable to most PCIe IO devices.
+
+## State of development
+
+Extremely incomplete. 
+
+We can:
+
+- emluate registers
+- do passthrough (e1000, E810)
+
+We cannot: 
+
+- multiplex
+- do interrupts
+- ...
 
 ## Develop
 
@@ -34,10 +60,14 @@ setup vm images, start VMs and connect
 ```shell
 # overwrite vm image with clean one
 just vm-overwrite
-# boot host-config
-just vm
+# start vmux
+just vmux
+# boot host-config with vmux as NIC
+just vm-libvfio-user
 # ssh into it
 just ssh
+# load the driver
+modprobe ice
 # re-apply host-config to vm
 just vm-update host-config
 ```
