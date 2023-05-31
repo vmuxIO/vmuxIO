@@ -72,6 +72,7 @@
     pkgs = nixpkgs.legacyPackages.${system};
     pkgs2211 = args.nixpkgs-2211.legacyPackages.${system};
     pkgs2111 = args.nixpkgs-2111.legacyPackages.${system};
+    flakepkgs = self.packages.${system};
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
@@ -83,16 +84,16 @@
       # moongen/dpdk
       moongen = pkgs.callPackage ./nix/moongen.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
-        inherit (selfpkgs) linux-firmware-pinned;
+        inherit (flakepkgs) linux-firmware-pinned;
       };
       moongen21 = pkgs.callPackage ./nix/moongen21.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
-        inherit (selfpkgs) linux-firmware-pinned;
+        inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
       moongen-lachnit = pkgs.callPackage ./nix/moongen-lachnit.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
-        inherit (selfpkgs) linux-firmware-pinned;
+        inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
       dpdk = mydpdk;
@@ -142,41 +143,57 @@
       });
 
       # qemu/kernel (ioregionfd)
-      host-image = nixos-generators.nixosGenerate {
+      nesting-host-image = nixos-generators.nixosGenerate {
         inherit pkgs;
         modules = [ ./nix/host-config.nix ];
         specialArgs = {
-          inherit (selfpkgs) linux-firmware-pinned;
+          inherit flakepkgs;
           extkern = false;
+          nested = false;
+          noiommu = false;
         };
         format = "qcow";
       };
-      host-extkern-image = nixos-generators.nixosGenerate {
+      nesting-host-extkern-image = nixos-generators.nixosGenerate {
         inherit pkgs;
         modules = [ ./nix/host-config.nix ];
         specialArgs = {
-          inherit (selfpkgs) linux-firmware-pinned;
+          inherit flakepkgs;
           extkern = true;
+          nested = false;
+          noiommu = false;
         };
         format = "qcow";
       };
+      nesting-guest-image = nixos-generators.nixosGenerate {
+        inherit pkgs;
+        modules = [ ./nix/host-config.nix ];
+        specialArgs = {
+          inherit flakepkgs;
+          extkern = false;
+          nested = true;
+          noiommu = false;
+        };
+        format = "qcow";
+      };
+      nesting-guest-image-noiommu = nixos-generators.nixosGenerate {
+        inherit pkgs;
+        modules = [ ./nix/host-config.nix ];
+        specialArgs = {
+          inherit flakepkgs;
+          extkern = false;
+          nested = true;
+          noiommu = true;
+        };
+        format = "qcow";
+      };
+      # used by autotest
       guest-image = nixos-generators.nixosGenerate {
         inherit pkgs;
         modules = [ ./nix/guest-config.nix ];
         specialArgs = {
-          inherit (selfpkgs) linux-firmware-pinned;
+          inherit (flakepkgs) linux-firmware-pinned;
         };
-        format = "qcow";
-      };
-      nested-guest-image = nixos-generators.nixosGenerate {
-        inherit pkgs;
-        modules = [ (import ./nix/host-config.nix {
-          inherit pkgs;
-          inherit (pkgs) lib;
-          inherit (self) config;
-          extkern = false;
-          nested = true;
-        }) ];
         format = "qcow";
       };
     };
@@ -261,14 +278,14 @@
     nixosConfigurations = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
       selfpkgs = self.packages.x86_64-linux;
+      flakepkgs = self.packages.x86_64-linux;
     in {
       host = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ (import ./nix/host-config.nix {
             inherit pkgs;
             inherit (pkgs) lib;
-            inherit (self) config;
-            inherit (selfpkgs) linux-firmware-pinned;
+            inherit flakepkgs;
             extkern = false;
           })
           ./nix/nixos-generators-qcow.nix
@@ -279,8 +296,7 @@
         modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
           inherit (pkgs) lib;
-          inherit (self) config;
-          inherit (selfpkgs) linux-firmware-pinned;
+          inherit flakepkgs;
           extkern = true;
         }) ];
       };

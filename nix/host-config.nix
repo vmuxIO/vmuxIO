@@ -1,13 +1,14 @@
-{ config, lib, pkgs, linux-firmware-pinned, 
+{ flakepkgs, lib, pkgs, 
 extkern ? false, # whether to use externally, manually built kernel
 nested ? false, # whether this is the config variant for the nested guest
+noiommu ? false, # whether to disable iommu via cmdline and kernel config
 ... }:
 lib.attrsets.recursiveUpdate ({
   #networking.useDHCP = false;
   #networking.interfaces.eth0.useDHCP = false;
   #networking.defaultGateway = "192.168.56.1";
   #networking.nameservers = [ "10.156.33.53" ];
-  #networking.hostName = "host";
+  networking.hostName = (if !nested then "host" else "guest");
   #networking.domain = "gierens.de";
   #networking.bridges = {
   #  "br0" = {
@@ -22,6 +23,9 @@ lib.attrsets.recursiveUpdate ({
 
   imports = [
     ./gpio.nix # enable gpio sysfs
+    ({ config, ...}: {
+      boot.extraModulePackages = [ config.boot.kernelPackages.dpdk-kmods ];
+    })
   ];
 
   services.sshd.enable = true;
@@ -72,7 +76,8 @@ lib.attrsets.recursiveUpdate ({
   system.activationScripts = {
     linkHome = {
       text = ''
-        ln -s /mnt /home/gierens
+        # dectivate, because it can fail if link exists:
+        #ln -s /mnt /home/gierens
       '';
       deps = [];
     };
@@ -121,7 +126,7 @@ lib.attrsets.recursiveUpdate ({
     bpftrace
   ];
 
-  hardware.firmware = [ linux-firmware-pinned ];
+  hardware.firmware = [ flakepkgs.linux-firmware-pinned ];
 
   # this breaks make/insmod kmods though:
   boot.extraModprobeConfig = ''
@@ -153,6 +158,11 @@ lib.attrsets.recursiveUpdate ({
         IKHEADERS y
       '';
     }
+    #{
+    #  name = "ixgbe-use-vmux-capability-offset-instead-of-hardware";
+    #  patch = ./0001-ixgbe-vmux-capa.patch;
+    #}
+  ] ++ lib.lists.optionals noiommu [
     {
       name = "enable-vfio-noiommu";
       patch = null;
@@ -160,10 +170,6 @@ lib.attrsets.recursiveUpdate ({
         VFIO_NOIOMMU y
       '';
     }
-    #{
-    #  name = "ixgbe-use-vmux-capability-offset-instead-of-hardware";
-    #  patch = ./0001-ixgbe-vmux-capa.patch;
-    #}
   ];
 
   #boot.kernelPackages = let
@@ -215,10 +221,10 @@ lib.attrsets.recursiveUpdate ({
   boot.kernelParams = [ 
     "nokaslr"
     "debug"
-  ] ++ lib.lists.optionals (!nested) [
+  ] ++ lib.lists.optionals (!noiommu) [
     "intel_iommu=on"
     "iommu=pt"
-  ] ++ lib.lists.optionals nested [
+  ] ++ lib.lists.optionals (nested && noiommu) [
     "intel_iommu=off"
     "vfio.enable_unsafe_noiommu_mode=1"
     "vfio-pci.ids=8086:100e"

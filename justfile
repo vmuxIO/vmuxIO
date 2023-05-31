@@ -1,5 +1,5 @@
 proot := justfile_directory()
-host_extkern_image :=  proot + "/VMs/host-extkern-image.qcow2"
+host_extkern_image :=  proot + "/VMs/nesting-host-extkern-image.qcow2"
 qemu_libvfiouser_bin := proot + "/qemu/bin/qemu-system-x86_64"
 qemu_ssh_port := "2222"
 user := `whoami`
@@ -12,6 +12,7 @@ default:
 # show help
 help:
   just --list
+
 vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
@@ -40,7 +41,7 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file={{proot}}/VMs/host-image2.qcow2 \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-pci,host={{PASSTHROUGH}} \
@@ -56,7 +57,7 @@ vm-libvfio-user:
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-user-pci,socket={{vmuxSock}} \
@@ -84,7 +85,7 @@ vm-libvfio-user:
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file={{proot}}/VMs/host-image.qcow2 \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -s \
@@ -96,11 +97,6 @@ prepare-guest:
     echo 8086 100e > /sys/bus/pci/drivers/vfio-pci/new_id
     #echo "vfio-pci" > /sys/bus/pci/devices/0000\:00\:03.0/driver_override 
     #echo 0000:00:03.0 > /sys/bus/pci/drivers/vfio-pci/bind 
-
-prepare-nested-guest:
-    modprobe vfio-pci
-    #echo "0000:00:06.0" > /sys/bus/pci/devices/0000\:00\:06.0/driver/unbind
-    echo 8086 100e > /sys/bus/pci/drivers/vfio-pci/new_id
 
 # start vmux in a VM
 vmux-guest:
@@ -119,7 +115,7 @@ vm-libvfio-user-iommu-guest:
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file=/mnt/VMs/host-image2.qcow2 \
+        -drive file=/mnt/VMs/nesting-guest-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-user-pci,socket="/tmp/vmux.sock" \
@@ -138,7 +134,7 @@ vm-noiommu-guest:
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file=/mnt/VMs/nested-guest-image.qcow2 \
+        -drive file=/mnt/VMs/nesting-guest-image-noiommu.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -s \
@@ -156,12 +152,17 @@ vm-libvfio-user-noiommu-guest:
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file=/mnt/VMs/nested-guest-image.qcow2 \
+        -drive file=/mnt/VMs/nesting-guest-image-noiommu.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-user-pci,socket="/tmp/vmux.sock" \
         -s \
         -nographic
+
+# use qemu with gdb command: handle all nostop pass
+# sudo gdb --args {{qemu_libvfiouser_bin}}  \
+#        -device vfio-pci,host=0000:00:03.0 \
+#        -device vfio-user-pci,socket="/tmp/vmux.sock" \
 
 # start nested guest w/ viommu, w/ vfio (not vmux) device
 vm-libvfio-user-iommu-guest-passthrough:
@@ -279,21 +280,24 @@ build:
 vm-overwrite:
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
-  # host-extkern VM
-  nix build -o {{proot}}/VMs/host-extkern-image-ro .#host-extkern-image # read only
-  install -D -m644 {{proot}}/VMs/host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
-  # host VM
-  nix build -o {{proot}}/VMs/host-image-ro .#host-image # read only
-  install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image.qcow2
-  install -D -m644 {{proot}}/VMs/host-image-ro/nixos.qcow2 {{proot}}/VMs/host-image2.qcow2
-  # guest VM
+  # nesting-host-extkern VM
+  nix build -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
+  install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  # nesting-host VM
+  nix build -o {{proot}}/VMs/nesting-host-image-ro .#nesting-host-image # read only
+  install -D -m644 {{proot}}/VMs/nesting-host-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-host-image.qcow2
+  qemu-img resize {{proot}}/VMs/nesting-guest-image.qcow2 +8g
+  # nesting-guest VM
+  nix build -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
+  install -D -m644 {{proot}}/VMs/nesting-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image.qcow2
+  qemu-img resize {{proot}}/VMs/nesting-guest-image.qcow2 +8g
+  nix build -o {{proot}}/VMs/nesting-guest-image-noiommu-ro .#nesting-guest-image-noiommu # read only
+  install -D -m644 {{proot}}/VMs/nesting-guest-image-noiommu-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image-noiommu.qcow2
+  qemu-img resize {{proot}}/VMs/nesting-guest-image-noiommu.qcow2 +8g
+  # guest VM (for autotest)
   nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
   install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2
   qemu-img resize {{proot}}/VMs/guest-image.qcow2 +8g
-  # nested guest VM
-  nix build -o {{proot}}/VMs/nested-guest-image-ro .#nested-guest-image # read only
-  install -D -m644 {{proot}}/VMs/nested-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nested-guest-image.qcow2
-  qemu-img resize {{proot}}/VMs/nested-guest-image.qcow2 +8g
 
 dpdk-setup:
   modprobe vfio-pci
@@ -382,7 +386,6 @@ autotest-ssh *ARGS:
   conf.read("{{proot}}/autotest.cfg")
   import os
   os.system(f"ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
-  
 
 # read list of hexvalues from stdin and find between which consecutive pairs arg1 lies
 rangefinder *ARGS:
