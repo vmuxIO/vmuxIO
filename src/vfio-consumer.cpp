@@ -252,7 +252,7 @@ void vfio_set_irqs(const int irq_type, const size_t count, std::vector<int> *irq
   ret = ioctl(device_fd, VFIO_DEVICE_SET_IRQS, irq_set);
   if (ret < 0) {
     //TODO: IRQs don't work properly on the e1000 yet
-    printf("Cannot set eventfds for interrupts type %d for device %d", irq_type, device_fd);
+    printf("Cannot set eventfds for interrupts type %d for device %d\n", irq_type, device_fd);
   }
 }
 

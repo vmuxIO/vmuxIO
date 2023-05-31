@@ -79,7 +79,7 @@ Capabilities::Capabilities(const vfio_region_info *config_info, std::string devi
 
 // allocates void pointer filled with cap_data
 void *Capabilities::capa(const char name[], int id, size_t size, bool extended) {
-  return NULL;
+  //return NULL;
   size_t cap_offset = vfu_pci_find_next_capability(this->vfu_ctx_stub, extended, 0, id);
   if (!cap_offset)
     die("capability %s not found", name);

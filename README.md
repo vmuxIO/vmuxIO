@@ -148,6 +148,6 @@ just vmux-guest
 just vm-libvfio-user-iommu-guest
 ```
 
-Use with mmisono/vfio-e1000: `gcc -o e1000 e1000.c -DPOLL -DECHO`
+Use with mmisono/vfio-e1000: `gcc -g -o e1000 e1000.c -DPOLL -DECHO`
 
 
