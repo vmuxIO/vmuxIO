@@ -157,6 +157,13 @@ int VfioConsumer::init() {
 
   printf("\nDevice irsq: %d\n\n", device_info.num_irqs);
 
+  // Enable DMA
+  struct vfio_region_info* cs_info = &this->regions[VFIO_PCI_CONFIG_REGION_INDEX];
+  char buf[2];
+  pread(device, buf, 2, cs_info->offset + 4);
+  *(uint16_t*)(buf) |= 1 << 2;
+  pwrite(device, buf, 2, cs_info->offset + 4);
+
   for (i = 0; i < device_info.num_irqs; i++) {
           struct vfio_irq_info irq = { .argsz = sizeof(irq) };
 
