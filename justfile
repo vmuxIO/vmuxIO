@@ -34,8 +34,9 @@ vm-update config:
 vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
     sudo qemu-system-x86_64 \
         -cpu host \
+        -smp 4 \
         -enable-kvm \
-        -m 8G \
+        -m 16G \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -268,7 +269,7 @@ prepare HOSTYAML:
 # prepare/configure this project for use
 build:
   chmod 600 ./nix/ssh_key
-  meson build --wipe
+  meson build --wipe # this fails, if no build/ folder exists yet. Run `meson build` once in that case.
   meson compile -C build
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21

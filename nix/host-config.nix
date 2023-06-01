@@ -25,6 +25,7 @@ lib.attrsets.recursiveUpdate ({
     ./gpio.nix # enable gpio sysfs
     ({ config, ...}: {
       boot.extraModulePackages = [ config.boot.kernelPackages.dpdk-kmods ];
+      boot.kernelModules = lib.lists.optionals nested [ "igb_uio" ];
     })
   ];
 
@@ -229,6 +230,10 @@ lib.attrsets.recursiveUpdate ({
     "intel_iommu=off"
     "vfio.enable_unsafe_noiommu_mode=1"
     "vfio-pci.ids=8086:100e"
+  ] ++ lib.lists.optionals (!nested) [
+    "default_hugepagesz=1G"
+    "hugepagez=1G"
+    "hugepages=8"
   ];
 
   boot.kernelModules = lib.lists.optionals nested ["vfio" "vfio-pci"];
