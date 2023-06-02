@@ -61,6 +61,7 @@ def applyDevice(devYaml: str) -> None:
     """
     modprobe(devYaml['dpdk-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['dpdk-driver'])
+    print(f"Binding dpdk-driver: {devYaml['pci']} <- {devYaml['dpdk-driver']}")
 
 def checkDeviceConfig(devYaml: str) -> None:
     """
@@ -69,7 +70,7 @@ def checkDeviceConfig(devYaml: str) -> None:
     modprobe(devYaml['kernel-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['kernel-driver'])
     info = subprocess.run(["ethtool", "-i", devYaml['if']], check=True, capture_output=True).stdout
-    print(f"ethtool: {info}")
+    # print(f"ethtool: {info}")
     info = info.split(b'\n')
     firmware_version = info[2].split(b'firmware-version: ')[1].decode('utf-8')
     assert firmware_version in devYaml['firmware-versions'], \

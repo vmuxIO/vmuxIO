@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <optional>
 #include <dirent.h>
+#include <set>
 
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
@@ -84,7 +85,9 @@ class VfioUserServer {
     size_t irq_req_pollfd_idx; // only one
     std::vector<struct pollfd> pollfds;
     VfioConsumer *callback_context;
-   
+    std::set<void*> mapped;
+    std::map<void*, dma_sg_t*> sgs;
+
     VfioUserServer(std::string sock) {
       this->sock = sock;
     }
@@ -211,7 +214,7 @@ class VfioUserServer {
       ret = vfu_setup_device_reset_cb(this->vfu_ctx, VfioUserServer::reset_device_cb);
       if (ret)
         die("setting up reset callback for libvfio-user failed %d", ret);
-      //vfu_setup_device_dma(this->vfu_ctx, VfioUserServer::dma_register_cb, VfioUserServer::dma_unregister_cb);
+      vfu_setup_device_dma(this->vfu_ctx, VfioUserServer::dma_register_cb, VfioUserServer::dma_unregister_cb);
       ret = vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_INTX_IRQ, VfioUserServer::intx_state_cb);
       if (ret)
         die("setting up intx state callback for libvfio-user failed");
@@ -241,30 +244,62 @@ class VfioUserServer {
     }
 
     static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_dma_info_t *info) {
+      
       printf("register dma cb\n");
-      if (info->iova.iov_base == NULL ||
-          info->iova.iov_base == (void*)0xc0000 ||
-          info->iova.iov_base == (void*)0xe0000 )
-        return;
+      
+      //if ( //info->iova.iov_base == NULL ||
+      //    info->iova.iov_base == (void*)0xc0000 || // TODO remove these checks as well
+      //    info->iova.iov_base == (void*)0xe0000 )
+      //  return;
 
-      __builtin_dump_struct(info, &printf);
+      //__builtin_dump_struct(info, &printf);
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
-
+      printf("{\n");
+      for(void* const& p: vfu->mapped){
+        printf("%p\n",p);
+      }
+      printf("}\n");
       uint32_t flags = 0;
       if (PROT_READ & info->prot)
         flags |= VFIO_DMA_MAP_FLAG_READ;
       if (PROT_WRITE & info->prot)
         flags |= VFIO_DMA_MAP_FLAG_WRITE;
+      __builtin_dump_struct(info, &printf);
+  
+      if (!info->vaddr){
+        //vfu_sgl_get failes if vaddr is NULL
+        printf("Region not mappable\n");
+        return;
+      }
 
-      if (info->vaddr != NULL)
-        die("dont know how to handle this vaddr");
+      //Map the region into the vmux Address Space
+      struct iovec* mapping = (struct iovec*)calloc(1,sizeof(struct iovec));
+      dma_sg_t *sgl = (dma_sg_t*)calloc(1, dma_sg_size());
+      int ret = vfu_addr_to_sgl(vfu_ctx,info->iova.iov_base,info->iova.iov_len,sgl,1,flags);
+      if(ret < 0){
+        die("Failed to get sgl for DMA\n");
+      }
+  
+      if(vfu_sgl_get(vfu_ctx ,sgl,mapping,1,0)){
+        die("Failed to populate iovec array");
+      }
 
+      
+
+
+      printf("Add Address to mapped addresses\n");
+      vfu->sgs[info->vaddr] = sgl; 
+      vfu->mapped.insert(info->vaddr);
+      __builtin_dump_struct(info, &printf);
+      __builtin_dump_struct(mapping, &printf);
+      
+      
       vfio_iommu_type1_dma_map dma_map = {
         .argsz = sizeof(vfio_iommu_type1_dma_map),
         .flags = flags,
         .vaddr = (uint64_t)(info->vaddr),
         .iova = (uint64_t)(info->iova.iov_base),
-        .size = info->iova.iov_len,
+        .size =  info->iova.iov_len,
       };
       __builtin_dump_struct(&dma_map, &printf);
       vfu->callback_context->map_dma(&dma_map);
@@ -272,13 +307,41 @@ class VfioUserServer {
 
     static void dma_unregister_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] vfu_dma_info_t *info) {
       printf("dma_unregister_cb\n");
-      if (info->iova.iov_base == NULL ||
-          info->iova.iov_base == (void*)0xc0000 ||
-          info->iova.iov_base == (void*)0xe0000 )
-        return;
+      //return;
 
+      //if (// info->iova.iov_base == NULL ||
+      //    info->iova.iov_base == (void*)0xc0000 ||
+      //    info->iova.iov_base == (void*)0xe0000 )
+      //  return;
       __builtin_dump_struct(info, &printf);
+
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      printf("{\n");
+      for(void* const& p: vfu->mapped){
+        printf("%p\n",p);
+      }
+      printf("}\n");
+
+
+      //info->mapping indicates if mapped
+      if(!info->mapping.iov_base){
+        printf("Region not mapped, nothing to do\n");
+        return;
+      }
+
+
+      if(!vfu->mapped.count(info->iova.iov_base)){
+        printf("Region seems not to be mapped\n");
+        //return;
+      }
+      if(vfu->sgs.count(info->vaddr)==1){
+        printf("dealloc sgl\n");
+      }
+      if(vfu->sgs.count(info->vaddr)>1){
+        printf("Why?\n");
+        //return;
+      }
+
 
       vfio_iommu_type1_dma_unmap dma_unmap = {
         .argsz = sizeof(vfio_iommu_type1_dma_unmap),
@@ -487,7 +550,7 @@ int _main(int argc, char** argv) {
   }
 
   ret = vfu_pci_init(vfu.vfu_ctx, VFU_PCI_TYPE_EXPRESS,
-                     PCI_HEADER_TYPE_NORMAL, 3); // maybe 4?
+                     PCI_HEADER_TYPE_NORMAL, 0); // maybe 4?
   if (ret < 0) {
     die("vfu_pci_init() failed") ;
   }
@@ -508,73 +571,74 @@ int _main(int argc, char** argv) {
   ret = vfu.add_irqs(vfioc.interrupts);
   if (ret < 0)
     die("failed to add irqs");
-
+  
   vfioc.init_legacy_irqs();
   vfu.add_legacy_irq_pollfds(vfioc.irqfd_intx, vfioc.irqfd_msi, vfioc.irqfd_err, vfioc.irqfd_req);
   vfioc.init_msix();
   vfu.add_msix_pollfds(vfioc.irqfds);
 
   // set capabilities
-  Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), device);
-  void *cap_data;
+  if(vfioc.is_pcie){
+    Capabilities caps = Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), device);
+    void *cap_data;
 
-  cap_data = caps.pm();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  free(cap_data);
+    cap_data = caps.pm();
+    ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
+    if (ret < 0)
+      die("add cap error");
+    free(cap_data);
 
-  cap_data = caps.msix();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  free(cap_data);
+    cap_data = caps.msix();
+    ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
+    if (ret < 0)
+      die("add cap error");
+    free(cap_data);
 
-  // not supported by libvfio-user:
-  //cap_data = caps.msi();
-  //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
-  //if (ret < 0)
-  //  die("add cap error");
-  //free(cap_data);
+    // not supported by libvfio-user:
+    //cap_data = caps.msi();
+    //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
+    //if (ret < 0)
+    //  die("add cap error");
+    //free(cap_data);
+    
+    cap_data = caps.exp();
+    ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
+    if (ret < 0)
+      die("add cap error");
+    free(cap_data);
   
-  cap_data = caps.exp();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  free(cap_data);
- 
-  // not supported by upstream libvfio-user, not used by linux ice driver
-  //cap_data = caps.vpd();
-  //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
-  //if (ret < 0)
-  //  die("add cap error");
-  //free(cap_data);
-  
-  cap_data = caps.dsn();
-  ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY | VFU_CAP_FLAG_EXTENDED, cap_data);
-  if (ret < 0)
-    die("add cap error");
-  free(cap_data);
+    // not supported by upstream libvfio-user, not used by linux ice driver
+    //cap_data = caps.vpd();
+    //ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY, cap_data);
+    //if (ret < 0)
+    //  die("add cap error");
+    //free(cap_data);
+    
+    cap_data = caps.dsn();
+    ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, VFU_CAP_FLAG_READONLY | VFU_CAP_FLAG_EXTENDED, cap_data);
+    if (ret < 0)
+      die("add cap error");
+    free(cap_data);
 
-  // see lspci about which fields mean what https://github.com/pciutils/pciutils/blob/42e6a803bda392e98276b71994db0b0dd285cab1/ls-caps.c#L1469
-  //struct msixcap data;
-  //data.hdr = {
-  //  .id = PCI_CAP_ID_MSIX,
-  //};
-  //data.mxc = {
-  //  // message control
-  //};
-  //data.mtab = {
-  //  // table offset / Table BIR
-  //};
-  //data.mpba = {
-  //  // PBA offset / PBA BIR
-  //};
-  ////ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, &data);
-  //if (ret < 0) {
-  //  die("Vfio-user: cannot add MSIX capability");
-  //}
-
+    // see lspci about which fields mean what https://github.com/pciutils/pciutils/blob/42e6a803bda392e98276b71994db0b0dd285cab1/ls-caps.c#L1469
+    //struct msixcap data;
+    //data.hdr = {
+    //  .id = PCI_CAP_ID_MSIX,
+    //};
+    //data.mxc = {
+    //  // message control
+    //};
+    //data.mtab = {
+    //  // table offset / Table BIR
+    //};
+    //data.mpba = {
+    //  // PBA offset / PBA BIR
+    //};
+    ////ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, &data);
+    //if (ret < 0) {
+    //  die("Vfio-user: cannot add MSIX capability");
+    //}
+  }
   // register callbacks
 
   //int reset_device(vfu_ctx_t *vfu_ctx, vfu_reset_type_t type) {

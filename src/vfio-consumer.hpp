@@ -22,6 +22,7 @@ class VfioConsumer {
     std::map<int, void*> mmio;
     struct vfio_iommu_type1_dma_map dma_map;
     bool use_msix = true;
+    bool is_pcie = true;
 
     std::string group_str;
     std::string device_name;
@@ -44,3 +45,4 @@ class VfioConsumer {
 };
 
 #define VFIOC_SECRET 1337
+#define PCIE_HEADER_LENGTH 4096

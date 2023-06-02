@@ -72,6 +72,7 @@
     pkgs = nixpkgs.legacyPackages.${system};
     pkgs2211 = args.nixpkgs-2211.legacyPackages.${system};
     pkgs2111 = args.nixpkgs-2111.legacyPackages.${system};
+    flakepkgs = self.packages.${system};
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
@@ -83,16 +84,16 @@
       # moongen/dpdk
       moongen = pkgs.callPackage ./nix/moongen.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
-        inherit (selfpkgs) linux-firmware-pinned;
+        inherit (flakepkgs) linux-firmware-pinned;
       };
       moongen21 = pkgs.callPackage ./nix/moongen21.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
-        inherit (selfpkgs) linux-firmware-pinned;
+        inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
       moongen-lachnit = pkgs.callPackage ./nix/moongen-lachnit.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
-        inherit (selfpkgs) linux-firmware-pinned;
+        inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
       dpdk = mydpdk;
@@ -114,6 +115,9 @@
         version = "8a2d81";
         outputHash = "sha256-dVvfwgto9Pgpkukf/IoJ298MUYzcsV1G/0jTxVcdFGw=";
       }));
+      kmod-tools = pkgs.callPackage ./nix/kmod-tools.nix {
+        inherit pkgs;
+      };
 
       #patched qemu
       qemu = pkgs.callPackage ./nix/qemu-libvfio.nix { 
@@ -138,30 +142,68 @@
         patches = pkgs.lib.lists.sublist 0 3 pkgs2111.qemu.patches;
       });
 
+      devShellGcRoot = pkgs.writeShellApplication {
+        name = "stub_app";
+        runtimeInputs = self.outputs.devShells.${system}.default.buildInputs;
+        text = ''
+          echo "This app does not actually do anything. It just makes sure all packages for the dev shell are already loaded in the store."
+          # Actually we should not do this workaround but place an actual garbage
+          # collection root for the dev shell (also including compilers etc), but
+          # i don't know how to do so. 
+        '';
+      };
+
       # qemu/kernel (ioregionfd)
-      host-image = nixos-generators.nixosGenerate {
+      nesting-host-image = nixos-generators.nixosGenerate {
         inherit pkgs;
         modules = [ ./nix/host-config.nix ];
         specialArgs = {
-          inherit (selfpkgs) linux-firmware-pinned;
+          inherit flakepkgs;
           extkern = false;
+          nested = false;
+          noiommu = false;
         };
         format = "qcow";
       };
-      host-extkern-image = nixos-generators.nixosGenerate {
+      nesting-host-extkern-image = nixos-generators.nixosGenerate {
         inherit pkgs;
         modules = [ ./nix/host-config.nix ];
         specialArgs = {
-          inherit (selfpkgs) linux-firmware-pinned;
+          inherit flakepkgs;
           extkern = true;
+          nested = false;
+          noiommu = false;
         };
         format = "qcow";
       };
+      nesting-guest-image = nixos-generators.nixosGenerate {
+        inherit pkgs;
+        modules = [ ./nix/host-config.nix ];
+        specialArgs = {
+          inherit flakepkgs;
+          extkern = false;
+          nested = true;
+          noiommu = false;
+        };
+        format = "qcow";
+      };
+      nesting-guest-image-noiommu = nixos-generators.nixosGenerate {
+        inherit pkgs;
+        modules = [ ./nix/host-config.nix ];
+        specialArgs = {
+          inherit flakepkgs;
+          extkern = false;
+          nested = true;
+          noiommu = true;
+        };
+        format = "qcow";
+      };
+      # used by autotest
       guest-image = nixos-generators.nixosGenerate {
         inherit pkgs;
         modules = [ ./nix/guest-config.nix ];
         specialArgs = {
-          inherit (selfpkgs) linux-firmware-pinned;
+          inherit (flakepkgs) linux-firmware-pinned;
         };
         format = "qcow";
       };
@@ -180,6 +222,8 @@
         (writeScriptBin "devmem" ''
           ${busybox}/bin/devmem $@
         '')
+        bridge-utils
+        self.packages.x86_64-linux.kmod-tools
 
         # dependencies for hosts/prepare.py
         python310.pkgs.pyyaml
@@ -192,7 +236,8 @@
         python310.pkgs.colorlog
       ] ++ (with self.packages; [
         dpdk
-        qemu
+        #self.packages.x86_64-linux.qemu
+        qemu # nixpkgs vanilla qemu
       ]);
     in {
       # use clang over gcc because it has __builtin_dump_struct()
@@ -227,11 +272,11 @@
         ] ++ common_deps;
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
-      # nix develop .#qemu
-      qemu = pkgs.qemu.overrideAttrs (old: {
+      # nix develop .#qemu-dev
+      qemu-dev = pkgs2211.qemu.overrideAttrs (old: {
         buildInputs = [ pkgs.libndctl pkgs.libtasn1 ] ++ old.buildInputs;
         nativeBuildInputs = [ pkgs.meson pkgs.ninja ] ++ old.nativeBuildInputs;
-        hardeningDisable = [ "stackprotector" ];
+        hardeningDisable = [ "all" ]; # [ "stackprotector" ];
         shellHook = ''
           unset CPP # intereferes with dependency calculation
         '';
@@ -244,14 +289,14 @@
     nixosConfigurations = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
       selfpkgs = self.packages.x86_64-linux;
+      flakepkgs = self.packages.x86_64-linux;
     in {
       host = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ (import ./nix/host-config.nix {
             inherit pkgs;
             inherit (pkgs) lib;
-            inherit (self) config;
-            inherit (selfpkgs) linux-firmware-pinned;
+            inherit flakepkgs;
             extkern = false;
           })
           ./nix/nixos-generators-qcow.nix
@@ -262,8 +307,7 @@
         modules = [ (import ./nix/host-config.nix {
           inherit pkgs;
           inherit (pkgs) lib;
-          inherit (self) config;
-          inherit (selfpkgs) linux-firmware-pinned;
+          inherit flakepkgs;
           extkern = true;
         }) ];
       };

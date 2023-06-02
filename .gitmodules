@@ -2,3 +2,7 @@
 	path = subprojects/libvfio-user
 	url = https://github.com/vmuxIO/libvfio-user.git
 	branch = vmux
+[submodule "subprojects/vfio-e1000"]
+	path = subprojects/vfio-e1000
+	url = https://github.com/mmisono/vfio-e1000.git
+	branch = master
