@@ -60,19 +60,22 @@ setup vm images, start VMs and connect
 ```shell
 # overwrite vm image with clean one
 just vm-overwrite
-# start vmux
-just vmux
-# boot host-config with vmux as NIC
-just vm-libvfio-user
+# boot host-config and use qemu (instead of vmux) to pass through the E810 NIC
+just vm
 # ssh into it
 just ssh
+# load development environment
+cd /mnt
+nix develop
 # load the driver
 modprobe ice
-# re-apply host-config to vm
+# re-apply host-config to vm to apply nixos changes
 just vm-update host-config
 ```
 
-## vMux demo
+## Demos
+
+### vMux register emulation
 
 Start vmux `just vmux` and qemu using `just vm-libvfio-user`. Connect to the VM `just ssh` and run:
 
@@ -89,6 +92,34 @@ devmem 0xfa0B8188
 ```
 
 If you read too much `FFFFFFFF` or `DEADBEEF`, you probably need to reboot the machine/NIC.
+
+### Passthrough
+
+E810 passthrough: `just vm` to do qemu passthrough - `just vmux` and `just vm-libvfio-user` to do passthrough with vmux.
+
+You can also pass through the simple e1000 NIC emulated by qemu with nested VMs:
+
+```
+just vm-libvfio-user-iommu
+#In VM ("host")
+just prepare-guest
+just vmux-guest
+just vm-libvfio-user-iommu-guest
+# In nested VM ("guest")
+just prepare-guest
+./subprojects/vfio-e1000/e1000 0000:00:06.0
+# on the native host running the "host" VM: observe how vfio-e1000 receives packets
+ping 10.0.0.2
+```
+
+Use guest driver subprojects/vfio-e1000: `gcc -g -o e1000 e1000.c -DPOLL -DECHO`
+
+Notes:
+
+Passthrough only works, if you pass through all PFs to the same VM. If you want to do different VMs, you have to use VFs i guess.
+
+Check if you receive any packets via sysfs `/sys/class/net/eth0/statistics/rx_packets`.
+
 
 ## Run benchmarks
 
@@ -166,18 +197,5 @@ use the `./configure` cmdline from `Makefile` and build with `make -j 12`
 manually built, qemu needs to be started with an additional parameter: `-L /qemu-srcs/pc-bios`
 
 
-## Debugging with qemus e1000
-
-To do nested virtualisation with a simple, qemu emulated NIC:
-
-```
-just vm-libvfio-user-iommu
-#In VM 
-just prepare-guest
-just vmux-guest
-just vm-libvfio-user-iommu-guest
-```
-
-Use with mmisono/vfio-e1000: `gcc -g -o e1000 e1000.c -DPOLL -DECHO`
 
 

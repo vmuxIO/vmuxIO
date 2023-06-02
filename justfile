@@ -287,7 +287,7 @@ vm-overwrite:
   # nesting-host VM
   nix build -o {{proot}}/VMs/nesting-host-image-ro .#nesting-host-image # read only
   install -D -m644 {{proot}}/VMs/nesting-host-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-host-image.qcow2
-  qemu-img resize {{proot}}/VMs/nesting-guest-image.qcow2 +8g
+  qemu-img resize {{proot}}/VMs/nesting-host-image.qcow2 +8g
   # nesting-guest VM
   nix build -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
   install -D -m644 {{proot}}/VMs/nesting-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image.qcow2
