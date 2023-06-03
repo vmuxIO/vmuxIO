@@ -322,9 +322,7 @@ class Server(ABC):
         _ = self.exec(f'tmux -L {self.tmux_socket}' +
                       ' list-sessions | cut -d ":" -f 1 ' +
                       f'| grep {session_name} | xargs ' +
-                      f'tmux -L {self.tmux_socket} kill-session -t')
-        # TODO we could add a || true here to ignore cases when there is no
-        #      session to kill
+                      f'tmux -L {self.tmux_socket} kill-session -t || true')
 
     def tmux_send_keys(self: 'Server', session_name: str, keys: str) -> None:
         """
