@@ -91,7 +91,9 @@ def apply(hostcfg: str, function: Callable[[str], None]) -> None:
         function(ethDut)
 
 def checkIommu(hostcfg: str) -> None:
-    iommu_on = os.path.isdir("/sys/devices/virtual/iommu")
+    intel_iommu_on = os.path.isdir("/sys/devices/virtual/iommu")
+    amd_iommu_on = os.path.isdir("/sys/devices/amd_iommu_0")
+    iommu_on = intel_iommu_on or amd_iommu_on
     assert iommu_on == hostcfg['iommu_on'], f"Iommu_is_on = {iommu_on} which is not what config requires"
 
 def checkHugepages(hostcfg: str) -> None:
