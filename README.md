@@ -49,10 +49,12 @@ just prepare ./hosts/ryan.yaml
 ulimit -n 2048 # or set nixos systemd.extraConfig = ''DefaultLimitNOFILE=2048:524288''
 ```
 
-do a performance measurement with moongen-lachnit:
+do a performance measurement with moongen-lachnit and two or one PFs:
 
 ```shell
 sudo ./mgln/bin/MoonGen ./mgln/bin/examples/l2-load-latency.lua 0 1 --rate 100000
+sudo ./mgln/bin/MoonGen ./test/moonprogs/l2-load-latency.lua 0 00:00:00:00:00
+
 ```
 
 setup vm images, start VMs and connect
