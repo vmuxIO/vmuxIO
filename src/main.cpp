@@ -218,9 +218,14 @@ class VfioUserServer {
       ret = vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_INTX_IRQ, VfioUserServer::intx_state_cb);
       if (ret)
         die("setting up intx state callback for libvfio-user failed");
-      for (int type = 1; type < VFU_DEV_NUM_IRQS; type++) {
-        // register callbacks for all since it is only called for used IRQs
-        ret = vfu_setup_irq_state_callback(this->vfu_ctx, (enum vfu_dev_irq_type) type, VfioUserServer::irq_state_cb);
+      ret = vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_MSIX_IRQ, VfioUserServer::msix_state_cb);
+      if (ret)
+        die("setting up msix state callback for libvfio-user failed");
+      // register unimplemented callback for all unused interrupt types
+      for (int type = 0; type < VFU_DEV_NUM_IRQS; type++) {
+        if (type == VFU_DEV_INTX_IRQ || type == VFU_DEV_MSIX_IRQ)
+          continue;
+        ret = vfu_setup_irq_state_callback(this->vfu_ctx, (enum vfu_dev_irq_type) type, VfioUserServer::irq_state_unimplemented_cb);
         if (ret)
           die("setting up irq type %d callback for libvfio-user failed", type);
       }
@@ -352,13 +357,18 @@ class VfioUserServer {
       vfu->callback_context->unmap_dma(&dma_unmap);
     }
 
-    static void intx_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
+    static void intx_state_cb(vfu_ctx_t *vfu_ctx, uint32_t start, uint32_t count, bool mask) {
       VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
       vfu->callback_context->mask_irqs(VFIO_PCI_INTX_IRQ_INDEX, start, count, mask);
     }
 
-    static void irq_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
-      die("irq_state_cb unimpl");
+    static void msix_state_cb(vfu_ctx_t *vfu_ctx, uint32_t start, uint32_t count, bool mask) {
+      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      vfu->callback_context->mask_irqs(VFIO_PCI_MSIX_IRQ_INDEX, start, count, mask);
+    }
+
+    static void irq_state_unimplemented_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
+      die("irq_state_unimplemented_cb unimplemented");
     }
 
     static ssize_t
