@@ -63,6 +63,12 @@ def applyDevice(devYaml: str) -> None:
     dpdk_devbind_bind(devYaml['pci'], devYaml['dpdk-driver'])
     print(f"Binding dpdk-driver: {devYaml['pci']} <- {devYaml['dpdk-driver']}")
 
+def checkDeviceAddrs(devYaml: str) -> None:
+    """
+    check semantic equality of pci address representations
+    """
+    assert devYaml['pci'] == f"0000:{devYaml['pci_full']}"
+
 def checkDeviceConfig(devYaml: str) -> None:
     """
     checks expected pci id and firmware version
