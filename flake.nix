@@ -190,8 +190,6 @@
         };
         format = "qcow";
       };
-
-      nixos-extkern-image = pkgs.callPackage ./nix/nixos-extkern-image.nix { inherit pkgs; inherit flakepkgs; };
     };
 
     devShells = let 
@@ -319,25 +317,6 @@
           ./nix/nixos-generators-qcow.nix
         ];
       };
-      nixos-extkern = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [ (import ./nix/nixos-config-extkern.nix {
-            inherit pkgs;
-            inherit (pkgs) lib;
-            inherit flakepkgs;
-            extkern = true;
-          })
-          ./nix/nixos-generators-qcow.nix
-        ];
-      };
-      # not bootable per se:
-      #guest = nixpkgs.lib.nixosSystem {
-      #  system = "x86_64-linux";
-      #  modules = [
-      #    ./nix/guest-config.nix
-      #  ];
-      #};
     };
-
   };
 }
