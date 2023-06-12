@@ -77,6 +77,8 @@
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
     selfpkgs = self.packages.${system};
+    make-disk-image = import (pkgs.path + "/nixos/lib/make-disk-image.nix");
+    eval-config-config = args: (import (pkgs.path + "/nixos/lib/eval-config.nix") args).config;
   in  {
     packages = {
       default = selfpkgs.moongen;
@@ -165,16 +167,22 @@
         };
         format = "qcow";
       };
-      nesting-host-extkern-image = nixos-generators.nixosGenerate {
-        inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
-        specialArgs = {
-          inherit flakepkgs;
-          extkern = true;
-          nested = false;
-          noiommu = false;
+      nesting-host-extkern-image = make-disk-image {
+        config = eval-config-config {
+          inherit (pkgs) system;
+          modules = [ ./nix/host-config.nix ];
+          specialArgs = {
+            inherit flakepkgs;
+            extkern = true;
+            nested = false;
+            noiommu = false;
+          };
         };
-        format = "qcow";
+        inherit (pkgs) lib;
+        inherit pkgs;
+        diskSize = 8 * 1024;
+        partitionTableType = "none";
+        format = "qcow2";
       };
       nesting-guest-image = nixos-generators.nixosGenerate {
         inherit pkgs;
