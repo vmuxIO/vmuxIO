@@ -28,4 +28,7 @@
   documentation.info.enable = false;
   programs.bash.enableCompletion = false;
   programs.command-not-found.enable = false;
+
+  console.enable = true;
+  systemd.services."serial-getty@ttyS0".enable = true;
 }
