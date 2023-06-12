@@ -246,9 +246,8 @@ lib.attrsets.recursiveUpdate ({
   boot.initrd.enable = false;
   boot.isContainer = true;
   boot.loader.initScript.enable = true;
-  systemd.services."serial-getty" = {
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig.ExecStart = "${pkgs.util-linux}/sbin/agetty  --login-program ${pkgs.shadow}/bin/login --autologin root hvc0 --keep-baud vt100";
-  };
-  systemd.services."serial-getty@hvc0".enable = false;
+
+  # fix qemu serial console
+  console.enable = true;
+  systemd.services."serial-getty@ttyS0".enable = true;
 })

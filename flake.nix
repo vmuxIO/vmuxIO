@@ -168,19 +168,9 @@
         format = "qcow";
       };
       nesting-host-extkern-image = make-disk-image {
-        config = eval-config-config {
-          inherit (pkgs) system;
-          modules = [ ./nix/host-config.nix ];
-          specialArgs = {
-            inherit flakepkgs;
-            extkern = true;
-            nested = false;
-            noiommu = false;
-          };
-        };
+        config = self.nixosConfigurations.host-extkern.config;
         inherit (pkgs) lib;
         inherit pkgs;
-        diskSize = 8 * 1024;
         partitionTableType = "none";
         format = "qcow2";
       };

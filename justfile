@@ -100,8 +100,8 @@ prepare-guest:
     #echo 0000:00:03.0 > /sys/bus/pci/drivers/vfio-pci/bind 
 
 # start vmux in a VM
-vmux-guest:
-    ./build/vmux -d 0000:00:03.0
+vmux-guest DEVICE="0000:00:03.0":
+    ./build/vmux -d {{DEVICE}}
 
 # start nested guest w/ viommu, w/ vmux (lib-vfio) device
 vm-libvfio-user-iommu-guest:
@@ -281,13 +281,13 @@ build:
 vm-overwrite:
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
-  # nesting-host-extkern VM
-  nix build -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
-  install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
   # nesting-host VM
   nix build -o {{proot}}/VMs/nesting-host-image-ro .#nesting-host-image # read only
   install -D -m644 {{proot}}/VMs/nesting-host-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-host-image.qcow2
   qemu-img resize {{proot}}/VMs/nesting-host-image.qcow2 +8g
+  # nesting-host-extkern VM
+  nix build -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
+  install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
   # nesting-guest VM
   nix build -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
   install -D -m644 {{proot}}/VMs/nesting-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image.qcow2
