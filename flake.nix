@@ -207,6 +207,8 @@
         };
         format = "qcow";
       };
+
+      nixos-extkern-image = pkgs.callPackage ./nix/nixos-extkern-image.nix { inherit pkgs; };
     };
 
     devShells = let 
@@ -305,6 +307,15 @@
       host-extkern = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ (import ./nix/host-config.nix {
+          inherit pkgs;
+          inherit (pkgs) lib;
+          inherit flakepkgs;
+          extkern = true;
+        }) ];
+      };
+      nixos-extkern = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ (import ./nix/nixos-config-extkern.nix {
           inherit pkgs;
           inherit (pkgs) lib;
           inherit flakepkgs;
