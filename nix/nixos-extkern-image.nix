@@ -9,7 +9,7 @@ import (pkgs.path + "/nixos/lib/make-disk-image.nix") {
       noiommu = false;
     };
     modules = [{
-      imports = [ ./nixos-config-extkern.nix ];
+      imports = [ ./host-config.nix ];
     }];
   }).config;
   inherit pkgs;
