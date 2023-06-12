@@ -208,7 +208,7 @@
         format = "qcow";
       };
 
-      nixos-extkern-image = pkgs.callPackage ./nix/nixos-extkern-image.nix { inherit pkgs; };
+      nixos-extkern-image = pkgs.callPackage ./nix/nixos-extkern-image.nix { inherit pkgs; inherit flakepkgs; };
     };
 
     devShells = let 
