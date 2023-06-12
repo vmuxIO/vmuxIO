@@ -156,16 +156,11 @@
       };
 
       # qemu/kernel (ioregionfd)
-      nesting-host-image = nixos-generators.nixosGenerate {
+      nesting-host-image = make-disk-image {
+        config = self.nixosConfigurations.host.config;
+        inherit (pkgs) lib;
         inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
-        specialArgs = {
-          inherit flakepkgs;
-          extkern = false;
-          nested = false;
-          noiommu = false;
-        };
-        format = "qcow";
+        format = "qcow2";
       };
       nesting-host-extkern-image = make-disk-image {
         config = self.nixosConfigurations.host-extkern.config;
@@ -174,27 +169,17 @@
         partitionTableType = "none";
         format = "qcow2";
       };
-      nesting-guest-image = nixos-generators.nixosGenerate {
+      nesting-guest-image = make-disk-image {
+        config = self.nixosConfigurations.guest.config;
+        inherit (pkgs) lib;
         inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
-        specialArgs = {
-          inherit flakepkgs;
-          extkern = false;
-          nested = true;
-          noiommu = false;
-        };
-        format = "qcow";
+        format = "qcow2";
       };
-      nesting-guest-image-noiommu = nixos-generators.nixosGenerate {
+      nesting-guest-image-noiommu = make-disk-image {
+        config = self.nixosConfigurations.guest-noiommu.config;
+        inherit (pkgs) lib;
         inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
-        specialArgs = {
-          inherit flakepkgs;
-          extkern = false;
-          nested = true;
-          noiommu = true;
-        };
-        format = "qcow";
+        format = "qcow2";
       };
       # used by autotest
       guest-image = nixos-generators.nixosGenerate {
@@ -311,14 +296,39 @@
           extkern = true;
         }) ];
       };
+      guest = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ (import ./nix/host-config.nix {
+            inherit pkgs;
+            inherit (pkgs) lib;
+            inherit flakepkgs;
+            guest = true;
+          }) 
+          ./nix/nixos-generators-qcow.nix
+        ];
+      };
+      guest-noiommu = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ (import ./nix/host-config.nix {
+            inherit pkgs;
+            inherit (pkgs) lib;
+            inherit flakepkgs;
+            guest = true;
+            noiommu = true;
+          }) 
+          ./nix/nixos-generators-qcow.nix
+        ];
+      };
       nixos-extkern = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [ (import ./nix/nixos-config-extkern.nix {
-          inherit pkgs;
-          inherit (pkgs) lib;
-          inherit flakepkgs;
-          extkern = true;
-        }) ];
+            inherit pkgs;
+            inherit (pkgs) lib;
+            inherit flakepkgs;
+            extkern = true;
+          })
+          ./nix/nixos-generators-qcow.nix
+        ];
       };
       # not bootable per se:
       #guest = nixpkgs.lib.nixosSystem {
