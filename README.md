@@ -185,7 +185,15 @@ make -C . M=drivers/block/null_blk
 
 read more at (Hacking on Kernel Modules in NixOS)[https://blog.thalheim.io/2022/12/17/hacking-on-kernel-modules-in-nixos/]
 
-To use manually built linux kernels in nixos guest configs, have a look at [ktest](https://github.com/YellowOnion/ktest/blob/73fadcff949236927133141fcba4bfd76df632e7/kernel_install.nix)
+## Debugging the kernel
+
+```bash
+just clone-linux
+just build-linux
+just vm-extkern
+# attach gdb to linux kernel of VM
+just gdb-vm-extkern
+````
 
 ## Qemu debug build
 

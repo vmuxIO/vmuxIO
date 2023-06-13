@@ -210,7 +210,7 @@ vm-libvfio-user-not-shared:
 # not working
 vm-extkern EXTRA_CMDLINE="":
     echo {{host_extkern_image}}
-    sudo qemu-system-x86_64 \
+    qemu-system-x86_64 -s \
         -cpu host \
         -enable-kvm \
         -m 500M \
@@ -219,10 +219,9 @@ vm-extkern EXTRA_CMDLINE="":
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -kernel {{linux_dir}}/arch/x86/boot/bzImage \
         -hda {{host_extkern_image}} \
-        -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
-        -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
-        -append "root=/dev/sda console=ttyS0 {{EXTRA_CMDLINE}}" \
+        -append "root=/dev/sda console=ttyS0 nokaslr {{EXTRA_CMDLINE}}" \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -nographic
@@ -231,6 +230,14 @@ vm-extkern EXTRA_CMDLINE="":
 # -kernel {{APP}} -nographic
 #-device virtio-net-pci,netdev=en0 \
 #-netdev bridge,id=en0,br=virbr0 \
+
+# attach gdb to linux in vm-extkern
+gdb-vm-extkern:
+  gdb \
+  -ex "add-auto-load-safe-path {{linux_dir}}" \
+  -ex "target remote :1234" \
+  -ex "file {{linux_dir}}/vmlinux"
+
 
 # test two unused links with iperf2 (brittle and not idempotent): just hardware_loopback_test enp129s0f0 enp129s0f1 10.0.0.1 10.0.0.2 "-P 8"
 # Remeber to set the used devices as unmanaged in `networkctl list`.
@@ -509,7 +516,7 @@ configure-linux: #clone-linux
        --disable NFS_FS \
        --disable ETHERNET \
        --disable NETFILTER \
-       --enable DEBUG \
+       --enable DEBUG_INFO \
        --enable GDB_SCRIPTS \
        --enable DEBUG_DRIVER \
        --enable KVM \
@@ -543,3 +550,6 @@ build-linux: configure-linux
   #{{kernel_shell}} "make -C {{linux_dir}} oldconfig"
   yes "" | {{kernel_shell}} "make -C {{linux_dir}} -j$(nproc)"
 
+# Linux kernel development shell
+build-linux-shell:
+  {{kernel_shell}} bash
