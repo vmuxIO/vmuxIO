@@ -1380,7 +1380,7 @@ class Host(Server):
                 )
         self.tmux_new(
             # TODO tmux session needs a guest specific name
-            'qemu',
+            f'qemu-{guest.hostname()}',
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
             qemu_bin_path +
             f' -machine {machine_type}' +
@@ -1426,7 +1426,7 @@ class Host(Server):
         """
         # TODO this should use guest information
         # TODO tmux session needs a guest specific name
-        self.tmux_kill('qemu')
+        self.tmux_kill(f'qemu-{guest.hostname()}')
 
     def start_vmux(self: 'Host') -> None:
         """
