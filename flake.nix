@@ -155,6 +155,12 @@
         '';
       };
 
+      # linux kernel build shells:
+      kernel-deps = pkgs.callPackage ./nix/kernel-deps.nix {};
+      kernel-deps-shell = (pkgs.callPackage ./nix/kernel-deps.nix {
+        runScript = "bash";
+      });
+
       # qemu/kernel (ioregionfd)
       nesting-host-image = make-disk-image {
         config = self.nixosConfigurations.host.config;

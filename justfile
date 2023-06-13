@@ -5,6 +5,11 @@ qemu_ssh_port := "2222"
 user := `whoami`
 vmuxSock := "/tmp/vmux-" + user + ".sock"
 #vmuxSock := "/tmp/vmux.sock"
+linux_dir := "/scratch/" + user + "/vmux-linux"
+linux_repo := "https://github.com/vmuxio/linux"
+linux_rev := "nixos-linux-5.15.89"
+nix_results := proot + "/kernel_shell"
+kernel_shell := "$(nix build --out-link " + nix_results + "/kernel-fhs --json " + justfile_directory() + "#kernel-deps | jq -r '.[] | .outputs | .out')/bin/linux-kernel-build"
 
 default:
   @just --choose
@@ -467,3 +472,74 @@ write PID ADDR VALUE:
   a = open("/proc/{{PID}}/mem", 'wb', 0)
   a.seek(0x{{ADDR}})
   a.write(int.to_bytes(8, 0x{{VALUE}}, byteorder="little"))
+
+# Git clone linux kernel
+clone-linux:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [[ ! -d {{linux_dir}} ]]; then
+    git clone {{linux_repo}} {{linux_dir}}
+  fi
+
+  set -x
+  commit="{{linux_rev}}"
+  if [[ $(git -C {{linux_dir}} rev-parse HEAD) != "$commit" ]]; then
+     git -C {{linux_dir}} fetch {{linux_repo}} $commit
+     git -C {{linux_dir}} checkout "$commit"
+     rm -f {{linux_dir}}/.config
+  fi
+
+
+# Configure linux kernel build
+configure-linux: #clone-linux
+  #!/usr/bin/env bash
+  set -xeuo pipefail
+  if [[ ! -f {{linux_dir}}/.config ]]; then
+    cd {{linux_dir}}
+    {{kernel_shell}} "make defconfig kvm_guest.config"
+    {{kernel_shell}} "scripts/config \
+       --disable DRM \
+       --disable USB \
+       --disable WIRELESS \
+       --disable WLAN \
+       --disable SOUND \
+       --disable SND \
+       --disable HID \
+       --disable INPUT \
+       --disable NFS_FS \
+       --disable ETHERNET \
+       --disable NETFILTER \
+       --enable DEBUG \
+       --enable GDB_SCRIPTS \
+       --enable DEBUG_DRIVER \
+       --enable KVM \
+       --enable KVM_INTEL \
+       --enable KVM_AMD \
+       --enable KVM_IOREGION \
+       --enable BPF_SYSCALL \
+       --enable CONFIG_MODVERSIONS \
+       --enable IKHEADERS \
+       --enable IKCONFIG_PROC \
+       --enable VIRTIO_MMIO \
+       --enable VIRTIO_MMIO_CMDLINE_DEVICES \
+       --enable PTDUMP_CORE \
+       --enable PTDUMP_DEBUGFS \
+       --enable OVERLAY_FS \
+       --enable SQUASHFS \
+       --enable SQUASHFS_XZ \
+       --enable SQUASHFS_FILE_DIRECT \
+       --enable PVH \
+       --disable SQUASHFS_FILE_CACHE \
+       --enable SQUASHFS_DECOMP_MULTI \
+       --disable SQUASHFS_DECOMP_SINGLE \
+       --disable SQUASHFS_DECOMP_MULTI_PERCPU"
+  fi
+
+# Build linux kernel
+build-linux: configure-linux
+  #!/usr/bin/env bash
+  set -xeu
+  cd {{linux_dir}}
+  #{{kernel_shell}} "make -C {{linux_dir}} oldconfig"
+  yes "" | {{kernel_shell}} "make -C {{linux_dir}} -j$(nproc)"
+
