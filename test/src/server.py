@@ -135,7 +135,7 @@ class Server(ABC):
         str
             The log name.
         """
-        return f'{self.__class__.__name__.lower()} {self.fqdn}'
+        return f'{self.__class__.__name__.lower()} {self.hostname()}'
 
     def is_reachable(self: 'Server') -> bool:
         """
