@@ -109,6 +109,20 @@ class Server(ABC):
         except Exception:
             warning(f'Could not run nixos detection on {self.fqdn}')
 
+    def hostname(self: 'Server') -> str:
+        """
+        Get the hostname of the server.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        str
+            The hostname of the server.
+        """
+        return self.fqdn.split('.')[0]
+
     def log_name(self: 'Server') -> str:
         """
         Get the log name.
