@@ -15,6 +15,7 @@ from os import (access, R_OK, W_OK)
 from os.path import isdir, isfile, join as path_join
 import readline
 from code import InteractiveConsole
+from jinja2 import Environment as JinjaEnv
 
 
 # project imports
@@ -468,6 +469,7 @@ def setup_logging(args: Namespace) -> None:
 def create_servers(conf: ConfigParser,
                    host: bool = True,
                    guest: bool = True,
+                   guests: tuple[int, int] = (0, 0),
                    loadgen: bool = True) -> dict[str, Server]:
     """
     Create the servers.
@@ -521,33 +523,52 @@ def create_servers(conf: ConfigParser,
             ssh_config=conf.get('host', 'ssh_config', fallback=None)
         )
     if guest:
-        fsdevs = {}
-        if conf['guest']['fsdevs']:
-            for fsdev in conf['guest']['fsdevs'].split(','):
-                if fsdev:
-                    name, path = fsdev.split(':')
-                    fsdevs[name] = path
-        servers['guest'] = Guest(
-            conf['guest']['fqdn'],
-            conf['guest']['vcpus'],
-            conf['guest']['memory'],
-            conf['guest']['admin_tap'],
-            conf['guest']['admin_iface_mac'],
-            conf['guest']['test_iface'],
-            conf['guest']['test_iface_addr'],
-            conf['guest']['test_iface_mac'],
-            conf['guest']['test_iface_driv'],
-            conf['guest']['test_iface_dpdk_driv'],
-            conf['guest']['test_tap'],
-            conf['guest']['test_macvtap'],
-            conf['guest']['root_disk_file'],
-            conf['guest']['tmux_socket'],
-            conf['guest']['moongen_dir'],
-            conf['guest']['moonprogs_dir'],
-            conf['guest']['xdp_reflector_dir'],
-            fsdevs,
-            ssh_config=conf.get('host', 'ssh_config', fallback=None)
-        )
+        jinja_env = JinjaEnv()
+        servers['guests'] = {}
+        for id in range(guests[0], guests[1]+1):
+            fsdevs = {}
+            if conf['guest']['fsdevs']:
+                for fsdev in conf['guest']['fsdevs'].split(','):
+                    if fsdev:
+                        name, path = fsdev.split(':')
+                        fsdevs[name] = path
+
+            fqdn_template = jinja_env.from_string(
+                conf['guest']['fqdn'])
+            admin_tap_template = jinja_env.from_string(
+                conf['guest']['admin_tap'])
+            admin_iface_mac_template = jinja_env.from_string(
+                conf['guest']['admin_iface_mac'])
+            test_tap_template = jinja_env.from_string(
+                conf['guest']['test_tap'])
+            test_macvtap_template = jinja_env.from_string(
+                conf['guest']['test_macvtap'])
+            test_iface_mac_template = jinja_env.from_string(
+                conf['guest']['test_iface_mac'])
+            root_disk_file_template = jinja_env.from_string(
+                conf['guest']['root_disk_file'])
+
+            servers['guests'][id] = Guest(
+                fqdn_template.render(id=id),
+                conf['guest']['vcpus'],
+                conf['guest']['memory'],
+                admin_tap_template.render(id=id),
+                admin_iface_mac_template.render(id=id),
+                conf['guest']['test_iface'],
+                conf['guest']['test_iface_addr'],
+                test_iface_mac_template.render(id=id),
+                conf['guest']['test_iface_driv'],
+                conf['guest']['test_iface_dpdk_driv'],
+                test_tap_template.render(id=id),
+                test_macvtap_template.render(id=id),
+                root_disk_file_template.render(id=id),
+                conf['guest']['tmux_socket'],
+                conf['guest']['moongen_dir'],
+                conf['guest']['moonprogs_dir'],
+                conf['guest']['xdp_reflector_dir'],
+                fsdevs,
+                ssh_config=conf.get('host', 'ssh_config', fallback=None)
+            )
     if loadgen:
         servers['loadgen'] = LoadGen(
             conf['loadgen']['fqdn'],
