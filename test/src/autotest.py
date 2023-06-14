@@ -654,7 +654,8 @@ def ping(args: Namespace, conf: ConfigParser) -> None:
     name: str
     server: Server
     # TODO here type annotation could be difficult
-    for name, server in create_servers(conf).items():
+    servers = create_servers(conf, guests=args.guests).items()
+    for name, server in servers:
         print(f'{name}: ' +
               f"{'reachable' if server.is_reachable() else 'unreachable'}")
 
