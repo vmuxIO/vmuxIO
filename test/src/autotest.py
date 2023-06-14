@@ -224,6 +224,11 @@ def setup_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter,
         help='''Ping all servers.'''
     )
+    ping_parser.add_argument('guests',
+                             nargs='?',
+                             type=number_ranges,
+                             help='''IDs of the guests to ping if any.''',
+                             )
     # TODO a status command would be cool. It should tell us, which nodes
     # are running and how the device status is maybe
     # TODO note this is just temporary, we will have more generic commands
@@ -389,7 +394,6 @@ def setup_parser() -> ArgumentParser:
         help='''Upload the MoonGen programs to the servers.'''
     )
 
-    __do_nothing(ping_parser)
     __do_nothing(kill_guest_parser)
     __do_nothing(teardown_network_parser)
 
