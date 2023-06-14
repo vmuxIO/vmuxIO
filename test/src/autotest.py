@@ -1245,6 +1245,7 @@ def main() -> None:
     args: Namespace = parse_args(parser)
     setup_logging(args)
     conf: ConfigParser = setup_and_parse_config(args)
+    debug(f'args: {args}')
 
     # execute the requested command
     execute_command(args, conf)
