@@ -129,6 +129,45 @@ def writable_dir(path: str) -> str:
     return path
 
 
+def number_ranges(ranges_str: str) -> list[int]:
+    numbers = []
+
+    for range_str in ranges_str.split(','):
+        if '-' not in range_str:
+            try:
+                number = int(range_str)
+            except ValueError:
+                raise ArgumentTypeError(f"'{ranges_str}' contains non-numbers")
+
+            if number in numbers:
+                raise ArgumentTypeError(f"'{ranges_str}' contains duplicates")
+
+            numbers.append(number)
+            continue
+
+        bound_strs = range_str.split('-')
+        if len(bound_strs) != 2:
+            raise ArgumentTypeError(f"'{ranges_str}' contains too many '-'s")
+
+        try:
+            start = int(bound_strs[0])
+            end = int(bound_strs[1])
+        except ValueError:
+            raise ArgumentTypeError(f"'{ranges_str}' contains non-numbers")
+
+        if start >= end:
+            raise ArgumentTypeError(f"'{ranges_str}' contains invalid ranges")
+
+        new_numbers = range(start, end+1)
+        for number in new_numbers:
+            if number in numbers:
+                raise ArgumentTypeError(f"'{ranges_str}' contains duplicates")
+
+        numbers.extend(new_numbers)
+
+    return sorted(numbers)
+
+
 def setup_parser() -> ArgumentParser:
     """
     Setup the argument parser.
