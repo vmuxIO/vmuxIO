@@ -157,7 +157,7 @@ class Server(ABC):
             return True
         else:
             try:
-                check_output(f'ping -c 1 -W 1 {self.fqdn}', shell=True)
+                check_output(f'ping -c 1 -W 1 {self.fqdn} 2>&1', shell=True)
             except CalledProcessError:
                 return False
             else:
