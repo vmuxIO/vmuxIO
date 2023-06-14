@@ -511,8 +511,7 @@ def setup_logging(args: Namespace) -> None:
 
 def create_servers(conf: ConfigParser,
                    host: bool = True,
-                   guest: bool = True,
-                   guests: tuple[int, int] = (0, 0),
+                   guests: list[int] = [],
                    loadgen: bool = True) -> dict[str, Server]:
     """
     Create the servers.
@@ -565,10 +564,22 @@ def create_servers(conf: ConfigParser,
             conf['host']['xdp_reflector_dir'],
             ssh_config=conf.get('host', 'ssh_config', fallback=None)
         )
-    if guest:
+    if loadgen:
+        servers['loadgen'] = LoadGen(
+            conf['loadgen']['fqdn'],
+            conf['loadgen']['test_iface'],
+            conf['loadgen']['test_iface_addr'],
+            conf['loadgen']['test_iface_mac'],
+            conf['loadgen']['test_iface_driv'],
+            conf['loadgen']['test_iface_dpdk_driv'],
+            conf['loadgen']['tmux_socket'],
+            conf['loadgen']['moongen_dir'],
+            conf['loadgen']['moonprogs_dir'],
+            ssh_config=conf.get('host', 'ssh_config', fallback=None)
+        )
+    if guests:
         jinja_env = JinjaEnv()
-        servers['guests'] = {}
-        for id in range(guests[0], guests[1]+1):
+        for id in guests:
             fsdevs = {}
             if conf['guest']['fsdevs']:
                 for fsdev in conf['guest']['fsdevs'].split(','):
@@ -591,7 +602,7 @@ def create_servers(conf: ConfigParser,
             root_disk_file_template = jinja_env.from_string(
                 conf['guest']['root_disk_file'])
 
-            servers['guests'][id] = Guest(
+            guest = Guest(
                 fqdn_template.render(id=id),
                 conf['guest']['vcpus'],
                 conf['guest']['memory'],
@@ -612,19 +623,7 @@ def create_servers(conf: ConfigParser,
                 fsdevs,
                 ssh_config=conf.get('host', 'ssh_config', fallback=None)
             )
-    if loadgen:
-        servers['loadgen'] = LoadGen(
-            conf['loadgen']['fqdn'],
-            conf['loadgen']['test_iface'],
-            conf['loadgen']['test_iface_addr'],
-            conf['loadgen']['test_iface_mac'],
-            conf['loadgen']['test_iface_driv'],
-            conf['loadgen']['test_iface_dpdk_driv'],
-            conf['loadgen']['tmux_socket'],
-            conf['loadgen']['moongen_dir'],
-            conf['loadgen']['moonprogs_dir'],
-            ssh_config=conf.get('host', 'ssh_config', fallback=None)
-        )
+            servers[guest.hostname()] = guest
     return servers
 
 
