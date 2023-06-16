@@ -276,7 +276,7 @@ hardware_loopback_test ETH1 ETH2 IP1 IP2 PERFARGS="" PREFIXSIZE="30":
   wait
   echo done
 
-prepare HOSTYAML:
+prepare HOSTYAML=`echo ./hosts/$(uname -n).yaml`:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 # prepare/configure this project for use
