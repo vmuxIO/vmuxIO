@@ -48,7 +48,7 @@ def dpdk_devbind_print():
 
 def dpdk_devbind_bind(dev_id: str, driver: str) -> None:
     dpdk_devbind_init()
-    dpdk_devbind.bind_all([dev_id], driver)
+    dpdk_devbind.bind_all([dev_id], driver, force=True)
 
 def modprobe(arg: str):
     subprocess.run(["modprobe", arg], check=True);
