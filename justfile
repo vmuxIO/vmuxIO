@@ -19,7 +19,7 @@ help:
   just --list
 
 vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci_full"' hosts/$(hostname).yaml`:
-  sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
+  ulimit -n 4096; sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
 # connect to `just qemu` vm
 ssh COMMAND="":
