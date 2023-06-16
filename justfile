@@ -293,23 +293,23 @@ build:
 
 vm-overwrite:
   mkdir -p {{proot}}/VMs
-  nix build -o {{proot}}/VMs/kernel nixpkgs#linux
+  nix build --fallback -o {{proot}}/VMs/kernel nixpkgs#linux
   # nesting-host VM
-  nix build -o {{proot}}/VMs/nesting-host-image-ro .#nesting-host-image # read only
+  nix build --fallback -o {{proot}}/VMs/nesting-host-image-ro .#nesting-host-image # read only
   install -D -m644 {{proot}}/VMs/nesting-host-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-host-image.qcow2
   qemu-img resize {{proot}}/VMs/nesting-host-image.qcow2 +8g
   # nesting-host-extkern VM
-  nix build -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
+  nix build --fallback -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
   install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
   # nesting-guest VM
-  nix build -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
+  nix build --fallback -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
   install -D -m644 {{proot}}/VMs/nesting-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image.qcow2
   qemu-img resize {{proot}}/VMs/nesting-guest-image.qcow2 +8g
-  nix build -o {{proot}}/VMs/nesting-guest-image-noiommu-ro .#nesting-guest-image-noiommu # read only
+  nix build --fallback -o {{proot}}/VMs/nesting-guest-image-noiommu-ro .#nesting-guest-image-noiommu # read only
   install -D -m644 {{proot}}/VMs/nesting-guest-image-noiommu-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image-noiommu.qcow2
   qemu-img resize {{proot}}/VMs/nesting-guest-image-noiommu.qcow2 +8g
   # guest VM (for autotest)
-  nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
+  nix build --fallback -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
   install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2
   qemu-img resize {{proot}}/VMs/guest-image.qcow2 +8g
 
