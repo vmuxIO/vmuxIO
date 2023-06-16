@@ -56,8 +56,9 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
 vm-libvfio-user:
     sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
+        -smp 4 \
         -enable-kvm \
-        -m 8G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=8G,share=on -numa node,memdev=bm \
+        -m 16G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
