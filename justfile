@@ -213,8 +213,9 @@ vm-extkern EXTRA_CMDLINE="":
     echo {{host_extkern_image}}
     qemu-system-x86_64 -s \
         -cpu host \
+        -smp 4 \
         -enable-kvm \
-        -m 500M \
+        -m 16G \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -540,7 +541,9 @@ configure-linux: #clone-linux
        --disable SQUASHFS_FILE_CACHE \
        --enable SQUASHFS_DECOMP_MULTI \
        --disable SQUASHFS_DECOMP_SINGLE \
-       --disable SQUASHFS_DECOMP_MULTI_PERCPU"
+       --disable SQUASHFS_DECOMP_MULTI_PERCPU \
+       --enable VFIO_PCI \
+       --enable VFIO"
   fi
 
 # Build linux kernel
