@@ -60,6 +60,8 @@ vm-libvfio-user:
         -cpu host \
         -enable-kvm \
         -m 8G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=8G,share=on -numa node,memdev=bm \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \

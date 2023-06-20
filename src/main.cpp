@@ -362,9 +362,10 @@ class VfioUserServer {
       vfu->callback_context->mask_irqs(VFIO_PCI_INTX_IRQ_INDEX, start, count, mask);
     }
 
-    static void msix_state_cb(vfu_ctx_t *vfu_ctx, uint32_t start, uint32_t count, bool mask) {
-      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
-      vfu->callback_context->mask_irqs(VFIO_PCI_MSIX_IRQ_INDEX, start, count, mask);
+    static void msix_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
+      // masking of MSIx interrupts is unimplemented in linux/vfio (see vfio_pci_intrs.c:666)
+      printf("ignoring msix state cb (mask %u)\n", mask);
+      // TODO track maskedness of interrupts and make vmux apply the mask
     }
 
     static void irq_state_unimplemented_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] uint32_t start, [[maybe_unused]] uint32_t count, [[maybe_unused]] bool mask) {
