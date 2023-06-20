@@ -42,6 +42,8 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -smp 4 \
         -enable-kvm \
         -m 16G \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -216,6 +218,8 @@ vm-extkern EXTRA_CMDLINE="":
         -smp 4 \
         -enable-kvm \
         -m 16G \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -223,7 +227,7 @@ vm-extkern EXTRA_CMDLINE="":
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
         -kernel {{linux_dir}}/arch/x86/boot/bzImage \
         -hda {{host_extkern_image}} \
-        -append "root=/dev/sda console=ttyS0 nokaslr {{EXTRA_CMDLINE}}" \
+        -append "root=/dev/sda console=ttyS0 nokaslr intel_iommu=on iommu=pt vfio_iommu_type1.allow_unsafe_interrupts=1 vfio_iommu_type1.dma_entry_limit=4294967295 {{EXTRA_CMDLINE}}" \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -nographic
@@ -283,7 +287,7 @@ prepare HOSTYAML=`echo ./hosts/$(uname -n).yaml`:
 # prepare/configure this project for use
 build:
   chmod 600 ./nix/ssh_key
-  meson build --wipe # this fails, if no build/ folder exists yet. Run `meson build` once in that case.
+  if [[ -d build ]]; then meson build --wipe; else meson build; fi
   meson compile -C build
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
@@ -302,6 +306,7 @@ vm-overwrite:
   # nesting-host-extkern VM
   nix build --fallback -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
   install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  qemu-img resize {{proot}}/VMs/nesting-host-extkern-image.qcow2 +8g
   # nesting-guest VM
   nix build --fallback -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
   install -D -m644 {{proot}}/VMs/nesting-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image.qcow2
@@ -542,8 +547,20 @@ configure-linux: #clone-linux
        --enable SQUASHFS_DECOMP_MULTI \
        --disable SQUASHFS_DECOMP_SINGLE \
        --disable SQUASHFS_DECOMP_MULTI_PERCPU \
+       --enable VFIO \
+       --enable VFIO_IOMMU_TYPE1 \
+       --enable VFIO_VIRQFD \
+       --enable VFIO_NOIOMMU \
+       --enable VFIO_PCI_CORE \
+       --enable VFIO_PCI_MMAP \
+       --enable VFIO_PCI_INTX \
        --enable VFIO_PCI \
-       --enable VFIO"
+       --enable VFIO_PCI_VGA \
+       --enable VFIO_PCI_IGD \
+       --enable VFIO_MDEV \
+       --enable IOMMU_DEBUGFS \
+       --enable INTEL_IOMMU_DEBUGFS \
+       "
   fi
 
 # Build linux kernel

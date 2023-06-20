@@ -193,7 +193,17 @@ just build-linux
 just vm-extkern
 # attach gdb to linux kernel of VM
 just gdb-vm-extkern
+# in VM: run `mount -a` to mount hosts nix store
 ````
+Using perf to find breakpointable/tracable lines:
+```bash
+sudo perf probe --vmlinux=./vmlinux --line schedule
+# use -v with --add to show which variables we can trace at a location
+sudo perf probe -v -n --vmlinux=./vmlinux --add "schedule:10 tsk"
+# you can also use uprobe (-x) instead of kprobes (--vmlinux):
+sudo perf probe -x ./build/vmux --add "_main:28 device" -n -v
+````
+
 
 ## Qemu debug build
 
