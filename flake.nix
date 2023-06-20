@@ -174,6 +174,7 @@
         inherit pkgs;
         partitionTableType = "none";
         format = "qcow2";
+        additionalSpace = "8G";
       };
       nesting-guest-image = make-disk-image {
         config = self.nixosConfigurations.guest.config;
