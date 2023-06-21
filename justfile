@@ -5,6 +5,11 @@ qemu_ssh_port := "2222"
 user := `whoami`
 vmuxSock := "/tmp/vmux-" + user + ".sock"
 #vmuxSock := "/tmp/vmux.sock"
+linux_dir := "/scratch/" + user + "/vmux-linux"
+linux_repo := "https://github.com/vmuxio/linux"
+linux_rev := "nixos-linux-5.15.89"
+nix_results := proot + "/kernel_shell"
+kernel_shell := "$(nix build --out-link " + nix_results + "/kernel-fhs --json " + justfile_directory() + "#kernel-deps | jq -r '.[] | .outputs | .out')/bin/linux-kernel-build"
 
 default:
   @just --choose
@@ -13,7 +18,7 @@ default:
 help:
   just --list
 
-vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
+vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci_full"' hosts/$(hostname).yaml`:
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
 # connect to `just qemu` vm
@@ -37,6 +42,8 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -smp 4 \
         -enable-kvm \
         -m 16G \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -53,6 +60,8 @@ vm-libvfio-user:
         -cpu host \
         -enable-kvm \
         -m 8G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=8G,share=on -numa node,memdev=bm \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -100,8 +109,8 @@ prepare-guest:
     #echo 0000:00:03.0 > /sys/bus/pci/drivers/vfio-pci/bind 
 
 # start vmux in a VM
-vmux-guest:
-    ./build/vmux -d 0000:00:03.0
+vmux-guest DEVICE="0000:00:03.0":
+    ./build/vmux -d {{DEVICE}}
 
 # start nested guest w/ viommu, w/ vmux (lib-vfio) device
 vm-libvfio-user-iommu-guest:
@@ -205,19 +214,20 @@ vm-libvfio-user-not-shared:
 # not working
 vm-extkern EXTRA_CMDLINE="":
     echo {{host_extkern_image}}
-    sudo qemu-system-x86_64 \
+    qemu-system-x86_64 -s \
         -cpu host \
         -enable-kvm \
         -m 500M \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
         -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
         -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -kernel {{linux_dir}}/arch/x86/boot/bzImage \
         -hda {{host_extkern_image}} \
-        -kernel /boot/EFI/nixos/3yzi7lf9lh56sx77zkjf3bwgd397zzxy-linux-5.15.77-bzImage.efi \
-        -initrd /boot/EFI/nixos/widwkz9smm89f290c0vxs97wnkr0jwpn-initrd-linux-5.15.77-initrd.efi \
-        -append "root=/dev/sda console=ttyS0 {{EXTRA_CMDLINE}}" \
+        -append "root=/dev/sda console=ttyS0 nokaslr intel_iommu=on iommu=pt vfio_iommu_type1.allow_unsafe_interrupts=1 vfio_iommu_type1.dma_entry_limit=4294967295 {{EXTRA_CMDLINE}}" \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -nographic
@@ -226,6 +236,14 @@ vm-extkern EXTRA_CMDLINE="":
 # -kernel {{APP}} -nographic
 #-device virtio-net-pci,netdev=en0 \
 #-netdev bridge,id=en0,br=virbr0 \
+
+# attach gdb to linux in vm-extkern
+gdb-vm-extkern:
+  gdb \
+  -ex "add-auto-load-safe-path {{linux_dir}}" \
+  -ex "target remote :1234" \
+  -ex "file {{linux_dir}}/vmlinux"
+
 
 # test two unused links with iperf2 (brittle and not idempotent): just hardware_loopback_test enp129s0f0 enp129s0f1 10.0.0.1 10.0.0.2 "-P 8"
 # Remeber to set the used devices as unmanaged in `networkctl list`.
@@ -269,7 +287,7 @@ prepare HOSTYAML:
 # prepare/configure this project for use
 build:
   chmod 600 ./nix/ssh_key
-  meson build --wipe # this fails, if no build/ folder exists yet. Run `meson build` once in that case.
+  if [[ -d build ]]; then meson build --wipe; else meson build; fi
   meson compile -C build
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
@@ -281,13 +299,14 @@ build:
 vm-overwrite:
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
-  # nesting-host-extkern VM
-  nix build -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
-  install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
   # nesting-host VM
   nix build -o {{proot}}/VMs/nesting-host-image-ro .#nesting-host-image # read only
   install -D -m644 {{proot}}/VMs/nesting-host-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-host-image.qcow2
   qemu-img resize {{proot}}/VMs/nesting-host-image.qcow2 +8g
+  # nesting-host-extkern VM
+  nix build -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
+  install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
+  qemu-img resize {{proot}}/VMs/nesting-host-extkern-image.qcow2 +8g
   # nesting-guest VM
   nix build -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
   install -D -m644 {{proot}}/VMs/nesting-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image.qcow2
@@ -467,3 +486,91 @@ write PID ADDR VALUE:
   a = open("/proc/{{PID}}/mem", 'wb', 0)
   a.seek(0x{{ADDR}})
   a.write(int.to_bytes(8, 0x{{VALUE}}, byteorder="little"))
+
+# Git clone linux kernel
+clone-linux:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [[ ! -d {{linux_dir}} ]]; then
+    git clone {{linux_repo}} {{linux_dir}}
+  fi
+
+  set -x
+  commit="{{linux_rev}}"
+  if [[ $(git -C {{linux_dir}} rev-parse HEAD) != "$commit" ]]; then
+     git -C {{linux_dir}} fetch {{linux_repo}} $commit
+     git -C {{linux_dir}} checkout "$commit"
+     rm -f {{linux_dir}}/.config
+  fi
+
+
+# Configure linux kernel build
+configure-linux: #clone-linux
+  #!/usr/bin/env bash
+  set -xeuo pipefail
+  if [[ ! -f {{linux_dir}}/.config ]]; then
+    cd {{linux_dir}}
+    {{kernel_shell}} "make defconfig kvm_guest.config"
+    {{kernel_shell}} "scripts/config \
+       --disable DRM \
+       --disable USB \
+       --disable WIRELESS \
+       --disable WLAN \
+       --disable SOUND \
+       --disable SND \
+       --disable HID \
+       --disable INPUT \
+       --disable NFS_FS \
+       --disable ETHERNET \
+       --disable NETFILTER \
+       --enable DEBUG_INFO \
+       --enable GDB_SCRIPTS \
+       --enable DEBUG_DRIVER \
+       --enable KVM \
+       --enable KVM_INTEL \
+       --enable KVM_AMD \
+       --enable KVM_IOREGION \
+       --enable BPF_SYSCALL \
+       --enable CONFIG_MODVERSIONS \
+       --enable IKHEADERS \
+       --enable IKCONFIG_PROC \
+       --enable VIRTIO_MMIO \
+       --enable VIRTIO_MMIO_CMDLINE_DEVICES \
+       --enable PTDUMP_CORE \
+       --enable PTDUMP_DEBUGFS \
+       --enable OVERLAY_FS \
+       --enable SQUASHFS \
+       --enable SQUASHFS_XZ \
+       --enable SQUASHFS_FILE_DIRECT \
+       --enable PVH \
+       --disable SQUASHFS_FILE_CACHE \
+       --enable SQUASHFS_DECOMP_MULTI \
+       --disable SQUASHFS_DECOMP_SINGLE \
+       --disable SQUASHFS_DECOMP_MULTI_PERCPU \
+       --enable VFIO \
+       --enable VFIO_IOMMU_TYPE1 \
+       --enable VFIO_VIRQFD \
+       --enable VFIO_NOIOMMU \
+       --enable VFIO_PCI_CORE \
+       --enable VFIO_PCI_MMAP \
+       --enable VFIO_PCI_INTX \
+       --enable VFIO_PCI \
+       --enable VFIO_PCI_VGA \
+       --enable VFIO_PCI_IGD \
+       --enable VFIO_MDEV \
+       --enable IOMMU_DEBUGFS \
+       --enable INTEL_IOMMU_DEBUGFS \
+       "
+  fi
+
+# Build linux kernel
+build-linux: configure-linux
+  #!/usr/bin/env bash
+  set -xeu
+  cd {{linux_dir}}
+  #{{kernel_shell}} "make -C {{linux_dir}} oldconfig"
+  yes "" | {{kernel_shell}} "make -C {{linux_dir}} -j$(nproc)"
+
+# Linux kernel development shell
+build-linux-shell:
+  {{kernel_shell}} bash

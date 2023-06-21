@@ -49,10 +49,12 @@ just prepare ./hosts/ryan.yaml
 ulimit -n 2048 # or set nixos systemd.extraConfig = ''DefaultLimitNOFILE=2048:524288''
 ```
 
-do a performance measurement with moongen-lachnit:
+do a performance measurement with moongen-lachnit and two or one PFs:
 
 ```shell
 sudo ./mgln/bin/MoonGen ./mgln/bin/examples/l2-load-latency.lua 0 1 --rate 100000
+sudo ./mgln/bin/MoonGen ./test/moonprogs/l2-load-latency.lua 0 00:00:00:00:00
+
 ```
 
 setup vm images, start VMs and connect
@@ -183,7 +185,25 @@ make -C . M=drivers/block/null_blk
 
 read more at (Hacking on Kernel Modules in NixOS)[https://blog.thalheim.io/2022/12/17/hacking-on-kernel-modules-in-nixos/]
 
-To use manually built linux kernels in nixos guest configs, have a look at [ktest](https://github.com/YellowOnion/ktest/blob/73fadcff949236927133141fcba4bfd76df632e7/kernel_install.nix)
+## Debugging the kernel
+
+```bash
+just clone-linux
+just build-linux
+just vm-extkern
+# attach gdb to linux kernel of VM
+just gdb-vm-extkern
+# in VM: run `mount -a` to mount hosts nix store
+````
+Using perf to find breakpointable/tracable lines:
+```bash
+sudo perf probe --vmlinux=./vmlinux --line schedule
+# use -v with --add to show which variables we can trace at a location
+sudo perf probe -v -n --vmlinux=./vmlinux --add "schedule:10 tsk"
+# you can also use uprobe (-x) instead of kprobes (--vmlinux):
+sudo perf probe -x ./build/vmux --add "_main:28 device" -n -v
+````
+
 
 ## Qemu debug build
 

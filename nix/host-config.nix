@@ -23,6 +23,7 @@ lib.attrsets.recursiveUpdate ({
 
   imports = [
     ./gpio.nix # enable gpio sysfs
+    ./desperately-fixing-overlayfs-for-extkern.nix
     ({ config, ...}: {
       boot.extraModulePackages = [ config.boot.kernelPackages.dpdk-kmods ];
       boot.kernelModules = lib.lists.optionals nested [ "igb_uio" ];
@@ -48,7 +49,7 @@ lib.attrsets.recursiveUpdate ({
   };
 
   # mount host nix store, but use overlay fs to make it writeable
-  fileSystems."/nix/.ro-store" = {
+  fileSystems."/nix/.ro-store-vmux" = {
     device = "myNixStore";
     fsType = "9p";
     options = [ "ro" "trans=virtio" "nofail" "msize=104857600" ];
@@ -58,12 +59,16 @@ lib.attrsets.recursiveUpdate ({
     device = "overlay";
     fsType = "overlay";
     options = [ 
-      "lowerdir=/nix/.ro-store"
+      "lowerdir=/nix/.ro-store-vmux"
       "upperdir=/nix/.rw-store/store"
       "workdir=/nix/.rw-store/work"
     ];
     neededForBoot = true;
-    depends = [ "/nix/.ro-store" ];
+    depends = [ 
+      "/nix/.ro-store-vmux" 
+      "/nix/.rw-store/store"
+      "/nix/.rw-store/work"
+    ];
   };
   boot.initrd.availableKernelModules = [ "overlay" ];
 
@@ -246,9 +251,9 @@ lib.attrsets.recursiveUpdate ({
   boot.initrd.enable = false;
   boot.isContainer = true;
   boot.loader.initScript.enable = true;
-  systemd.services."serial-getty" = {
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig.ExecStart = "${pkgs.util-linux}/sbin/agetty  --login-program ${pkgs.shadow}/bin/login --autologin root hvc0 --keep-baud vt100";
-  };
-  systemd.services."serial-getty@hvc0".enable = false;
+
+  # fix qemu serial console
+  console.enable = true;
+  systemd.services."serial-getty@ttyS0".enable = true;
+  #boot.growPartition = true; # doesnt seem to do anything
 })

@@ -49,6 +49,14 @@ def dpdk_devbind_print():
 def dpdk_devbind_bind(dev_id: str, driver: str) -> None:
     dpdk_devbind_init()
     dpdk_devbind.bind_all([dev_id], driver)
+    assert current_driver(dev_id) == driver # binding failed
+
+def current_driver(dev_id: str) -> str:
+    # write to /sys to unbind
+    device = Path(f"/sys/bus/pci/devices/0000:{dev_id}/driver")
+    driver = device.readlink()
+    current_driver = driver.name
+    return current_driver
 
 def modprobe(arg: str):
     subprocess.run(["modprobe", arg], check=True);
@@ -62,6 +70,12 @@ def applyDevice(devYaml: str) -> None:
     modprobe(devYaml['dpdk-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['dpdk-driver'])
     print(f"Binding dpdk-driver: {devYaml['pci']} <- {devYaml['dpdk-driver']}")
+
+def checkDeviceAddrs(devYaml: str) -> None:
+    """
+    check semantic equality of pci address representations
+    """
+    assert devYaml['pci'] == f"0000:{devYaml['pci_full']}"
 
 def checkDeviceConfig(devYaml: str) -> None:
     """

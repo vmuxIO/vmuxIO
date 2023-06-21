@@ -77,6 +77,8 @@
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
     selfpkgs = self.packages.${system};
+    make-disk-image = import (pkgs.path + "/nixos/lib/make-disk-image.nix");
+    eval-config-config = args: (import (pkgs.path + "/nixos/lib/eval-config.nix") args).config;
   in  {
     packages = {
       default = selfpkgs.moongen;
@@ -153,50 +155,38 @@
         '';
       };
 
+      # linux kernel build shells:
+      kernel-deps = pkgs.callPackage ./nix/kernel-deps.nix {};
+      kernel-deps-shell = (pkgs.callPackage ./nix/kernel-deps.nix {
+        runScript = "bash";
+      });
+
       # qemu/kernel (ioregionfd)
-      nesting-host-image = nixos-generators.nixosGenerate {
+      nesting-host-image = make-disk-image {
+        config = self.nixosConfigurations.host.config;
+        inherit (pkgs) lib;
         inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
-        specialArgs = {
-          inherit flakepkgs;
-          extkern = false;
-          nested = false;
-          noiommu = false;
-        };
-        format = "qcow";
+        format = "qcow2";
       };
-      nesting-host-extkern-image = nixos-generators.nixosGenerate {
+      nesting-host-extkern-image = make-disk-image {
+        config = self.nixosConfigurations.host-extkern.config;
+        inherit (pkgs) lib;
         inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
-        specialArgs = {
-          inherit flakepkgs;
-          extkern = true;
-          nested = false;
-          noiommu = false;
-        };
-        format = "qcow";
+        partitionTableType = "none";
+        format = "qcow2";
+        additionalSpace = "8G";
       };
-      nesting-guest-image = nixos-generators.nixosGenerate {
+      nesting-guest-image = make-disk-image {
+        config = self.nixosConfigurations.guest.config;
+        inherit (pkgs) lib;
         inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
-        specialArgs = {
-          inherit flakepkgs;
-          extkern = false;
-          nested = true;
-          noiommu = false;
-        };
-        format = "qcow";
+        format = "qcow2";
       };
-      nesting-guest-image-noiommu = nixos-generators.nixosGenerate {
+      nesting-guest-image-noiommu = make-disk-image {
+        config = self.nixosConfigurations.guest-noiommu.config;
+        inherit (pkgs) lib;
         inherit pkgs;
-        modules = [ ./nix/host-config.nix ];
-        specialArgs = {
-          inherit flakepkgs;
-          extkern = false;
-          nested = true;
-          noiommu = true;
-        };
-        format = "qcow";
+        format = "qcow2";
       };
       # used by autotest
       guest-image = nixos-generators.nixosGenerate {
@@ -311,14 +301,29 @@
           extkern = true;
         }) ];
       };
-      # not bootable per se:
-      #guest = nixpkgs.lib.nixosSystem {
-      #  system = "x86_64-linux";
-      #  modules = [
-      #    ./nix/guest-config.nix
-      #  ];
-      #};
+      guest = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ (import ./nix/host-config.nix {
+            inherit pkgs;
+            inherit (pkgs) lib;
+            inherit flakepkgs;
+            nested = true;
+          }) 
+          ./nix/nixos-generators-qcow.nix
+        ];
+      };
+      guest-noiommu = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [ (import ./nix/host-config.nix {
+            inherit pkgs;
+            inherit (pkgs) lib;
+            inherit flakepkgs;
+            nested = true;
+            noiommu = true;
+          }) 
+          ./nix/nixos-generators-qcow.nix
+        ];
+      };
     };
-
   };
 }
