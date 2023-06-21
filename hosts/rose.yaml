@@ -1,0 +1,15 @@
+iommu_on: true
+hugepages1G: 8
+devices:
+  - name: ethDut
+    pci: "41:00.0"
+    if: enp65s0
+    mac: b4:96:91:b3:8a:90
+    type: Intel E810-C 100G
+    pciid: 8086:1592
+    # known good versions:
+    firmware-versions: 
+      - "2.15 0x800049c3 1.2789.0"
+      - "2.30 0x80005d1e 1.2877.0"
+    dpdk-driver: vfio-pci
+    kernel-driver: ice
