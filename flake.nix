@@ -307,7 +307,7 @@
             inherit pkgs;
             inherit (pkgs) lib;
             inherit flakepkgs;
-            guest = true;
+            nested = true;
           }) 
           ./nix/nixos-generators-qcow.nix
         ];
@@ -318,7 +318,7 @@
             inherit pkgs;
             inherit (pkgs) lib;
             inherit flakepkgs;
-            guest = true;
+            nested = true;
             noiommu = true;
           }) 
           ./nix/nixos-generators-qcow.nix
