@@ -19,7 +19,7 @@
 #include <optional>
 #include <dirent.h>
 #include <set>
-
+#include <signal.h>
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
@@ -31,6 +31,7 @@ extern "C" {
 
 #include <signal.h>
 #include <atomic>
+
 
 // set true by signals, should be respected by runtime loops
 std::atomic<bool> quit(false); 
@@ -45,6 +46,10 @@ static void
 _log([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] int level, char const *msg)
 {
     fprintf(stderr, "server[%d]: %s\n", getpid(), msg);
+}
+
+void sigint_handler_while_waiting(int t){ 
+  exit(0); 
 }
 
 // keep as reference for now, how bar callback functions should work
@@ -547,7 +552,7 @@ int _main(int argc, char** argv) {
   vfu.vfu_ctx = vfu_create_ctx(
     VFU_TRANS_SOCK,
     vfu.sock.c_str(),
-    0,
+    LIBVFIO_USER_FLAG_ATTACH_NB,
     &vfu,
     VFU_DEV_TYPE_PCI
   );
@@ -664,11 +669,16 @@ int _main(int argc, char** argv) {
   }
 
   printf("Waiting for qemu to attach...\n");
-
-  ret = vfu_attach_ctx(vfu.vfu_ctx);
-  if (ret < 0) {
-      die("failed to attach device");
+  signal(SIGINT, sigint_handler_while_waiting);
+  while(1){
+    ret = vfu_attach_ctx(vfu.vfu_ctx);
+    if (ret < 0) {
+      usleep(10000);
+      continue;
+    }
+    break;
   }
+  signal(SIGINT, SIG_DFL);
 
   vfu.reset_run_ctx_poll_fd();
 
