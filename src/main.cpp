@@ -48,10 +48,6 @@ _log([[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] int level, char const
     fprintf(stderr, "server[%d]: %s\n", getpid(), msg);
 }
 
-void sigint_handler_while_waiting(int t){ 
-  exit(0); 
-}
-
 // keep as reference for now, how bar callback functions should work
 [[maybe_unused]] static ssize_t
 bar0_access(vfu_ctx_t *vfu_ctx, char * const buf, size_t count, __loff_t offset,
@@ -669,16 +665,19 @@ int _main(int argc, char** argv) {
   }
 
   printf("Waiting for qemu to attach...\n");
-  signal(SIGINT, sigint_handler_while_waiting);
   while(1){
     ret = vfu_attach_ctx(vfu.vfu_ctx);
     if (ret < 0) {
       usleep(10000);
+
+    if(quit.load()){
+      break;
+    }
       continue;
     }
+
     break;
   }
-  signal(SIGINT, SIG_DFL);
 
   vfu.reset_run_ctx_poll_fd();
 
@@ -687,7 +686,7 @@ int _main(int argc, char** argv) {
   // in our case this is msix (type 2) interrupts (0-1023)
   //ret = vfu_irq_trigger(vfu.vfu_ctx, 0xFFFFFFFF);
 
-  do {
+  while (!quit.load()) {
     ret = poll(vfu.pollfds.data(), vfu.pollfds.size(), 500);
     if (ret < 0) {
       die("failed to poll(2)");
@@ -738,7 +737,7 @@ int _main(int argc, char** argv) {
         die("vfu_run_ctx() failed (to realize device emulation)");
       }
     }
-  } while (!quit.load());
+  }
 
   // destruction is done by ~VfioUserServer
 
