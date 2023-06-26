@@ -29,7 +29,7 @@ extern "C" {
 }
 
 
-#include <signal.h>
+
 #include <atomic>
 
 
@@ -670,12 +670,11 @@ int _main(int argc, char** argv) {
     if (ret < 0) {
       usleep(10000);
 
-    if(quit.load()){
-      break;
-    }
+      if(quit.load()){
+        break;
+      }
       continue;
     }
-
     break;
   }
 
