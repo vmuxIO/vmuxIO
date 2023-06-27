@@ -692,25 +692,28 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
     -------
     >>> run_guest(args, conf)
     """
-    host: Host
-    guest: Guest
-    host, guest = create_servers(conf, loadgen=False).values()
+    servers = list(create_servers(conf, loadgen=False, guests=args.guests
+                                  ).values())
+    host: Host = servers[0]
+    guests: list[Guest] = servers[1:]
 
-    try:
-        _setup_network(host, guest, args.interface)
+    for guest in guests:
+        debug(f'Running guest {guest.hostname()}')
+        try:
+            _setup_network(host, guest, args.interface)
 
-        vcpus = args.cpus if args.cpus else None
-        memory = args.memory if args.memory else None
-        disk = args.disk if args.disk else None
-        qemu_path = args.qemu_path \
-            if args.qemu_path else conf['host']['qemu_path']
+            vcpus = args.cpus if args.cpus else None
+            memory = args.memory if args.memory else None
+            disk = args.disk if args.disk else None
+            qemu_path = args.qemu_path \
+                if args.qemu_path else conf['host']['qemu_path']
 
-        host.run_guest(guest, args.interface, args.machine, vcpus, memory,
-                       disk, args.debug, args.ioregionfd, qemu_path,
-                       args.vhost, args.rx_queue_size, args.tx_queue_size)
-    except Exception:
-        host.kill_guest(guest)
-        host.cleanup_network(guest)
+            host.run_guest(guest, args.interface, args.machine, vcpus, memory,
+                           disk, args.debug, args.ioregionfd, qemu_path,
+                           args.vhost, args.rx_queue_size, args.tx_queue_size)
+        except Exception:
+            host.kill_guest(guest)
+            host.cleanup_network(guest)
 
 
 def kill_guest(args: Namespace, conf: ConfigParser) -> None:
