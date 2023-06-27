@@ -1396,7 +1396,7 @@ class Host(Server):
             # ' -cdrom /home/networkadmin/images/guest_init.iso' +
             fsdev_config +
             ' -serial stdio' +
-            ' -monitor tcp:127.0.0.1:2345,server,nowait' +
+            # ' -monitor tcp:127.0.0.1:2345,server,nowait' +
             f' -netdev tap,vhost=on,id=admin0,ifname={guest.admin_tap},' +
             'script=no,downscript=no' +
             f' -device virtio-net-{dev_type},id=admif,netdev=admin0,' +
