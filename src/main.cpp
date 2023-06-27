@@ -19,7 +19,7 @@
 #include <optional>
 #include <dirent.h>
 #include <set>
-
+#include <signal.h>
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
@@ -29,8 +29,9 @@ extern "C" {
 }
 
 
-#include <signal.h>
+
 #include <atomic>
+
 
 // set true by signals, should be respected by runtime loops
 std::atomic<bool> quit(false); 
@@ -547,7 +548,7 @@ int _main(int argc, char** argv) {
   vfu.vfu_ctx = vfu_create_ctx(
     VFU_TRANS_SOCK,
     vfu.sock.c_str(),
-    0,
+    LIBVFIO_USER_FLAG_ATTACH_NB,
     &vfu,
     VFU_DEV_TYPE_PCI
   );
@@ -664,10 +665,17 @@ int _main(int argc, char** argv) {
   }
 
   printf("Waiting for qemu to attach...\n");
+  while(1){
+    ret = vfu_attach_ctx(vfu.vfu_ctx);
+    if (ret < 0) {
+      usleep(10000);
 
-  ret = vfu_attach_ctx(vfu.vfu_ctx);
-  if (ret < 0) {
-      die("failed to attach device");
+      if(quit.load()){
+        break;
+      }
+      continue;
+    }
+    break;
   }
 
   vfu.reset_run_ctx_poll_fd();
@@ -677,7 +685,7 @@ int _main(int argc, char** argv) {
   // in our case this is msix (type 2) interrupts (0-1023)
   //ret = vfu_irq_trigger(vfu.vfu_ctx, 0xFFFFFFFF);
 
-  do {
+  while (!quit.load()) {
     ret = poll(vfu.pollfds.data(), vfu.pollfds.size(), 500);
     if (ret < 0) {
       die("failed to poll(2)");
@@ -728,7 +736,7 @@ int _main(int argc, char** argv) {
         die("vfu_run_ctx() failed (to realize device emulation)");
       }
     }
-  } while (!quit.load());
+  }
 
   // destruction is done by ~VfioUserServer
 
