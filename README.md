@@ -26,6 +26,29 @@ We cannot:
 - do interrupts
 - ...
 
+## Usage
+
+Preconditions:
+
+- you have an intel E810 or e1000 NIC available in your system at say `0000:08:00.0`
+- `0000:08:00.0` is bound to `vfio-pci`
+- you are in a `nix shell github:vmuxio/vmuxio` to have the latest vmux available
+
+Run vmux:
+
+```bash
+sudo vmux -d 0000:08:00.0 -s /tmp/vmux.sock
+```
+
+Run a VM with qemu using the vmux device:
+
+```bash
+qemu-system-x86_64
+  -m 16G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+  -device vfio-user-pci,socket=/tmp/vmux.sock \
+  ...
+```
+
 ## Develop
 
 example for ryan.dse.in.tum.de:
