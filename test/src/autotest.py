@@ -313,6 +313,10 @@ def setup_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter,
         help='Kill the guest VM.'
     )
+    kill_guest_parser.add_argument('guests',
+                                   type=number_ranges,
+                                   help='''IDs of the guests to kill.''',
+                                   )
     setup_network_parser = subparsers.add_parser(
         'setup-network',
         formatter_class=ArgumentDefaultsHelpFormatter,
