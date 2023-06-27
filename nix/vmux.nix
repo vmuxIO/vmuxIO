@@ -1,21 +1,4 @@
-{ stdenv
-, fetchFromGitHub
-, fetchurl
-, writeShellApplication
-, linux
-, openssl
-, tbb
-, libbsd
-, numactl
-, luajit
-, hello
-, cmake
-, ninja
-, meson
-, bash
-, gcc8Stdenv
-, libpcap
-, python3Packages
+{ fetchFromGitHub
 , pkgs
 }:
 let 
@@ -92,10 +75,14 @@ pkgs.clangStdenv.mkDerivation {
     mkdir -p $out/bin
     cp build/vmux $out/bin/
 
-    mkdir -p $out/bin/subprojects/libvfio-user/lib
-    cp build/subprojects/libvfio-user/lib/libvfio-user.so $out/bin/subprojects/libvfio-user/lib/
-    cp build/subprojects/libvfio-user/lib/libvfio-user.so.0 $out/bin/subprojects/libvfio-user/lib/
-    cp build/subprojects/libvfio-user/lib/libvfio-user.so.0.0.1 $out/bin/subprojects/libvfio-user/lib/
+    mkdir -p $out/lib
+    cp build/subprojects/libvfio-user/lib/libvfio-user.so $out/lib
+    cp build/subprojects/libvfio-user/lib/libvfio-user.so.0 $out/lib
+    cp build/subprojects/libvfio-user/lib/libvfio-user.so.0.0.1 $out/lib
 
-  '';
+    patchelf --shrink-rpath --allowed-rpath-prefixes /nix/store $out/bin/vmux
+    patchelf --add-rpath $out/lib $out/bin/vmux
+    '';
+
+    dontFixup = true;
 }
