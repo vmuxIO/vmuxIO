@@ -238,6 +238,10 @@ def setup_parser() -> ArgumentParser:
         formatter_class=ArgumentDefaultsHelpFormatter,
         help='Run the guest VM.'
     )
+    run_guest_parser.add_argument('guests',
+                                  type=number_ranges,
+                                  help='''IDs of the guests to run.''',
+                                  )
     run_guest_parser.add_argument('-i',
                                   '--interface',
                                   type=str,
