@@ -740,12 +740,15 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
     -------
     >>> kill_guest(args, conf)
     """
-    host: Host
-    guest: Guest
-    host, guest = create_servers(conf, loadgen=False).values()
+    servers = list(create_servers(conf, loadgen=False, guests=args.guests
+                                  ).values())
+    host: Host = servers[0]
+    guests: list[Guest] = servers[1:]
 
-    host.kill_guest(guest)
-    host.cleanup_network(guest)
+    for guest in guests:
+        debug(f'Killing guest {guest.hostname()}')
+        host.kill_guest(guest)
+        host.cleanup_network(guest)
 
 
 def _setup_network(host: Host, guest: Guest, interface: str) -> None:
