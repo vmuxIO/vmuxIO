@@ -81,7 +81,9 @@
     eval-config-config = args: (import (pkgs.path + "/nixos/lib/eval-config.nix") args).config;
   in  {
     packages = {
-      default = selfpkgs.moongen;
+      default = selfpkgs.vmux;
+
+      vmux = pkgs.callPackage ./nix/vmux.nix {};
 
       # moongen/dpdk
       moongen = pkgs.callPackage ./nix/moongen.nix {
