@@ -21,6 +21,11 @@ VfioConsumer::VfioConsumer(std::string group_str, std::string device_name){
   this->device_name = device_name;
 }
 
+VfioConsumer::VfioConsumer(std::string device_name){
+  this->group_str = "/dev/vfio/" + get_iommu_group(device_name);
+  this->device_name = device_name;
+}
+
 
 VfioConsumer::~VfioConsumer() {
   printf("vfio consumer destructor called\n");

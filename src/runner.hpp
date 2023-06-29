@@ -7,7 +7,7 @@ class VmuxRunner{
 
     public: 
     VfioUserServer vfu;
-    VfioConsumer vfioc;
+    VfioConsumer& vfioc;
     std::thread runner;
     std::optional<Capabilities> caps;
     std::atomic_int state;
@@ -22,8 +22,8 @@ class VmuxRunner{
         CONNECTED = 3,
     };
 
-    VmuxRunner(std::string socket, std::string device):
-        vfu(socket),vfioc("","")
+    VmuxRunner(std::string socket, std::string device, VfioConsumer& vfioc):
+        vfu(socket),vfioc(vfioc)
     {
         state.store(0);
         this->device = device;

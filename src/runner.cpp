@@ -28,7 +28,8 @@ void VmuxRunner::run(){
         continue;
         }
         break;
-    }
+    }   
+    state.store(CONNECTED);
 
     struct pollfd pfd = (struct pollfd) {
         .fd = vfu_get_poll_fd(vfu.vfu_ctx),
@@ -65,10 +66,7 @@ void VmuxRunner::initilize(){
     running.store(1);
 
     group_arg = get_iommu_group(device);
-    if(group_arg == ""){
-        die("Failed to map PCI device %s to IOMMU-Group\n",device.c_str());
-        //stop_runner(-1,"Failed to map PCI device %s to IOMMU-Group\n",device.c_str() );
-    }
+
     //Get Hardware Information from Device
     pci_ids = get_hardware_ids(device,group_arg);
     if(pci_ids.size() != 5){
@@ -86,15 +84,6 @@ void VmuxRunner::initilize(){
             socket.c_str());
 
 
-    vfioc = VfioConsumer(group_arg,device);
-
-    if (vfioc.init() < 0) {
-        die("failed to initialize vfio consumer");
-    }
-    
-    if (vfioc.init_mmio() < 0) {
-        die("failed to initialize vfio mmio mappings");
-    }
     printf("%s", vfu.sock.c_str());
     vfu.vfu_ctx = vfu_create_ctx(
         VFU_TRANS_SOCK,
@@ -135,10 +124,8 @@ void VmuxRunner::initilize(){
     ret = vfu.add_irqs(vfioc.interrupts);
     if (ret < 0)
         die("failed to add irqs");
-    
-    vfioc.init_legacy_irqs();
+
     vfu.add_legacy_irq_pollfds(vfioc.irqfd_intx, vfioc.irqfd_msi, vfioc.irqfd_err, vfioc.irqfd_req);
-    vfioc.init_msix();
     vfu.add_msix_pollfds(vfioc.irqfds);
     
     if(vfioc.is_pcie){
