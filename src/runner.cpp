@@ -58,7 +58,7 @@ void VmuxRunner::run(){
 }
 
 void VmuxRunner::initilize(){
-        std::vector<int> pci_ids;
+    std::vector<int> pci_ids;
     std::string group_arg;
     int HARDWARE_REVISION;
 
@@ -92,7 +92,7 @@ void VmuxRunner::initilize(){
         &vfu,
         VFU_DEV_TYPE_PCI
     );
-    //exit(0);
+    
     if (vfu.vfu_ctx == NULL) {
         die("failed to initialize device emulation");
     }

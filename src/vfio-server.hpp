@@ -26,12 +26,21 @@
 #include "src/util.hpp"
 #include "src/caps.hpp"
 #include <thread>
-
+#include <sys/epoll.h>
 extern "C" {
   #include "libvfio-user.h"
 }
 
+#include "util.hpp"
 
+class VfioUserServer;
+
+struct interrupt_callback{
+  int fd;
+  void (*callback)(int, VfioUserServer*);
+  VfioUserServer* vfu;
+  int irq_subindex;
+};
 
 
 class VfioUserServer {
@@ -50,8 +59,16 @@ class VfioUserServer {
     std::set<void*> mapped;
     std::map<void*, dma_sg_t*> sgs;
 
-    VfioUserServer(std::string sock) {
+    int efd;
+
+    interrupt_callback ic[1028];
+    size_t ic_used;
+
+
+    VfioUserServer(std::string sock, int efd) {
       this->sock = sock;
+      this->efd = efd;
+      ic_used = 0;
     }
 
     ~VfioUserServer() {
@@ -113,15 +130,60 @@ class VfioUserServer {
       return 0;
     }
 
+    static void msix_callback(int fd, VfioUserServer* vfu){
+
+      //size_t irq_subindex = i - vfu.irq_msix_pollfd_idx;
+      int ret = vfu_irq_trigger(vfu->vfu_ctx, fd);
+      printf("Triggered interrupt. ret = %d, errno: %d\n", ret,errno);
+      if (ret < 0) {
+        die("Cannot trigger MSIX interrupt %d", fd);
+      }
+
+
+    }
+    static void msi_callback(int fd, VfioUserServer* vfu){
+      (void)vfu;
+      (void)fd;
+      printf("msi interrupt! unimplemented\n");
+    }
+
+    static void intx_callback(int fd, VfioUserServer* vfu){
+      (void)vfu;
+      (void)fd;
+      printf("intx interrupt! unimplemented\n");
+    }
+
+    static void err_callback(int fd, VfioUserServer* vfu){
+      (void)vfu;
+      (void)fd;
+      printf("err interrupt! unimplemented\n");
+    }
+
+    static void req_callback(int fd, VfioUserServer* vfu){
+      (void)vfu;
+      (void)fd;
+      printf("req interrupt! unimplemented\n");
+    }
+
+
+
+
     void add_msix_pollfds(std::vector<int> const eventfds) {
+
+      
       this->irq_msix_pollfd_idx = this->pollfds.size();
       this->irq_msix_pollfd_count = eventfds.size();
-      for (auto eventfd : eventfds) {
-        auto pfd = (struct pollfd) {
-            .fd = eventfd,
-            .events = POLLIN
-            };
-        this->pollfds.push_back(pfd);
+      
+      for(size_t i = 0; i < eventfds.size(); i++){
+        ic[ic_used].fd = eventfds[i];
+        ic[ic_used].callback = msix_callback;
+        ic[ic_used].vfu = this;
+        struct epoll_event e;
+        e.events = EPOLLIN;
+        e.data.ptr = &ic[ic_used++];
+        
+        epoll_ctl(efd,EPOLL_CTL_ADD, eventfds[i], &e);
+
       }
       if (!eventfds.empty())
         printf("registered fds %d-%d to poll for msix interrupts\n", 
@@ -129,23 +191,43 @@ class VfioUserServer {
     }
 
     void add_legacy_irq_pollfds(const int intx, const int msi, const int err, const int req) {
-      struct pollfd pfd; 
+        struct epoll_event e;
 
-      this->irq_intx_pollfd_idx = this->pollfds.size();
-      pfd = (struct pollfd) { .fd = intx, .events = POLLIN };
-      this->pollfds.push_back(pfd);
+        ic[ic_used].fd = intx;
+        ic[ic_used].callback = intx_callback;
+        ic[ic_used].vfu = this;
+        
+        e.events = EPOLLIN;
+        e.data.ptr = &ic[ic_used++];
+        
+        epoll_ctl(efd,EPOLL_CTL_ADD, intx, &e);
 
-      this->irq_msi_pollfd_idx = this->pollfds.size();
-      pfd = (struct pollfd) { .fd = msi, .events = POLLIN };
-      this->pollfds.push_back(pfd);
+        ic[ic_used].fd = msi;
+        ic[ic_used].callback = msi_callback;
+        ic[ic_used].vfu = this;
+        
+        e.events = EPOLLIN;
+        e.data.ptr = &ic[ic_used++];       
 
-      this->irq_err_pollfd_idx = this->pollfds.size();
-      pfd = (struct pollfd) { .fd = err, .events = POLLIN };
-      this->pollfds.push_back(pfd);
+        epoll_ctl(efd,EPOLL_CTL_ADD, msi, &e); 
 
-      this->irq_req_pollfd_idx = this->pollfds.size();
-      pfd = (struct pollfd) { .fd = req, .events = POLLIN };
-      this->pollfds.push_back(pfd);
+        ic[ic_used].fd = err;
+        ic[ic_used].callback = err_callback;
+        ic[ic_used].vfu = this;
+        
+        e.events = EPOLLIN;
+        e.data.ptr = &ic[ic_used++];       
+
+        epoll_ctl(efd,EPOLL_CTL_ADD, err, &e); 
+
+        ic[ic_used].fd = req;
+        ic[ic_used].callback = req_callback;
+        ic[ic_used].vfu = this;
+        
+        e.events = EPOLLIN;
+        e.data.ptr = &ic[ic_used++];       
+
+        epoll_ctl(efd,EPOLL_CTL_ADD, req, &e); 
 
       printf("register interrupt fds: intx %d, msi %d, err %d, req %d\n", intx, msi, err, req);
     }

@@ -14,6 +14,7 @@ class VmuxRunner{
     std::atomic_bool running;
     std::string device;
     std::string socket;
+    //void (*VmuxRunner::interrupt_handler)(void);
 
     enum State{
         NOT_STARTED = 0,
@@ -22,8 +23,8 @@ class VmuxRunner{
         CONNECTED = 3,
     };
 
-    VmuxRunner(std::string socket, std::string device, VfioConsumer& vfioc):
-        vfu(socket),vfioc(vfioc)
+    VmuxRunner(std::string socket, std::string device, VfioConsumer& vfioc, int efd):
+        vfu(socket,efd),vfioc(vfioc)
     {
         state.store(0);
         this->device = device;
