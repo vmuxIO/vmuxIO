@@ -1376,7 +1376,12 @@ class Host(Server):
             f' -machine {machine_type}' +
             ' -cpu host' +
             f' -smp {cpus}' +
+
+            # shared memory
             f' -m {mem}' +
+            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size={mem}M,share=on'
+            ' -numa node,memdev=bm' +
+
             ' -enable-kvm' +
             f' -drive id=root,format=qcow2,file={disk_path},'
             'if=none,cache=none' +
