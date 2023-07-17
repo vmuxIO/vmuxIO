@@ -1431,7 +1431,7 @@ class Host(Server):
         Returns
         -------
         """
-        self.tmux_new('vmux', f'ulimit -n 4096; sudo {self.vmux_path}')
+        self.tmux_new('vmux', f'ulimit -n 4096; sudo {self.vmux_path}  -d 0000:41:00.0 -s /tmp/vmux-okelmann.sock')
 
     def stop_vmux(self: 'Host') -> None:
         """
