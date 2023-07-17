@@ -1371,6 +1371,7 @@ class Host(Server):
         self.tmux_new(
             'qemu',
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
+            "sudo " +
             qemu_bin_path +
             f' -machine {machine_type}' +
             ' -cpu host' +
