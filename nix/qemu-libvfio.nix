@@ -1,6 +1,7 @@
-{ pkgs2211 }:
-with pkgs2211;
-qemu_full.overrideAttrs ( new: old: {
+{ pkgs, pkgs2211, nixpkgs }:
+# with pkgs2211;
+with pkgs;
+qemu_full.overrideAttrs ( new: old: rec {
   src = fetchFromGitHub {
     owner = "oracle";
     repo = "qemu";
@@ -54,9 +55,15 @@ qemu_full.overrideAttrs ( new: old: {
     "--disable-qed"
     "--disable-parallels"
   ] ++ [ "--enable-vfio-user-server"];
-  patches = old.patches ++ [
-    ./print.patch
-    ./0001-qemu-hva2gpa.patch
-    ./0001-qemu-dma_read.patch
-  ];
+  patchPath = "${nixpkgs.outPath}/pkgs/applications/virtualization/qemu";
+  patches = # old.patches ++ 
+    [
+      "${patchPath}/fix-qemu-ga.patch"
+      # we omit macos patches and one fetchpatch for nested virt
+    ] ++
+    lib.optionals (lib.versionOlder version "8.0.0") [
+      ./print.patch
+      ./0001-qemu-hva2gpa.patch
+      ./0001-qemu-dma_read.patch
+    ];
 })

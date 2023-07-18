@@ -126,8 +126,10 @@
 
       #patched qemu
       qemu = pkgs.callPackage ./nix/qemu-libvfio.nix { 
+        inherit pkgs;
         # needs a nixpkgs with qemu ~7.1.0 for patches to apply.
         inherit pkgs2211;
+        inherit nixpkgs;
       };
 
       qemu-ioregionfd = pkgs2211.qemu.overrideAttrs ( new: old: {
