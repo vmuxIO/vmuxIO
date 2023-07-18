@@ -193,23 +193,29 @@ class VfioUserServer {
     void add_legacy_irq_pollfds(const int intx, const int msi, const int err, const int req) {
         struct epoll_event e;
 
-        ic[ic_used].fd = intx;
-        ic[ic_used].callback = intx_callback;
-        ic[ic_used].vfu = this;
-        
-        e.events = EPOLLIN;
-        e.data.ptr = &ic[ic_used++];
-        
-        epoll_ctl(efd,EPOLL_CTL_ADD, intx, &e);
+        // intx may be 0 if unsupported by msix devices
+        if (intx != 0) {
+          ic[ic_used].fd = intx;
+          ic[ic_used].callback = intx_callback;
+          ic[ic_used].vfu = this;
+          
+          e.events = EPOLLIN;
+          e.data.ptr = &ic[ic_used++];
+          
+          epoll_ctl(efd,EPOLL_CTL_ADD, intx, &e);
+        }
 
-        ic[ic_used].fd = msi;
-        ic[ic_used].callback = msi_callback;
-        ic[ic_used].vfu = this;
-        
-        e.events = EPOLLIN;
-        e.data.ptr = &ic[ic_used++];       
+        // msi may be 0 if unsupported by msix devices
+        if (msi != 0) {
+          ic[ic_used].fd = msi;
+          ic[ic_used].callback = msi_callback;
+          ic[ic_used].vfu = this;
+          
+          e.events = EPOLLIN;
+          e.data.ptr = &ic[ic_used++];       
 
-        epoll_ctl(efd,EPOLL_CTL_ADD, msi, &e); 
+          epoll_ctl(efd,EPOLL_CTL_ADD, msi, &e); 
+        }
 
         ic[ic_used].fd = err;
         ic[ic_used].callback = err_callback;
