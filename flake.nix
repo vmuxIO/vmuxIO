@@ -246,6 +246,11 @@
         ] ++ common_deps;
         hardeningDisable = [ "all" ];
 
+        # prevent clangStdenv from overriding the fixed clang-tools binaries from nixos
+        shellHook = ''
+          PATH="${pkgs.clang-tools}/bin:$PATH"
+        '';
+
         # stub stuff to statisfy the build
         src = ./LICENSE; 
         dontUnpack = true;
