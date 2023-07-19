@@ -36,7 +36,7 @@ lib.attrsets.recursiveUpdate ({
   # networking.firewall.allowedTCPPorts = [22];
 
   users.users.root.password = "password";
-  services.openssh.settings.permitRootLogin = lib.mkDefault "yes";
+  services.openssh.settings.PermitRootLogin = lib.mkDefault "yes";
   users.users.root.openssh.authorizedKeys.keys = [
     (builtins.readFile ./ssh_key.pub)
   ];
