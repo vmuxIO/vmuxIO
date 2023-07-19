@@ -21,6 +21,11 @@ VfioConsumer::VfioConsumer(std::string group_str, std::string device_name){
   this->device_name = device_name;
 }
 
+VfioConsumer::VfioConsumer(std::string device_name){
+  this->group_str = "/dev/vfio/" + get_iommu_group(device_name);
+  this->device_name = device_name;
+}
+
 
 VfioConsumer::~VfioConsumer() {
   printf("vfio consumer destructor called\n");
@@ -252,7 +257,7 @@ void vfio_set_irqs(const int irq_type, const size_t count, std::vector<int> *irq
     }
     irqfds->push_back(fd);
   }
-
+  
   memcpy((int*)&irq_set->data, irqfds->data(), sizeof(int) * count);
   __builtin_dump_struct(irq_set, &printf);
   printf("irqfds %d-%d (#%zu)\n", irqfds->front(), irqfds->back(), irqfds->size());

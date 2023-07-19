@@ -34,6 +34,7 @@ class VfioConsumer {
 
     ~VfioConsumer();
     VfioConsumer(std::string group_str, std::string device_name);
+    VfioConsumer(std::string device_name);
     int init();
     int init_mmio();
     void init_msix();
