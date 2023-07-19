@@ -12,7 +12,46 @@ qemu_full.overrideAttrs ( new: old: rec {
   version = "8.0.50";
   buildInputs = [ libndctl ] ++ old.buildInputs;
   nativeBuildInputs = [ json_c cmocka ] ++ old.nativeBuildInputs;
-  configureFlags = old.configureFlags ++ [
+  configureFlags = # old.configureFlags ++ 
+  [ # old.configureFlags
+  "--disable-dependency-tracking"
+  "--prefix=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50"
+  "--bindir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/bin"
+  "--sbindir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/sbin"
+  "--includedir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/include"
+  "--oldincludedir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/include"
+  "--mandir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/share/man"
+  "--infodir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/share/info"
+  "--docdir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/share/doc/qemu"
+  "--libdir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/lib"
+  "--libexecdir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/libexec"
+  "--localedir=/nix/store/52x85sa3gcl481gxcbx27bgl22avimz4-qemu-8.0.50/share/locale"
+  "--disable-strip"
+  "--enable-docs"
+  "--enable-tools"
+  "--localstatedir=/var"
+  "--sysconfdir=/etc"
+  # "--meson=meson" # no worky
+  "--cross-prefix="
+  "--enable-guest-agent"
+  "--enable-numa"
+  "--enable-seccomp"
+  "--enable-smartcard"
+  "--enable-spice"
+  "--enable-usb-redir"
+  "--enable-linux-aio"
+  "--enable-gtk"
+  "--enable-rbd"
+  "--enable-glusterfs"
+  "--enable-opengl"
+  "--enable-virglrenderer"
+  "--enable-tpm"
+  "--enable-libiscsi"
+  "--smbd=/nix/store/jlawj526gvigij42b4qc5iq0wjdjrj5d-samba-4.17.7/bin/smbd"
+  "--enable-linux-io-uring"
+  "--enable-capstone"
+  ] ++
+  [
     "--enable-vfio-user-server"
     "--target-list=x86_64-softmmu"
     "--enable-debug"
@@ -40,7 +79,7 @@ qemu_full.overrideAttrs ( new: old: rec {
     "--disable-smartcard"
     "--disable-usb-redir"
     "--enable-virtfs"
-    "--disable-virtiofsd"
+    # "--disable-virtiofsd" # no worky
     "--disable-xen"
     "--disable-xen-pci-passthrough"
     "--disable-xkbcommon"
