@@ -1,3 +1,4 @@
+# remove this once PR xxx is merged
 /* Technical details
 
 `make-disk-image` has a bit of magic to minimize the amount of work to do in a virtual machine.
