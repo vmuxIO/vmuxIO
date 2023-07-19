@@ -83,7 +83,7 @@ int _main(int argc, char** argv) {
   std::string group_arg;
   //int HARDWARE_REVISION; // could be set by vfu_pci_set_class: vfu_ctx->pci.config_space->hdr.rid = 0x02;
   std::vector<int> pci_ids;
-  std::string socket = "/tmp/vmux.sock";
+  std::vector<std::string> sockets;
   while ((ch = getopt(argc,argv,"hd:s:")) != -1){
     switch(ch)
       {
@@ -91,7 +91,7 @@ int _main(int argc, char** argv) {
         devices.push_back(optarg);
         break;
       case 's':
-        socket = optarg;
+        sockets.push_back(optarg);
         break;
       case '?':
       case 'h':
@@ -102,6 +102,9 @@ int _main(int argc, char** argv) {
         break;
       }
   }
+
+  if (sockets.size() == 0)
+    sockets.push_back("/tmp/vmux.sock");
   
   for(size_t i = 0; i < devices.size(); i++){
     printf("Using: %s\n", devices[i].c_str());
@@ -123,7 +126,7 @@ int _main(int argc, char** argv) {
 
   for(size_t i = 0; i < devices.size(); i++){
     printf("Using: %s\n", devices[i].c_str());
-    runner.push_back(new VmuxRunner(std::string("/tmp/vmux_") + devices[i] + ".sock", devices[i], *vfioc[i], efd));
+    runner.push_back(new VmuxRunner(sockets[i], devices[i], *vfioc[i], efd));
     
     runner[i]->start();
      
