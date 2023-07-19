@@ -61,7 +61,9 @@ class VfioUserServer {
 
     int efd;
 
-    interrupt_callback ic[1028];
+    /// MSIX irqs + 1 intx + 1 msi + 1 err + 1 req
+    static const size_t IC_MAX = PCI_MSIX_MAX + 4;
+    interrupt_callback ic[IC_MAX];
     size_t ic_used;
 
 
@@ -194,52 +196,57 @@ class VfioUserServer {
       if (!eventfds.empty())
         printf("registered fds %d-%d to poll for msix interrupts\n", 
             eventfds.front(), eventfds.back());
+      if (ic_used >= IC_MAX)
+        die("Tried to allocate more interrupt callbacks than expected");
     }
 
     void add_legacy_irq_pollfds(const int intx, const int msi, const int err, const int req) {
-        struct epoll_event e;
+      struct epoll_event e;
 
-        // intx may be 0 if unsupported by msix devices
-        if (intx != 0) {
-          ic[ic_used].fd = intx;
-          ic[ic_used].callback = intx_callback;
-          ic[ic_used].vfu = this;
-          
-          e.events = EPOLLIN;
-          e.data.ptr = &ic[ic_used++];
-          
-          epoll_ctl(efd,EPOLL_CTL_ADD, intx, &e);
-        }
+      // intx may be 0 if unsupported by msix devices
+      if (intx != 0) {
+        ic[ic_used].fd = intx;
+        ic[ic_used].callback = intx_callback;
+        ic[ic_used].vfu = this;
+        
+        e.events = EPOLLIN;
+        e.data.ptr = &ic[ic_used++];
+        
+        epoll_ctl(efd,EPOLL_CTL_ADD, intx, &e);
+      }
 
-        // msi may be 0 if unsupported by msix devices
-        if (msi != 0) {
-          ic[ic_used].fd = msi;
-          ic[ic_used].callback = msi_callback;
-          ic[ic_used].vfu = this;
-          
-          e.events = EPOLLIN;
-          e.data.ptr = &ic[ic_used++];       
-
-          epoll_ctl(efd,EPOLL_CTL_ADD, msi, &e); 
-        }
-
-        ic[ic_used].fd = err;
-        ic[ic_used].callback = err_callback;
+      // msi may be 0 if unsupported by msix devices
+      if (msi != 0) {
+        ic[ic_used].fd = msi;
+        ic[ic_used].callback = msi_callback;
         ic[ic_used].vfu = this;
         
         e.events = EPOLLIN;
         e.data.ptr = &ic[ic_used++];       
 
-        epoll_ctl(efd,EPOLL_CTL_ADD, err, &e); 
+        epoll_ctl(efd,EPOLL_CTL_ADD, msi, &e); 
+      }
 
-        ic[ic_used].fd = req;
-        ic[ic_used].callback = req_callback;
-        ic[ic_used].vfu = this;
-        
-        e.events = EPOLLIN;
-        e.data.ptr = &ic[ic_used++];       
+      ic[ic_used].fd = err;
+      ic[ic_used].callback = err_callback;
+      ic[ic_used].vfu = this;
+      
+      e.events = EPOLLIN;
+      e.data.ptr = &ic[ic_used++];       
 
-        epoll_ctl(efd,EPOLL_CTL_ADD, req, &e); 
+      epoll_ctl(efd,EPOLL_CTL_ADD, err, &e); 
+
+      ic[ic_used].fd = req;
+      ic[ic_used].callback = req_callback;
+      ic[ic_used].vfu = this;
+      
+      e.events = EPOLLIN;
+      e.data.ptr = &ic[ic_used++];       
+
+      epoll_ctl(efd,EPOLL_CTL_ADD, req, &e); 
+
+      if (ic_used >= IC_MAX)
+        die("Tried to allocate more interrupt callbacks than expected");
 
       printf("register interrupt fds: intx %d, msi %d, err %d, req %d\n", intx, msi, err, req);
     }
