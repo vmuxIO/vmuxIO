@@ -77,8 +77,9 @@
       kernel = pkgs.linuxPackages_5_10.kernel;
     };
     selfpkgs = self.packages.${system};
-    make-disk-image = import (pkgs.path + "/nixos/lib/make-disk-image.nix");
-    eval-config-config = args: (import (pkgs.path + "/nixos/lib/eval-config.nix") args).config;
+    # make-disk-image = import (pkgs.path + "/nixos/lib/make-disk-image.nix");
+    make-disk-image = import (./nix/make-disk-image.nix);
+    # eval-config-config = args: (import (pkgs.path + "/nixos/lib/eval-config.nix") args).config;
   in  {
     packages = {
       default = selfpkgs.vmux;
