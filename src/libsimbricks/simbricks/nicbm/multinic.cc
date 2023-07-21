@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "lib/simbricks/nicbm/multinic.h"
+#include "src/libsimbricks/simbricks/nicbm/multinic.h"
 
 #include <string.h>
 

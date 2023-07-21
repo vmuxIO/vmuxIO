@@ -28,7 +28,7 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include <simbricks/base/proto.h>
+#include <src/libsimbricks/simbricks/base/proto.h>
 
 /******************************************************************************/
 /* Initialization messages on Unix socket */

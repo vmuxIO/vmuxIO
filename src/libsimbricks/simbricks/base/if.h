@@ -27,7 +27,7 @@
 
 #ifdef __cplusplus
 // FIXME
-#include <simbricks/base/cxxatomicfix.h>
+#include <src/libsimbricks/simbricks/base/cxxatomicfix.h>
 #else
 #include <stdatomic.h>
 #endif
@@ -36,7 +36,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <simbricks/base/proto.h>
+#include <src/libsimbricks/simbricks/base/proto.h>
 
 /** Handle for a SHM pool. Treat as opaque. */
 struct SimbricksBaseIfSHMPool {

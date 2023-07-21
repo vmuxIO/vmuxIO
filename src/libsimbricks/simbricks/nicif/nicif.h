@@ -28,8 +28,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <simbricks/network/if.h>
-#include <simbricks/pcie/if.h>
+#include <src/libsimbricks/simbricks/network/if.h>
+#include <src/libsimbricks/simbricks/pcie/if.h>
 
 struct SimbricksNicIf {
   struct SimbricksBaseIfSHMPool pool;

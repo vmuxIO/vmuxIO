@@ -28,9 +28,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <simbricks/base/generic.h>
-#include <simbricks/base/if.h>
-#include <simbricks/pcie/proto.h>
+#include <src/libsimbricks/simbricks/base/generic.h>
+#include <src/libsimbricks/simbricks/base/if.h>
+#include <src/libsimbricks/simbricks/pcie/proto.h>
 
 void SimbricksPcieIfDefaultParams(struct SimbricksBaseIfParams *params);
 

@@ -30,9 +30,9 @@
 #include <deque>
 #include <set>
 
-#include <simbricks/base/cxxatomicfix.h>
+#include <src/libsimbricks/simbricks/base/cxxatomicfix.h>
 extern "C" {
-#include <simbricks/nicif/nicif.h>
+#include <src/libsimbricks/simbricks/nicif/nicif.h>
 }
 
 namespace nicbm {

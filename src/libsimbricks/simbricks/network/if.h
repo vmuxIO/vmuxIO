@@ -28,8 +28,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <simbricks/base/generic.h>
-#include <simbricks/network/proto.h>
+#include <src/libsimbricks/simbricks/base/generic.h>
+#include <src/libsimbricks/simbricks/network/proto.h>
 
 struct SimbricksNetIf {
   struct SimbricksBaseIf base;

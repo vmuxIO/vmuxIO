@@ -24,7 +24,7 @@
 
 #define _GNU_SOURCE
 
-#include "lib/simbricks/base/if.h"
+#include "src/libsimbricks/simbricks/base/if.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -38,7 +38,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#include <simbricks/base/proto.h>
+#include <src/libsimbricks/simbricks/base/proto.h>
 
 enum ConnState {
   kConnClosed = 0,

@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "lib/simbricks/nicbm/nicbm.h"
+#include "src/libsimbricks/simbricks/nicbm/nicbm.h"
 
 #include <fcntl.h>
 #include <signal.h>
@@ -38,7 +38,7 @@
 #include <vector>
 
 extern "C" {
-#include <simbricks/base/proto.h>
+#include <src/libsimbricks/simbricks/base/proto.h>
 }
 
 // #define DEBUG_NICBM 1

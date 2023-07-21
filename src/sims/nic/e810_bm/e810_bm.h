@@ -30,9 +30,9 @@
 #include <sstream>
 #include <string>
 extern "C" {
-#include <simbricks/pcie/proto.h>
+#include <src/libsimbricks/simbricks/pcie/proto.h>
 }
-#include <simbricks/nicbm/nicbm.h>
+#include <src/libsimbricks/simbricks/nicbm/nicbm.h>
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 
 #define DEBUG_DEV

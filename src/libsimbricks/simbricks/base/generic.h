@@ -25,7 +25,7 @@
 #ifndef SIMBRICKS_BASE_GENERIC_H_
 #define SIMBRICKS_BASE_GENERIC_H_
 
-#include <simbricks/base/if.h>
+#include <src/libsimbricks/simbricks/base/if.h>
 
 /**
  * Generates static inline functions specialized for message types of a specific
