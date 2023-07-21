@@ -31,6 +31,7 @@ lib.attrsets.recursiveUpdate ({
   ];
 
   services.sshd.enable = true;
+  programs.direnv.enable = true;
 
   networking.firewall.enable = false;
   # networking.firewall.allowedTCPPorts = [22];
