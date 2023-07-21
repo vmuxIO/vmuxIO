@@ -9,7 +9,11 @@ typedef uint32_t u32;
 typedef uint64_t u64;
 typedef uint16_t __le16;
 typedef uint32_t __le32;
+
+#ifndef _LINUX_TYPES_H
 typedef uint64_t __le64;
+#endif /* _LINUX_TYPES_H */
+
 union ice_32byte_rx_desc {
 	struct {
 		__le64 pkt_addr; /* Packet buffer address */

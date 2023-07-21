@@ -15,7 +15,10 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint16_t __le16;
 typedef uint32_t __le32;
+
+#ifndef _LINUX_TYPES_H
 typedef uint64_t __le64;
+#endif /* _LINUX_TYPES_H */
 
 #define __AC(X,Y)	(X##Y)
 #define _AC(X,Y)	__AC(X,Y)
