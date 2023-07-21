@@ -72,10 +72,12 @@ class VfioUserServer {
       this->efd = efd;
       ic_used = 0;
       int ret  = std::remove(this->sock.c_str());
-      if (ret == ENOENT) {
-        // printf("Did not clean up old sockets because none are there.\n");
-      } else if (ret != 0) {
-        die("Failed to clean up existing socket %s\n", this->sock.c_str());
+      if (ret != 0) {
+        if (errno == ENOENT) {
+          // printf("Did not clean up old sockets because none are there.\n");
+        } else {
+          die("Failed to clean up existing socket %s\n", this->sock.c_str());
+        }
       }
     }
 
