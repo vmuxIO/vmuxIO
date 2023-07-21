@@ -42,7 +42,7 @@ lib.attrsets.recursiveUpdate ({
   ];
   services.getty.autologinUser = lib.mkDefault "root";
 
-  fileSystems."/mnt" = {
+  fileSystems."/root" = {
     device = "home";
     fsType = "9p";
     options = [ "trans=virtio" "nofail" "msize=104857600" ];
