@@ -1105,7 +1105,7 @@ class i40e_factory : public nicbm::MultiNicRunner::DeviceFactory {
     }
 };
 
-int main(int argc, char *argv[]) {
+int _i40e_main(int argc, char *argv[]) {
   i40e_factory fact;
   nicbm::MultiNicRunner mr(fact);
   return mr.RunMain(argc, argv);

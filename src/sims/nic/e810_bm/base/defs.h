@@ -34,6 +34,8 @@
 #define be64_to_cpu bswap_64
 #endif
 
+#define typeof(x) __typeof__(x)
+
 #define GENMASK(h, l) \
 	(((~UL(0)) - (UL(1) << (l)) + 1) & \
 	 (~UL(0) >> (BITS_PER_LONG - 1 - (h))))
