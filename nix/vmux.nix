@@ -55,6 +55,7 @@ pkgs.clangStdenv.mkDerivation {
     numactl
     luajit
     libpcap
+    boost
 
     json_c
     cmocka
