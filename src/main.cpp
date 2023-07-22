@@ -26,6 +26,10 @@
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
+#include <thread>
+#include <src/libsimbricks/simbricks/nicbm/nicbm.h>
+#include <src/sims/nic/e810_bm/e810_bm.h>
+
 #include "src/vfio-server.hpp"
 #include "src/util.hpp"
 #include "src/runner.hpp"
@@ -185,6 +189,13 @@ void signal_handler(int) {
 
 
 int main(int argc, char** argv) {
+    printf("foobar %zu\n", nicbm::kMaxDmaLen);
+    // i40e::i40e_bm* model = new i40e::i40e_bm();
+    auto model = new i40e::i40e_bm();
+    (void) model;
+
+    // model->SetupIntro(struct SimbricksProtoPcieDevIntro &di);
+
     // register signal handler to handle SIGINT gracefully to call destructors
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
