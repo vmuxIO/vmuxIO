@@ -219,14 +219,14 @@ void control_queue_pair::admin_desc_ctx::process() {
     temp = 0;
     u64 max_cnt = 0x00040000;
     temp = FIELD_PREP(IRDMA_QUERY_FPM_MAX_QPS, max_cnt);
-    temp = 1<<32 | temp; // GLHMC_PEQPOBJSZ
+    temp = ((u64)1)<<32 | temp; // GLHMC_PEQPOBJSZ
     set_64bit_val(return_buffer, 8, temp);
 
     // 8-15 bytes
     temp = 0;
     u64 cq_max_cnt = 0x00080000;
     temp = FIELD_PREP(IRDMA_QUERY_FPM_MAX_CQS, cq_max_cnt);
-    temp = 1<<32 | temp; 
+    temp = ((u64)1)<<32 | temp; 
     set_64bit_val(return_buffer, 16, temp);
 
     // 64 bytes

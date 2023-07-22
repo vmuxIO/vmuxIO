@@ -77,7 +77,7 @@ completion_event_queue::completion_event_queue(i40e_bm &dev_, uint64_t ceq_base,
                                uint32_t &reg_tail_)
     : queue_base("ceq", reg_head_, reg_tail_, dev_){
   desc_len = 64;
-  ceq_base = ceq_base;
+  // ceq_base = ceq_base; TODO this looks like some impl is missing here
   
 }
 

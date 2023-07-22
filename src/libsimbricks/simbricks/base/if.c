@@ -652,7 +652,7 @@ int SimbricksBaseIfIntroRecv(struct SimbricksBaseIf *base_if, void *payload,
       fprintf(stderr,
               "SimbricksBaseIfIntroRecv: getting shm fd failed (%zu) "
               "(%p != %zu)\n",
-              msg.msg_controllen, cmsg, CMSG_LEN(sizeof(int)));
+              msg.msg_controllen, (void*)cmsg, CMSG_LEN(sizeof(int)));
       return -1;
     }
     int shmfd = *(int *)CMSG_DATA(cmsg);

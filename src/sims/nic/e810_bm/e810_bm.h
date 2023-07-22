@@ -522,7 +522,7 @@ class completion_event_queue : public queue_base {
 
   virtual void tail_updated(u32 msix_idx, u32 itr_idx);
 
-  virtual void interrupt();
+  virtual void interrupt() override;
 
   // virtual void do_writeback(uint32_t first_idx, uint32_t first_pos,
                             // uint32_t cnt);

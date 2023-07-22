@@ -187,14 +187,14 @@ void queue_admin_tx::admin_desc_ctx::process() {
         reinterpret_cast<struct ice_aqc_list_caps *>(d->params.raw);
     // if functionatily number larger than 4, rdma is not supported.
     struct ice_aqc_list_caps_elem caps[] = {
-        {ICE_AQC_CAPS_VALID_FUNCTIONS, 1, 0, 2, 1, 0, {}},
-        {ICE_AQC_CAPS_RSS, 1, 0, 2048, 4, 0, {}},
-        {ICE_AQC_CAPS_RXQS, 1, 0, dev.NUM_QUEUES, 0, 0, {}},
-        {ICE_AQC_CAPS_TXQS, 1, 0, dev.NUM_QUEUES, 0, 0, {}},
-        {ICE_AQC_CAPS_MSIX, 1, 0, dev.NUM_PFINTS, 0, 0, {}},
-        {ICE_AQC_CAPS_VSI, 1, 0, dev.NUM_VSIS, 0, 0, {}},
-        {ICE_AQC_CAPS_DCB, 1, 0, 1, 4, 1, {}},
-        {ICE_AQC_CAPS_RDMA, 1, 0, 1, 1, 1, {}},
+        {ICE_AQC_CAPS_VALID_FUNCTIONS, 1, 0, 2, 1, 0, {}, {}},
+        {ICE_AQC_CAPS_RSS, 1, 0, 2048, 4, 0, {}, {}},
+        {ICE_AQC_CAPS_RXQS, 1, 0, dev.NUM_QUEUES, 0, 0, {}, {}},
+        {ICE_AQC_CAPS_TXQS, 1, 0, dev.NUM_QUEUES, 0, 0, {}, {}},
+        {ICE_AQC_CAPS_MSIX, 1, 0, dev.NUM_PFINTS, 0, 0, {}, {}},
+        {ICE_AQC_CAPS_VSI, 1, 0, dev.NUM_VSIS, 0, 0, {}, {}},
+        {ICE_AQC_CAPS_DCB, 1, 0, 1, 4, 1, {}, {}},
+        {ICE_AQC_CAPS_RDMA, 1, 0, 1, 1, 1, {}, {}},
     };
     size_t num_caps = sizeof(caps) / sizeof(caps[0]);
 

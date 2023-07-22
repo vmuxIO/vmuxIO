@@ -76,7 +76,7 @@ static void sigint_handler(int dummy) {
 
 static void sigusr1_handler(int dummy) {
   for (Runner *r : runners)
-    fprintf(stderr, "[%p] main_time = %lu\n", r, r->TimePs());
+    fprintf(stderr, "[%p] main_time = %lu\n", (void*)r, r->TimePs());
 }
 
 #ifdef STAT_NICBM
