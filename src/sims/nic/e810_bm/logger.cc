@@ -24,7 +24,7 @@
 
 #include <iostream>
 
-#include "sims/nic/e810_bm/e810_bm.h"
+#include "src/sims/nic/e810_bm/e810_bm.h"
 
 namespace i40e {
 

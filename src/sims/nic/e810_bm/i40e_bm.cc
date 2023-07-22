@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "sims/nic/e810_bm/e810_bm.h"
+#include "src/sims/nic/e810_bm/e810_bm.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -30,7 +30,7 @@
 #include <cassert>
 #include <iostream>
 
-#include "lib/simbricks/nicbm/multinic.h"
+#include "src/libsimbricks/simbricks/nicbm/multinic.h"
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 
 namespace i40e {
