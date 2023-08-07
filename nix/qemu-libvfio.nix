@@ -159,6 +159,7 @@ qemu_full.overrideAttrs ( new: old: rec {
     [
       "${patchPath}/fix-qemu-ga.patch"
       # we omit macos patches and one fetchpatch for nested virt
+      ./qemu8-libvfio-sock.patch
     ] ++
     lib.optionals (lib.versionOlder version "8.0.0") [
       ./print.patch
