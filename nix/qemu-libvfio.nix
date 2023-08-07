@@ -153,13 +153,13 @@ qemu_full.overrideAttrs ( new: old: rec {
     "--disable-vvfat"
     "--disable-qed"
     "--disable-parallels"
-  ] ++ [ "--enable-kvm" "--enable-vfio-user-server"];
+  ] ++ [ "--enable-kvm" "--enable-vfio-user-server" "--enable-multiprocess" ];
   patchPath = "${nixpkgs.outPath}/pkgs/applications/virtualization/qemu";
   patches = # old.patches ++ 
     [
       "${patchPath}/fix-qemu-ga.patch"
       # we omit macos patches and one fetchpatch for nested virt
-      ./qemu8-libvfio-sock.patch
+      # ./qemu8-libvfio-sock.patch
     ] ++
     lib.optionals (lib.versionOlder version "8.0.0") [
       ./print.patch
