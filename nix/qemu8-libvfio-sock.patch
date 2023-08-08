@@ -1,0 +1,15 @@
+diff --git a/hw/remote/proxy.c b/hw/remote/proxy.c
+index 2052d721e5..3080490808 100644
+--- a/hw/remote/proxy.c
++++ b/hw/remote/proxy.c
+@@ -87,7 +87,7 @@ static void pci_proxy_dev_realize(PCIDevice *device, Error **errp)
+         return;
+     }
+ 
+-    fd = monitor_fd_param(monitor_cur(), dev->fd, errp);
++    fd = socket(AF_UNIX, SOCK_STREAM, SOCK_CLOEXEC); int ret3 = connect(fd, "/tmp/vmux-okelmann.sock", 64);
++    fd = 3;
+-     if (fd == -1) {
++     if (fd == -1 || ret3 < 0) {
+         error_prepend(errp, "proxy: unable to parse fd %s, ret3 %d: ", dev->fd);
+         return;

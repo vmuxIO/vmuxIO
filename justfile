@@ -37,7 +37,7 @@ vm-update config:
   just ssh "cd /mnt && nixos-rebuild switch --flake .#{{config}}"
 
 vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | ."pci"' hosts/$(hostname).yaml`:
-    sudo qemu-system-x86_64 \
+    sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
         -smp 4 \
         -enable-kvm \
@@ -56,7 +56,16 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -nographic
 
 vm-libvfio-user:
-    sudo qemu/bin/qemu-system-x86_64 \
+    #!/usr/bin/env python3
+    print("henlo")
+    import socket
+    import os
+    sock = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
+    sock.connect("{{vmuxSock}}")
+    #sock, _ = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+    os.set_inheritable(sock.fileno(), True)
+    os.system(f"""
+    qemu/bin/qemu-system-x86_64 \
         -cpu host \
         -smp 8 \
         -enable-kvm \
@@ -71,9 +80,10 @@ vm-libvfio-user:
         -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
         -net nic,netdev=user.0,model=virtio \
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
-        -device vfio-user-pci,socket={{vmuxSock}} \
+        -device x-pci-proxy-dev,fd=3 \
         -s \
         -nographic
+    """)
 
 
 # Launch a VM to test libvfio-user in a VM
