@@ -14,7 +14,7 @@ qemu_full.overrideAttrs ( new: old: rec {
   libvfio-user-src = pkgs.fetchFromGitLab {
     owner = "qemu-project";
     repo = "libvfio-user";
-    rev = "0b28d205572c80b568a1003db2c8f37ca333e4d7";
+    rev = "0b28d205572c80b568a1003db2c8f37ca333e4d7"; # upstream master 09.06.2022
     hash = "sha256-V05nnJbz8Us28N7nXvQYbj66LO4WbVBm6EO+sCjhhG8=";
     fetchSubmodules = true;
   };

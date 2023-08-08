@@ -55,21 +55,15 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -device vfio-pci,host={{PASSTHROUGH}} \
         -nographic
 
-foo:
+vm-libvfio-user:
     #!/usr/bin/env python3
     print("henlo")
     import socket
     import os
-    # fd = open("/tmp/vmux-okelmann.sock")
     sock = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
-    print("henlo")
-    sock.connect("/tmp/vmux-okelmann.sock")
-    print("henlo")
+    sock.connect("{{vmuxSock}}")
     #sock, _ = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
     os.set_inheritable(sock.fileno(), True)
-    print("henlo")
-    breakpoint()
-    # os.system("sleep 9999")
     os.system(f"""
     qemu/bin/qemu-system-x86_64 \
         -cpu host \
@@ -89,28 +83,6 @@ foo:
         -s \
         -nographic
     """)
-    #-device x-pci-proxy-dev,fd={str(sock.fileno())} \
-    # '-device x-pci-proxy-dev,id=lsi1,fd='+str(sock.fileno())
-
-
-vm-libvfio-user FOO=`exec 3<> >(socat - UNIX-CONNECT:/tmp/vmux-okelmann.sock)`:
-    sudo qemu/bin/qemu-system-x86_64 \
-        -cpu host \
-        -enable-kvm \
-        -m 8G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=8G,share=on -numa node,memdev=bm \
-        -machine q35,accel=kvm,kernel-irqchip=split \
-        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
-        -device virtio-serial \
-        -fsdev local,id=myid,path={{proot}},security_model=none \
-        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
-        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
-        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
-        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
-        -net nic,netdev=user.0,model=virtio \
-        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
-        -device x-pci-proxy-dev,fd=3 \
-        -s \
-        -nographic
 
 
 # Launch a VM to test libvfio-user in a VM
