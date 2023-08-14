@@ -86,6 +86,7 @@ class Server(ABC):
     localhost: bool = False
     nixos: bool = False
     ssh_config: Optional[str] = None
+    ssh_as_root: bool = False
 
     def __post_init__(self: 'Server') -> None:
         """
@@ -198,7 +199,11 @@ class Server(ABC):
         if self.ssh_config is not None:
             options = f" -F {self.ssh_config}"
 
-        return check_output(f"ssh{options} {self.fqdn} '{command}'",
+        sudo = ""
+        if self.ssh_as_root == True:
+            sudo = "sudo "
+
+        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'",
                             stderr=STDOUT, shell=True).decode('utf-8')
 
     def exec(self: 'Server', command: str) -> str:
@@ -1035,7 +1040,8 @@ class Host(Server):
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
                  localhost: bool = False,
-                 ssh_config: Optional[str] = None) -> None:
+                 ssh_config: Optional[str] = None,
+                 ssh_as_root: bool = False) -> None:
         """
         Initialize the Host class.
 
@@ -1113,7 +1119,8 @@ class Host(Server):
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
                          test_iface_driv, test_iface_dpdk_driv,
                          tmux_socket, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir, localhost, ssh_config=ssh_config)
+                         xdp_reflector_dir, localhost, ssh_config=ssh_config, 
+                         ssh_as_root=ssh_as_root)
         self.admin_bridge = admin_bridge
         self.admin_bridge_ip_net = admin_bridge_ip_net
         self.admin_tap = admin_tap
@@ -1495,7 +1502,7 @@ class Guest(Server):
                  moonprogs_dir: str,
                  xdp_reflector_dir: str,
                  ssh_config: Optional[str] = None,
-                 ) -> None:
+                 ssh_as_root: bool = False) -> None:
         """
         Initialize the Guest class.
 
@@ -1543,7 +1550,8 @@ class Guest(Server):
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
                          test_iface_driv, test_iface_dpdk_driv,
                          tmux_socket, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir, ssh_config=ssh_config)
+                         xdp_reflector_dir, ssh_config=ssh_config,
+                         ssh_as_root=ssh_as_root)
 
     def __post_init__(self: 'Guest') -> None:
         """
@@ -1600,7 +1608,8 @@ class LoadGen(Server):
                  moonprogs_dir: str,
                  xdp_reflector_dir: Optional[str] = None,
                  localhost: bool = False,
-                 ssh_config: Optional[str] = None) -> None:
+                 ssh_config: Optional[str] = None,
+                 ssh_as_root: bool = False) -> None:
         """
         Initialize the LoadGen class.
 
@@ -1646,7 +1655,7 @@ class LoadGen(Server):
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
                          test_iface_driv, tmux_socket, moongen_dir,
                          moonprogs_dir, xdp_reflector_dir, localhost,
-                         ssh_config=ssh_config)
+                         ssh_config=ssh_config, ssh_as_root=ssh_as_root)
 
     def run_l2_load_latency(self: 'LoadGen',
                             mac: str,
