@@ -4,7 +4,7 @@ This is vmuxIO's subproject for automated testing (autotest).
 
 ## Overview
 
-- host: where you run `autotest`
+- host: the machine to run VMs. Is not necessarily where `autotest` is run.
 - guest: runs on the host
 - loadgen: anything
 

@@ -6,3 +6,15 @@ IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 
+Host rose.christina
+Hostname rose.dse.in.tum.de
+IdentityFile /root/.ssh/lawful_access
+
+Host vm.rose.christina
+ProxyJump rose.christina
+Hostname 192.168.56.20
+User root
+StrictHostKeyChecking=no
+IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
