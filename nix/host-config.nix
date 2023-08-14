@@ -1,12 +1,14 @@
-{ config, lib, pkgs, linux-firmware-pinned, 
+{ flakepkgs, lib, pkgs, 
 extkern ? false, # whether to use externally, manually built kernel
+nested ? false, # whether this is the config variant for the nested guest
+noiommu ? false, # whether to disable iommu via cmdline and kernel config
 ... }:
 lib.attrsets.recursiveUpdate ({
   #networking.useDHCP = false;
   #networking.interfaces.eth0.useDHCP = false;
   #networking.defaultGateway = "192.168.56.1";
   #networking.nameservers = [ "10.156.33.53" ];
-  #networking.hostName = "host";
+  networking.hostName = (if !nested then "host" else "guest");
   #networking.domain = "gierens.de";
   #networking.bridges = {
   #  "br0" = {
@@ -21,6 +23,11 @@ lib.attrsets.recursiveUpdate ({
 
   imports = [
     ./gpio.nix # enable gpio sysfs
+    ./desperately-fixing-overlayfs-for-extkern.nix
+    ({ config, ...}: {
+      boot.extraModulePackages = [ config.boot.kernelPackages.dpdk-kmods ];
+      boot.kernelModules = lib.lists.optionals nested [ "igb_uio" ];
+    })
   ];
 
   services.sshd.enable = true;
@@ -29,7 +36,7 @@ lib.attrsets.recursiveUpdate ({
   # networking.firewall.allowedTCPPorts = [22];
 
   users.users.root.password = "password";
-  services.openssh.settings.permitRootLogin = lib.mkDefault "yes";
+  services.openssh.settings.PermitRootLogin = lib.mkDefault "yes";
   users.users.root.openssh.authorizedKeys.keys = [
     (builtins.readFile ./ssh_key.pub)
   ];
@@ -42,7 +49,7 @@ lib.attrsets.recursiveUpdate ({
   };
 
   # mount host nix store, but use overlay fs to make it writeable
-  fileSystems."/nix/.ro-store" = {
+  fileSystems."/nix/.ro-store-vmux" = {
     device = "myNixStore";
     fsType = "9p";
     options = [ "ro" "trans=virtio" "nofail" "msize=104857600" ];
@@ -52,12 +59,16 @@ lib.attrsets.recursiveUpdate ({
     device = "overlay";
     fsType = "overlay";
     options = [ 
-      "lowerdir=/nix/.ro-store"
+      "lowerdir=/nix/.ro-store-vmux"
       "upperdir=/nix/.rw-store/store"
       "workdir=/nix/.rw-store/work"
     ];
     neededForBoot = true;
-    depends = [ "/nix/.ro-store" ];
+    depends = [ 
+      "/nix/.ro-store-vmux" 
+      "/nix/.rw-store/store"
+      "/nix/.rw-store/work"
+    ];
   };
   boot.initrd.availableKernelModules = [ "overlay" ];
 
@@ -71,7 +82,8 @@ lib.attrsets.recursiveUpdate ({
   system.activationScripts = {
     linkHome = {
       text = ''
-        ln -s /mnt /home/gierens
+        # dectivate, because it can fail if link exists:
+        #ln -s /mnt /home/gierens
       '';
       deps = [];
     };
@@ -109,6 +121,8 @@ lib.attrsets.recursiveUpdate ({
     iperf
     fio
     pciutils
+    just
+    python3
     ioport # access port io (pio) via inb and outw commands
     busybox # for devmem to access physical memory
     (writeScriptBin "devmem" ''
@@ -116,15 +130,18 @@ lib.attrsets.recursiveUpdate ({
     '')
     ethtool
     bpftrace
+    flakepkgs.devShellGcRoot
   ];
 
-  hardware.firmware = [ linux-firmware-pinned ];
+  hardware.firmware = [ flakepkgs.linux-firmware-pinned ];
 
   # this breaks make/insmod kmods though:
-  #boot.extraModprobeConfig = ''
-  #  blacklist ice
-  #  blacklist ixgbe
-  #'';
+  boot.extraModprobeConfig = ''
+    blacklist ice
+    blacklist ixgbe
+    blacklist e1000
+    blacklist e1000e
+  '';
   boot.kernelPatches = [
     {
       name = "enable-debug-symbols";
@@ -133,10 +150,33 @@ lib.attrsets.recursiveUpdate ({
         DEBUG_INFO y
       '';
     }
+    {
+      name = "enable-iommu-debugfs";
+      patch = null;
+      extraConfig = ''
+        IOMMU_DEBUGFS y
+        INTEL_IOMMU_DEBUGFS y
+      '';
+    }
+    {
+      name = "fix-bpf-tools";
+      patch = null;
+      extraConfig = ''
+        IKHEADERS y
+      '';
+    }
     #{
     #  name = "ixgbe-use-vmux-capability-offset-instead-of-hardware";
     #  patch = ./0001-ixgbe-vmux-capa.patch;
     #}
+  ] ++ lib.lists.optionals noiommu [
+    {
+      name = "enable-vfio-noiommu";
+      patch = null;
+      extraConfig = ''
+        VFIO_NOIOMMU y
+      '';
+    }
   ];
 
   #boot.kernelPackages = let
@@ -188,7 +228,20 @@ lib.attrsets.recursiveUpdate ({
   boot.kernelParams = [ 
     "nokaslr"
     "debug"
+  ] ++ lib.lists.optionals (!noiommu) [
+    "intel_iommu=on"
+    "iommu=pt"
+  ] ++ lib.lists.optionals (nested && noiommu) [
+    "intel_iommu=off"
+    "vfio.enable_unsafe_noiommu_mode=1"
+    "vfio-pci.ids=8086:100e"
+  ] ++ lib.lists.optionals (!nested) [
+    "default_hugepagesz=1G"
+    "hugepagez=1G"
+    "hugepages=8"
   ];
+
+  boot.kernelModules = lib.lists.optionals nested ["vfio" "vfio-pci"];
 
 })
 # merge the following with the previous. See recursiveUpdate above. 
@@ -198,9 +251,9 @@ lib.attrsets.recursiveUpdate ({
   boot.initrd.enable = false;
   boot.isContainer = true;
   boot.loader.initScript.enable = true;
-  systemd.services."serial-getty" = {
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig.ExecStart = "${pkgs.util-linux}/sbin/agetty  --login-program ${pkgs.shadow}/bin/login --autologin root hvc0 --keep-baud vt100";
-  };
-  systemd.services."serial-getty@hvc0".enable = false;
+
+  # fix qemu serial console
+  console.enable = true;
+  systemd.services."serial-getty@ttyS0".enable = true;
+  #boot.growPartition = true; # doesnt seem to do anything
 })

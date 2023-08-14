@@ -25,12 +25,16 @@ stdenv.mkDerivation rec {
   RTE_SDK = dpdk;
   GUI = lib.optionalString withGtk "true";
 
-  NIX_CFLAGS_COMPILE = "-msse3 -Wno-mismatched-dealloc"; # newer gcc produces this dealloc warning now
+  NIX_CFLAGS_COMPILE = "-msse3 -Wno-mismatched-dealloc -Wno-use-after-free"; # newer gccs produces some warnings
   # requires symbols from this file
   NIX_LDFLAGS = "-lrte_net_bond";
 
   postPatch = ''
     substituteInPlace lib/common/lscpu.h --replace /usr/bin/lscpu ${util-linux}/bin/lscpu
+    # suppress condition can never be met:
+    substituteInPlace app/pktgen-cmds.c --replace \
+      "if (info->latsamp_rate == 0 || info->latsamp_outfile == NULL ||" \
+      "if (info->latsamp_rate == 0 ||"
   '';
 
   postInstall = ''

@@ -21,6 +21,11 @@ VfioConsumer::VfioConsumer(std::string group_str, std::string device_name){
   this->device_name = device_name;
 }
 
+VfioConsumer::VfioConsumer(std::string device_name){
+  this->group_str = "/dev/vfio/" + get_iommu_group(device_name);
+  this->device_name = device_name;
+}
+
 
 VfioConsumer::~VfioConsumer() {
   printf("vfio consumer destructor called\n");
@@ -121,10 +126,10 @@ int VfioConsumer::init() {
   dma_map.iova = 0; /* 1MB starting at 0x0 from device view */
   dma_map.flags = VFIO_DMA_MAP_FLAG_READ | VFIO_DMA_MAP_FLAG_WRITE;
 
-  ret = ioctl(container, VFIO_IOMMU_MAP_DMA, &dma_map);
-  if (ret < 0) {
-    die("Cannot set dma map");
-  }
+  //ret = ioctl(container, VFIO_IOMMU_MAP_DMA, &dma_map);
+  //if (ret < 0) {
+    //die("Cannot set dma map");
+  //}
   this->dma_map = dma_map;
 
   /* Get a file descriptor for the device */
@@ -157,6 +162,13 @@ int VfioConsumer::init() {
 
   printf("\nDevice irsq: %d\n\n", device_info.num_irqs);
 
+  // Enable DMA
+  struct vfio_region_info* cs_info = &this->regions[VFIO_PCI_CONFIG_REGION_INDEX];
+  char buf[2];
+  pread(device, buf, 2, cs_info->offset + 4);
+  *(uint16_t*)(buf) |= 1 << 2;
+  pwrite(device, buf, 2, cs_info->offset + 4);
+
   for (i = 0; i < device_info.num_irqs; i++) {
           struct vfio_irq_info irq = { .argsz = sizeof(irq) };
 
@@ -172,12 +184,43 @@ int VfioConsumer::init() {
   /* Gratuitous device reset and go... */
   ioctl(device, VFIO_DEVICE_RESET);
 
+  //Get Header size to determine if the device is PCI or PCIe
+  std::string config_path = "/sys/bus/pci/devices/" + this->device_name + "/config";
+  FILE *fd = fopen(config_path.c_str(), "rb");
+  if (fd == NULL)
+    die("Cannot open %s", config_path.c_str());
+
+  
+  char* tmp[PCIE_HEADER_LENGTH];
+  size_t size = fread(tmp, sizeof(char), PCIE_HEADER_LENGTH, fd);
+  switch (size)
+  {
+  case 256:
+    printf("Device is PCI only\n");
+    this->is_pcie = false;
+    this->use_msix = false;
+    break;
+  case PCIE_HEADER_LENGTH:
+    printf("Device is PCIe\n");
+    this->is_pcie = true;
+    this->use_msix = true;
+    break;  
+  default:
+    die("only %zu bytes read", size);
+    break;
+  }
+  fclose(fd);
+
   return 0;
 }
 
 int VfioConsumer::init_mmio() {
   // Only iterate bars 0-5. Bar >=6 seems not mappable. 
-  for (int i = 0; i <= 5; i++) { 
+  int num_regions = 5;
+  if(!this->is_pcie){
+    num_regions = 0;
+  }
+  for (int i = 0; i <= num_regions; i++) { 
     auto region = this->regions[i];
     if (region.size == 0) {
       printf("Mapping region BAR %d skipped\n", region.index);
@@ -214,13 +257,14 @@ void vfio_set_irqs(const int irq_type, const size_t count, std::vector<int> *irq
     }
     irqfds->push_back(fd);
   }
-
+  
   memcpy((int*)&irq_set->data, irqfds->data(), sizeof(int) * count);
   __builtin_dump_struct(irq_set, &printf);
   printf("irqfds %d-%d (#%zu)\n", irqfds->front(), irqfds->back(), irqfds->size());
   ret = ioctl(device_fd, VFIO_DEVICE_SET_IRQS, irq_set);
   if (ret < 0) {
-    die("Cannot set eventfds for interrupts type %d for device %d", irq_type, device_fd);
+    //TODO: IRQs don't work properly on the e1000 yet
+    printf("Cannot set eventfds for interrupts type %d for device %d\n", irq_type, device_fd);
   }
 }
 
@@ -294,14 +338,23 @@ void VfioConsumer::mask_irqs(uint32_t irq_type, uint32_t start, uint32_t count, 
 void VfioConsumer::reset_device() {
   // TODO check if device supports reset VFIO_DEVICE_FLAGS_RESET
   int ret = ioctl(this->device, VFIO_DEVICE_RESET, NULL);
+  
   if (ret < 0)
-    die("failed to reset device");
+    printf("failed to reset device\n");
+    //TODO
 }
 
 void VfioConsumer::map_dma(vfio_iommu_type1_dma_map *dma_map) {
   int ret = ioctl(this->container, VFIO_IOMMU_MAP_DMA, dma_map);
-  if (ret < 0)
-    die("vfio failed to map dma");
+  if (ret < 0){
+    	printf("\033[31mvifo failed to map dma, %d: %s\033[0m\n",errno, strerror(errno));
+	printf("\033[31m");
+	__builtin_dump_struct(dma_map, &printf);
+	printf("\033[0m");
+	return;
+	die("vfio failed to map dma, %d",errno);
+	
+  }
 }
 
 void VfioConsumer::unmap_dma(vfio_iommu_type1_dma_unmap *dma_unmap) {

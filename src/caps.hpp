@@ -6,6 +6,7 @@ extern "C" {
 
 class Capabilities {
   public:
+    // Contains the pci config space of the passed-through device (underlying device). Does not contain any vfio-user context. Used to apply vfu functions to host config space.
     vfu_ctx_t *vfu_ctx_stub;
 
     ~Capabilities();
@@ -20,6 +21,7 @@ class Capabilities {
     void *vpd();
 
   private:
+    // copy of config space of underlying device
     void *header_mmap = NULL;
     size_t header_size;
 

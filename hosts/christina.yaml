@@ -3,6 +3,7 @@ hugepages1G: 8
 devices:
   - name: ethLoadgen
     pci: "18:00.0"
+    pci_full: "0000:18:00.0"
     if: enp24s0f0
     mac: b4:96:91:aa:a1:c0
     type: Intel E810-C 100G
@@ -15,6 +16,7 @@ devices:
     kernel-driver: ice
   - name: ethDut
     pci: "18:00.1"
+    pci_full: "0000:18:00.1"
     if: enp24s0f1
     mac: b4:96:91:aa:a1:c1
     type: Intel E810-C 100G
