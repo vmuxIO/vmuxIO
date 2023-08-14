@@ -58,8 +58,9 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
 vm-libvfio-user:
     sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
+        -smp 8 \
         -enable-kvm \
-        -m 8G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=8G,share=on -numa node,memdev=bm \
+        -m 16G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
         -machine q35,accel=kvm,kernel-irqchip=split \
         -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
         -device virtio-serial \
