@@ -1,4 +1,4 @@
-{ config, lib, pkgs, 
+{ config, lib, pkgs, linux-firmware-pinned, 
 extkern ? false, # whether to use externally, manually built kernel
 ... }:
 lib.attrsets.recursiveUpdate ({
@@ -117,6 +117,8 @@ lib.attrsets.recursiveUpdate ({
     ethtool
     bpftrace
   ];
+
+  hardware.firmware = [ linux-firmware-pinned ];
 
   # this breaks make/insmod kmods though:
   #boot.extraModprobeConfig = ''
