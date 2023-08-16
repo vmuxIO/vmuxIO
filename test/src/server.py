@@ -399,7 +399,15 @@ class Server(ABC):
         __copy_local : Copy a file from the server to the server over SSH.
         __scp_from : Copy a file from the server to the server over SSH.
         """
-        self.__exec_local(f'scp {source} {self.fqdn}:{destination}')
+        options = ""
+        if self.ssh_config is not None:
+            options = f" -F {self.ssh_config}"
+
+        sudo = ""
+        if self.ssh_as_root == True:
+            sudo = "sudo "
+
+        self.__exec_local(f'{sudo}scp{options} {source} {self.fqdn}:{destination}')
 
     def __scp_from(self: 'Server', source: str, destination: str) -> None:
         """
@@ -424,7 +432,15 @@ class Server(ABC):
         __copy_local : Copy a file from the server to the server over SSH.
         __scp_to : Copy a file from the server to the server over SSH.
         """
-        self.__exec_local(f'scp {self.fqdn}:{source} {destination}')
+        options = ""
+        if self.ssh_config is not None:
+            options = f" -F {self.ssh_config}"
+
+        sudo = ""
+        if self.ssh_as_root == True:
+            sudo = "sudo "
+
+        self.__exec_local(f'{sudo}scp{options} {self.fqdn}:{source} {destination}')
 
     def copy_to(self: 'Server', source: str, destination: str) -> None:
         """
