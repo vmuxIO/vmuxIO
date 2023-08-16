@@ -14,6 +14,10 @@ Host wilfred.christina
 Hostname wilfred.dse.in.tum.de
 IdentityFile /root/.ssh/lawful_access
 
+Host river.christina
+Hostname river.dse.in.tum.de
+IdentityFile /root/.ssh/lawful_access
+
 Host vm.rose.christina
 ProxyJump rose.christina
 Hostname 192.168.56.20
