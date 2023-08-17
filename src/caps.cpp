@@ -33,7 +33,7 @@ void Capabilities::map_header(std::string device) {
     die("malloc failed");
 
   size_t ret = fread(this->header_mmap, sizeof(char), this->header_size, fd);
-  if (ret != this->header_size)
+  if (ret != this->header_size && ret != 256)
     die("only %zu bytes read", ret);
 
   fclose(fd);
@@ -73,12 +73,13 @@ Capabilities::Capabilities(const vfio_region_info *config_info, std::string devi
   config_info_stub->size = config_info->size;
   config_info_stub->offset = config_info->offset;
 
-  if (config_info_stub->size != this->header_size)
+  if (config_info_stub->size != this->header_size && config_info_stub->size != 256)
     die("Inconsistent pci config space size found");
 }
 
-// allocates void pointer filled with cap_data
+// allocates void pointer filled with cap_data sourced from a physical device
 void *Capabilities::capa(const char name[], int id, size_t size, bool extended) {
+  //return NULL;
   size_t cap_offset = vfu_pci_find_next_capability(this->vfu_ctx_stub, extended, 0, id);
   if (!cap_offset)
     die("capability %s not found", name);

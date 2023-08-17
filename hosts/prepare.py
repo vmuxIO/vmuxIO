@@ -49,6 +49,14 @@ def dpdk_devbind_print():
 def dpdk_devbind_bind(dev_id: str, driver: str) -> None:
     dpdk_devbind_init()
     dpdk_devbind.bind_all([dev_id], driver)
+    assert current_driver(dev_id) == driver # binding failed
+
+def current_driver(dev_id: str) -> str:
+    # write to /sys to unbind
+    device = Path(f"/sys/bus/pci/devices/0000:{dev_id}/driver")
+    driver = device.readlink()
+    current_driver = driver.name
+    return current_driver
 
 def modprobe(arg: str):
     subprocess.run(["modprobe", arg], check=True);
@@ -61,6 +69,13 @@ def applyDevice(devYaml: str) -> None:
     """
     modprobe(devYaml['dpdk-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['dpdk-driver'])
+    print(f"Binding dpdk-driver: {devYaml['pci']} <- {devYaml['dpdk-driver']}")
+
+def checkDeviceAddrs(devYaml: str) -> None:
+    """
+    check semantic equality of pci address representations
+    """
+    assert devYaml['pci'] == f"0000:{devYaml['pci_full']}"
 
 def checkDeviceConfig(devYaml: str) -> None:
     """
@@ -69,7 +84,7 @@ def checkDeviceConfig(devYaml: str) -> None:
     modprobe(devYaml['kernel-driver'])
     dpdk_devbind_bind(devYaml['pci'], devYaml['kernel-driver'])
     info = subprocess.run(["ethtool", "-i", devYaml['if']], check=True, capture_output=True).stdout
-    print(f"ethtool: {info}")
+    # print(f"ethtool: {info}")
     info = info.split(b'\n')
     firmware_version = info[2].split(b'firmware-version: ')[1].decode('utf-8')
     assert firmware_version in devYaml['firmware-versions'], \
@@ -90,7 +105,9 @@ def apply(hostcfg: str, function: Callable[[str], None]) -> None:
         function(ethDut)
 
 def checkIommu(hostcfg: str) -> None:
-    iommu_on = os.path.isdir("/sys/devices/virtual/iommu")
+    intel_iommu_on = os.path.isdir("/sys/devices/virtual/iommu")
+    amd_iommu_on = os.path.isdir("/sys/devices/amd_iommu_0")
+    iommu_on = intel_iommu_on or amd_iommu_on
     assert iommu_on == hostcfg['iommu_on'], f"Iommu_is_on = {iommu_on} which is not what config requires"
 
 def checkHugepages(hostcfg: str) -> None:

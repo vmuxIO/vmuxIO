@@ -1,0 +1,129 @@
+diff --git a/hmp-commands.hx b/hmp-commands.hx
+index 8ab8000acd..60a6189a47 100644
+--- a/hmp-commands.hx
++++ b/hmp-commands.hx
+@@ -1791,6 +1791,19 @@ SRST
+   command.
+ ERST
+ 
++    {
++      .name       = "dma_read",
++      .args_type  = "device_name:s,iova:l",
++      .params     = "device_name iova",
++      .help       = "Make a NIC named device_name execute a DMA read on address iova.",
++      .cmd        = hmp_dma_read,
++    },
++
++SRST
++``hva2gpa`` *addr*
++Make a NIC named device_name execute a DMA read on address iova.
++ERST
++
+     {
+         .name       = "info",
+         .args_type  = "item:s?",
+@@ -1800,3 +1813,4 @@ ERST
+         .sub_table  = hmp_info_cmds,
+         .flags      = "p",
+     },
++
+diff --git a/include/monitor/hmp-target.h b/include/monitor/hmp-target.h
+index 1891a19b21..1e46188fb5 100644
+--- a/include/monitor/hmp-target.h
++++ b/include/monitor/hmp-target.h
+@@ -51,5 +51,6 @@ void hmp_info_local_apic(Monitor *mon, const QDict *qdict);
+ void hmp_info_sev(Monitor *mon, const QDict *qdict);
++void hmp_dma_read(Monitor *mon, const QDict *qdict);
+ void hmp_info_sgx(Monitor *mon, const QDict *qdict);
+ void hmp_info_via(Monitor *mon, const QDict *qdict);
+ 
+ #endif /* MONITOR_HMP_TARGET_H */
+diff --git a/monitor/misc.c b/monitor/misc.c
+index 6436a8786b..9f62babd08 100644
+--- a/monitor/misc.c
++++ b/monitor/misc.c
+@@ -684,6 +684,58 @@ void *gpa2hva(MemoryRegion **p_mr, hwaddr addr, uint64_t size, Error **errp)
+     return qemu_map_ram_ptr(mrs.mr->ram_block, mrs.offset_within_region);
+ }
+ 
++/*#include "hw/net/e1000.c"*/
++// include doesnt work so we just redefine the struct here
++struct E1000State_incomplete {
++    /*< private >*/
++    PCIDevice parent_obj;
++    /*< public >*/
++
++    NICState *nic;
++    NICConf conf;
++    void *more_stuff_here;
++};
++
++struct find_nic_args {
++  const char *nic_name; // name to search for
++  PCIDevice *nic; // result
++};
++
++void find_nic(NICState *nic, void *opaque);
++void find_nic(NICState *nic, void *opaque) {
++    struct find_nic_args *args = opaque;
++    /*printf("NIC %p\n", nic);*/
++    struct E1000State_incomplete *d = nic->opaque;
++    PCIDevice *e1000 = &(d->parent_obj);
++    /*printf("e1000 %p\n", e1000);*/
++    /*printf("name %s\n", e1000->name); // example: e1000*/
++    /*printf("name %s\n", e1000->qdev.id);*/ // is null
++    if (!strncmp(e1000->name, args->nic_name, 64)) { // if equal
++      /*printf("found\n");*/
++      args->nic = e1000;
++    }
++}
++
++void hmp_dma_read(Monitor *mon, const QDict *qdict)
++{
++    const char *device_name = qdict_get_str(qdict, "device_name");
++    hwaddr iova = qdict_get_int(qdict, "iova");
++    struct find_nic_args find = { .nic_name = device_name };
++
++    qemu_foreach_nic(find_nic, &find);
++    if (find.nic == NULL) {
++      monitor_printf(mon, "could not find NIC\n");
++      return;
++    }
++    uint64_t val = 0x0;
++    int ret = pci_dma_read(find.nic, iova, &val, sizeof(val)); // PCIDevice, iova, *buf, size
++    if (ret != 0) {
++      printf("ERROR: pci_dma_read error returned %u\n", ret);
++    } else {
++      monitor_printf(mon, "pci_dma_read iova %lx: %016lx\n", iova, val);
++    }
++}
++
+ static void hmp_gpa2hva(Monitor *mon, const QDict *qdict)
+ {
+     hwaddr addr = qdict_get_int(qdict, "addr");
+@@ -697,6 +749,25 @@ static void hmp_gpa2hva(Monitor *mon, const QDict *qdict)
+         return;
+     }
+ 
++    ///*PCIBus *root_bus = pci_device_root_bus(*/
++    ///*PCIDevice *e1000 = pci_find_device(*/
++    //PCIDevice *e1000 = NULL;
++    ///* int ret = */ pci_qdev_find_device("03:00.0", &e1000);
++    //monitor_printf(mon, "! %p\n", e1000);
++    //qemu_foreach_nic(fn, &e1000);
++    //if (e1000 == NULL) {
++    //  monitor_printf(mon, "could not find NIC\n");
++    //  return;
++    //}
++    //uint64_t val = 0xDEAD;
++    //uint64_t iova = 0x0;
++    //int ret = pci_dma_read(e1000, iova, &val, sizeof(val)); // PCIDevice, iova, *buf, size
++    //if (ret != 0) {
++    //  printf("ERROR 4: pci_dma_read error returned %u\n", ret);
++    //} else {
++    //  monitor_printf(mon, "pci_dma_read iova %lx: %lx\n", iova, val);
++    //}
++
+     monitor_printf(mon, "Host virtual address for 0x%" HWADDR_PRIx
+                    " (%s) is %p\n",
+                    addr, mr->name, ptr);
