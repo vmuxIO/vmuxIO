@@ -303,7 +303,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     };*/
     struct ice_aqc_get_sw_cfg_resp_elem els[] = {
         // VSI PF
-        {ICE_AQC_GET_SW_CONF_RESP_PHYS_PORT << ICE_AQC_GET_SW_CONF_RESP_TYPE_S || 1,
+        {ICE_AQC_GET_SW_CONF_RESP_PHYS_PORT << ICE_AQC_GET_SW_CONF_RESP_TYPE_S | 1, // this used to be ||, but IMHO only bitwise or makes sense here
          0,
          0},
     };
