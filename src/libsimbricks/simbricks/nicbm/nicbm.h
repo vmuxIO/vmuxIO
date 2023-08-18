@@ -31,6 +31,7 @@
 #include <set>
 
 #include <src/libsimbricks/simbricks/base/cxxatomicfix.h>
+#include <src/libsimbricks/simbricks/nicbm/nicemu.hpp>
 extern "C" {
 #include <src/libsimbricks/simbricks/nicif/nicif.h>
 }
@@ -68,6 +69,7 @@ class Runner {
   class Device {
    public:
     Runner *runner_;
+    Emulator *emulator_;
 
    protected:
     bool int_intx_en_;
