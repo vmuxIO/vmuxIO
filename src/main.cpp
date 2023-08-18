@@ -194,7 +194,9 @@ int main(int argc, char** argv) {
     auto model = new i40e::i40e_bm();
     (void) model;
 
-    // model->SetupIntro(struct SimbricksProtoPcieDevIntro &di);
+    SimbricksProtoPcieDevIntro di = SimbricksProtoPcieDevIntro();
+    __builtin_dump_struct(&di, &printf);
+    model->SetupIntro(di);
 
     // register signal handler to handle SIGINT gracefully to call destructors
     struct sigaction sa;
