@@ -31,7 +31,6 @@
 #include <set>
 
 #include <src/libsimbricks/simbricks/base/cxxatomicfix.h>
-#include <src/libsimbricks/simbricks/nicbm/nicemu.hpp>
 extern "C" {
 #include <src/libsimbricks/simbricks/nicif/nicif.h>
 }
@@ -66,6 +65,38 @@ class TimedEvent {
  * */
 class Runner {
  public:
+
+  class Device;
+
+  /**
+   * Replaces the Runner class. Adapts simbricks behavioral models to an libvfio-user-ish interface. 
+   **/
+  class Emulator {
+    protected:
+      Device *device_;
+
+    public:
+      Emulator(Device &dev);
+
+      // Functions to be called through libvfio-user by the VM
+      void RegRead(uint8_t bar, uint64_t addr, void *dest,
+                           size_t len) {
+        device_->RegRead(bar, addr, dest, len);
+      }
+      void RegWrite(uint8_t bar, uint64_t addr, const void *src,
+                            size_t len) {
+        device_->RegWrite(bar, addr, src, len);
+      }
+
+      // when calling this, the  device will do all pending DMAs
+      void DmaComplete(DMAOp &op);
+      // send a packet from the network fabric to the NIC device
+      void EthRx(uint8_t port, const void *data, size_t len);
+
+      // todo
+      // IssueDma, MsiXIssue, EthSend, EventSchedule, ...
+  };
+
   class Device {
    public:
     Runner *runner_;
