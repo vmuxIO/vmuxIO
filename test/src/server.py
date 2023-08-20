@@ -1386,7 +1386,7 @@ class Host(Server):
 
             # shared memory
             f' -m {mem}' +
-            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size={mem}M,share=on'
+            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory1,prealloc=yes,id=bm,size={mem}M,share=on'
             ' -numa node,memdev=bm' +
 
             ' -enable-kvm' +
