@@ -5,18 +5,31 @@ StrictHostKeyChecking=no
 IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
+StrictHostKeyChecking=no
 
 Host rose.christina
 Hostname rose.dse.in.tum.de
 IdentityFile /root/.ssh/lawful_access
+StrictHostKeyChecking=no
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
+StrictHostKeyChecking=no
 
 Host wilfred.christina
 Hostname wilfred.dse.in.tum.de
 IdentityFile /root/.ssh/lawful_access
+StrictHostKeyChecking=no
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
+StrictHostKeyChecking=no
 
 Host river.christina
 Hostname river.dse.in.tum.de
 IdentityFile /root/.ssh/lawful_access
+StrictHostKeyChecking=no
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
+LogLevel=ERROR
 
 Host vm.rose.christina
 ProxyJump rose.christina
@@ -26,3 +39,5 @@ StrictHostKeyChecking=no
 IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
+StrictHostKeyChecking=no
+LogLevel=ERROR
