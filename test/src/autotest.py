@@ -633,7 +633,10 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
         memory = args.memory if args.memory else None
         disk = args.disk if args.disk else None
         qemu_path = args.qemu_path \
-            if args.qemu_path else conf['host']['qemu_path']
+            if args.qemu_path \
+            else (conf['host']['vmux_qemu_path']
+                  if args.interface in ['vfio', 'vmux']
+                  else conf['host']['qemu_path'])
 
         host.run_guest(args.interface, args.machine, vcpus, memory, disk,
                        args.debug, args.ioregionfd, qemu_path, args.vhost,
@@ -685,6 +688,7 @@ def _setup_network(host: Host, interface: str) -> None:
         host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
     elif interface == 'vmux':
+        host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
         host.start_vmux()
 

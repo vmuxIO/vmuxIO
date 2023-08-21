@@ -1402,7 +1402,7 @@ class Host(Server):
 
             # shared memory
             f' -m {mem}' +
-            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size={mem}M,share=on'
+            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory1,prealloc=yes,id=bm,size={mem}M,share=on'
             ' -numa node,memdev=bm' +
 
             ' -enable-kvm' +
@@ -1454,7 +1454,12 @@ class Host(Server):
         Returns
         -------
         """
-        self.tmux_new('vmux', f'ulimit -n 4096; sudo {self.vmux_path}  -d 0000:41:00.0 -s /tmp/vmux-okelmann.sock')
+        self.tmux_new(
+            'vmux',
+            f'ulimit -n 4096; sudo {self.vmux_path}'
+            f' -d {self.test_iface_addr} -s {self.vmux_socket_path}'
+        )
+        self.exec(f'sudo chmod 777 {self.vmux_socket_path}')
 
     def stop_vmux(self: 'Host') -> None:
         """

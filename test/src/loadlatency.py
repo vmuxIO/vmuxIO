@@ -38,7 +38,8 @@ class Interface(Enum):
     # VFIO-passthrough to physical NIC for the VM
     VFIO = "vfio"
 
-    # TODO implement vmux interfaces
+    # VMux-passthrough to physical NIC for the VM
+    VMUX = "vmux"
 
 
 class Reflector(Enum):
@@ -265,14 +266,16 @@ class LoadLatencyTestGenerator(object):
             host.setup_admin_bridge()
             host.setup_admin_tap()
             host.modprobe_test_iface_drivers()
-        if interface == Interface.BRIDGE:
+        if interface == Interface.PNIC:
+            host.delete_nic_ip_addresses(host.test_iface)
+        elif interface == Interface.BRIDGE:
             if machine == Machine.HOST:
                 host.setup_test_bridge()
             else:
                 host.setup_test_br_tap()
         elif interface == Interface.MACVTAP:
             host.setup_test_macvtap()
-        elif interface == Interface.VFIO:
+        elif interface in [Interface.VFIO, Interface.VMUX]:
             host.delete_nic_ip_addresses(host.test_iface)
             host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
 
@@ -290,7 +293,7 @@ class LoadLatencyTestGenerator(object):
                        interface: Interface, iface: str = None):
         if reflector == Reflector.MOONGEN:
             server.stop_moongen_reflector()
-            if interface == Interface.VFIO:
+            if interface in [Interface.VFIO, Interface.VMUX]:
                 server.unbind_device(server.test_iface_addr)
                 # TODO: The hardcoded driver is a dirty workaround,
                 #       we need to fix this later on
@@ -310,6 +313,8 @@ class LoadLatencyTestGenerator(object):
             net_type = 'macvtap'
         elif interface == Interface.VFIO:
             net_type = 'vfio'
+        elif interface == Interface.VMUX:
+            net_type = 'vmux'
         host.run_guest(
             net_type=net_type,
             machine_type='pc' if machine == Machine.PCVM else 'microvm',
@@ -352,7 +357,8 @@ class LoadLatencyTestGenerator(object):
     def create_test_tree(self, host: Host):
         tree = {}
         count = 0
-        interface_test_count = len(self.rates) * len(self.runtimes)
+        interface_test_count = \
+            len(self.rates) * len(self.sizes) * len(self.runtimes)
         # host part
         mac = host.test_iface_mac
         if Machine.HOST in self.machines:
@@ -385,22 +391,24 @@ class LoadLatencyTestGenerator(object):
         for m in self.machines - {Machine.HOST}:
             tree[m] = {}
             for i in self.interfaces - {Interface.PNIC}:
-                if (m == Machine.MICROVM and i == Interface.VFIO):
+                if (m == Machine.MICROVM
+                        and i in [Interface.VFIO, Interface.VMUX]):
                     continue
                 tree[m][i] = {}
                 mac = host.test_iface_mac \
-                    if i == Interface.VFIO else host.guest_test_iface_mac
+                    if i in [Interface.VFIO, Interface.VMUX] \
+                    else host.guest_test_iface_mac
                 for q in self.qemus:
                     qemu, _ = q.split(':')
                     tree[m][i][q] = {}
                     for v in self.vhosts:
-                        if v and i == Interface.VFIO:
+                        if (v and i in [Interface.VFIO, Interface.VMUX]):
                             continue
                         tree[m][i][q][v] = {}
                         # for io in reversed(list(self.ioregionfds)):
                         for io in self.ioregionfds:
-                            if io and (m != Machine.MICROVM
-                                       or i == Interface.VFIO):
+                            if io and (m != Machine.MICROVM or
+                                       i in [Interface.VFIO, Interface.VMUX]):
                                 continue
                             tree[m][i][q][v][io] = {}
                             for r in self.reflectors:
@@ -481,6 +489,10 @@ class LoadLatencyTestGenerator(object):
         host.cleanup_network()
 
         debug('Binding loadgen interface')
+        try:
+            loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+        except Exception:
+            pass
         loadgen.bind_test_iface()
         loadgen.setup_hugetlbfs()
 
@@ -511,6 +523,8 @@ class LoadLatencyTestGenerator(object):
                                 debug(f"Running guest {machine.value} " +
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
+                                if interface == Interface.VMUX:
+                                    host.start_vmux()
                                 self.run_guest(host, machine, interface,
                                                qemu_path, vhost, ioregionfd)
                                 # TODO maybe check if tmux session running
@@ -551,6 +565,8 @@ class LoadLatencyTestGenerator(object):
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
                                 host.kill_guest()
+                                if interface == Interface.VMUX:
+                                    host.stop_vmux()
 
                 debug(f"Tearing down interface {interface.value}")
                 host.cleanup_network()
