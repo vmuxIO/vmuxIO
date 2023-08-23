@@ -296,6 +296,7 @@ build:
   nix build -o {{proot}}/qemu .#qemu
   nix build -o {{proot}}/xdp .#xdp-reflector
   nix build -o {{proot}}/qemu-ioregionfd .#qemu-ioregionfd
+  nix build -o {{proot}}/vmux-nixbuild .#vmux
 
 vm-overwrite:
   mkdir -p {{proot}}/VMs
