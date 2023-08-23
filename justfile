@@ -4,6 +4,7 @@ qemu_libvfiouser_bin := proot + "/qemu/bin/qemu-system-x86_64"
 qemu_ssh_port := "2222"
 user := `whoami`
 vmuxSock := "/tmp/vmux-" + user + ".sock"
+qemuMem := "/dev/shm/qemu-memory-" + user
 #vmuxSock := "/tmp/vmux.sock"
 linux_dir := "/scratch/" + user + "/vmux-linux"
 linux_repo := "https://github.com/vmuxio/linux"
@@ -56,11 +57,12 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -nographic
 
 vm-libvfio-user:
+    sudo rm {{qemuMem}} || true
     sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
         -smp 8 \
         -enable-kvm \
-        -m 16G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
         -machine q35,accel=kvm,kernel-irqchip=split \
         -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
         -device virtio-serial \
@@ -83,6 +85,7 @@ vm-libvfio-user:
     sudo ip tuntap add mode tap tap0
     sudo ip link set dev tap0 up
     sudo ip a add 10.0.0.1/24 dev tap0
+    sudo rm {{qemuMem}} || true
     sudo {{qemu_libvfiouser_bin}}  \
         -L / \
         -cpu host \
@@ -90,7 +93,7 @@ vm-libvfio-user:
         -device e1000,netdev=net0 \
         -machine q35,accel=kvm,kernel-irqchip=split \
         -device intel-iommu,intremap=on,device-iotlb=on \
-        -m 16G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
         -device virtio-serial \
         -fsdev local,id=myid,path={{proot}},security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -115,12 +118,13 @@ vmux-guest DEVICE="0000:00:03.0":
 
 # start nested guest w/ viommu, w/ vmux (lib-vfio) device
 vm-libvfio-user-iommu-guest:
+    sudo rm {{qemuMem}} || true
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
         -cpu host \
         -machine q35,accel=kvm,kernel-irqchip=split \
         -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
-        -m 1G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
+        -m 1G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
         -device virtio-serial \
         -fsdev local,id=myid,path=/mnt,security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -135,11 +139,12 @@ vm-libvfio-user-iommu-guest:
 
 # start nested guest w/o viommu, w/o vmux (libvfio) device
 vm-noiommu-guest:
+    sudo rm {{qemuMem}} || true
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
         -cpu host \
         -machine q35,accel=kvm,kernel-irqchip=split \
-        -m 1G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
+        -m 1G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
         -device virtio-serial \
         -fsdev local,id=myid,path=/mnt,security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -153,11 +158,12 @@ vm-noiommu-guest:
 
 # start nested guest w/o viommu, w/ vmux (libvfio) device
 vm-libvfio-user-noiommu-guest:
+    sudo rm {{qemuMem}} || true
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
         -cpu host \
         -machine q35,accel=kvm,kernel-irqchip=split \
-        -m 1G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
+        -m 1G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=1G,share=on -numa node,memdev=bm \
         -device virtio-serial \
         -fsdev local,id=myid,path=/mnt,security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
@@ -177,12 +183,13 @@ vm-libvfio-user-noiommu-guest:
 
 # start nested guest w/ viommu, w/ vfio (not vmux) device
 vm-libvfio-user-iommu-guest-passthrough:
+    sudo rm {{qemuMem}} || true
     sudo {{qemu_libvfiouser_bin}}  \
         -L {{proot}}/qemu-manual/pc-bios/ \
         -cpu host \
         -machine q35,accel=kvm,kernel-irqchip=split \
         -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
-        -m 4G -object memory-backend-file,mem-path=/dev/shm/qemu-memory,prealloc=yes,id=bm,size=4G,share=on -numa node,memdev=bm \
+        -m 4G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=4G,share=on -numa node,memdev=bm \
         -device virtio-serial \
         -fsdev local,id=myid,path=/mnt,security_model=none \
         -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
