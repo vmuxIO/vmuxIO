@@ -69,16 +69,18 @@ class Runner {
   class Device;
 
   /**
-   * Replaces the Runner class. Adapts simbricks behavioral models to an libvfio-user-ish interface. 
+   * Replaces the Runner class. Adapts behavioral models from simbricks or other libraries to an libvfio-user-ish interface. 
    **/
-  class Emulator {
+  class DeviceEmulator {
     protected:
+      // behavioral model of a device
       Device *device_;
 
     public:
-      Emulator(Device &dev);
+      DeviceEmulator(Device &dev);
 
       // Functions to be called through libvfio-user by the VM
+      // In rust speak they would belong to "trait MmioProvider"
       void RegRead(uint8_t bar, uint64_t addr, void *dest,
                            size_t len) {
         device_->RegRead(bar, addr, dest, len);
@@ -88,19 +90,27 @@ class Runner {
         device_->RegWrite(bar, addr, src, len);
       }
 
-      // when calling this, the  device will do all pending DMAs
+      // Functions to be called by the owner of DeviceEmulator
+      // when calling this, the  device will do all pending DMAs.
       void DmaComplete(DMAOp &op);
       // send a packet from the network fabric to the NIC device
       void EthRx(uint8_t port, const void *data, size_t len);
 
-      // todo
+      // Functions to be called by the Device
       // IssueDma, MsiXIssue, EthSend, EventSchedule, ...
+      // device tells the Emulator to issue a DMA. The emulator can then do the memcopy. 
+      // In rust these would belong to "trait DeviceCallbacks"
+      void IssueDma(DMAOp &op);
+      void MsiIssue(uint8_t vec);
+      void MsiXIssue(uint8_t vec);
+      void IntXIssue(bool level);
+      void EthSend(const void *data, size_t len);
   };
 
   class Device {
    public:
     Runner *runner_;
-    Emulator *emulator_;
+    DeviceEmulator *emulator_;
 
    protected:
     bool int_intx_en_;
