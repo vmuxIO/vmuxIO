@@ -533,7 +533,8 @@ def create_servers(conf: ConfigParser,
             conf['host']['moongen_dir'],
             conf['host']['moonprogs_dir'],
             conf['host']['xdp_reflector_dir'],
-            ssh_config=conf.get('host', 'ssh_config', fallback=None)
+            ssh_config=conf.get('host', 'ssh_config', fallback=None),
+            ssh_as_root=conf.getboolean('host', 'ssh_as_root', fallback=False)
         )
     if guest:
         servers['guest'] = Guest(
@@ -547,7 +548,8 @@ def create_servers(conf: ConfigParser,
             conf['guest']['moongen_dir'],
             conf['guest']['moonprogs_dir'],
             conf['guest']['xdp_reflector_dir'],
-            ssh_config=conf.get('host', 'ssh_config', fallback=None)
+            ssh_config=conf.get('host', 'ssh_config', fallback=None),
+            ssh_as_root=conf.getboolean('host', 'ssh_as_root', fallback=False)
         )
     if loadgen:
         servers['loadgen'] = LoadGen(
@@ -560,7 +562,8 @@ def create_servers(conf: ConfigParser,
             conf['loadgen']['tmux_socket'],
             conf['loadgen']['moongen_dir'],
             conf['loadgen']['moonprogs_dir'],
-            ssh_config=conf.get('host', 'ssh_config', fallback=None)
+            ssh_config=conf.get('host', 'ssh_config', fallback=None),
+            ssh_as_root=conf.getboolean('host', 'ssh_as_root', fallback=False)
         )
     return servers
 
@@ -630,7 +633,10 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
         memory = args.memory if args.memory else None
         disk = args.disk if args.disk else None
         qemu_path = args.qemu_path \
-            if args.qemu_path else conf['host']['qemu_path']
+            if args.qemu_path \
+            else (conf['host']['vmux_qemu_path']
+                  if args.interface in ['vfio', 'vmux']
+                  else conf['host']['qemu_path'])
 
         host.run_guest(args.interface, args.machine, vcpus, memory, disk,
                        args.debug, args.ioregionfd, qemu_path, args.vhost,
@@ -682,6 +688,7 @@ def _setup_network(host: Host, interface: str) -> None:
         host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
     elif interface == 'vmux':
+        host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
         host.start_vmux()
 

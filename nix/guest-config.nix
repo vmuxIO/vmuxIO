@@ -19,6 +19,7 @@
 
   users.users.root.password = "ach2Chai8muo";
   users.users.root.openssh.authorizedKeys.keys = [
+    (builtins.readFile ./ssh_key.pub)
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBevyJ5i0237DNoS29F9aii2AJwrSxXNz3hP61hWXfRl sandro@reaper.gierens.de"
   ];
   services.openssh.settings.PermitRootLogin = lib.mkDefault "yes";
