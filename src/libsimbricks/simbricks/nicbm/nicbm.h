@@ -70,6 +70,7 @@ class Runner {
 
   /**
    * Replaces the Runner class. Adapts behavioral models from simbricks or other libraries to an libvfio-user-ish interface. 
+   * From the point of view of emulators interfacing directly with libvfio-user, this class is similar to "device context".
    **/
   class DeviceEmulator {
     protected:
@@ -81,6 +82,7 @@ class Runner {
 
       // Functions to be called through libvfio-user by the VM
       // In rust speak they would belong to "trait MmioProvider"
+      // TODO: maybe replace by bar?_access functions
       void RegRead(uint8_t bar, uint64_t addr, void *dest,
                            size_t len) {
         device_->RegRead(bar, addr, dest, len);
@@ -90,7 +92,8 @@ class Runner {
         device_->RegWrite(bar, addr, src, len);
       }
 
-      // Functions to be called by the owner of DeviceEmulator
+      // Functions to be called by the owner of DeviceEmulator. The device must have these functions as well.
+
       // when calling this, the  device will do all pending DMAs.
       void DmaComplete(DMAOp &op);
       // send a packet from the network fabric to the NIC device
@@ -98,13 +101,28 @@ class Runner {
 
       // Functions to be called by the Device
       // IssueDma, MsiXIssue, EthSend, EventSchedule, ...
-      // device tells the Emulator to issue a DMA. The emulator can then do the memcopy. 
-      // In rust these would belong to "trait DeviceCallbacks"
+      // In rust these would belong to "trait DeviceCallbacks" or "struct DeviceContext"
+
+      // device tells the Emulator to issue a DMA. The emulator can then do the memcopy or sgl_read/write.
       void IssueDma(DMAOp &op);
+      // Inject interrupts (maybe replace with a single function?)
+      // Similar to DeviceContext::trigger_irq
       void MsiIssue(uint8_t vec);
       void MsiXIssue(uint8_t vec);
       void IntXIssue(bool level);
       void EthSend(const void *data, size_t len);
+
+      // Further methods called by the Device to set up passthrough or mediation (can be ignored for now)
+      
+      // true: phy. device and emu. device can dma
+      void MapPhysicalDeviceDma(bool enable); 
+      // TODO returns where registers of a physical device have been mapped to. Vmux can now use them.
+      void MapPhysicalDeviceRegistersToVmux(bool enable); 
+      // true: RegRead callbacks stop and are redirected to physical device
+      void MapPhysicalDeviceRegistersToVm(bool enable); 
+
+      // Further methods called by the Device to do multiple emulated devices (backed by one physical one)
+      // TODO
   };
 
   class Device {
