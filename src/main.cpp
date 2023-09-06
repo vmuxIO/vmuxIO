@@ -87,7 +87,7 @@ int _main(int argc, char** argv) {
     std::string device = "0000:18:00.0";
     std::vector<std::string> devices; 
     std::vector<std::unique_ptr<VmuxRunner>> runner;
-    std::vector<std::unique_ptr<VfioConsumer>> vfioc;
+    std::vector<std::shared_ptr<VfioConsumer>> vfioc;
     std::string group_arg;
     // int HARDWARE_REVISION; // could be set by vfu_pci_set_class:
                               // vfu_ctx->pci.config_space->hdr.rid = 0x02;
@@ -119,7 +119,7 @@ int _main(int argc, char** argv) {
 
     for(size_t i = 0; i < devices.size(); i++) {
         printf("Using: %s\n", devices[i].c_str());
-        vfioc.push_back(std::unique_ptr<VfioConsumer>(new VfioConsumer(devices[i].c_str())));
+        vfioc.push_back(std::shared_ptr<VfioConsumer>(new VfioConsumer(devices[i].c_str())));
 
         if(vfioc[i]->init() < 0){
             die("failed to initialize vfio consumer");
@@ -136,7 +136,7 @@ int _main(int argc, char** argv) {
 
     for(size_t i = 0; i < devices.size(); i++){
         printf("Using: %s\n", devices[i].c_str());
-        runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], *vfioc[i], efd)));
+        runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], vfioc[i], efd)));
         runner[i]->start();
 
         while(runner[i]->state !=2);

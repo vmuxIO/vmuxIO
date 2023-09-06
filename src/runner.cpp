@@ -126,25 +126,25 @@ void VmuxRunner::initilize(){
 
     // set up vfio-user DMA
 
-    ret = vfu.add_regions(vfioc.regions, vfioc.device);
+    ret = vfu.add_regions(vfioc->regions, vfioc->device);
     if (ret < 0)
         die("failed to add regions");
 
     // set up irqs 
 
-    ret = vfu.add_irqs(vfioc.interrupts);
+    ret = vfu.add_irqs(vfioc->interrupts);
     if (ret < 0)
         die("failed to add irqs");
 
-    vfu.add_legacy_irq_pollfds(vfioc.irqfd_intx, vfioc.irqfd_msi,
-            vfioc.irqfd_err, vfioc.irqfd_req);
-    vfu.add_msix_pollfds(vfioc.irqfds);
+    vfu.add_legacy_irq_pollfds(vfioc->irqfd_intx, vfioc->irqfd_msi,
+            vfioc->irqfd_err, vfioc->irqfd_req);
+    vfu.add_msix_pollfds(vfioc->irqfds);
 
-    if(vfioc.is_pcie){
+    if(vfioc->is_pcie){
         this->add_caps();
     }
 
-    vfu.setup_callbacks(&vfioc);
+    vfu.setup_callbacks(vfioc);
 
     ret = vfu_realize_ctx(vfu.vfu_ctx);
     if (ret < 0) {
@@ -155,7 +155,7 @@ void VmuxRunner::initilize(){
 
 void VmuxRunner::add_caps(){
     Capabilities caps =
-        Capabilities(&(vfioc.regions[VFU_PCI_DEV_CFG_REGION_IDX]), device);
+        Capabilities(&(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), device);
     void *cap_data;
 
     cap_data = caps.pm();
