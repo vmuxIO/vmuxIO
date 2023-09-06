@@ -1,4 +1,6 @@
 #include "src/runner.hpp"
+#include "caps.hpp"
+#include <memory>
 
 
 #define stop_runner(s,str, ...) do { \
@@ -154,17 +156,17 @@ void VmuxRunner::initilize(){
 
 
 void VmuxRunner::add_caps(){
-    Capabilities caps =
-        Capabilities(&(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), device);
+    std::shared_ptr<Capabilities> caps =
+        std::shared_ptr<Capabilities>(new Capabilities(&(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), device));
     void *cap_data;
 
-    cap_data = caps.pm();
+    cap_data = caps->pm();
     int ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
     if (ret < 0)
         die("add cap error");
     free(cap_data);
 
-    cap_data = caps.msix();
+    cap_data = caps->msix();
     ret = vfu_pci_add_capability(vfu.vfu_ctx, 0, 0, cap_data);
     if (ret < 0)
         die("add cap error");
@@ -178,7 +180,7 @@ void VmuxRunner::add_caps(){
     //   die("add cap error");
     // free(cap_data);
 
-    cap_data = caps.exp();
+    cap_data = caps->exp();
     ret = vfu_pci_add_capability(vfu.vfu_ctx, 0,
             VFU_CAP_FLAG_READONLY, cap_data);
     if (ret < 0)
@@ -193,7 +195,7 @@ void VmuxRunner::add_caps(){
     //   die("add cap error");
     // free(cap_data);
 
-    cap_data = caps.dsn();
+    cap_data = caps->dsn();
     ret = vfu_pci_add_capability(vfu.vfu_ctx, 0,
             VFU_CAP_FLAG_READONLY | VFU_CAP_FLAG_EXTENDED, cap_data);
     if (ret < 0)

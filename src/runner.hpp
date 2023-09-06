@@ -12,7 +12,7 @@ class VmuxRunner{
         VfioUserServer vfu;
         std::shared_ptr<VfioConsumer> vfioc;
         std::thread runner;
-        std::optional<Capabilities> caps;
+        std::shared_ptr<Capabilities> caps;
         std::atomic_int state;
         std::atomic_bool running;
         std::string device;
