@@ -1,4 +1,5 @@
 #include "src/runner.hpp"
+#include "src/device.hpp"
 #include "caps.hpp"
 #include <memory>
 
@@ -64,36 +65,10 @@ void VmuxRunner::run()
 
 
 void VmuxRunner::initilize(){
-    std::vector<int> pci_ids;
-    std::string group_arg;
-    int HARDWARE_REVISION;
-
     state.store(STARTED);
     running.store(1);
 
-    group_arg = get_iommu_group(device);
-
-    //Get Hardware Information from Device
-    pci_ids = get_hardware_ids(device,group_arg);
-    if(pci_ids.size() != 5){
-        die("Failed to parse Hardware Information, expected %d IDs got %zu\n",
-                5, pci_ids.size());
-        // stop_runner(-1,
-        // "Failed to parse Hardware Information, expected %d IDs got %zu\n",
-        // 5, pci_ids.size());
-    }
-    HARDWARE_REVISION = pci_ids[0];
-    pci_ids.erase(pci_ids.begin()); // Only contains Vendor ID, Device ID,
-                                    // Subsystem Vendor ID, Subsystem ID now
-
-    printf("PCI-Device: %s\nIOMMU-Group: %s\nRevision: 0x%02X\n\
-            IDs: 0x%04X,0x%04X,0x%04X,0x%04X\nSocket: %s\n",
-            device.c_str(),
-            group_arg.c_str(),
-            HARDWARE_REVISION,
-            pci_ids[0],pci_ids[1],pci_ids[2],pci_ids[3],
-            socket.c_str());
-
+    PassthroughDevice device = PassthroughDevice(this->socket);
 
     printf("%s", vfu.sock.c_str());
     vfu.vfu_ctx = vfu_create_ctx(
@@ -119,11 +94,11 @@ void VmuxRunner::initilize(){
         die("vfu_pci_init() failed") ;
     }
 
-    vfu_pci_set_id(vfu.vfu_ctx, pci_ids[0], pci_ids[1],
-            pci_ids[2], pci_ids[3]);
+    vfu_pci_set_id(vfu.vfu_ctx, device.info.pci_vendor_id, device.info.pci_device_id,
+            device.info.pci_class, device.info.pci_subclass);
     vfu_pci_config_space_t *config_space =
         vfu_pci_get_config_space(vfu.vfu_ctx);
-    config_space->hdr.rid = HARDWARE_REVISION;
+    config_space->hdr.rid = device.info.pci_revision;
     vfu_pci_set_class(vfu.vfu_ctx, 0x02, 0x00, 0x00);
 
     // set up vfio-user DMA
