@@ -68,7 +68,7 @@ void VmuxRunner::initilize(){
     state.store(STARTED);
     running.store(1);
 
-    PassthroughDevice device = PassthroughDevice(this->socket);
+    PassthroughDevice device = PassthroughDevice(this->socket); // TODO pass VmuxDevice to VmuxRunner constructor instead
 
     printf("%s", vfu.sock.c_str());
     vfu.vfu_ctx = vfu_create_ctx(

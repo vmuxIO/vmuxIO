@@ -27,7 +27,7 @@ class VmuxRunner{
             CONNECTED = 3,
         };
 
-        VmuxRunner(std::string socket, std::string device, std::shared_ptr<VfioConsumer> vfioc,
+        VmuxRunner(std::string socket, std::string device, std::shared_ptr<VfioConsumer> vfioc, std::string mode,
                 int efd): vfu(socket,efd), vfioc(vfioc) {
             state.store(0);
             this->device = device;

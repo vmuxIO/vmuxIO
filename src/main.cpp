@@ -80,7 +80,6 @@ typedef struct {
     return count;
 }
 
-
 int _main(int argc, char** argv) {
 
     int ch;
@@ -93,7 +92,8 @@ int _main(int argc, char** argv) {
                               // vfu_ctx->pci.config_space->hdr.rid = 0x02;
     std::vector<int> pci_ids;
     std::vector<std::string> sockets;
-    while ((ch = getopt(argc,argv,"hd:s:")) != -1){
+    std::vector<std::string> modes;
+    while ((ch = getopt(argc,argv,"hd:s:m:")) != -1){
         switch(ch)
         {
             case 'd':
@@ -102,12 +102,16 @@ int _main(int argc, char** argv) {
             case 's':
                 sockets.push_back(optarg);
                 break;
+            case 'm':
+                modes.push_back(optarg);
+                break;
             case '?':
             case 'h':
                 std::cout <<
-                    "-d 0000:18:00.0                        PCI-Device\n" <<
-                    "-s /tmp/vmux.sock                      Path of the socket"
-                    << "\n";
+                    "-d 0000:18:00.0                        PCI-Device (or \"none\" if not applicable)\n" <<
+                    "-s /tmp/vmux.sock                      Path of the socket\n" <<
+                    "-m passthrough                         vMux mode: passthrough, emulation\n"
+                    ;
                 return 0;
             default:
                 break;
@@ -117,7 +121,20 @@ int _main(int argc, char** argv) {
     if (sockets.size() == 0)
         sockets.push_back("/tmp/vmux.sock");
 
+    if (modes.size() == 0)
+        modes.push_back("passthrough");
+
+    if (sockets.size() != modes.size() || modes.size() != devices.size()) {
+        errno = EINVAL;
+        die("Command line arguments need to specify the same number of devices, sockets and modes");
+    }
+
+    // TODO move into VmuxRunner
     for(size_t i = 0; i < devices.size(); i++) {
+        if (devices[i] == "none") {
+            vfioc.push_back(NULL);
+            continue;
+        }
         printf("Using: %s\n", devices[i].c_str());
         vfioc.push_back(std::shared_ptr<VfioConsumer>(new VfioConsumer(devices[i].c_str())));
 
@@ -136,7 +153,7 @@ int _main(int argc, char** argv) {
 
     for(size_t i = 0; i < devices.size(); i++){
         printf("Using: %s\n", devices[i].c_str());
-        runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], vfioc[i], efd)));
+        runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], vfioc[i], modes[i], efd)));
         runner[i]->start();
 
         while(runner[i]->state !=2);

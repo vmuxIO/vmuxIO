@@ -5,7 +5,7 @@
 /** Number of PCI bars */
 #define SIMBRICKS_PROTO_PCIE_NBARS 6
 
-/* Some of these fields may be unused */
+/* TODO Some of these fields may be unused */
 struct DeviceInfo {
   /** information for each BAR exposed by the device */
   struct {
