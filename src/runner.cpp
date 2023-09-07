@@ -21,7 +21,7 @@ void VmuxRunner::run()
 {
     this->initilize();
     state.store(INITILIZED);
-    printf("%s: Waiting for qemu to attach...\n",this->device.data());
+    printf("%s: Waiting for qemu to attach...\n",this->pciAddress.data());
     while(1){
         int ret = vfu_attach_ctx(vfu.vfu_ctx);
         if (ret < 0) {
@@ -91,40 +91,40 @@ void VmuxRunner::initilize(){
         die("vfu_pci_init() failed") ;
     }
 
-    vfu_pci_set_id(vfu.vfu_ctx, device_->info.pci_vendor_id, device_->info.pci_device_id,
-            device_->info.pci_class, device_->info.pci_subclass);
+    vfu_pci_set_id(vfu.vfu_ctx, device->info.pci_vendor_id, device->info.pci_device_id,
+            device->info.pci_class, device->info.pci_subclass);
     vfu_pci_config_space_t *config_space =
         vfu_pci_get_config_space(vfu.vfu_ctx);
-    config_space->hdr.rid = device_->info.pci_revision;
+    config_space->hdr.rid = device->info.pci_revision;
     vfu_pci_set_class(vfu.vfu_ctx, 0x02, 0x00, 0x00);
 
     // set up vfio-user DMA
 
-    if (device_->vfioc != NULL) {
+    if (device->vfioc != NULL) {
         // pass through registers, only if it is a passthrough device
-        ret = vfu.add_regions(device_->vfioc->regions, device_->vfioc->device);
+        ret = vfu.add_regions(device->vfioc->regions, device->vfioc->device);
         if (ret < 0)
             die("failed to add regions");
     }
 
     // set up irqs 
 
-    if (device_->vfioc != NULL) {
-        ret = vfu.add_irqs(device_->vfioc->interrupts);
+    if (device->vfioc != NULL) {
+        ret = vfu.add_irqs(device->vfioc->interrupts);
         if (ret < 0)
             die("failed to add irqs");
 
-        vfu.add_legacy_irq_pollfds(device_->vfioc->irqfd_intx, device_->vfioc->irqfd_msi,
-                device_->vfioc->irqfd_err, device_->vfioc->irqfd_req);
-        vfu.add_msix_pollfds(device_->vfioc->irqfds);
+        vfu.add_legacy_irq_pollfds(device->vfioc->irqfd_intx, device->vfioc->irqfd_msi,
+                device->vfioc->irqfd_err, device->vfioc->irqfd_req);
+        vfu.add_msix_pollfds(device->vfioc->irqfds);
     }
 
-    if (device_->vfioc != NULL) {
-        if(device_->vfioc->is_pcie){
-            this->add_caps(device_->vfioc);
+    if (device->vfioc != NULL) {
+        if(device->vfioc->is_pcie){
+            this->add_caps(device->vfioc);
         }
 
-        vfu.setup_callbacks(device_->vfioc);
+        vfu.setup_callbacks(device->vfioc);
     }
 
     ret = vfu_realize_ctx(vfu.vfu_ctx);
@@ -135,7 +135,7 @@ void VmuxRunner::initilize(){
 
 void VmuxRunner::add_caps(shared_ptr<VfioConsumer> vfioc) {
   std::shared_ptr<Capabilities> caps = std::shared_ptr<Capabilities>(
-      new Capabilities(&(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), device));
+      new Capabilities(&(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), pciAddress));
   void *cap_data;
 
   cap_data = caps->pm();

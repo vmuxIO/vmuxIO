@@ -11,12 +11,12 @@
 class VmuxRunner{
     public: 
         VfioUserServer vfu;
-        std::shared_ptr<VmuxDevice> device_;
+        std::shared_ptr<VmuxDevice> device;
         std::thread runner;
         std::shared_ptr<Capabilities> caps;
         std::atomic_int state;
         std::atomic_bool running;
-        std::string device;
+        std::string pciAddress;
         std::string socket;
 
         //void (*VmuxRunner::interrupt_handler)(void);
@@ -28,10 +28,10 @@ class VmuxRunner{
             CONNECTED = 3,
         };
 
-        VmuxRunner(std::string socket, std::string device, std::shared_ptr<VmuxDevice> device_, 
-                int efd): vfu(socket,efd), device_(device_) {
+        VmuxRunner(std::string socket, std::string pciAddress, std::shared_ptr<VmuxDevice> device, 
+                int efd): vfu(socket,efd), device(device) {
             state.store(0);
-            this->device = device;
+            this->pciAddress = pciAddress;
             this->socket = socket;
         }
 
