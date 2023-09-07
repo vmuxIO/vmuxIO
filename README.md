@@ -156,8 +156,19 @@ just prepare ./hosts/christina_autotest.yaml
 sln ./test/conf/autotest_okelmann_christina.cfg autotest.cfg
 python3.10 ./test/autotest -vvv test-load-lat-file
 ls output
-
 ```
+
+To run passthrough tests on the DOS infrastructure, run autotest on `christina`. 
+Ssh configs are set up there to work with `./testconf/ssh_config_doctor_cluster` and `autotest_rose_wilfred_okelmann.cfg`).
+Take care to check out and build vmux on rose and wilfred - and replace relevant variables like username and paths in the configs.
+
+Run it with:
+```bash
+python3.10 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_okelmann.cfg run-guest -i vmux
+python3.10 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_okelmann.cfg test-load-lat-file -t test/conf/tests_passthrough_multihost.cfg
+```
+
+
 # Debugging
 
 ## Notes on IOMMU/VFs
