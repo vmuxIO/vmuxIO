@@ -129,7 +129,6 @@ int _main(int argc, char** argv) {
         die("Command line arguments need to specify the same number of devices, sockets and modes");
     }
 
-    // TODO move into VmuxRunner
     for(size_t i = 0; i < devices.size(); i++) {
         if (devices[i] == "none") {
             vfioc.push_back(NULL);
@@ -153,7 +152,7 @@ int _main(int argc, char** argv) {
 
     for(size_t i = 0; i < devices.size(); i++){
         printf("Using: %s\n", devices[i].c_str());
-        std::shared_ptr<PassthroughDevice> device = std::shared_ptr<PassthroughDevice>(new PassthroughDevice(vfioc[i], devices[i]));
+        std::shared_ptr<VmuxDevice> device = std::shared_ptr<PassthroughDevice>(new PassthroughDevice(vfioc[i], devices[i]));
         runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], device, efd)));
         runner[i]->start();
 

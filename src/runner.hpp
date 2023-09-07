@@ -11,7 +11,7 @@
 class VmuxRunner{
     public: 
         VfioUserServer vfu;
-        std::shared_ptr<PassthroughDevice> device_;
+        std::shared_ptr<VmuxDevice> device_;
         std::thread runner;
         std::shared_ptr<Capabilities> caps;
         std::atomic_int state;
@@ -28,7 +28,7 @@ class VmuxRunner{
             CONNECTED = 3,
         };
 
-        VmuxRunner(std::string socket, std::string device, std::shared_ptr<PassthroughDevice> device_, 
+        VmuxRunner(std::string socket, std::string device, std::shared_ptr<VmuxDevice> device_, 
                 int efd): vfu(socket,efd), device_(device_) {
             state.store(0);
             this->device = device;
