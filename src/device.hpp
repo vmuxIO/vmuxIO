@@ -1,5 +1,9 @@
+#pragma once
+
 #include "util.hpp"
+#include "vfio-consumer.hpp"
 #include <cstdint>
+#include <memory>
 #include <string>
 
 /** Number of PCI bars */
@@ -49,11 +53,15 @@ class VmuxDevice {
   public:
     DeviceInfo info;
 
+    /* vfio endpoint, may be null for some devices */
+    std::shared_ptr<VfioConsumer> vfioc;
+
 };
 
 class PassthroughDevice : public VmuxDevice {
   public:
-    PassthroughDevice(std::string pci_address) {
+    PassthroughDevice(std::shared_ptr<VfioConsumer> vfioc, std::string pci_address) {
+      this->vfioc = vfioc;
       this->init_pci_ids(pci_address);
     }
 
