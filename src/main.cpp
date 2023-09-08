@@ -24,6 +24,7 @@
 #include <signal.h>
 #include <thread>
 
+#include "device.hpp"
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
@@ -84,9 +85,10 @@ int _main(int argc, char** argv) {
 
     int ch;
     std::string device = "0000:18:00.0";
-    std::vector<std::string> devices; 
+    std::vector<std::string> pciAddresses; 
     std::vector<std::unique_ptr<VmuxRunner>> runner;
     std::vector<std::shared_ptr<VfioConsumer>> vfioc;
+    std::vector<std::shared_ptr<VmuxDevice>> devices;
     std::string group_arg;
     // int HARDWARE_REVISION; // could be set by vfu_pci_set_class:
                               // vfu_ctx->pci.config_space->hdr.rid = 0x02;
@@ -97,7 +99,7 @@ int _main(int argc, char** argv) {
         switch(ch)
         {
             case 'd':
-                devices.push_back(optarg);
+                pciAddresses.push_back(optarg);
                 break;
             case 's':
                 sockets.push_back(optarg);
@@ -124,18 +126,19 @@ int _main(int argc, char** argv) {
     if (modes.size() == 0)
         modes.push_back("passthrough");
 
-    if (sockets.size() != modes.size() || modes.size() != devices.size()) {
+    if (sockets.size() != modes.size() || modes.size() != pciAddresses.size()) {
         errno = EINVAL;
         die("Command line arguments need to specify the same number of devices, sockets and modes");
     }
 
-    for(size_t i = 0; i < devices.size(); i++) {
-        if (devices[i] == "none") {
+    // create vfio consumers
+    for(size_t i = 0; i < pciAddresses.size(); i++) {
+        if (pciAddresses[i] == "none") {
             vfioc.push_back(NULL);
             continue;
         }
-        printf("Using: %s\n", devices[i].c_str());
-        vfioc.push_back(std::shared_ptr<VfioConsumer>(new VfioConsumer(devices[i].c_str())));
+        printf("Using: %s\n", pciAddresses[i].c_str());
+        vfioc.push_back(std::shared_ptr<VfioConsumer>(new VfioConsumer(pciAddresses[i].c_str())));
 
         if(vfioc[i]->init() < 0){
             die("failed to initialize vfio consumer");
@@ -146,14 +149,24 @@ int _main(int argc, char** argv) {
         vfioc[i]->init_legacy_irqs();
         vfioc[i]->init_msix();
     }
-    //return 0;
+
+    // create devices
+    for(size_t i = 0; i < pciAddresses.size(); i++) {
+        std::shared_ptr<VmuxDevice> device;
+        if (modes[i] == "passthrough") {
+            device = std::shared_ptr<PassthroughDevice>(new PassthroughDevice(vfioc[i], pciAddresses[i]));
+        }
+        if (modes[i] == "emulation") {
+            device = std::shared_ptr<StubDevice>(new StubDevice());
+        }
+        devices.push_back(device);
+    }
 
     int efd = epoll_create1(0);
 
-    for(size_t i = 0; i < devices.size(); i++){
-        printf("Using: %s\n", devices[i].c_str());
-        std::shared_ptr<VmuxDevice> device = std::shared_ptr<PassthroughDevice>(new PassthroughDevice(vfioc[i], devices[i]));
-        runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], device, efd)));
+    for(size_t i = 0; i < pciAddresses.size(); i++){
+        printf("Using: %s\n", pciAddresses[i].c_str());
+        runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], efd)));
         runner[i]->start();
 
         while(runner[i]->state !=2);
@@ -162,7 +175,7 @@ int _main(int argc, char** argv) {
 
     //VmuxRunner r(socket,device);
     //r.start();
-    for(size_t i = 0; i < devices.size(); i++){
+    for(size_t i = 0; i < pciAddresses.size(); i++){
         while(!runner[i]->is_connected()){
             if(quit.load())
                 break;
@@ -188,10 +201,10 @@ int _main(int argc, char** argv) {
         }
     }
 
-    for(size_t i = 0; i < devices.size(); i++){
+    for(size_t i = 0; i < pciAddresses.size(); i++){
         runner[i]->stop();
     }
-    for(size_t i = 0; i < devices.size(); i++){
+    for(size_t i = 0; i < pciAddresses.size(); i++){
         runner[i]->join();
     }
 

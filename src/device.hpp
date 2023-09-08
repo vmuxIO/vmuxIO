@@ -57,6 +57,13 @@ class VmuxDevice {
 
 };
 
+class StubDevice : public VmuxDevice {
+  public:
+    StubDevice() {
+      this->vfioc = NULL;
+    }
+};
+
 class PassthroughDevice : public VmuxDevice {
   public:
     PassthroughDevice(std::shared_ptr<VfioConsumer> vfioc, std::string pci_address) {

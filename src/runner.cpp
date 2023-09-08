@@ -21,7 +21,7 @@ void VmuxRunner::run()
 {
     this->initilize();
     state.store(INITILIZED);
-    printf("%s: Waiting for qemu to attach...\n",this->pciAddress.data());
+    printf("%s: Waiting for qemu to attach...\n",this->socket.c_str());
     while(1){
         int ret = vfu_attach_ctx(vfu.vfu_ctx);
         if (ret < 0) {
@@ -67,7 +67,7 @@ void VmuxRunner::initilize(){
     state.store(STARTED);
     running.store(1);
 
-    printf("%s", vfu.sock.c_str());
+    printf("initialize %s\n", vfu.sock.c_str());
     vfu.vfu_ctx = vfu_create_ctx(
             VFU_TRANS_SOCK,
             vfu.sock.c_str(),
@@ -135,7 +135,7 @@ void VmuxRunner::initilize(){
 
 void VmuxRunner::add_caps(shared_ptr<VfioConsumer> vfioc) {
   std::shared_ptr<Capabilities> caps = std::shared_ptr<Capabilities>(
-      new Capabilities(&(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), pciAddress));
+      new Capabilities(&(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc->device_name));
   void *cap_data;
 
   cap_data = caps->pm();

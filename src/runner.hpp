@@ -16,7 +16,6 @@ class VmuxRunner{
         std::shared_ptr<Capabilities> caps;
         std::atomic_int state;
         std::atomic_bool running;
-        std::string pciAddress;
         std::string socket;
 
         //void (*VmuxRunner::interrupt_handler)(void);
@@ -28,10 +27,9 @@ class VmuxRunner{
             CONNECTED = 3,
         };
 
-        VmuxRunner(std::string socket, std::string pciAddress, std::shared_ptr<VmuxDevice> device, 
+        VmuxRunner(std::string socket, std::shared_ptr<VmuxDevice> device, 
                 int efd): vfu(socket,efd), device(device) {
             state.store(0);
-            this->pciAddress = pciAddress;
             this->socket = socket;
         }
 
