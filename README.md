@@ -13,18 +13,16 @@ Our vMux device multiplexer targets modern Network Interface Cards (NICs), in pa
 
 ## State of development
 
-Extremely incomplete. 
-
 We can:
 
 - emluate registers
 - do passthrough (e1000, E810)
 
-We cannot: 
+We cannot yet: 
 
 - multiplex
 - do interrupts
-- ...
+- emulate devices
 
 ## Usage
 
@@ -37,7 +35,7 @@ Preconditions:
 Run vmux:
 
 ```bash
-sudo vmux -d 0000:08:00.0 -s /tmp/vmux.sock
+sudo vmux -d 0000:08:00.0 -s /tmp/vmux.sock -m passthrough
 ```
 
 Run a VM with qemu using the vmux device:
