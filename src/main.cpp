@@ -218,9 +218,8 @@ void signal_handler(int) {
     quit.store(true);
 }
 
-
-int main(int argc, char** argv) {
-    printf("foobar %zu\n", nicbm::kMaxDmaLen);
+void e810bmTesting() {
+    // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
     auto model = std::unique_ptr<i40e::i40e_bm>(new i40e::i40e_bm());
     (void) model;
@@ -228,6 +227,11 @@ int main(int argc, char** argv) {
     SimbricksProtoPcieDevIntro di = SimbricksProtoPcieDevIntro();
     __builtin_dump_struct(&di, &printf);
     model->SetupIntro(di);
+}
+
+
+int main(int argc, char** argv) {
+    e810bmTesting();
 
     // register signal handler to handle SIGINT gracefully to call destructors
     struct sigaction sa;
