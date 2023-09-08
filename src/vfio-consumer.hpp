@@ -28,7 +28,7 @@ class VfioConsumer {
         bool is_pcie = true;
 
         std::string group_str;
-        std::string device_name;
+        std::string device_name; // pci address
 
         // vfio fds
         int container;

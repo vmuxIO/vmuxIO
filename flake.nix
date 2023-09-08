@@ -210,6 +210,7 @@
         ccls # c lang serv
         meson
         ninja
+        boost
         python310.pkgs.mypy # python static typing
         gdb
         (writeScriptBin "devmem" ''

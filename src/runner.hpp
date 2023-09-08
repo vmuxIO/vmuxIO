@@ -3,18 +3,19 @@
 #include <thread>
 #include <atomic>
 #include <optional>
+#include <memory>
+#include "src/device.hpp"
 #include "src/vfio-server.hpp"
 
 
 class VmuxRunner{
     public: 
         VfioUserServer vfu;
-        VfioConsumer& vfioc;
+        std::shared_ptr<VmuxDevice> device;
         std::thread runner;
-        std::optional<Capabilities> caps;
+        std::shared_ptr<Capabilities> caps;
         std::atomic_int state;
         std::atomic_bool running;
-        std::string device;
         std::string socket;
 
         //void (*VmuxRunner::interrupt_handler)(void);
@@ -26,10 +27,9 @@ class VmuxRunner{
             CONNECTED = 3,
         };
 
-        VmuxRunner(std::string socket, std::string device, VfioConsumer& vfioc,
-                int efd): vfu(socket,efd), vfioc(vfioc) {
+        VmuxRunner(std::string socket, std::shared_ptr<VmuxDevice> device, 
+                int efd): vfu(socket,efd), device(device) {
             state.store(0);
-            this->device = device;
             this->socket = socket;
         }
 
@@ -57,6 +57,6 @@ class VmuxRunner{
 
     private:
         void run();
-        void add_caps();
+        void add_caps(std::shared_ptr<VfioConsumer> vfioc);
         void initilize();
 };

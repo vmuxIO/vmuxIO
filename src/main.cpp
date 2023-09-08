@@ -1,4 +1,5 @@
 #include <atomic>
+#include <memory>
 #include <stdio.h>
 #include <stdlib.h>
 #include <err.h>
@@ -23,9 +24,14 @@
 #include <signal.h>
 #include <thread>
 
+#include "device.hpp"
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
+#include <thread>
+#include <src/libsimbricks/simbricks/nicbm/nicbm.h>
+#include <src/sims/nic/e810_bm/e810_bm.h>
+
 #include "src/vfio-server.hpp"
 #include "src/util.hpp"
 #include "src/runner.hpp"
@@ -75,34 +81,39 @@ typedef struct {
     return count;
 }
 
-
 int _main(int argc, char** argv) {
 
     int ch;
     std::string device = "0000:18:00.0";
-    std::vector<std::string> devices; 
-    std::vector<VmuxRunner*> runner;
-    std::vector<VfioConsumer*> vfioc;
+    std::vector<std::string> pciAddresses; 
+    std::vector<std::unique_ptr<VmuxRunner>> runner;
+    std::vector<std::shared_ptr<VfioConsumer>> vfioc;
+    std::vector<std::shared_ptr<VmuxDevice>> devices;
     std::string group_arg;
     // int HARDWARE_REVISION; // could be set by vfu_pci_set_class:
                               // vfu_ctx->pci.config_space->hdr.rid = 0x02;
     std::vector<int> pci_ids;
     std::vector<std::string> sockets;
-    while ((ch = getopt(argc,argv,"hd:s:")) != -1){
+    std::vector<std::string> modes;
+    while ((ch = getopt(argc,argv,"hd:s:m:")) != -1){
         switch(ch)
         {
             case 'd':
-                devices.push_back(optarg);
+                pciAddresses.push_back(optarg);
                 break;
             case 's':
                 sockets.push_back(optarg);
                 break;
+            case 'm':
+                modes.push_back(optarg);
+                break;
             case '?':
             case 'h':
                 std::cout <<
-                    "-d 0000:18:00.0                        PCI-Device\n" <<
-                    "-s /tmp/vmux.sock                      Path of the socket"
-                    << "\n";
+                    "-d 0000:18:00.0                        PCI-Device (or \"none\" if not applicable)\n" <<
+                    "-s /tmp/vmux.sock                      Path of the socket\n" <<
+                    "-m passthrough                         vMux mode: passthrough, emulation\n"
+                    ;
                 return 0;
             default:
                 break;
@@ -112,9 +123,22 @@ int _main(int argc, char** argv) {
     if (sockets.size() == 0)
         sockets.push_back("/tmp/vmux.sock");
 
-    for(size_t i = 0; i < devices.size(); i++) {
-        printf("Using: %s\n", devices[i].c_str());
-        vfioc.push_back(new VfioConsumer(devices[i].c_str()));
+    if (modes.size() == 0)
+        modes.push_back("passthrough");
+
+    if (sockets.size() != modes.size() || modes.size() != pciAddresses.size()) {
+        errno = EINVAL;
+        die("Command line arguments need to specify the same number of devices, sockets and modes");
+    }
+
+    // create vfio consumers
+    for(size_t i = 0; i < pciAddresses.size(); i++) {
+        if (pciAddresses[i] == "none") {
+            vfioc.push_back(NULL);
+            continue;
+        }
+        printf("Using: %s\n", pciAddresses[i].c_str());
+        vfioc.push_back(std::shared_ptr<VfioConsumer>(new VfioConsumer(pciAddresses[i].c_str())));
 
         if(vfioc[i]->init() < 0){
             die("failed to initialize vfio consumer");
@@ -125,13 +149,24 @@ int _main(int argc, char** argv) {
         vfioc[i]->init_legacy_irqs();
         vfioc[i]->init_msix();
     }
-    //return 0;
+
+    // create devices
+    for(size_t i = 0; i < pciAddresses.size(); i++) {
+        std::shared_ptr<VmuxDevice> device;
+        if (modes[i] == "passthrough") {
+            device = std::shared_ptr<PassthroughDevice>(new PassthroughDevice(vfioc[i], pciAddresses[i]));
+        }
+        if (modes[i] == "emulation") {
+            device = std::shared_ptr<StubDevice>(new StubDevice());
+        }
+        devices.push_back(device);
+    }
 
     int efd = epoll_create1(0);
 
-    for(size_t i = 0; i < devices.size(); i++){
-        printf("Using: %s\n", devices[i].c_str());
-        runner.push_back(new VmuxRunner(sockets[i], devices[i], *vfioc[i], efd));
+    for(size_t i = 0; i < pciAddresses.size(); i++){
+        printf("Using: %s\n", pciAddresses[i].c_str());
+        runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], efd)));
         runner[i]->start();
 
         while(runner[i]->state !=2);
@@ -140,7 +175,7 @@ int _main(int argc, char** argv) {
 
     //VmuxRunner r(socket,device);
     //r.start();
-    for(size_t i = 0; i < devices.size(); i++){
+    for(size_t i = 0; i < pciAddresses.size(); i++){
         while(!runner[i]->is_connected()){
             if(quit.load())
                 break;
@@ -166,10 +201,10 @@ int _main(int argc, char** argv) {
         }
     }
 
-    for(size_t i = 0; i < devices.size(); i++){
+    for(size_t i = 0; i < pciAddresses.size(); i++){
         runner[i]->stop();
     }
-    for(size_t i = 0; i < devices.size(); i++){
+    for(size_t i = 0; i < pciAddresses.size(); i++){
         runner[i]->join();
     }
 
@@ -183,8 +218,21 @@ void signal_handler(int) {
     quit.store(true);
 }
 
+void e810bmTesting() {
+    // printf("foobar %zu\n", nicbm::kMaxDmaLen);
+    // i40e::i40e_bm* model = new i40e::i40e_bm();
+    auto model = std::unique_ptr<i40e::i40e_bm>(new i40e::i40e_bm());
+    (void) model;
+
+    SimbricksProtoPcieDevIntro di = SimbricksProtoPcieDevIntro();
+    __builtin_dump_struct(&di, &printf);
+    model->SetupIntro(di);
+}
+
 
 int main(int argc, char** argv) {
+    e810bmTesting();
+
     // register signal handler to handle SIGINT gracefully to call destructors
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));

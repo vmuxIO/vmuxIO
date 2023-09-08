@@ -48,7 +48,7 @@ std::vector<int> get_hardware_ids(std::string pci_device,
         id = fopen((path + values[i]).c_str(), "r");
         if(id == NULL){
             result.clear();
-            printf("Failed ot open %s\n",(path + values[i]).c_str());
+            printf("Failed to open iommu sysfs file: %s\n",(path + values[i]).c_str());
             return result;
         }
         bytes_read = fread(id_buffer, 1, sizeof(id_buffer) /

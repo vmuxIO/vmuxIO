@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <map>
+#include <memory>
 #include <string>
 #include <fcntl.h>
 #include <iostream>
@@ -57,7 +58,7 @@ class VfioUserServer {
         size_t irq_err_pollfd_idx; // only one
         size_t irq_req_pollfd_idx; // only one
         std::vector<struct pollfd> pollfds;
-        VfioConsumer *callback_context;
+        std::shared_ptr<VfioConsumer> callback_context;
         std::set<void*> mapped;
         std::map<void*, dma_sg_t*> sgs;
 
@@ -300,7 +301,7 @@ class VfioUserServer {
             return &this->pollfds[this->run_ctx_pollfd_idx.value()];
         }
 
-        void setup_callbacks(VfioConsumer *callback_context)
+        void setup_callbacks(std::shared_ptr<VfioConsumer> callback_context)
         {
             int ret;
             this->callback_context = callback_context;
