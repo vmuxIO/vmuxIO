@@ -98,33 +98,12 @@ void VmuxRunner::initilize(){
     config_space->hdr.rid = device->info.pci_revision;
     vfu_pci_set_class(vfu->vfu_ctx, 0x02, 0x00, 0x00);
 
-    // set up vfio-user DMA
-
-    if (device->vfioc != NULL) {
-        // pass through registers, only if it is a passthrough device
-        ret = vfu->add_regions(device->vfioc->regions, device->vfioc->device);
-        if (ret < 0)
-            die("failed to add regions");
-    }
-
-    // set up irqs 
-
-    if (device->vfioc != NULL) {
-        ret = vfu->add_irqs(device->vfioc->interrupts);
-        if (ret < 0)
-            die("failed to add irqs");
-
-        vfu->add_legacy_irq_pollfds(device->vfioc->irqfd_intx, device->vfioc->irqfd_msi,
-                device->vfioc->irqfd_err, device->vfioc->irqfd_req);
-        vfu->add_msix_pollfds(device->vfioc->irqfds);
-    }
+    this->device->setup_vfu(*vfu);
 
     if (device->vfioc != NULL) {
         if(device->vfioc->is_pcie){
             this->add_caps(device->vfioc);
         }
-
-        vfu->setup_callbacks(device->vfioc);
     }
 
     ret = vfu_realize_ctx(vfu->vfu_ctx);

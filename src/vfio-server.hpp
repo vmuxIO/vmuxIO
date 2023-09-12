@@ -301,7 +301,7 @@ class VfioUserServer {
             return &this->pollfds[this->run_ctx_pollfd_idx.value()];
         }
 
-        void setup_callbacks(std::shared_ptr<VfioConsumer> callback_context)
+        void setup_passthrough_callbacks(std::shared_ptr<VfioConsumer> callback_context)
         {
             int ret;
             this->callback_context = callback_context;

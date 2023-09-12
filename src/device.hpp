@@ -4,6 +4,7 @@
 #include "libsimbricks/simbricks/nicbm/nicbm.h"
 #include "util.hpp"
 #include "vfio-consumer.hpp"
+#include "vfio-server.hpp"
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -57,6 +58,10 @@ class VmuxDevice {
     /* vfio endpoint, may be null for some devices */
     std::shared_ptr<VfioConsumer> vfioc;
 
+    /* the implementor is not allowed to keep this vfu, it is only borrowed */
+    virtual void setup_vfu(VfioUserServer &vfu) = 0;
+
+    virtual ~VmuxDevice() = default;
 };
 
 class StubDevice : public VmuxDevice {
@@ -64,6 +69,7 @@ class StubDevice : public VmuxDevice {
     StubDevice() {
       this->vfioc = NULL;
     }
+    void setup_vfu(VfioUserServer &vfu) {};
 };
 
 class E810EmulatedDevice : public VmuxDevice {
@@ -80,6 +86,8 @@ class E810EmulatedDevice : public VmuxDevice {
       this->model->vmux = this->callbacks;
       this->init_pci_ids();
     }
+
+    void setup_vfu(VfioUserServer &vfu) {};
 
     void init_pci_ids() {
       SimbricksProtoPcieDevIntro di = SimbricksProtoPcieDevIntro();
@@ -99,6 +107,31 @@ class PassthroughDevice : public VmuxDevice {
     PassthroughDevice(std::shared_ptr<VfioConsumer> vfioc, std::string pci_address) {
       this->vfioc = vfioc;
       this->init_pci_ids(pci_address);
+    }
+
+    void setup_vfu(VfioUserServer &vfu) {
+      int ret; 
+
+      // set up vfio-user DMA
+      if (this->vfioc != NULL) {
+          // pass through registers, only if it is a passthrough device
+          ret = vfu.add_regions(this->vfioc->regions, this->vfioc->device);
+          if (ret < 0)
+              die("failed to add regions");
+      }
+
+      // set up irqs 
+      if (this->vfioc != NULL) {
+          ret = vfu.add_irqs(this->vfioc->interrupts);
+          if (ret < 0)
+              die("failed to add irqs");
+
+          vfu.add_legacy_irq_pollfds(this->vfioc->irqfd_intx, this->vfioc->irqfd_msi,
+                  this->vfioc->irqfd_err, this->vfioc->irqfd_req);
+          vfu.add_msix_pollfds(this->vfioc->irqfds);
+      }
+
+      vfu.setup_passthrough_callbacks(this->vfioc);
     }
 
   private:
