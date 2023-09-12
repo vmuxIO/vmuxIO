@@ -1,5 +1,7 @@
 #pragma once
 
+#include "sims/nic/e810_bm/e810_bm.h"
+#include "libsimbricks/simbricks/nicbm/nicbm.h"
 #include "util.hpp"
 #include "vfio-consumer.hpp"
 #include <cstdint>
@@ -61,6 +63,31 @@ class StubDevice : public VmuxDevice {
   public:
     StubDevice() {
       this->vfioc = NULL;
+    }
+};
+
+class E810EmulatedDevice : public VmuxDevice {
+  private:
+    std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
+
+  public:
+    E810EmulatedDevice() {
+      // printf("foobar %zu\n", nicbm::kMaxDmaLen);
+      // i40e::i40e_bm* model = new i40e::i40e_bm();
+      this->model = std::unique_ptr<i40e::i40e_bm>(new i40e::i40e_bm());
+      this->init_pci_ids();
+    }
+
+    void init_pci_ids() {
+      SimbricksProtoPcieDevIntro di = SimbricksProtoPcieDevIntro();
+      this->model->SetupIntro(di);
+      this->info.pci_vendor_id = di.pci_vendor_id;
+      this->info.pci_device_id = di.pci_device_id;
+      this->info.pci_class = di.pci_class;
+      this->info.pci_subclass = di.pci_subclass;
+      this->info.pci_revision = di.pci_revision;
+      __builtin_dump_struct(&di, &printf);
+      this->model->SetupIntro(di);
     }
 };
 

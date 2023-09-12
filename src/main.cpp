@@ -156,8 +156,11 @@ int _main(int argc, char** argv) {
         if (modes[i] == "passthrough") {
             device = std::shared_ptr<PassthroughDevice>(new PassthroughDevice(vfioc[i], pciAddresses[i]));
         }
-        if (modes[i] == "emulation") {
+        if (modes[i] == "stub") {
             device = std::shared_ptr<StubDevice>(new StubDevice());
+        }
+        if (modes[i] == "emulation") {
+            device = std::shared_ptr<E810EmulatedDevice>(new E810EmulatedDevice());
         }
         devices.push_back(device);
     }
@@ -218,21 +221,8 @@ void signal_handler(int) {
     quit.store(true);
 }
 
-void e810bmTesting() {
-    // printf("foobar %zu\n", nicbm::kMaxDmaLen);
-    // i40e::i40e_bm* model = new i40e::i40e_bm();
-    auto model = std::unique_ptr<i40e::i40e_bm>(new i40e::i40e_bm());
-    (void) model;
-
-    SimbricksProtoPcieDevIntro di = SimbricksProtoPcieDevIntro();
-    __builtin_dump_struct(&di, &printf);
-    model->SetupIntro(di);
-}
-
 
 int main(int argc, char** argv) {
-    e810bmTesting();
-
     // register signal handler to handle SIGINT gracefully to call destructors
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
