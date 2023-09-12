@@ -58,7 +58,7 @@ class VfioUserServer {
         size_t irq_err_pollfd_idx; // only one
         size_t irq_req_pollfd_idx; // only one
         std::vector<struct pollfd> pollfds;
-        std::shared_ptr<VfioConsumer> callback_context;
+        std::shared_ptr<VfioConsumer> callback_context; // may actually be NULL!
         std::set<void*> mapped;
         std::map<void*, dma_sg_t*> sgs;
 
@@ -108,6 +108,7 @@ class VfioUserServer {
             }
         }
 
+        /* set up regions as passthrough */
         int add_regions(std::vector<struct vfio_region_info> regions,
                 int device_fd)
         {

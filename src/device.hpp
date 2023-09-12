@@ -76,6 +76,7 @@ class E810EmulatedDevice : public VmuxDevice {
   private:
     std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
     std::shared_ptr<nicbm::CallbackAdaptor> callbacks;
+    SimbricksProtoPcieDevIntro deviceIntro;
 
   public:
     E810EmulatedDevice() {
@@ -87,19 +88,90 @@ class E810EmulatedDevice : public VmuxDevice {
       this->init_pci_ids();
     }
 
-    void setup_vfu(VfioUserServer &vfu) {};
+    void setup_vfu(VfioUserServer &vfu) {
+      // set up vfio-user register mediation
+      this->init_bar_callbacks(vfu);
+
+      // set up irqs 
+      // TODO
+
+      // set up callbacks
+    };
 
     void init_pci_ids() {
-      SimbricksProtoPcieDevIntro di = SimbricksProtoPcieDevIntro();
-      this->model->SetupIntro(di);
-      this->info.pci_vendor_id = di.pci_vendor_id;
-      this->info.pci_device_id = di.pci_device_id;
-      this->info.pci_class = di.pci_class;
-      this->info.pci_subclass = di.pci_subclass;
-      this->info.pci_revision = di.pci_revision;
-      __builtin_dump_struct(&di, &printf);
-      this->model->SetupIntro(di);
+      this->model->SetupIntro(this->deviceIntro);
+      this->info.pci_vendor_id = this->deviceIntro.pci_vendor_id;
+      this->info.pci_device_id = this->deviceIntro.pci_device_id;
+      this->info.pci_class = this->deviceIntro.pci_class;
+      this->info.pci_subclass = this->deviceIntro.pci_subclass;
+      this->info.pci_revision = this->deviceIntro.pci_revision;
+      __builtin_dump_struct(&this->deviceIntro, &printf);
+      this->model->SetupIntro(this->deviceIntro);
     }
+
+  private:
+    void init_bar_callbacks(VfioUserServer &vfu) {
+      for (int idx = 0; idx < SIMBRICKS_PROTO_PCIE_NBARS; idx++) {
+        __builtin_dump_struct(&(this->deviceIntro.bars[idx]), &printf);
+        auto region = this->deviceIntro.bars[idx];
+
+        int ret;
+
+        if (region.len == 0) {
+            printf("Bar region %d skipped.\n", idx);
+        }
+
+        // set up dma VM<->vmux
+        
+        struct iovec bar_mmap_areas[] = {
+            // no cb, just shmem
+            // { .iov_base  = (void*)region->offset,
+            // .iov_len = region->size}, 
+            { .iov_base  = (void*)0, .iov_len = region.len},
+        };
+
+        int flags = convert_flags(region.flags);
+        flags = SIMBRICKS_PROTO_PCIE_BAR_IO; // TODO
+        flags |= VFU_REGION_FLAG_RW;
+        ret = vfu_setup_region(vfu.vfu_ctx, idx,
+                region.len, &(this->expected_access_callback),
+                flags, bar_mmap_areas, 
+                1, // nr. items in bar_mmap_areas
+              0, 0); // 0, because fd and its offset are unused
+        if (ret < 0) {
+            die("failed to setup BAR region %d", idx);
+        }
+
+        // init some flags that are also set with qemu passthrough
+        vfu_pci_config_space_t *config_space =
+            vfu_pci_get_config_space(vfu.vfu_ctx);
+        vfu_bar_t *bar_config = &(config_space->hdr.bars[idx]);
+        // see pci spec sec 7.5.1.2.1 for meaning of bits:
+        if (region.flags & SIMBRICKS_PROTO_PCIE_BAR_PF) {
+          bar_config->mem.prefetchable = 1; // prefetchable
+        }
+        if (region.flags & SIMBRICKS_PROTO_PCIE_BAR_64) {
+          bar_config->mem.locatable = 0b10; // 64 bit
+        }
+
+        printf("Vfio-user: Bar region %d \
+                (size 0x%x) set up.\n", idx,
+                (uint)region.len);
+      }
+    }
+    static ssize_t expected_access_callback(
+              [[maybe_unused]] vfu_ctx_t *vfu_ctx,
+              [[maybe_unused]] char * const buf,
+              [[maybe_unused]] size_t count,
+              [[maybe_unused]] __loff_t offset,
+              [[maybe_unused]] const bool is_write
+              )
+      {
+        printf("a vfio register/DMA access callback was \
+                triggered (at 0x%lx, is write %d.\n",
+                offset, is_write);
+        return 0;
+      }
 };
 
 class PassthroughDevice : public VmuxDevice {
@@ -112,7 +184,7 @@ class PassthroughDevice : public VmuxDevice {
     void setup_vfu(VfioUserServer &vfu) {
       int ret; 
 
-      // set up vfio-user DMA
+      // set up vfio-user register passthrough
       if (this->vfioc != NULL) {
           // pass through registers, only if it is a passthrough device
           ret = vfu.add_regions(this->vfioc->regions, this->vfioc->device);
@@ -131,6 +203,7 @@ class PassthroughDevice : public VmuxDevice {
           vfu.add_msix_pollfds(this->vfioc->irqfds);
       }
 
+      // set up callbacks
       vfu.setup_passthrough_callbacks(this->vfioc);
     }
 

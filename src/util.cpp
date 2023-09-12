@@ -64,3 +64,15 @@ std::vector<int> get_hardware_ids(std::string pci_device,
 
     return result;
 }
+
+/* convert simbricks bar flags (SIMBRICKS_PROTO_PCIE_BAR_*) to vfio-user flags (VFU_REGION_FLAG_*) */
+int convert_flags(int bricks) {
+    int vfu = 0;
+    
+    // if BAR_IO (port io) is not set, it is FLAG_MEM (MMIO)
+    if (!(bricks & SIMBRICKS_PROTO_PCIE_BAR_IO)) {
+        vfu &= VFU_REGION_FLAG_MEM;
+    }
+
+    return vfu;
+}
