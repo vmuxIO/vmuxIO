@@ -10,7 +10,7 @@
 
 class VmuxRunner{
     public: 
-        VfioUserServer vfu;
+        std::shared_ptr<VfioUserServer> vfu;
         std::shared_ptr<VmuxDevice> device;
         std::thread runner;
         std::shared_ptr<Capabilities> caps;
@@ -28,9 +28,10 @@ class VmuxRunner{
         };
 
         VmuxRunner(std::string socket, std::shared_ptr<VmuxDevice> device, 
-                int efd): vfu(socket,efd), device(device) {
+                int efd): device(device) {
             state.store(0);
             this->socket = socket;
+            this->vfu = std::shared_ptr<VfioUserServer>(new VfioUserServer(socket, efd));
         }
 
         void start(){
@@ -50,9 +51,6 @@ class VmuxRunner{
         }
         bool is_connected(){
             return state == CONNECTED;
-        }
-        VfioUserServer& get_interrupts(){
-            return vfu;
         }
 
     private:
