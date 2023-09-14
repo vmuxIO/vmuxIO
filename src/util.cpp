@@ -41,7 +41,7 @@ std::vector<int> get_hardware_ids(std::string pci_device,
         "subsystem_vendor", "subsystem_device"};
     std::vector<int> result;
     int bytes_read;
-    char id_buffer[7];
+    char id_buffer[7] = {0};
     FILE* id;
 
     for(size_t i = 0; i < values.size(); i++ ){
