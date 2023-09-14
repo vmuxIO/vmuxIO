@@ -71,7 +71,7 @@ int convert_flags(int bricks) {
     
     // if BAR_IO (port io) is not set, it is FLAG_MEM (MMIO)
     if (!(bricks & SIMBRICKS_PROTO_PCIE_BAR_IO)) {
-        vfu &= VFU_REGION_FLAG_MEM;
+        vfu |= VFU_REGION_FLAG_MEM;
     }
 
     return vfu;
