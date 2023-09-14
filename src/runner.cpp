@@ -92,11 +92,11 @@ void VmuxRunner::initilize(){
     }
 
     vfu_pci_set_id(vfu->vfu_ctx, device->info.pci_vendor_id, device->info.pci_device_id,
-            device->info.pci_class, device->info.pci_subclass);
+            device->info.pci_subsystem_vendor_id, device->info.pci_subsystem_id);
     vfu_pci_config_space_t *config_space =
         vfu_pci_get_config_space(vfu->vfu_ctx);
     config_space->hdr.rid = device->info.pci_revision;
-    vfu_pci_set_class(vfu->vfu_ctx, 0x02, 0x00, 0x00);
+    vfu_pci_set_class(vfu->vfu_ctx, device->info.pci_class, device->info.pci_subclass, device->info.pci_revision);
 
     this->device->setup_vfu(*vfu);
 

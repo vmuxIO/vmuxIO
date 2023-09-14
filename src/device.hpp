@@ -21,15 +21,22 @@ struct DeviceInfo {
   //   uint64_t flags;
   // } __attribute__((packed)) bars[SIMBRICKS_PROTO_PCIE_NBARS];
 
+  // Vendor ID, Device ID, Subsystem Vendor ID, and Subsystem ID
   /** PCI vendor id */
   uint16_t pci_vendor_id;
   /** PCI device id */
   uint16_t pci_device_id;
-  /* PCI device class */
+  /** PCI subsystem vendor id **/
+  uint16_t pci_subsystem_vendor_id;
+  /** PCI subsystem id **/
+  uint16_t pci_subsystem_id;
+  /** PCI device revision id **/
+  uint8_t pci_device_revision_id;
+  /* PCI class */
   uint8_t pci_class;
-  /* PCI device subclass */
+  /* PCI subclass */
   uint8_t pci_subclass;
-  /* PCI device revision */
+  /* PCI revision */
   uint8_t pci_revision;
   // /* PCI prog if */
   // uint8_t pci_progif;
@@ -76,7 +83,7 @@ class E810EmulatedDevice : public VmuxDevice {
   private:
     std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
     std::shared_ptr<nicbm::CallbackAdaptor> callbacks;
-    SimbricksProtoPcieDevIntro deviceIntro;
+    SimbricksProtoPcieDevIntro deviceIntro = SimbricksProtoPcieDevIntro();
 
   public:
     E810EmulatedDevice() {
@@ -102,9 +109,14 @@ class E810EmulatedDevice : public VmuxDevice {
       this->model->SetupIntro(this->deviceIntro);
       this->info.pci_vendor_id = this->deviceIntro.pci_vendor_id;
       this->info.pci_device_id = this->deviceIntro.pci_device_id;
+      // Some values are not set by SetupIntro
+      this->info.pci_subsystem_vendor_id = 0x0086;
+      this->info.pci_subsystem_id = 0x0001;
+      this->info.pci_device_revision_id = 0x2;
       this->info.pci_class = this->deviceIntro.pci_class;
       this->info.pci_subclass = this->deviceIntro.pci_subclass;
       this->info.pci_revision = this->deviceIntro.pci_revision;
+      __builtin_dump_struct(&this->info, &printf);
       __builtin_dump_struct(&this->deviceIntro, &printf);
       this->model->SetupIntro(this->deviceIntro);
     }
@@ -112,7 +124,6 @@ class E810EmulatedDevice : public VmuxDevice {
   private:
     void init_bar_callbacks(VfioUserServer &vfu) {
       for (int idx = 0; idx < SIMBRICKS_PROTO_PCIE_NBARS; idx++) {
-        __builtin_dump_struct(&(this->deviceIntro.bars[idx]), &printf);
         auto region = this->deviceIntro.bars[idx];
 
         int ret;
@@ -121,23 +132,16 @@ class E810EmulatedDevice : public VmuxDevice {
             printf("Bar region %d skipped.\n", idx);
         }
 
-        // set up dma VM<->vmux
+        // set up register accesses VM<->vmux
         
-        struct iovec bar_mmap_areas[] = {
-            // no cb, just shmem
-            // { .iov_base  = (void*)region->offset,
-            // .iov_len = region->size}, 
-            { .iov_base  = (void*)0, .iov_len = region.len},
-        };
-
         int flags = convert_flags(region.flags);
-        flags = SIMBRICKS_PROTO_PCIE_BAR_IO; // TODO
         flags |= VFU_REGION_FLAG_RW;
         ret = vfu_setup_region(vfu.vfu_ctx, idx,
-                region.len, &(this->expected_access_callback),
-                flags, bar_mmap_areas, 
-                1, // nr. items in bar_mmap_areas
-              0, 0); // 0, because fd and its offset are unused
+                region.len,
+                &(this->expected_access_callback),
+                flags, NULL, 
+                0, // nr. items in bar_mmap_areas
+                -1, 0); // fd -1 and offset 0 because fd is unused
         if (ret < 0) {
             die("failed to setup BAR region %d", idx);
         }
@@ -220,23 +224,29 @@ class PassthroughDevice : public VmuxDevice {
           // "Failed to parse Hardware Information, expected %d IDs got %zu\n",
           // 5, pci_ids.size());
       }
-      this->info.pci_revision = pci_ids[0];
+      this->info.pci_device_revision_id = pci_ids[0];
       pci_ids.erase(pci_ids.begin()); // Only contains Vendor ID, Device ID,
                                       // Subsystem Vendor ID, Subsystem ID now
       this->info.pci_vendor_id = pci_ids[0];
       this->info.pci_device_id = pci_ids[1];
-      this->info.pci_class = pci_ids[2];
-      this->info.pci_subclass = pci_ids[3];
+      this->info.pci_subsystem_vendor_id = pci_ids[2];
+      this->info.pci_subsystem_id = pci_ids[3];
+
+      // sane defaults for pci (non-device) ids
+      this->info.pci_class = 0x2;
+      this->info.pci_subclass = 0x0;
+      this->info.pci_revision = 0x0;
+      __builtin_dump_struct(&this->info, &printf);
 
       printf("PCI-Device: %s\nIOMMU-Group: %s\nRevision: 0x%02X\n\
               IDs: 0x%04X,0x%04X,0x%04X,0x%04X\n",
               device.c_str(),
               group_arg.c_str(),
-              this->info.pci_revision,
+              this->info.pci_device_revision_id,
               this->info.pci_vendor_id,
               this->info.pci_device_id,
-              this->info.pci_class,
-              this->info.pci_subclass);
+              this->info.pci_subsystem_vendor_id,
+              this->info.pci_subsystem_id);
 
     }
 };
