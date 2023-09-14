@@ -7,7 +7,7 @@ let
     libvfio-user = fetchFromGitHub {
       owner = "vmuxIO";
       repo = "libvfio-user";
-      rev = "9a5124df49efed644f0db7e573ebd0367df480cd"; # master 09.06.22
+      rev = "9a5124df49efed644f0db7e573ebd0367df480cd"; # vmux branch 14.09.22
       #fetchSubmodules = true;
       sha256 = "sha256-v48G4GUzdHwdzZcpAjbZG3rutYR9rLXBqvx4clgB7kw=";
     };
