@@ -106,8 +106,8 @@ void VmuxRunner::initilize(){
 }
 
 void VmuxRunner::add_caps(shared_ptr<VfioConsumer> vfioc) {
-  std::shared_ptr<Capabilities> caps = std::shared_ptr<Capabilities>(
-      new Capabilities(&(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc->device_name));
+  std::shared_ptr<Capabilities> caps = std::make_shared<Capabilities>(
+      &(vfioc->regions[VFU_PCI_DEV_CFG_REGION_IDX]), vfioc->device_name);
   void *cap_data;
 
   cap_data = caps->pm();

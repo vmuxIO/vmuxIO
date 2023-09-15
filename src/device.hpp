@@ -89,8 +89,8 @@ class E810EmulatedDevice : public VmuxDevice {
     E810EmulatedDevice() {
       // printf("foobar %zu\n", nicbm::kMaxDmaLen);
       // i40e::i40e_bm* model = new i40e::i40e_bm();
-      this->model = std::unique_ptr<i40e::i40e_bm>(new i40e::i40e_bm());
-      this->callbacks = std::shared_ptr<nicbm::CallbackAdaptor>(new nicbm::CallbackAdaptor());
+      this->model = std::make_unique<i40e::i40e_bm>();
+      this->callbacks = std::make_shared<nicbm::CallbackAdaptor>();
       this->model->vmux = this->callbacks;
       this->init_pci_ids();
     }

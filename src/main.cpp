@@ -138,7 +138,7 @@ int _main(int argc, char** argv) {
             continue;
         }
         printf("Using: %s\n", pciAddresses[i].c_str());
-        vfioc.push_back(std::shared_ptr<VfioConsumer>(new VfioConsumer(pciAddresses[i].c_str())));
+        vfioc.push_back(std::make_shared<VfioConsumer>(pciAddresses[i].c_str()));
 
         if(vfioc[i]->init() < 0){
             die("failed to initialize vfio consumer");
@@ -154,13 +154,13 @@ int _main(int argc, char** argv) {
     for(size_t i = 0; i < pciAddresses.size(); i++) {
         std::shared_ptr<VmuxDevice> device;
         if (modes[i] == "passthrough") {
-            device = std::shared_ptr<PassthroughDevice>(new PassthroughDevice(vfioc[i], pciAddresses[i]));
+            device = std::make_shared<PassthroughDevice>(vfioc[i], pciAddresses[i]);
         }
         if (modes[i] == "stub") {
-            device = std::shared_ptr<StubDevice>(new StubDevice());
+            device = std::make_shared<StubDevice>();
         }
         if (modes[i] == "emulation") {
-            device = std::shared_ptr<E810EmulatedDevice>(new E810EmulatedDevice());
+            device = std::make_shared<E810EmulatedDevice>();
         }
         devices.push_back(device);
     }
@@ -169,7 +169,7 @@ int _main(int argc, char** argv) {
 
     for(size_t i = 0; i < pciAddresses.size(); i++){
         printf("Using: %s\n", pciAddresses[i].c_str());
-        runner.push_back(std::unique_ptr<VmuxRunner>(new VmuxRunner(sockets[i], devices[i], efd)));
+        runner.push_back(std::make_unique<VmuxRunner>(sockets[i], devices[i], efd));
         runner[i]->start();
 
         while(runner[i]->state !=2);
