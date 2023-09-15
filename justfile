@@ -22,6 +22,9 @@ help:
 vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci_full"' hosts/$(hostname).yaml`:
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
+vmuxE810:
+  sudo {{proot}}/build/vmux -d none -m emulation -s {{vmuxSock}}
+
 # connect to `just qemu` vm
 ssh COMMAND="":
   ssh \
