@@ -3,6 +3,9 @@
 
 #ifndef _ICE_LAN_TX_RX_H_
 #define _ICE_LAN_TX_RX_H_
+
+#include <linux/types.h>
+
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;

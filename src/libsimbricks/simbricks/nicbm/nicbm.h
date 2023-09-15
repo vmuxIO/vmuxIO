@@ -29,6 +29,8 @@
 #include <cstring>
 #include <deque>
 #include <set>
+#include "util.hpp"
+#include <memory>
 
 #include <src/libsimbricks/simbricks/base/cxxatomicfix.h>
 extern "C" {
@@ -56,6 +58,47 @@ class TimedEvent {
   uint64_t time_;
   int priority_;
 };
+
+/*
+ * Adaptor to replace the simbricks class Runner
+ */
+class CallbackAdaptor {
+  public:
+    /* these three are for `Runner::Device`. */
+    void IssueDma(nicbm::DMAOp &op) {
+      printf("CallbackAdaptor::IssueDma:\n");
+      __builtin_dump_struct(&op, &printf);
+    }
+    void MsiIssue(uint8_t vec) {
+      printf("CallbackAdaptor::MsiIssue(%d)\n", vec);
+    }
+    void MsiXIssue(uint8_t vec) {
+      printf("CallbackAdaptor::MsiXIssue(%d)\n", vec);
+    }
+    void IntXIssue(bool level) {
+      printf("CallbackAdaptor::IntXIssue(%d)\n", level);
+    }
+    void EthSend(const void *data, size_t len) {
+      printf("CallbackAdaptor::EthSend(len=%zu)\n", len);
+    }
+
+    void EventSchedule(nicbm::TimedEvent &evt) {
+      printf("CallbackAdaptor::EventSchedule\n");
+    }
+    void EventCancel(nicbm::TimedEvent &evt) {
+      printf("CallbackAdaptor::EventCancel\n");
+    }
+
+    uint64_t TimePs() const {
+     die("unimplemented");
+     return 0;
+    }
+    uint64_t GetMacAddr() const {
+     die("unimplemented");
+     return 0;
+    }
+};
+
 
 /**
  * The Runner drives the main simulation loop. It's initialized with a reference
@@ -127,8 +170,8 @@ class Runner {
 
   class Device {
    public:
-    Runner *runner_;
-    DeviceEmulator *emulator_;
+    Runner *runner_; // vmux leaves this at null and replaces it with CallbackAdaptor
+    std::shared_ptr<CallbackAdaptor> vmux;
 
    protected:
     bool int_intx_en_;

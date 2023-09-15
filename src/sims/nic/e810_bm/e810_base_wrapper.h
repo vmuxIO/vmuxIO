@@ -5,6 +5,7 @@
 #ifndef I40E_BASE_WRAPPER_H_
 #define I40E_BASE_WRAPPER_H_
 
+#include <linux/types.h>
 #include <stdint.h>
 
 #define PF_DRIVER

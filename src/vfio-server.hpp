@@ -37,6 +37,10 @@ extern "C" {
 
 class VfioUserServer;
 
+// break cyclic import: define empty classes (defined in device.hpp)
+class VmuxDevice;
+class PassthroughDevice;
+
 
 struct interrupt_callback{
     int fd;
@@ -58,9 +62,15 @@ class VfioUserServer {
         size_t irq_err_pollfd_idx; // only one
         size_t irq_req_pollfd_idx; // only one
         std::vector<struct pollfd> pollfds;
-        std::shared_ptr<VfioConsumer> callback_context;
+        std::shared_ptr<VfioConsumer> callback_context; // may actually be NULL!
         std::set<void*> mapped;
         std::map<void*, dma_sg_t*> sgs;
+
+        /** In the constructor, we leak the raw device pointer into vfu to be
+         * used as private context passed into callbacks. This variable makes
+         * sure, that this class retains a shared_ptr backing the raw pointer
+         * during the lifetime of vfu. **/
+        std::shared_ptr<VmuxDevice> vfu_pvt_anker;
 
         int efd;
 
@@ -69,7 +79,7 @@ class VfioUserServer {
         interrupt_callback ic[IC_MAX];
         size_t ic_used;
 
-        VfioUserServer(std::string sock, int efd)
+        VfioUserServer(std::string sock, int efd, std::shared_ptr<VmuxDevice> device)
         {
             this->sock = sock;
             this->efd = efd;
@@ -84,6 +94,19 @@ class VfioUserServer {
                             this->sock.c_str());
                 }
             }
+
+            // TODO this is a workaround to keep legacy code for passthrough in
+            // VfioUserServer, even though it is also used for non-passthrough
+            void* vfu_callback_context;
+            if (std::dynamic_pointer_cast<PassthroughDevice>(device)) {
+                vfu_callback_context = this;
+            } else {
+                this->vfu_pvt_anker = device;
+                vfu_callback_context = device.get();
+            }
+            this->vfu_ctx = vfu_create_ctx(VFU_TRANS_SOCK, this->sock.c_str(),
+                                           LIBVFIO_USER_FLAG_ATTACH_NB, vfu_callback_context,
+                                           VFU_DEV_TYPE_PCI);
         }
 
         ~VfioUserServer() {
@@ -108,6 +131,7 @@ class VfioUserServer {
             }
         }
 
+        /* set up regions as passthrough */
         int add_regions(std::vector<struct vfio_region_info> regions,
                 int device_fd)
         {
@@ -301,7 +325,7 @@ class VfioUserServer {
             return &this->pollfds[this->run_ctx_pollfd_idx.value()];
         }
 
-        void setup_callbacks(std::shared_ptr<VfioConsumer> callback_context)
+        void setup_passthrough_callbacks(std::shared_ptr<VfioConsumer> callback_context)
         {
             int ret;
             this->callback_context = callback_context;
@@ -314,9 +338,12 @@ class VfioUserServer {
             if (ret)
                 die("setting up reset callback for libvfio-user failed %d",
                         ret);
-            vfu_setup_device_dma(this->vfu_ctx,
+            ret = vfu_setup_device_dma(this->vfu_ctx,
                     VfioUserServer::dma_register_cb,
                     VfioUserServer::dma_unregister_cb);
+              if (ret)
+                    die("setting up dma callback for libvfio-user failed %d",
+                          ret);
             ret = vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_INTX_IRQ,
                     VfioUserServer::intx_state_cb);
             if (ret)
