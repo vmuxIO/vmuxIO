@@ -84,6 +84,13 @@ class VfioUserServer {
                             this->sock.c_str());
                 }
             }
+            this->vfu_ctx = vfu_create_ctx(
+                VFU_TRANS_SOCK,
+                this->sock.c_str(),
+                LIBVFIO_USER_FLAG_ATTACH_NB,
+                this,
+                VFU_DEV_TYPE_PCI
+                );
         }
 
         ~VfioUserServer() {

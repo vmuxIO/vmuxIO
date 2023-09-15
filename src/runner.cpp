@@ -68,13 +68,6 @@ void VmuxRunner::initilize(){
     running.store(1);
 
     printf("initialize %s\n", vfu->sock.c_str());
-    vfu->vfu_ctx = vfu_create_ctx(
-            VFU_TRANS_SOCK,
-            vfu->sock.c_str(),
-            LIBVFIO_USER_FLAG_ATTACH_NB,
-            &vfu,
-            VFU_DEV_TYPE_PCI
-            );
 
     if (vfu->vfu_ctx == NULL) {
         die("failed to initialize device emulation");
