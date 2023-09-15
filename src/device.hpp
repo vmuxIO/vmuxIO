@@ -82,7 +82,13 @@ class StubDevice : public VmuxDevice {
 class E810EmulatedDevice : public VmuxDevice {
   private:
     std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
+                                          //
+    /** we don't pass the entire device to the model, but only the callback
+     * adaptor. We choose this approach, because we don't want to purpose
+     * build the device to fit the simbricks code, and don't want to change
+     * the simbricks code too much to fit the vmux code. **/
     std::shared_ptr<nicbm::CallbackAdaptor> callbacks;
+
     SimbricksProtoPcieDevIntro deviceIntro = SimbricksProtoPcieDevIntro();
 
   public:
@@ -90,7 +96,9 @@ class E810EmulatedDevice : public VmuxDevice {
       // printf("foobar %zu\n", nicbm::kMaxDmaLen);
       // i40e::i40e_bm* model = new i40e::i40e_bm();
       this->model = std::make_unique<i40e::i40e_bm>();
+
       this->callbacks = std::make_shared<nicbm::CallbackAdaptor>();
+
       this->model->vmux = this->callbacks;
       this->init_pci_ids();
     }
@@ -102,7 +110,9 @@ class E810EmulatedDevice : public VmuxDevice {
       // set up irqs 
       // TODO
 
-      // set up callbacks
+      // set up libvfio-user callbacks
+      // vfu.setup_passthrough_callbacks(this->vfioc);
+      this->init_general_callbacks(vfu);
     };
 
     void init_pci_ids() {
@@ -122,6 +132,75 @@ class E810EmulatedDevice : public VmuxDevice {
     }
 
   private:
+    void init_general_callbacks(VfioUserServer &vfu) {
+      int ret;
+      // I think quiescing only applies when using vfu_add_to_sgl and
+      // vfu_sgl_read (see libvfio-user/docs/memory-mapping.md
+      // vfu_setup_device_quiesce_cb(this->vfu_ctx,
+      //      VfioUserServer::quiesce_cb);
+      ret = vfu_setup_device_reset_cb(vfu.vfu_ctx,
+              E810EmulatedDevice::reset_device_cb);
+      if (ret)
+        die("setting up reset callback for libvfio-user failed %d",
+                  ret);
+
+      ret = vfu_setup_device_dma(vfu.vfu_ctx,
+              E810EmulatedDevice::dma_register_cb,
+              E810EmulatedDevice::dma_unregister_cb);
+      if (ret)
+        die("setting up dma callback for libvfio-user failed %d",
+                  ret);
+
+      ret = vfu_setup_irq_state_callback(vfu.vfu_ctx, VFU_DEV_INTX_IRQ,
+              E810EmulatedDevice::irq_state_unimplemented_cb);
+      if (ret)
+        die("setting up intx state callback for libvfio-user failed");
+
+      ret = vfu_setup_irq_state_callback(vfu.vfu_ctx, VFU_DEV_MSIX_IRQ,
+              E810EmulatedDevice::irq_state_unimplemented_cb);
+      if (ret)
+        die("setting up msix state callback for libvfio-user failed");
+
+      // register unimplemented callback for all unused interrupt types
+      for (int type = 0; type < VFU_DEV_NUM_IRQS; type++) {
+        if (type == VFU_DEV_INTX_IRQ || type == VFU_DEV_MSIX_IRQ)
+          continue;
+        ret = vfu_setup_irq_state_callback(vfu.vfu_ctx,
+                  (enum vfu_dev_irq_type) type,
+                  E810EmulatedDevice::irq_state_unimplemented_cb);
+        if (ret)
+          die("setting up irq type %d callback for libvfio-user \
+                      failed", type);
+      }
+    }
+    static int reset_device_cb(vfu_ctx_t *vfu_ctx,
+            [[maybe_unused]] vfu_reset_type_t type)
+    {
+      VfioUserServer *vfu = (VfioUserServer*) vfu_get_private(vfu_ctx);
+      printf("resetting device\n"); // this happens at VM boot
+      return 0;
+      // TODO
+    }
+    static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
+            [[maybe_unused]] vfu_dma_info_t *info)
+    {
+      // TODO
+    }
+    static void dma_unregister_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
+            [[maybe_unused]] vfu_dma_info_t *info)
+    {
+      // TODO
+    }
+    static void irq_state_unimplemented_cb(
+            [[maybe_unused]] vfu_ctx_t *vfu_ctx,
+            [[maybe_unused]] uint32_t start,
+            [[maybe_unused]] uint32_t count,
+            [[maybe_unused]] bool mask
+            )
+    {
+        die("irq_state_unimplemented_cb unimplemented");
+    }
+
     void init_bar_callbacks(VfioUserServer &vfu) {
       for (int idx = 0; idx < SIMBRICKS_PROTO_PCIE_NBARS; idx++) {
         auto region = this->deviceIntro.bars[idx];

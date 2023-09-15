@@ -322,9 +322,12 @@ class VfioUserServer {
             if (ret)
                 die("setting up reset callback for libvfio-user failed %d",
                         ret);
-            vfu_setup_device_dma(this->vfu_ctx,
+            ret = vfu_setup_device_dma(this->vfu_ctx,
                     VfioUserServer::dma_register_cb,
                     VfioUserServer::dma_unregister_cb);
+              if (ret)
+                    die("setting up dma callback for libvfio-user failed %d",
+                          ret);
             ret = vfu_setup_irq_state_callback(this->vfu_ctx, VFU_DEV_INTX_IRQ,
                     VfioUserServer::intx_state_cb);
             if (ret)
