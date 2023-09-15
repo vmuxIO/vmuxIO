@@ -31,7 +31,7 @@ class VmuxRunner{
                 int efd): device(device) {
             state.store(0);
             this->socket = socket;
-            this->vfu = std::make_shared<VfioUserServer>(socket, efd);
+            this->vfu = std::make_shared<VfioUserServer>(socket, efd, device);
         }
 
         void start(){

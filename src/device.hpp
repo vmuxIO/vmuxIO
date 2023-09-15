@@ -133,6 +133,7 @@ class E810EmulatedDevice : public VmuxDevice {
 
   private:
     void init_general_callbacks(VfioUserServer &vfu) {
+      // TODO all those callback functions need implementation
       int ret;
       // I think quiescing only applies when using vfu_add_to_sgl and
       // vfu_sgl_read (see libvfio-user/docs/memory-mapping.md
@@ -176,20 +177,20 @@ class E810EmulatedDevice : public VmuxDevice {
     static int reset_device_cb(vfu_ctx_t *vfu_ctx,
             [[maybe_unused]] vfu_reset_type_t type)
     {
-      VfioUserServer *vfu = (VfioUserServer*) vfu_get_private(vfu_ctx);
+      E810EmulatedDevice *device = (E810EmulatedDevice*) vfu_get_private(vfu_ctx);
       printf("resetting device\n"); // this happens at VM boot
+      // device->model->SignalInterrupt(1, 1); // just as an example: do stuff
       return 0;
-      // TODO
     }
     static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
             [[maybe_unused]] vfu_dma_info_t *info)
     {
-      // TODO
+      printf("dma register cb\n");
     }
     static void dma_unregister_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
             [[maybe_unused]] vfu_dma_info_t *info)
     {
-      // TODO
+      printf("dma unregister cb\n");
     }
     static void irq_state_unimplemented_cb(
             [[maybe_unused]] vfu_ctx_t *vfu_ctx,
@@ -198,7 +199,7 @@ class E810EmulatedDevice : public VmuxDevice {
             [[maybe_unused]] bool mask
             )
     {
-        die("irq_state_unimplemented_cb unimplemented");
+        printf("irq_state_unimplemented_cb unimplemented\n");
     }
 
     void init_bar_callbacks(VfioUserServer &vfu) {

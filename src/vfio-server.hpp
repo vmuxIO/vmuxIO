@@ -37,6 +37,10 @@ extern "C" {
 
 class VfioUserServer;
 
+// break cyclic import: define empty classes (defined in device.hpp)
+class VmuxDevice;
+class PassthroughDevice;
+
 
 struct interrupt_callback{
     int fd;
@@ -62,6 +66,12 @@ class VfioUserServer {
         std::set<void*> mapped;
         std::map<void*, dma_sg_t*> sgs;
 
+        /** In the constructor, we leak the raw device pointer into vfu to be
+         * used as private context passed into callbacks. This variable makes
+         * sure, that this class retains a shared_ptr backing the raw pointer
+         * during the lifetime of vfu. **/
+        std::shared_ptr<VmuxDevice> vfu_pvt_anker;
+
         int efd;
 
         /// MSIX irqs + 1 intx + 1 msi + 1 err + 1 req
@@ -69,7 +79,7 @@ class VfioUserServer {
         interrupt_callback ic[IC_MAX];
         size_t ic_used;
 
-        VfioUserServer(std::string sock, int efd)
+        VfioUserServer(std::string sock, int efd, std::shared_ptr<VmuxDevice> device)
         {
             this->sock = sock;
             this->efd = efd;
@@ -84,13 +94,19 @@ class VfioUserServer {
                             this->sock.c_str());
                 }
             }
-            this->vfu_ctx = vfu_create_ctx(
-                VFU_TRANS_SOCK,
-                this->sock.c_str(),
-                LIBVFIO_USER_FLAG_ATTACH_NB,
-                this,
-                VFU_DEV_TYPE_PCI
-                );
+
+            // TODO this is a workaround to keep legacy code for passthrough in
+            // VfioUserServer, even though it is also used for non-passthrough
+            void* vfu_callback_context;
+            if (std::dynamic_pointer_cast<PassthroughDevice>(device)) {
+                vfu_callback_context = this;
+            } else {
+                this->vfu_pvt_anker = device;
+                vfu_callback_context = device.get();
+            }
+            this->vfu_ctx = vfu_create_ctx(VFU_TRANS_SOCK, this->sock.c_str(),
+                                           LIBVFIO_USER_FLAG_ATTACH_NB, vfu_callback_context,
+                                           VFU_DEV_TYPE_PCI);
         }
 
         ~VfioUserServer() {
