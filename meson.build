@@ -23,6 +23,9 @@ sims_flags = [
 libvfio_user = subproject('libvfio-user')
 libvfio_user_dep = libvfio_user.get_variable('libvfio_user_dep')
 
+nic_emu = subproject('nic-emu')
+nic_emu_dep = nic_emu.get_variable('nic_emu_dep')
+
 sources = files()
 subdir('src')
 # cxx = meson.get_compiler('cpp')
@@ -36,7 +39,7 @@ exe = executable('vmux', 'src/main.cpp',
   # dependencies : [libvfio_user_dep, cxx.find_library('boost_fiber')],
   # link_args : '-lboost',
   link_args : ['-lboost_fiber', '-lboost_context'],
-  dependencies : [libvfio_user_dep, boost_dep],
+  dependencies : [libvfio_user_dep, boost_dep, nic_emu_dep],
   install : true)
 
 test('basic', exe)
