@@ -312,6 +312,8 @@ class SimpleDevice : public Runner::Device {
   }
 };
 
+static bool rust_logs_initialized = false;
+
 class E1000Device : public Runner::Device {
     E1000FFI* e1000;
 
@@ -332,6 +334,11 @@ class E1000Device : public Runner::Device {
     }
 
     E1000Device() {
+        if (!rust_logs_initialized) {
+            initialize_rust_logging(4); // Debug logs
+            rust_logs_initialized = true;
+        }
+
         auto callbacks = FfiCallbacks {
             this,
             send_cb,
@@ -345,10 +352,6 @@ class E1000Device : public Runner::Device {
 
     ~E1000Device() {
         drop_e1000(e1000);
-    }
-
-    void SetupIntro(struct SimbricksProtoPcieDevIntro &di) override {
-        initialize_rust_logging(4); // Debug logs
     }
 
     void RegRead(uint8_t bar, uint64_t addr, void *dest, size_t len) override {
