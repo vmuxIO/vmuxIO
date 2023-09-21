@@ -315,24 +315,25 @@ class SimpleDevice : public Runner::Device {
 class E1000Device : public Runner::Device {
     E1000FFI* e1000;
 
-    static void send_cb(const uint8_t *buffer, uintptr_t len) {
+    static void send_cb(void *private_ptr, const uint8_t *buffer, uintptr_t len) {
         printf("Send CB\n");
     }
 
-    static void dma_read_cb(uintptr_t dma_address, uint8_t *buffer, uintptr_t len) {
+    static void dma_read_cb(void *private_ptr, uintptr_t dma_address, uint8_t *buffer, uintptr_t len) {
         printf("Dma read CB\n");
     }
 
-    static void dma_write_cb(uintptr_t dma_address, const uint8_t *buffer, uintptr_t len) {
+    static void dma_write_cb(void *private_ptr, uintptr_t dma_address, const uint8_t *buffer, uintptr_t len) {
         printf("Dma write CB\n");
     }
 
-    static void issue_interrupt_cb() {
+    static void issue_interrupt_cb(void *private_ptr) {
         printf("Issue interrupt CB\n");
     }
 
     E1000Device() {
         auto callbacks = FfiCallbacks {
+            this,
             send_cb,
             dma_read_cb,
             dma_write_cb,
