@@ -102,6 +102,11 @@
         inherit self;
       };
       dpdk = mydpdk;
+      dpvs = pkgs.callPackage ./nix/dpvs.nix {
+        linux = pkgs.linuxPackages_5_10.kernel;
+        inherit (flakepkgs) linux-firmware-pinned;
+        inherit self;
+      };
       pktgen = pkgs.callPackage ./nix/pktgen.nix {
         dpdk = mydpdk;
       };

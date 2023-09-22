@@ -9,14 +9,14 @@
 
 let
   mod = false; #kernel != null;
-  dpdkVersion = "21.05";
+  dpdkVersion = "20.11";
 in stdenv.mkDerivation rec {
   pname = "dpdk";
   version = "${dpdkVersion}" + lib.optionalString mod "-${kernel.version}";
 
   src = fetchurl {
     url = "https://fast.dpdk.org/rel/dpdk-${dpdkVersion}.tar.xz";
-    sha256 = "sha256-HhJJm0xfzbV8g+X+GE6mvs3ffPCSiTwsXvLvsO7BLws=";
+    sha256 = "sha256-cPdrKhAKoDCR/T2vcHOu8h0sEYa7HnJrhXCCuZdXdWU=";
   };
 
   nativeBuildInputs = [
@@ -40,7 +40,7 @@ in stdenv.mkDerivation rec {
   ] ++ lib.optionals mod kernel.moduleBuildDependencies;
 
   patches = [
-    ./dpdk-new-meson.patch
+    # ./dpdk-new-meson.patch
   ];
 
   postPatch = ''
@@ -58,6 +58,11 @@ in stdenv.mkDerivation rec {
 #define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/"    
 #define ICE_PKG_FILE_SEARCH_PATH_UPDATES "/lib/firmware/updates/intel/ice/ddp/"               
 
+    substituteInPlace lib/librte_mbuf/rte_mbuf_dyn.h \
+      --replace "#include <sys/types.h>
+    " "#include <sys/types.h>
+    #include <stdint.h>
+    "
   '';
 
   mesonFlags = [
@@ -85,8 +90,16 @@ in stdenv.mkDerivation rec {
     rm -f $kmod/lib/modules/${kernel.modDirVersion}/build
   '';
 
-  postInstall = lib.optionalString (withExamples != []) ''
+  postInstall = (lib.optionalString (withExamples != []) ''
     find examples -type f -executable -exec install {} $out/bin \;
+  '') + ''
+    pwd
+    ls
+    # substituteInPlace include/rte_mbuf_dyn.h \
+    #   --replace "#include <sys/types.h>
+    # " "#include <sys/types.h>
+    # #include <stdint.h>
+    # "
   '';
 
   outputs = [ "out" ] ++ lib.optional mod "kmod";
