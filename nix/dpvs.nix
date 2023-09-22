@@ -121,6 +121,8 @@ stdenv.mkDerivation {
     "
     substituteInPlace ./tools/ipvsadm/ipvsadm.c \
       --replace '#include "popt.h"' '#include <popt.h>'
+    substituteInPlace ./Makefile \
+      --replace 'INSDIR  =' 'INSDIR  ?='
     substituteInPlace ./dpdk-result/lib/pkgconfig/libdpdk.pc \
       --replace "${dpdk}" "$sourceRoot/dpdk-result"
   '';
@@ -144,6 +146,7 @@ stdenv.mkDerivation {
   '';
 
   installPhase = ''
+    export INSDIR=$out/bin
     make install
   '';
   # installPhase = ''
