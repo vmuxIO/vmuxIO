@@ -98,9 +98,10 @@ stdenv.mkDerivation {
   ];
   RTE_KERNELDIR = "${linux.dev}/lib/modules/${linux.modDirVersion}/build";
   CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
-  CFLAGS = "-Wno-deprecated-declarations -Wno-address";
+  CFLAGS = "-Wno-deprecated-declarations -Wno-address -ggdb -Og";
   PKG_CONFIG_PATH = "${dpdk}/lib/pkgconfig/";
   hardeningDisable = [ "all" ];
+  # NIX_CFLAGS_COMPILE = toString (args.NIX_CFLAGS_COMPILE or "") + " -ggdb -Og";
 
   dontConfigure = true;
 
@@ -123,6 +124,15 @@ stdenv.mkDerivation {
       --replace '#include "popt.h"' '#include <popt.h>'
     substituteInPlace ./Makefile \
       --replace 'INSDIR  =' 'INSDIR  ?='
+    substituteInPlace ./src/netif.c \
+      --replace "return rss_value;" "return rss_value & (!ETH_RSS_IPV6_EX); // ignore this one feature not supported by E810"
+
+    # dpvs sample config crashes, if not all cores are configured. Sample config uses 9 cores.
+    substituteInPlace ./src/config.mk \
+      --replace 'DPVS_MAX_LCORE=64' 'DPVS_MAX_LCORE=9'
+    substituteInPlace ./src/ctrl.c \
+      --replace 'MSG_MAX_LCORE_SUPPORTED 64' 'MSG_MAX_LCORE_SUPPORTED 9'
+
     substituteInPlace ./dpdk-result/lib/pkgconfig/libdpdk.pc \
       --replace "${dpdk}" "$sourceRoot/dpdk-result"
   '';
@@ -141,13 +151,14 @@ stdenv.mkDerivation {
 
   buildPhase = ''
     export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$sourceRoot/dpdk-result/lib/pkgconfig"
-    make
-    # make install
+    make DEBUG=1
   '';
 
   installPhase = ''
     export INSDIR=$out/bin
     make install
+    mkdir -p $out/share/conf
+    cp -r /build/$sourceRoot/conf $out/share
   '';
   # installPhase = ''
   #   mkdir -p $out/bin
@@ -182,4 +193,5 @@ stdenv.mkDerivation {
   # '';
 
   # dontFixup = true;
+  dontStrip = true;
 }

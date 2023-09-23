@@ -5,18 +5,19 @@
 , libbsd, numactl, libbpf, zlib, libelf, jansson, openssl, libpcap
 , doxygen, python3
 , withExamples ? []
-, shared ? false }:
+, shared ? false 
+, linux-firmware-pinned}:
 
 let
   mod = false; #kernel != null;
-  dpdkVersion = "20.11";
+  dpdkVersion = "20.11.9";
 in stdenv.mkDerivation rec {
   pname = "dpdk";
   version = "${dpdkVersion}" + lib.optionalString mod "-${kernel.version}";
 
   src = fetchurl {
     url = "https://fast.dpdk.org/rel/dpdk-${dpdkVersion}.tar.xz";
-    sha256 = "sha256-cPdrKhAKoDCR/T2vcHOu8h0sEYa7HnJrhXCCuZdXdWU=";
+    sha256 = "sha256-ji+6fx/G+6MQHf+Ke8dstE8h14W8S+mVUE3xFQVWn30=";
   };
 
   nativeBuildInputs = [
@@ -48,14 +49,14 @@ in stdenv.mkDerivation rec {
     ls -la drivers/net/ice/ice_ethdev.c
     substituteInPlace drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_DEFAULT "/lib/firmware/intel/ice/ddp/ice.pkg"' \
-      '#define ICE_PKG_FILE_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
+      '#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
     substituteInPlace drivers/net/ice/ice_ethdev.h --replace \
       '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/lib/firmware/intel/ice/ddp/"' \
-      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/"'
+      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"'
     #exit 1
-#define ICE_PKG_FILE_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/ice-1.3.26.0.pkg"
+#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"
 #define ICE_PKG_FILE_UPDATES "/lib/firmware/updates/intel/ice/ddp/ice.pkg"                    
-#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/"    
+#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"    
 #define ICE_PKG_FILE_SEARCH_PATH_UPDATES "/lib/firmware/updates/intel/ice/ddp/"               
 
     substituteInPlace lib/librte_mbuf/rte_mbuf_dyn.h \
