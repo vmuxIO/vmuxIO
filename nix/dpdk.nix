@@ -5,19 +5,18 @@
 , libbsd, numactl, libbpf, zlib, libelf, jansson, openssl, libpcap
 , doxygen, python3
 , withExamples ? []
-, shared ? false 
-, linux-firmware-pinned}:
+, shared ? false }:
 
 let
   mod = false; #kernel != null;
-  dpdkVersion = "20.11.9";
+  dpdkVersion = "21.05";
 in stdenv.mkDerivation rec {
   pname = "dpdk";
   version = "${dpdkVersion}" + lib.optionalString mod "-${kernel.version}";
 
   src = fetchurl {
     url = "https://fast.dpdk.org/rel/dpdk-${dpdkVersion}.tar.xz";
-    sha256 = "sha256-ji+6fx/G+6MQHf+Ke8dstE8h14W8S+mVUE3xFQVWn30=";
+    sha256 = "sha256-HhJJm0xfzbV8g+X+GE6mvs3ffPCSiTwsXvLvsO7BLws=";
   };
 
   nativeBuildInputs = [
@@ -41,7 +40,7 @@ in stdenv.mkDerivation rec {
   ] ++ lib.optionals mod kernel.moduleBuildDependencies;
 
   patches = [
-    # ./dpdk-new-meson.patch
+    ./dpdk-new-meson.patch
   ];
 
   postPatch = ''
@@ -49,21 +48,16 @@ in stdenv.mkDerivation rec {
     ls -la drivers/net/ice/ice_ethdev.c
     substituteInPlace drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_DEFAULT "/lib/firmware/intel/ice/ddp/ice.pkg"' \
-      '#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
+      '#define ICE_PKG_FILE_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
     substituteInPlace drivers/net/ice/ice_ethdev.h --replace \
       '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/lib/firmware/intel/ice/ddp/"' \
-      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"'
+      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/"'
     #exit 1
-#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"
+#define ICE_PKG_FILE_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/ice-1.3.26.0.pkg"
 #define ICE_PKG_FILE_UPDATES "/lib/firmware/updates/intel/ice/ddp/ice.pkg"                    
-#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"    
+#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/scratch/okelmann/linux-firmware/intel/ice/ddp/"    
 #define ICE_PKG_FILE_SEARCH_PATH_UPDATES "/lib/firmware/updates/intel/ice/ddp/"               
 
-    substituteInPlace lib/librte_mbuf/rte_mbuf_dyn.h \
-      --replace "#include <sys/types.h>
-    " "#include <sys/types.h>
-    #include <stdint.h>
-    "
   '';
 
   mesonFlags = [
@@ -91,16 +85,8 @@ in stdenv.mkDerivation rec {
     rm -f $kmod/lib/modules/${kernel.modDirVersion}/build
   '';
 
-  postInstall = (lib.optionalString (withExamples != []) ''
+  postInstall = lib.optionalString (withExamples != []) ''
     find examples -type f -executable -exec install {} $out/bin \;
-  '') + ''
-    pwd
-    ls
-    # substituteInPlace include/rte_mbuf_dyn.h \
-    #   --replace "#include <sys/types.h>
-    # " "#include <sys/types.h>
-    # #include <stdint.h>
-    # "
   '';
 
   outputs = [ "out" ] ++ lib.optional mod "kmod";

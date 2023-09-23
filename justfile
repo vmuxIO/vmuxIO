@@ -392,15 +392,6 @@ trex_ieee1588:
   cd automation/trex_control_plane/interactive/
   python3 udp_1pkt_src_ip_split_latency_ieee_1588.py
 
-dpvs:
-  just prepare
-  echo 8192 | sudo tee /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
-  echo 8192 | sudo tee /sys/devices/system/node/node1/hugepages/hugepages-2048kB/nr_hugepages
-  sudo mount -t hugetlbfs -o pagesize=2M nodev /tmp/mnt
-  echo spawn exactly one VF and bind it to vfio
-  echo make sure dpdk-devbind only detects exactly one compatible device (otherwise dpvs fails)
-  sudo modprobe rte_kni carrier=on
-
 vfio-user-server:
   qemu-system-x86_64 \
   -machine x-remote,vfio-user=on \
