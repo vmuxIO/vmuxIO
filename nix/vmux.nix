@@ -55,7 +55,7 @@ pkgs.clangStdenv.mkDerivation {
     numactl
     luajit
     libpcap
-    boost
+    (boost.override { enableStatic = true; enableShared = false; })
 
     json_c
     cmocka
