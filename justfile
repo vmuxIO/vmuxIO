@@ -400,6 +400,9 @@ dpvs:
   echo spawn exactly one VF and bind it to vfio
   echo make sure dpdk-devbind only detects exactly one compatible device (otherwise dpvs fails)
   sudo modprobe rte_kni carrier=on
+  echo with E810 VF (iavf) the following inits and starts polling
+  echo with E810 PF (ice) the following inits and start polling, but seems to use some fallback function (NETIF: dpdk_set_mc_list: rte_eth_dev_set_mc_addr_list is not supported, enable all multicast.)
+  sudo ./result/bin/dpvs -c ./nix/dpvs.conf.single-nic.sample -- -l 0-8
 
 vfio-user-server:
   qemu-system-x86_64 \
