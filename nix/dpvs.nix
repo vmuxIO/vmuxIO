@@ -127,12 +127,6 @@ stdenv.mkDerivation {
     substituteInPlace ./src/netif.c \
       --replace "return rss_value;" "return rss_value & (!ETH_RSS_IPV6_EX); // ignore this one feature not supported by E810"
 
-    # dpvs sample config crashes, if not all cores are configured. Sample config uses 9 cores.
-    substituteInPlace ./src/config.mk \
-      --replace 'DPVS_MAX_LCORE=64' 'DPVS_MAX_LCORE=9'
-    substituteInPlace ./src/ctrl.c \
-      --replace 'MSG_MAX_LCORE_SUPPORTED 64' 'MSG_MAX_LCORE_SUPPORTED 9'
-
     substituteInPlace ./dpdk-result/lib/pkgconfig/libdpdk.pc \
       --replace "${dpdk}" "$sourceRoot/dpdk-result"
   '';
