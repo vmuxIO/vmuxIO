@@ -65,9 +65,7 @@
     flake-utils,
     nixos-generators,
     ...
-  } @ args: let
-  in
-  (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
+  } @ args: (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
     pkgs2211 = args.nixpkgs-2211.legacyPackages.${system};
@@ -108,8 +106,6 @@
         dpvs-version = true;
       };
       dpvs = pkgs.callPackage ./nix/dpvs.nix {
-        linux = pkgs.linuxPackages_5_10.kernel;
-        inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
       pktgen = pkgs.callPackage ./nix/pktgen.nix {
