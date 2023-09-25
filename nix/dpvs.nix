@@ -22,7 +22,6 @@
 , pkgs
 }:
 let 
-  dpdkVersion = "21.11";
   srcpack = {
     dpvs = fetchFromGitHub {
       owner = "iqiyi";
@@ -30,14 +29,7 @@ let
       rev = "v1.9.4";
       sha256 = "sha256-PSBApG2Ix/peh2+FZxz7PjK1f+JbNmL1l6aNpEhLslY=";
     };
-    moongen = self.inputs.moongen-lachnit-src;
-    libmoon = self.inputs.libmoon-lachnit-src;
     dpdk = self.inputs.dpdk-lachnit-src;
-    # dpdk = fetchurl {
-    #   url = "https://fast.dpdk.org/rel/dpdk-${dpdkVersion}.tar.xz";
-    #   sha256 = "sha256-HhJJm0xfzbV8g+X+GE6mvs3ffPCSiTwsXvLvsO7BLws=";
-    # };
-    #
   };
   dpdk = self.outputs.packages.${system}.dpdk;
 in
@@ -47,10 +39,6 @@ stdenv.mkDerivation {
 
   src = srcpack.dpvs;
   
-  postUnpack = ''
-    cp -r ${dpdk} $sourceRoot/dpdk-result
-    chmod -R u+w $sourceRoot/dpdk-result
-  '';
   # postUnpack = ''
   #   rm -r $sourceRoot/libmoon
   #   cp -r ${srcpack.libmoon} $sourceRoot/libmoon
@@ -108,27 +96,12 @@ stdenv.mkDerivation {
   postPatch = ''
     substituteInPlace ./Makefile \
       --replace "/bin/uname" "${pkgs.coreutils}/bin/uname"
-    substituteInPlace ./dpdk-result/include/rte_mbuf_dyn.h \
-      --replace "#include <sys/types.h>
-    " "#include <sys/types.h>
-    #include <stdint.h>
-    "
-    substituteInPlace ./src/mbuf.c \
-      --replace "#include <rte_mbuf_dyn.h>
-    " "#include <stdint.h>
-    #include <stdio.h>
-    #include <rte_compat.h>
-    #include <rte_mbuf_dyn.h>
-    "
     substituteInPlace ./tools/ipvsadm/ipvsadm.c \
       --replace '#include "popt.h"' '#include <popt.h>'
     substituteInPlace ./Makefile \
       --replace 'INSDIR  =' 'INSDIR  ?='
     substituteInPlace ./src/netif.c \
       --replace "return rss_value;" "return rss_value & (!ETH_RSS_IPV6_EX); // ignore this one feature not supported by E810"
-
-    substituteInPlace ./dpdk-result/lib/pkgconfig/libdpdk.pc \
-      --replace "${dpdk}" "$sourceRoot/dpdk-result"
   '';
   # postPatch = ''
   #   ls -la ./libmoon
@@ -144,7 +117,7 @@ stdenv.mkDerivation {
   # '';
 
   buildPhase = ''
-    export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:$sourceRoot/dpdk-result/lib/pkgconfig"
+    export PKG_CONFIG_PATH="$PKG_CONFIG_PATH:${dpdk}/lib/pkgconfig"
     make DEBUG=1
   '';
 
