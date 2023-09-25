@@ -75,6 +75,7 @@
     flakepkgs = self.packages.${system};
     mydpdk = pkgs.callPackage ./nix/dpdk.nix {
       kernel = pkgs.linuxPackages_5_10.kernel;
+      inherit (flakepkgs) linux-firmware-pinned;
     };
     selfpkgs = self.packages.${system};
     # make-disk-image = import (pkgs.path + "/nixos/lib/make-disk-image.nix");
@@ -102,6 +103,11 @@
         inherit self;
       };
       dpdk = mydpdk;
+      dpvs = pkgs.callPackage ./nix/dpvs.nix {
+        linux = pkgs.linuxPackages_5_10.kernel;
+        inherit (flakepkgs) linux-firmware-pinned;
+        inherit self;
+      };
       pktgen = pkgs.callPackage ./nix/pktgen.nix {
         dpdk = mydpdk;
       };
