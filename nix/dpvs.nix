@@ -31,7 +31,7 @@ let
     };
     dpdk = self.inputs.dpdk-lachnit-src;
   };
-  dpdk = self.outputs.packages.${system}.dpdk;
+  dpdk = self.outputs.packages.${system}.dpdk-dpvs;
 in
 stdenv.mkDerivation {
   pname = "dpvs";
