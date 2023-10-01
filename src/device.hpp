@@ -336,12 +336,12 @@ class E810EmulatedDevice : public VmuxDevice {
                   ret);
 
       ret = vfu_setup_irq_state_callback(vfu.vfu_ctx, VFU_DEV_INTX_IRQ,
-              E810EmulatedDevice::irq_state_unimplemented_cb);
+              E810EmulatedDevice::irq_state_intx_cb);
       if (ret)
         die("setting up intx state callback for libvfio-user failed");
 
       ret = vfu_setup_irq_state_callback(vfu.vfu_ctx, VFU_DEV_MSIX_IRQ,
-              E810EmulatedDevice::irq_state_unimplemented_cb);
+              E810EmulatedDevice::irq_state_msix_cb);
       if (ret)
         die("setting up msix state callback for libvfio-user failed");
 
@@ -350,11 +350,10 @@ class E810EmulatedDevice : public VmuxDevice {
         if (type == VFU_DEV_INTX_IRQ || type == VFU_DEV_MSIX_IRQ)
           continue;
         ret = vfu_setup_irq_state_callback(vfu.vfu_ctx,
-                  (enum vfu_dev_irq_type) type,
-                  E810EmulatedDevice::irq_state_unimplemented_cb);
+            (enum vfu_dev_irq_type) type,
+            E810EmulatedDevice::irq_state_unimplemented_cb);
         if (ret)
-          die("setting up irq type %d callback for libvfio-user \
-                      failed", type);
+          die("setting up irq type %d callback for libvfio-user failed", type);
       }
     }
     static int reset_device_cb(vfu_ctx_t *vfu_ctx,
@@ -383,6 +382,25 @@ class E810EmulatedDevice : public VmuxDevice {
             )
     {
         printf("irq_state_unimplemented_cb unimplemented\n");
+    }
+
+    /*
+     * @vfu_ctx: the libvfio-user context
+     * @start: starting IRQ vector
+     * @count: number of vectors
+     * @mask: indicates if the IRQ is masked or unmasked
+     */
+    static void irq_state_intx_cb(vfu_ctx_t *vfu_ctx, uint32_t start, uint32_t count, bool mask)
+    {
+      printf("irq_state_intx_cb\n");
+      E810EmulatedDevice *device = (E810EmulatedDevice*) vfu_get_private(vfu_ctx);
+      device->model->vmux->IntXIssue(true);
+    }
+    static void irq_state_msix_cb(vfu_ctx_t *vfu_ctx, uint32_t start, uint32_t count, bool mask)
+    {
+      printf("irq_state_msix_cb\n");
+      E810EmulatedDevice *device = (E810EmulatedDevice*) vfu_get_private(vfu_ctx);
+      device->model->vmux->MsiXIssue(start);
     }
 
     void init_bar_callbacks(VfioUserServer &vfu) {
