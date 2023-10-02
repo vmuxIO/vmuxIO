@@ -95,6 +95,7 @@ int _main(int argc, char** argv) {
     std::vector<int> pci_ids;
     std::vector<std::string> sockets;
     std::vector<std::string> modes;
+    std::vector<std::string> emulationDevices;
     while ((ch = getopt(argc,argv,"hd:s:m:")) != -1){
         switch(ch)
         {
@@ -107,12 +108,16 @@ int _main(int argc, char** argv) {
             case 'm':
                 modes.push_back(optarg);
                 break;
+            case 'e':
+                emulationDevices.push_back(optarg);
+                break;
             case '?':
             case 'h':
                 std::cout <<
                     "-d 0000:18:00.0                        PCI-Device (or \"none\" if not applicable)\n" <<
                     "-s /tmp/vmux.sock                      Path of the socket\n" <<
                     "-m passthrough                         vMux mode: passthrough, emulation\n"
+                    "-e e810                                emulation device: e810, e1000 (or \"none\")\n"
                     ;
                 return 0;
             default:
@@ -160,7 +165,12 @@ int _main(int argc, char** argv) {
             device = std::make_shared<StubDevice>();
         }
         if (modes[i] == "emulation") {
-            device = std::make_shared<E810EmulatedDevice>();
+            if (emulationDevices[i] == "e810") {
+                device = std::make_shared<E810EmulatedDevice>();
+            }
+            if (emulationDevices[i] == "e1000") {
+                device = std::make_shared<E1000EmulatedDevice>();
+            }
         }
         devices.push_back(device);
     }
