@@ -395,6 +395,8 @@ class E810EmulatedDevice : public VmuxDevice {
       printf("irq_state_intx_cb\n");
       E810EmulatedDevice *device = (E810EmulatedDevice*) vfu_get_private(vfu_ctx);
       device->model->vmux->IntXIssue(true);
+      /* device->model->SignalInterrupt(1, 1); */
+      // TODO(HE7086): masking
     }
     static void irq_state_msix_cb(vfu_ctx_t *vfu_ctx, uint32_t start, uint32_t count, bool mask)
     {
