@@ -79,8 +79,8 @@
     packages = {
       default = selfpkgs.vmux;
 
-      vmux = pkgs.callPackage ./nix/vmux.nix { libnic-emu = flakepkgs.nic-emu; };
-      nic-emu = pkgs.callPackage ./nix/nic-emu.nix {};
+      vmux = pkgs.callPackage ./nix/vmux.nix { inherit (flakepkgs) libnic-emu; };
+      libnic-emu = pkgs.callPackage ./nix/nic-emu.nix {};
 
       # moongen/dpdk
       moongen = pkgs.callPackage ./nix/moongen.nix {

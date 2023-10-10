@@ -20,12 +20,7 @@ let
       fetchSubmodules = true;
       sha256 = "sha256-9bT1eQvjw87JjVc05Eia8CRVACEfcQf9a3JDrMy4GUg=";
     };
-    nic-emu = fetchFromGitHub {
-      owner = "vmuxIO";
-      repo = "nic-emu";
-      rev = "b9f08e11a59e0cb289a7f401d1ccb089daa6a99c";
-      sha256 = "sha256-6ZZ1eECixWHsxw3aTwVIb068jDBpAUNWhqc4vde3hfA=";
-    };
+    nic-emu = libnic-emu.src;
   };
 in
 pkgs.clangStdenv.mkDerivation {
@@ -39,14 +34,12 @@ pkgs.clangStdenv.mkDerivation {
     cp -r ${srcpack.libvfio-user} $sourceRoot/subprojects/libvfio-user
     chmod -R u+w $sourceRoot/subprojects/libvfio-user
 
+    # not actually used, but meson will complain if its not there
     rm -r $sourceRoot/subprojects/nic-emu || true
     cp -r ${srcpack.nic-emu} $sourceRoot/subprojects/nic-emu
     chmod -R u+w $sourceRoot/subprojects/nic-emu
 
-    mkdir -p $sourceRoot/build/subprojects/nic-emu/target/debug/build
-    chmod -R u+w $sourceRoot/build/subprojects/nic-emu/target/debug/build
-    cp ${libnic-emu}/lib/libnic_emu.a $sourceRoot/build/subprojects/nic-emu/target/debug/build
-
+    # we build libnic-emu artifacts in another package and use dont_build_libnic_emu=true
     cp ${libnic-emu}/lib/libnic_emu.a $sourceRoot/
     cp ${libnic-emu}/lib/include/* $sourceRoot/src
   '';
@@ -87,8 +80,6 @@ pkgs.clangStdenv.mkDerivation {
   hardeningDisable = [ "all" ];
 
   configurePhase = ''
-    pwd
-    ls
     meson build -Ddont_build_libnic_emu=true
   '';
   buildPhase = ''
