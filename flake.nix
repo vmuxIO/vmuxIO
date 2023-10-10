@@ -84,7 +84,7 @@
     packages = {
       default = selfpkgs.vmux;
 
-      vmux = pkgs.callPackage ./nix/vmux.nix {};
+      vmux = pkgs.callPackage ./nix/vmux.nix { libnic-emu = flakepkgs.nic-emu; };
       nic-emu = pkgs.callPackage ./nix/nic-emu.nix {};
 
       # moongen/dpdk
