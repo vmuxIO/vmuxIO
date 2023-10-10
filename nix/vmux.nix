@@ -89,7 +89,7 @@ pkgs.clangStdenv.mkDerivation {
   configurePhase = ''
     pwd
     ls
-    meson build
+    meson build -Ddont_build_libnic_emu=true
   '';
   buildPhase = ''
     meson compile -C build

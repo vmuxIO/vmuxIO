@@ -2,6 +2,8 @@ project('vmux', ['c' ,'cpp'],
   version : '0.1',
   default_options : ['warning_level=3', 'cpp_std=c++20'])
 
+dont_build_libnic_emu = get_option('dont_build_libnic_emu')
+
 #incdir = include_directories('deps/libvfio-user/include')
 incdir = include_directories('src')
 
@@ -23,13 +25,14 @@ sims_flags = [
 libvfio_user = subproject('libvfio-user')
 libvfio_user_dep = libvfio_user.get_variable('libvfio_user_dep')
 
-# nic_emu = subproject('nic-emu')
-# nic_emu_dep = nic_emu.get_variable('nic_emu_dep')
-# nic_emu_dep = static_library('nic_emu_dep', [], link_with : files('./libnic_emu.a'))
-nic_emu_dep = declare_dependency(
-  link_args : ['-L./libnic_emu.a', '-lnic_emu'],
-  # link_whole : files('./libnic_emu.a')
-  )
+if dont_build_libnic_emu
+  nic_emu_dep = declare_dependency(
+    link_args : ['-L./libnic_emu.a', '-lnic_emu'],
+    )
+else 
+  nic_emu = subproject('nic-emu')
+  nic_emu_dep = nic_emu.get_variable('nic_emu_dep')
+endif
 
 sources = files()
 subdir('src')
