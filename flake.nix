@@ -65,8 +65,7 @@
     flake-utils,
     nixos-generators,
     ...
-  } @ args: let
-  in
+  } @ args:
   (flake-utils.lib.eachSystem ["x86_64-linux"] (system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
@@ -84,8 +83,8 @@
     packages = {
       default = selfpkgs.vmux;
 
-      vmux = pkgs.callPackage ./nix/vmux.nix { libnic-emu = flakepkgs.nic-emu; };
-      nic-emu = pkgs.callPackage ./nix/nic-emu.nix {};
+      vmux = pkgs.callPackage ./nix/vmux.nix { inherit (flakepkgs) libnic-emu; };
+      libnic-emu = pkgs.callPackage ./nix/nic-emu.nix {};
 
       # moongen/dpdk
       moongen = pkgs.callPackage ./nix/moongen.nix {
