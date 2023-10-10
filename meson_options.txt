@@ -1,0 +1,1 @@
+option('dont_build_libnic_emu', type : 'boolean', value : false, description : 'Skip libnic_emu subproject build. Instead expect artifacts in path.')
