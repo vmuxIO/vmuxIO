@@ -19,6 +19,12 @@ let
       fetchSubmodules = true;
       sha256 = "sha256-9bT1eQvjw87JjVc05Eia8CRVACEfcQf9a3JDrMy4GUg=";
     };
+    nic-emu = fetchFromGitHub {
+      owner = "vmuxIO";
+      repo = "nic-emu";
+      rev = "b9f08e11a59e0cb289a7f401d1ccb089daa6a99c";
+      sha256 = "sha256-6ZZ1eECixWHsxw3aTwVIb068jDBpAUNWhqc4vde3hfA=";
+    };
   };
 in
 pkgs.clangStdenv.mkDerivation {
@@ -31,6 +37,10 @@ pkgs.clangStdenv.mkDerivation {
     rm -r $sourceRoot/subprojects/libvfio-user || true
     cp -r ${srcpack.libvfio-user} $sourceRoot/subprojects/libvfio-user
     chmod -R u+w $sourceRoot/subprojects/libvfio-user
+
+    rm -r $sourceRoot/subprojects/nic-emu || true
+    cp -r ${srcpack.nic-emu} $sourceRoot/subprojects/nic-emu
+    chmod -R u+w $sourceRoot/subprojects/nic-emu
   '';
 
   nativeBuildInputs = with pkgs; [
@@ -47,6 +57,10 @@ pkgs.clangStdenv.mkDerivation {
     })
 
     pkg-config
+
+    # dependencies for nic-emu
+    rustc
+    cargo
   ];
   buildInputs = with pkgs; [
     openssl

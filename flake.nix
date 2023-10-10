@@ -80,6 +80,7 @@
       default = selfpkgs.vmux;
 
       vmux = pkgs.callPackage ./nix/vmux.nix {};
+      nic-emu = pkgs.callPackage ./nix/nic-emu.nix {};
 
       # moongen/dpdk
       moongen = pkgs.callPackage ./nix/moongen.nix {
@@ -251,6 +252,9 @@
           json_c
           cmocka
           pkg-config
+          # dependencies for nic-emu
+          rustc
+          cargo
         ] ++ common_deps;
         hardeningDisable = [ "all" ];
 
