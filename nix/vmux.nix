@@ -1,5 +1,6 @@
 { fetchFromGitHub
 , pkgs
+, libnic-emu
 }:
 let 
   srcpack = {
@@ -41,6 +42,13 @@ pkgs.clangStdenv.mkDerivation {
     rm -r $sourceRoot/subprojects/nic-emu || true
     cp -r ${srcpack.nic-emu} $sourceRoot/subprojects/nic-emu
     chmod -R u+w $sourceRoot/subprojects/nic-emu
+
+    mkdir -p $sourceRoot/build/subprojects/nic-emu/target/debug/build
+    chmod -R u+w $sourceRoot/build/subprojects/nic-emu/target/debug/build
+    cp ${libnic-emu}/lib/libnic_emu.a $sourceRoot/build/subprojects/nic-emu/target/debug/build
+
+    cp ${libnic-emu}/lib/libnic_emu.a $sourceRoot/
+    cp ${libnic-emu}/lib/include/* $sourceRoot/src
   '';
 
   nativeBuildInputs = with pkgs; [
@@ -73,6 +81,7 @@ pkgs.clangStdenv.mkDerivation {
 
     json_c
     cmocka
+    libnic-emu
   ];
 
   hardeningDisable = [ "all" ];

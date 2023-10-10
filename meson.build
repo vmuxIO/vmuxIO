@@ -23,8 +23,13 @@ sims_flags = [
 libvfio_user = subproject('libvfio-user')
 libvfio_user_dep = libvfio_user.get_variable('libvfio_user_dep')
 
-nic_emu = subproject('nic-emu')
-nic_emu_dep = nic_emu.get_variable('nic_emu_dep')
+# nic_emu = subproject('nic-emu')
+# nic_emu_dep = nic_emu.get_variable('nic_emu_dep')
+# nic_emu_dep = static_library('nic_emu_dep', [], link_with : files('./libnic_emu.a'))
+nic_emu_dep = declare_dependency(
+  link_args : ['-L./libnic_emu.a', '-lnic_emu'],
+  # link_whole : files('./libnic_emu.a')
+  )
 
 sources = files()
 subdir('src')
