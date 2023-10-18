@@ -25,6 +25,7 @@
 #include <thread>
 
 #include "device.hpp"
+#include "devices/e1000.hpp"
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
@@ -112,7 +113,7 @@ int _main(int argc, char** argv) {
                 std::cout <<
                     "-d 0000:18:00.0                        PCI-Device (or \"none\" if not applicable)\n" <<
                     "-s /tmp/vmux.sock                      Path of the socket\n" <<
-                    "-m passthrough                         vMux mode: passthrough, emulation\n"
+                    "-m passthrough                         vMux mode: passthrough, emulation, e1000-emu\n"
                     ;
                 return 0;
             default:
@@ -152,7 +153,7 @@ int _main(int argc, char** argv) {
 
     // create devices
     for(size_t i = 0; i < pciAddresses.size(); i++) {
-        std::shared_ptr<VmuxDevice> device;
+        std::shared_ptr<VmuxDevice> device = NULL;
         if (modes[i] == "passthrough") {
             device = std::make_shared<PassthroughDevice>(vfioc[i], pciAddresses[i]);
         }
@@ -162,6 +163,11 @@ int _main(int argc, char** argv) {
         if (modes[i] == "emulation") {
             device = std::make_shared<E810EmulatedDevice>();
         }
+        if (modes[i] == "e1000-emu") {
+            device = std::make_shared<E1000EmulatedDevice>();
+        }
+        if (device == NULL)
+            die("Unknown mode specified: %s\n", modes[i].c_str());
         devices.push_back(device);
     }
 
