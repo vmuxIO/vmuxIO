@@ -155,7 +155,22 @@ class E1000EmulatedDevice : public VmuxDevice {
       flags |= VFU_REGION_FLAG_RW;
       ret = vfu_setup_region(vfu.vfu_ctx, bar_idx,
               bar_len,
-              &(this->expected_access_callback),
+              &(this->bar0callback),
+              flags, NULL, 
+              0, // nr. items in bar_mmap_areas
+              -1, 0); // fd -1 and offset 0 because fd is unused
+      if (ret < 0) {
+          die("failed to setup BAR region %d", bar_idx);
+      }
+
+      bar_idx = 1;
+      bar_len = 0x40;
+      
+      flags = 0; // actually PIO for once
+      flags |= VFU_REGION_FLAG_RW;
+      ret = vfu_setup_region(vfu.vfu_ctx, bar_idx,
+              bar_len,
+              &(this->bar1callback),
               flags, NULL, 
               0, // nr. items in bar_mmap_areas
               -1, 0); // fd -1 and offset 0 because fd is unused
@@ -179,7 +194,7 @@ class E1000EmulatedDevice : public VmuxDevice {
               (size 0x%x) set up.\n", bar_idx,
               (uint)bar_len);
     }
-    static ssize_t expected_access_callback(
+    static ssize_t bar0callback(
               [[maybe_unused]] vfu_ctx_t *vfu_ctx,
               [[maybe_unused]] char * const buf,
               [[maybe_unused]] size_t count,
@@ -191,6 +206,23 @@ class E1000EmulatedDevice : public VmuxDevice {
         printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
                 offset, is_write);
         if (e1000_region_access(device->e1000, 0, offset, (uint8_t*) buf, count, is_write)) { // TODO fixed bar number
+          return count;
+        }
+        return 0;
+      }
+
+    static ssize_t bar1callback(
+              [[maybe_unused]] vfu_ctx_t *vfu_ctx,
+              [[maybe_unused]] char * const buf,
+              [[maybe_unused]] size_t count,
+              [[maybe_unused]] __loff_t offset,
+              [[maybe_unused]] const bool is_write
+              )
+      {
+        E1000EmulatedDevice *device = (E1000EmulatedDevice*) vfu_get_private(vfu_ctx);
+        printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
+                offset, is_write);
+        if (e1000_region_access(device->e1000, 1, offset, (uint8_t*) buf, count, is_write)) { // TODO fixed bar number
           return count;
         }
         return 0;
