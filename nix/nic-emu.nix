@@ -5,8 +5,8 @@
     repo = "nic-emu";
     # rev = "05aeaaaa9bdb05b16c03ed3e96e486f670e78bf4"; # dev/peter
     # sha256 = "sha256-tEL96zK+cYvr69mMLunku4kXESWadl0GdOJnDc8umbo=";
-    rev = "b16320b436cf49379fdc6f7e915dc33f39793239"; # main
-    sha256 = "sha256-VeNJ9myv11irINeeR/D37xZO55QkQKseOt0ZIzdBCCk=";
+    rev = "82bb3b1432bc62511eb43127e535e85154ce1053"; # main
+    sha256 = "sha256-iXizCJ/yKTdnUjObfXTi44+1DL9/GteN6h9kbBSwe14=";
   };
 
   cargoLock = {
