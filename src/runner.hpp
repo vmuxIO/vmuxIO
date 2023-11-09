@@ -28,10 +28,9 @@ class VmuxRunner{
         };
 
         VmuxRunner(std::string socket, std::shared_ptr<VmuxDevice> device, 
-                int efd): device(device) {
+                int efd, std::shared_ptr<VfioUserServer> vfu): vfu(vfu), device(device) {
             state.store(0);
             this->socket = socket;
-            this->vfu = std::make_shared<VfioUserServer>(socket, efd, device);
         }
 
         void start(){

@@ -91,7 +91,7 @@ void VmuxRunner::initilize(){
     config_space->hdr.rid = device->info.pci_revision;
     vfu_pci_set_class(vfu->vfu_ctx, device->info.pci_class, device->info.pci_subclass, device->info.pci_revision);
 
-    this->device->setup_vfu(*vfu);
+    this->device->setup_vfu(vfu);
 
     if (device->vfioc != NULL) {
         if(device->vfioc->is_pcie){

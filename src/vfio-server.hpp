@@ -365,6 +365,96 @@ class VfioUserServer {
             }
         }
 
+        /* Map dma region to this process
+         * Write to flags_ and vfu->mapped
+         * Return true if mapped
+         */
+        static bool map_dma_here(vfu_ctx_t *vfu_ctx, VfioUserServer *vfu, vfu_dma_info_t *info, uint32_t *flags_) {
+            vfu->mapped.insert(NULL);
+            printf("{ #%lu\n", vfu->mapped.size());
+            for(auto p: vfu->mapped){
+                // printf("%p\n",p);
+                printf("?");
+            }
+            printf("}\n");
+            uint32_t flags = 0;
+            if (PROT_READ & info->prot)
+                flags |= VFIO_DMA_MAP_FLAG_READ;
+            if (PROT_WRITE & info->prot)
+                flags |= VFIO_DMA_MAP_FLAG_WRITE;
+            __builtin_dump_struct(info, &printf);
+
+            if (!info->vaddr){
+                //vfu_sgl_get failes if vaddr is NULL
+                printf("Region not mappable\n");
+                return false;
+            }
+
+            //Map the region into the vmux Address Space
+            struct iovec* mapping =
+                (struct iovec*) calloc(1,sizeof(struct iovec));
+            dma_sg_t *sgl = (dma_sg_t*)calloc(1, dma_sg_size());
+            int ret = vfu_addr_to_sgl(vfu_ctx, info->iova.iov_base, 
+                    info->iova.iov_len, sgl, 1, flags);
+            if(ret < 0){
+                die("Failed to get sgl for DMA\n");
+            }
+
+            if(vfu_sgl_get(vfu_ctx ,sgl,mapping,1,0)){
+                die("Failed to populate iovec array");
+            }
+
+            printf("Add Address to mapped addresses\n");
+            vfu->sgs[info->vaddr] = sgl; 
+            vfu->mapped.insert(info->vaddr);
+            __builtin_dump_struct(info, &printf);
+            __builtin_dump_struct(mapping, &printf);
+
+            *flags_ = flags;
+            return true;
+        }
+
+        static bool unmap_dma_here(vfu_ctx_t *vfu_ctx, VfioUserServer *vfu, vfu_dma_info_t *info) {
+            printf("{\n");
+            for(void* const& p: vfu->mapped){
+                printf("%p\n",p);
+            }
+            printf("}\n");
+
+            // info->mapping indicates if mapped
+            if(!info->mapping.iov_base){
+                printf("Region not mapped, nothing to do\n");
+                return false;
+            }
+
+            if(!vfu->mapped.count(info->iova.iov_base)){
+                printf("Region seems not to be mapped\n");
+                //return;
+            }
+            if(vfu->sgs.count(info->vaddr)==1){
+                printf("dealloc sgl\n");
+            }
+            if(vfu->sgs.count(info->vaddr)>1){
+                printf("Why?\n");
+                //return;
+            }
+
+            // TODO should probably return with vfu_sgl_put()
+
+            return true;
+        }
+
+        /* Convert dma addr (iova) to addr where it is locally mapped
+         */
+        void* dma_local_addr(uintptr_t dma_address, size_t len) {
+            for (const auto& [local_ptr, segment] : this->sgs) {
+                if (this->sgs.size() == 1)
+                    return local_ptr;
+                    // TODO actually check if addr is in range
+            }
+            return NULL;
+        }
+
     private:
         static int reset_device_cb(vfu_ctx_t *vfu_ctx,
                 [[maybe_unused]] vfu_reset_type_t type)
@@ -397,44 +487,13 @@ class VfioUserServer {
             //  return;
 
             //__builtin_dump_struct(info, &printf);
-            VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
-            printf("{\n");
-            for(void* const& p: vfu->mapped){
-                printf("%p\n",p);
-            }
-            printf("}\n");
+            VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx); 
+            // VfioUserServer *vfu = ((VmuxDevice*)vfu_get_private(vfu_ctx))->vfuServer; // TODO this breaks passthrough and others
             uint32_t flags = 0;
-            if (PROT_READ & info->prot)
-                flags |= VFIO_DMA_MAP_FLAG_READ;
-            if (PROT_WRITE & info->prot)
-                flags |= VFIO_DMA_MAP_FLAG_WRITE;
-            __builtin_dump_struct(info, &printf);
 
-            if (!info->vaddr){
-                //vfu_sgl_get failes if vaddr is NULL
-                printf("Region not mappable\n");
+            if (!VfioUserServer::map_dma_here(vfu_ctx, vfu, info, &flags)) {
                 return;
             }
-
-            //Map the region into the vmux Address Space
-            struct iovec* mapping =
-                (struct iovec*) calloc(1,sizeof(struct iovec));
-            dma_sg_t *sgl = (dma_sg_t*)calloc(1, dma_sg_size());
-            int ret = vfu_addr_to_sgl(vfu_ctx, info->iova.iov_base, 
-                    info->iova.iov_len, sgl, 1, flags);
-            if(ret < 0){
-                die("Failed to get sgl for DMA\n");
-            }
-
-            if(vfu_sgl_get(vfu_ctx ,sgl,mapping,1,0)){
-                die("Failed to populate iovec array");
-            }
-
-            printf("Add Address to mapped addresses\n");
-            vfu->sgs[info->vaddr] = sgl; 
-            vfu->mapped.insert(info->vaddr);
-            __builtin_dump_struct(info, &printf);
-            __builtin_dump_struct(mapping, &printf);
 
             vfio_iommu_type1_dma_map dma_map = {
                 .argsz = sizeof(vfio_iommu_type1_dma_map),
@@ -460,28 +519,9 @@ class VfioUserServer {
             __builtin_dump_struct(info, &printf);
 
             VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
-            printf("{\n");
-            for(void* const& p: vfu->mapped){
-                printf("%p\n",p);
-            }
-            printf("}\n");
 
-            // info->mapping indicates if mapped
-            if(!info->mapping.iov_base){
-                printf("Region not mapped, nothing to do\n");
+            if (!VfioUserServer::unmap_dma_here(vfu_ctx, vfu, info)) {
                 return;
-            }
-
-            if(!vfu->mapped.count(info->iova.iov_base)){
-                printf("Region seems not to be mapped\n");
-                //return;
-            }
-            if(vfu->sgs.count(info->vaddr)==1){
-                printf("dealloc sgl\n");
-            }
-            if(vfu->sgs.count(info->vaddr)>1){
-                printf("Why?\n");
-                //return;
             }
 
             vfio_iommu_type1_dma_unmap dma_unmap = {

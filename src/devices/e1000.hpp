@@ -11,7 +11,7 @@ class E1000EmulatedDevice : public VmuxDevice {
   public:
     E1000EmulatedDevice() {
       if (!rust_logs_initialized) {
-          initialize_rust_logging(4); // Debug logs
+          initialize_rust_logging(6); // Debug logs
           rust_logs_initialized = true;
       }
 
@@ -32,16 +32,30 @@ class E1000EmulatedDevice : public VmuxDevice {
         drop_e1000(e1000);
     }
 
-    void setup_vfu(VfioUserServer &vfu) {
+    void ethRx() {
+      uint64_t data = 0xdeadbeef;
+      e1000_receive(e1000, (uint8_t*) &data, sizeof(data));
+    }
+
+    void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
+      this->vfuServer = vfu;
       // set up vfio-user register mediation
-      this->init_bar_callbacks(vfu);
+      this->init_bar_callbacks(*vfu);
 
       // set up irqs 
       // TODO
 
       // set up libvfio-user callbacks
       // vfu.setup_passthrough_callbacks(this->vfioc);
-      this->init_general_callbacks(vfu);
+      this->init_general_callbacks(*vfu);
+
+      int ret = vfu_setup_device_dma(vfu->vfu_ctx,
+              E1000EmulatedDevice::dma_register_cb,
+              E1000EmulatedDevice::dma_unregister_cb);
+
+      if (ret)
+            die("setting up dma callback for libvfio-user failed %d",
+                  ret);
     };
 
     void init_pci_ids() {
@@ -63,6 +77,9 @@ class E1000EmulatedDevice : public VmuxDevice {
     }
 
     static void dma_read_cb(void *private_ptr, uintptr_t dma_address, uint8_t *buffer, uintptr_t len) {
+        E1000EmulatedDevice *this_ = (E1000EmulatedDevice*)private_ptr;
+        void* local_addr = this_->vfuServer->dma_local_addr(dma_address, len);
+        // memcpy() TODO
         die("Dma read CB\n");
     }
 
@@ -124,15 +141,22 @@ class E1000EmulatedDevice : public VmuxDevice {
       // device->model->SignalInterrupt(1, 1); // just as an example: do stuff
       return 0;
     }
+
     static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
             [[maybe_unused]] vfu_dma_info_t *info)
     {
       printf("dma register cb\n");
+      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      uint32_t flags = 0; // unused here
+      
+      VfioUserServer::map_dma_here(vfu_ctx, vfu, info, &flags);
     }
     static void dma_unregister_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
             [[maybe_unused]] vfu_dma_info_t *info)
     {
       printf("dma unregister cb\n");
+      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      VfioUserServer::unmap_dma_here(vfu_ctx, vfu, info);
     }
     static void irq_state_unimplemented_cb(
             [[maybe_unused]] vfu_ctx_t *vfu_ctx,
@@ -203,8 +227,8 @@ class E1000EmulatedDevice : public VmuxDevice {
               )
       {
         E1000EmulatedDevice *device = (E1000EmulatedDevice*) vfu_get_private(vfu_ctx);
-        printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
-                offset, is_write);
+        // printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
+                // offset, is_write);
         if (e1000_region_access(device->e1000, 0, offset, (uint8_t*) buf, count, is_write)) { // TODO fixed bar number
           return count;
         }
@@ -220,8 +244,8 @@ class E1000EmulatedDevice : public VmuxDevice {
               )
       {
         E1000EmulatedDevice *device = (E1000EmulatedDevice*) vfu_get_private(vfu_ctx);
-        printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
-                offset, is_write);
+        // printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
+                // offset, is_write);
         if (e1000_region_access(device->e1000, 1, offset, (uint8_t*) buf, count, is_write)) { // TODO fixed bar number
           return count;
         }

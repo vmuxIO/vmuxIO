@@ -90,6 +90,7 @@ int _main(int argc, char** argv) {
     std::vector<std::unique_ptr<VmuxRunner>> runner;
     std::vector<std::shared_ptr<VfioConsumer>> vfioc;
     std::vector<std::shared_ptr<VmuxDevice>> devices;
+    std::vector<std::shared_ptr<VfioUserServer>> vfuServers;
     std::string group_arg;
     // int HARDWARE_REVISION; // could be set by vfu_pci_set_class:
                               // vfu_ctx->pci.config_space->hdr.rid = 0x02;
@@ -173,9 +174,13 @@ int _main(int argc, char** argv) {
 
     int efd = epoll_create1(0);
 
+    for(size_t i = 0; i < pciAddresses.size(); i++) {
+        vfuServers.push_back(std::make_shared<VfioUserServer>(sockets[i], efd, devices[i]));
+    }
+
     for(size_t i = 0; i < pciAddresses.size(); i++){
         printf("Using: %s\n", pciAddresses[i].c_str());
-        runner.push_back(std::make_unique<VmuxRunner>(sockets[i], devices[i], efd));
+        runner.push_back(std::make_unique<VmuxRunner>(sockets[i], devices[i], efd, vfuServers[i]));
         runner[i]->start();
 
         while(runner[i]->state !=2);
@@ -197,10 +202,15 @@ int _main(int argc, char** argv) {
     //            ].revents & POLLIN);
     
     // runtime loop
+    bool foobar = false;
     while (!quit.load()) {
         for(size_t i = 0; i < runner.size(); i++){
             struct epoll_event events[1024];
 
+            if (foobar) {
+                std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx();
+                foobar = false;
+            }
             int eventsc = epoll_wait(efd, events, 1024,500);
 
             for(int i = 0; i < eventsc; i++){
