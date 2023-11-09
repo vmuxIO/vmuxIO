@@ -370,7 +370,6 @@ class VfioUserServer {
          * Return true if mapped
          */
         static bool map_dma_here(vfu_ctx_t *vfu_ctx, VfioUserServer *vfu, vfu_dma_info_t *info, uint32_t *flags_) {
-            vfu->mapped.insert(NULL);
             printf("{ #%lu\n", vfu->mapped.size());
             for(auto p: vfu->mapped){
                 // printf("%p\n",p);
@@ -475,6 +474,7 @@ class VfioUserServer {
             return 0;
         }
 
+        // this callback is only used for passthrough devices
         static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                 [[maybe_unused]] vfu_dma_info_t *info)
         {

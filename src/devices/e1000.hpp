@@ -146,7 +146,8 @@ class E1000EmulatedDevice : public VmuxDevice {
             [[maybe_unused]] vfu_dma_info_t *info)
     {
       printf("dma register cb\n");
-      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      std::shared_ptr<VfioUserServer> vfu_ = ((E1000EmulatedDevice*)vfu_get_private(vfu_ctx))->vfuServer;
+      VfioUserServer* vfu = vfu_.get(); // lets hope vfu_ stays around until end of this function and map_dma_here only borrows vfu
       uint32_t flags = 0; // unused here
       
       VfioUserServer::map_dma_here(vfu_ctx, vfu, info, &flags);
@@ -155,7 +156,8 @@ class E1000EmulatedDevice : public VmuxDevice {
             [[maybe_unused]] vfu_dma_info_t *info)
     {
       printf("dma unregister cb\n");
-      VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+      std::shared_ptr<VfioUserServer> vfu_ = ((E1000EmulatedDevice*)vfu_get_private(vfu_ctx))->vfuServer;
+      VfioUserServer* vfu = vfu_.get(); // lets hope vfu_ stays around until end of this function and map_dma_here only borrows vfu
       VfioUserServer::unmap_dma_here(vfu_ctx, vfu, info);
     }
     static void irq_state_unimplemented_cb(
