@@ -65,6 +65,7 @@ class VfioUserServer {
         std::shared_ptr<VfioConsumer> callback_context; // may actually be NULL!
         std::set<void*> mapped;
         std::map<void*, dma_sg_t*> sgs;
+        std::map<void*, iovec*> mappings;
 
         /** In the constructor, we leak the raw device pointer into vfu to be
          * used as private context passed into callbacks. This variable makes
@@ -390,6 +391,7 @@ class VfioUserServer {
             }
 
             //Map the region into the vmux Address Space
+            // Only supports iovec size of one for now.
             struct iovec* mapping =
                 (struct iovec*) calloc(1,sizeof(struct iovec));
             dma_sg_t *sgl = (dma_sg_t*)calloc(1, dma_sg_size());
@@ -405,6 +407,7 @@ class VfioUserServer {
 
             printf("Add Address to mapped addresses\n");
             vfu->sgs[info->vaddr] = sgl; 
+            vfu->mappings[info->iova.iov_base] = mapping; 
             vfu->mapped.insert(info->vaddr);
             __builtin_dump_struct(info, &printf);
             __builtin_dump_struct(mapping, &printf);
@@ -446,10 +449,19 @@ class VfioUserServer {
         /* Convert dma addr (iova) to addr where it is locally mapped
          */
         void* dma_local_addr(uintptr_t dma_address, size_t len) {
-            for (const auto& [local_ptr, segment] : this->sgs) {
-                if (this->sgs.size() == 1)
-                    return local_ptr;
-                    // TODO actually check if addr is in range
+            for (const auto& [iova_start_, segment] : this->mappings) {
+                uintptr_t vaddr_start = (uintptr_t)segment->iov_base;
+                uintptr_t vaddr_end = (uintptr_t)segment->iov_base + segment->iov_len;
+                uintptr_t iova_start = (uintptr_t)iova_start_;
+                uintptr_t iova_end = iova_start + segment->iov_len;
+                if (iova_start <= dma_address && 
+                        dma_address < iova_end) {
+                    if (dma_address + len > iova_end) {
+                        die("DMA too big too handle without implementing loops here");
+                    }
+                    size_t offset = iova_start - dma_address;
+                    return (void*)(vaddr_start + offset);
+                }
             }
             return NULL;
         }

@@ -1,5 +1,6 @@
 #include "device.hpp"
 #include "nic-emu.hpp"
+#include <cstring>
 
 static bool rust_logs_initialized = false;
 
@@ -79,12 +80,19 @@ class E1000EmulatedDevice : public VmuxDevice {
     static void dma_read_cb(void *private_ptr, uintptr_t dma_address, uint8_t *buffer, uintptr_t len) {
         E1000EmulatedDevice *this_ = (E1000EmulatedDevice*)private_ptr;
         void* local_addr = this_->vfuServer->dma_local_addr(dma_address, len);
-        // memcpy() TODO
-        die("Dma read CB\n");
+        if (!local_addr) {
+          die("Could not translate DMA address");
+        }
+        memcpy(buffer, local_addr, len); // TODO bounds checks!?
     }
 
     static void dma_write_cb(void *private_ptr, uintptr_t dma_address, const uint8_t *buffer, uintptr_t len) {
-        die("Dma write CB\n");
+        E1000EmulatedDevice *this_ = (E1000EmulatedDevice*)private_ptr;
+        void* local_addr = this_->vfuServer->dma_local_addr(dma_address, len);
+        if (!local_addr) {
+          die("Could not translate DMA address");
+        }
+        memcpy(local_addr, buffer, len); // TODO bounds checks!?
     }
 
     static void issue_interrupt_cb(void *private_ptr) {
