@@ -39,8 +39,8 @@ class E1000EmulatedDevice : public VmuxDevice {
       e1000_receive(e1000, (uint8_t*) &data, sizeof(data));
     }
 
-    void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
-      this->vfuServer = vfu;
+    void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override {
+      VmuxDevice::setup_vfu(vfu);
       // set up vfio-user register mediation
       this->init_bar_callbacks(*vfu);
 

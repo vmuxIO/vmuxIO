@@ -29,6 +29,7 @@
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
+#include "src/devices/vmux-device.hpp"
 
 extern "C" {
 #include "libvfio-user.h"
@@ -96,15 +97,9 @@ class VfioUserServer {
                 }
             }
 
-            // TODO this is a workaround to keep legacy code for passthrough in
-            // VfioUserServer, even though it is also used for non-passthrough
-            void* vfu_callback_context;
-            if (std::dynamic_pointer_cast<PassthroughDevice>(device)) {
-                vfu_callback_context = this;
-            } else {
-                this->vfu_pvt_anker = device;
-                vfu_callback_context = device.get();
-            }
+            void* vfu_callback_context = device.get();
+            this->vfu_pvt_anker = device;
+            
             this->vfu_ctx = vfu_create_ctx(VFU_TRANS_SOCK, this->sock.c_str(),
                                            LIBVFIO_USER_FLAG_ATTACH_NB, vfu_callback_context,
                                            VFU_DEV_TYPE_PCI);
@@ -326,6 +321,7 @@ class VfioUserServer {
             return &this->pollfds[this->run_ctx_pollfd_idx.value()];
         }
 
+        // TODO probably this should be defined in the PassthroughDevice
         void setup_passthrough_callbacks(std::shared_ptr<VfioConsumer> callback_context)
         {
             int ret;
@@ -470,7 +466,8 @@ class VfioUserServer {
         static int reset_device_cb(vfu_ctx_t *vfu_ctx,
                 [[maybe_unused]] vfu_reset_type_t type)
         {
-            VfioUserServer *vfu = (VfioUserServer*) vfu_get_private(vfu_ctx);
+            std::shared_ptr<VfioUserServer> vfu_ = ((VmuxDevice*)vfu_get_private(vfu_ctx))->vfuServer;
+            VfioUserServer* vfu = vfu_.get(); // lets hope vfu_ stays around until end of this function and map_dma_here only borrows vfu
             printf("resetting device\n"); // this happens at VM boot
             vfu->callback_context->reset_device();
             return 0;
@@ -499,7 +496,8 @@ class VfioUserServer {
             //  return;
 
             //__builtin_dump_struct(info, &printf);
-            VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx); 
+            std::shared_ptr<VfioUserServer> vfu_ = ((VmuxDevice*)vfu_get_private(vfu_ctx))->vfuServer;
+            VfioUserServer* vfu = vfu_.get(); // lets hope vfu_ stays around until end of this function and map_dma_here only borrows vfu
             uint32_t flags = 0;
 
             if (!VfioUserServer::map_dma_here(vfu_ctx, vfu, info, &flags)) {
@@ -530,7 +528,8 @@ class VfioUserServer {
             //   return;
             __builtin_dump_struct(info, &printf);
 
-            VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx);
+            std::shared_ptr<VfioUserServer> vfu_ = ((VmuxDevice*)vfu_get_private(vfu_ctx))->vfuServer;
+            VfioUserServer* vfu = vfu_.get(); // lets hope vfu_ stays around until end of this function and map_dma_here only borrows vfu
 
             if (!VfioUserServer::unmap_dma_here(vfu_ctx, vfu, info)) {
                 return;
@@ -548,7 +547,8 @@ class VfioUserServer {
         static void intx_state_cb(vfu_ctx_t *vfu_ctx, uint32_t start, uint32_t
                 count, bool mask)
         {
-            VfioUserServer *vfu = (VfioUserServer*) vfu_get_private(vfu_ctx);
+            std::shared_ptr<VfioUserServer> vfu_ = ((VmuxDevice*)vfu_get_private(vfu_ctx))->vfuServer;
+            VfioUserServer* vfu = vfu_.get(); // lets hope vfu_ stays around until end of this function and map_dma_here only borrows vfu
             vfu->callback_context->mask_irqs(VFIO_PCI_INTX_IRQ_INDEX,
                     start, count, mask);
         }
