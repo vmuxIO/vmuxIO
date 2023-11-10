@@ -71,3 +71,12 @@ class VmuxDevice {
 
     virtual ~VmuxDevice() = default;
 };
+
+class StubDevice : public VmuxDevice {
+  public:
+    StubDevice() {
+      this->vfioc = NULL;
+    }
+    void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {};
+};
+

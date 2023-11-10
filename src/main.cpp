@@ -26,6 +26,8 @@
 
 #include "device.hpp"
 #include "devices/e1000.hpp"
+#include "devices/e810.hpp"
+#include "devices/passthrough.hpp"
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
