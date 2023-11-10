@@ -76,3 +76,18 @@ int convert_flags(int bricks) {
 
     return vfu;
 }
+
+void dump_pkt(void* buffer, size_t len) {
+    ethhdr* eth = (ethhdr*)malloc(sizeof(ethhdr));
+    memcpy(eth, buffer, MIN(len, sizeof(*eth)));
+
+    printf("src=%02X:%02X:%02X:%02X:%02X:%02X\n", eth->h_source[5],
+           eth->h_source[4], eth->h_source[3], eth->h_source[2],
+           eth->h_source[1], eth->h_source[0]);
+
+    printf("dst=%02X:%02X:%02X:%02X:%02X:%02X\n", eth->h_dest[5],
+           eth->h_dest[4], eth->h_dest[3], eth->h_dest[2], eth->h_dest[1],
+           eth->h_dest[0]);
+    printf("proto=%04X\n", ntohs(eth->h_proto));
+}
+

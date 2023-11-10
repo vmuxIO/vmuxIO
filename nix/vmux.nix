@@ -1,5 +1,6 @@
 { fetchFromGitHub
 , pkgs
+, libnic-emu
 }:
 let 
   srcpack = {
@@ -19,6 +20,7 @@ let
       fetchSubmodules = true;
       sha256 = "sha256-9bT1eQvjw87JjVc05Eia8CRVACEfcQf9a3JDrMy4GUg=";
     };
+    nic-emu = libnic-emu.src;
   };
 in
 pkgs.clangStdenv.mkDerivation {
@@ -31,6 +33,15 @@ pkgs.clangStdenv.mkDerivation {
     rm -r $sourceRoot/subprojects/libvfio-user || true
     cp -r ${srcpack.libvfio-user} $sourceRoot/subprojects/libvfio-user
     chmod -R u+w $sourceRoot/subprojects/libvfio-user
+
+    # not actually used, but meson will complain if its not there
+    rm -r $sourceRoot/subprojects/nic-emu || true
+    cp -r ${srcpack.nic-emu} $sourceRoot/subprojects/nic-emu
+    chmod -R u+w $sourceRoot/subprojects/nic-emu
+
+    # we build libnic-emu artifacts in another package and use dont_build_libnic_emu=true
+    cp ${libnic-emu}/lib/libnic_emu.a $sourceRoot/
+    cp ${libnic-emu}/lib/include/* $sourceRoot/src
   '';
 
   nativeBuildInputs = with pkgs; [
@@ -47,6 +58,10 @@ pkgs.clangStdenv.mkDerivation {
     })
 
     pkg-config
+
+    # dependencies for nic-emu
+    rustc
+    cargo
   ];
   buildInputs = with pkgs; [
     openssl
@@ -59,14 +74,13 @@ pkgs.clangStdenv.mkDerivation {
 
     json_c
     cmocka
+    libnic-emu
   ];
 
   hardeningDisable = [ "all" ];
 
   configurePhase = ''
-    pwd
-    ls
-    meson build
+    meson build -Ddont_build_libnic_emu=true
   '';
   buildPhase = ''
     meson compile -C build

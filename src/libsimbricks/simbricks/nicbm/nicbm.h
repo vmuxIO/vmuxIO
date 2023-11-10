@@ -309,6 +309,7 @@ class SimpleDevice : public Runner::Device {
     RegWrite(bar, addr, r);
   }
 };
+
 }  // namespace nicbm
 
 #endif  // SIMBRICKS_NICBM_NICBM_H_

@@ -65,8 +65,10 @@ class VmuxDevice {
     /* vfio endpoint, may be null for some devices */
     std::shared_ptr<VfioConsumer> vfioc;
 
+    std::shared_ptr<VfioUserServer> vfuServer;
+
     /* the implementor is not allowed to keep this vfu, it is only borrowed */
-    virtual void setup_vfu(VfioUserServer &vfu) = 0;
+    virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) = 0;
 
     virtual ~VmuxDevice() = default;
 };
@@ -76,7 +78,7 @@ class StubDevice : public VmuxDevice {
     StubDevice() {
       this->vfioc = NULL;
     }
-    void setup_vfu(VfioUserServer &vfu) {};
+    void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {};
 };
 
 class E810EmulatedDevice : public VmuxDevice {
@@ -103,16 +105,16 @@ class E810EmulatedDevice : public VmuxDevice {
       this->init_pci_ids();
     }
 
-    void setup_vfu(VfioUserServer &vfu) {
+    void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
       // set up vfio-user register mediation
-      this->init_bar_callbacks(vfu);
+      this->init_bar_callbacks(*vfu);
 
       // set up irqs 
       // TODO
 
       // set up libvfio-user callbacks
       // vfu.setup_passthrough_callbacks(this->vfioc);
-      this->init_general_callbacks(vfu);
+      this->init_general_callbacks(*vfu);
     };
 
     void init_pci_ids() {
@@ -265,30 +267,30 @@ class PassthroughDevice : public VmuxDevice {
       this->init_pci_ids(pci_address);
     }
 
-    void setup_vfu(VfioUserServer &vfu) {
+    void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
       int ret; 
 
       // set up vfio-user register passthrough
       if (this->vfioc != NULL) {
           // pass through registers, only if it is a passthrough device
-          ret = vfu.add_regions(this->vfioc->regions, this->vfioc->device);
+          ret = vfu->add_regions(this->vfioc->regions, this->vfioc->device);
           if (ret < 0)
               die("failed to add regions");
       }
 
       // set up irqs 
       if (this->vfioc != NULL) {
-          ret = vfu.add_irqs(this->vfioc->interrupts);
+          ret = vfu->add_irqs(this->vfioc->interrupts);
           if (ret < 0)
               die("failed to add irqs");
 
-          vfu.add_legacy_irq_pollfds(this->vfioc->irqfd_intx, this->vfioc->irqfd_msi,
+          vfu->add_legacy_irq_pollfds(this->vfioc->irqfd_intx, this->vfioc->irqfd_msi,
                   this->vfioc->irqfd_err, this->vfioc->irqfd_req);
-          vfu.add_msix_pollfds(this->vfioc->irqfds);
+          vfu->add_msix_pollfds(this->vfioc->irqfds);
       }
 
       // set up callbacks
-      vfu.setup_passthrough_callbacks(this->vfioc);
+      vfu->setup_passthrough_callbacks(this->vfioc);
     }
 
   private:
