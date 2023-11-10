@@ -19,11 +19,15 @@ default:
 help:
   just --list
 
+# vmux passthrough (uses config: hosts/yourhostname.yaml)
 vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci_full"' hosts/$(hostname).yaml`:
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
 vmuxE810:
   sudo {{proot}}/build/vmux -d none -m emulation -s {{vmuxSock}}
+
+vmuxE1000:
+  sudo {{proot}}/build/vmux -d none -m e1000-emu -s {{vmuxSock}}
 
 # connect to `just qemu` vm
 ssh COMMAND="":

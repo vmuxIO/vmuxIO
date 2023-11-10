@@ -1,10 +1,13 @@
 #pragma once
 
+#include <netinet/in.h>
 #include <stdexcept>
 #include <err.h>
 #include <dirent.h>
 #include <vector> 
 #include <cstring>
+#include <netinet/if_ether.h>
+#include <sys/param.h>
 #include "src/libsimbricks/simbricks/pcie/proto.h"
 #include "libvfio-user.h"
 
@@ -24,3 +27,6 @@ std::vector<int> get_hardware_ids(std::string pci_device,
         std::string iommu_group);
 
 int convert_flags(int bricks);
+
+// dump an ethernet packet
+void dump_pkt(void* buffer, size_t len);

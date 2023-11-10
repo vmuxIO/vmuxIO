@@ -17,16 +17,17 @@ We can:
 
 - emluate registers
 - do passthrough (e1000, E810)
+- emulate an e1000
 
 We cannot yet: 
 
 - multiplex
 - do interrupts
-- emulate devices
+- emulate an E810/iavf
 
 ## Usage
 
-Preconditions:
+Preconditions for passthrough:
 
 - you have an intel E810 or e1000 NIC available in your system at say `0000:08:00.0`
 - `0000:08:00.0` is bound to `vfio-pci`
@@ -94,6 +95,20 @@ nix develop
 modprobe ice
 # re-apply host-config to vm to apply nixos changes
 just vm-update host-config
+```
+
+to use vMux instead of qemu for emulation/passthrough:
+
+```shell
+# start vMux
+just vmuxPt
+# or
+just vmuxE810
+# or
+just vmuxE1000
+
+# and then qemu
+just vm-libvfio-user
 ```
 
 ## Demos

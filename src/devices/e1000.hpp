@@ -34,6 +34,7 @@ class E1000EmulatedDevice : public VmuxDevice {
     }
 
     void ethRx() {
+      // simulate that the NIC received a small bogus packet
       uint64_t data = 0xdeadbeef;
       e1000_receive(e1000, (uint8_t*) &data, sizeof(data));
     }
@@ -74,7 +75,8 @@ class E1000EmulatedDevice : public VmuxDevice {
 
   private:
     static void send_cb(void *private_ptr, const uint8_t *buffer, uintptr_t len) {
-        die("Send CB\n"); // TODO connect this and the ones below
+        printf("received (and ignored) packet:\n");
+        dump_pkt((void*)buffer, (size_t)len);
     }
 
     static void dma_read_cb(void *private_ptr, uintptr_t dma_address, uint8_t *buffer, uintptr_t len) {
@@ -83,7 +85,7 @@ class E1000EmulatedDevice : public VmuxDevice {
         if (!local_addr) {
           die("Could not translate DMA address");
         }
-        memcpy(buffer, local_addr, len); // TODO bounds checks!?
+        memcpy(buffer, local_addr, len);
     }
 
     static void dma_write_cb(void *private_ptr, uintptr_t dma_address, const uint8_t *buffer, uintptr_t len) {
@@ -92,7 +94,7 @@ class E1000EmulatedDevice : public VmuxDevice {
         if (!local_addr) {
           die("Could not translate DMA address");
         }
-        memcpy(local_addr, buffer, len); // TODO bounds checks!?
+        memcpy(local_addr, buffer, len);
     }
 
     static void issue_interrupt_cb(void *private_ptr) {
