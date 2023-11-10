@@ -500,13 +500,13 @@ class VfioUserServer {
 
             //__builtin_dump_struct(info, &printf);
             VfioUserServer *vfu = (VfioUserServer*)vfu_get_private(vfu_ctx); 
-            // VfioUserServer *vfu = ((VmuxDevice*)vfu_get_private(vfu_ctx))->vfuServer; // TODO this breaks passthrough and others
             uint32_t flags = 0;
 
             if (!VfioUserServer::map_dma_here(vfu_ctx, vfu, info, &flags)) {
                 return;
             }
 
+            // Set up DMA mapping for the physical device via VFIO
             vfio_iommu_type1_dma_map dma_map = {
                 .argsz = sizeof(vfio_iommu_type1_dma_map),
                 .flags = flags,

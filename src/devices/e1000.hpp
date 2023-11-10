@@ -48,7 +48,6 @@ class E1000EmulatedDevice : public VmuxDevice {
       // TODO
 
       // set up libvfio-user callbacks
-      // vfu.setup_passthrough_callbacks(this->vfioc);
       this->init_general_callbacks(*vfu);
 
       int ret = vfu_setup_device_dma(vfu->vfu_ctx,
