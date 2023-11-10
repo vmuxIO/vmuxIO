@@ -1,4 +1,4 @@
-{pkgs, ...}: pkgs.rustPlatform.buildRustPackage {
+{pkgs, ...}: pkgs.rustPlatform.buildRustPackage rec {
   name = "libnic-emu";
   src = pkgs.fetchFromGitHub {
     owner = "vmuxIO";
@@ -10,7 +10,7 @@
   };
 
   cargoLock = {
-    lockFile = ./nic-emu.cargo.lock;
+    lockFile = src + "/Cargo.lock";
     outputHashes = {
       "libvfio-user-0.1.0" = "sha256-jxWy2/g3jVyGsdfEGxA+WoYMzQZwztSsDV+IwoJ82xk=";
     };
