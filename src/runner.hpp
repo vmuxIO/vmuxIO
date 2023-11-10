@@ -4,8 +4,8 @@
 #include <atomic>
 #include <optional>
 #include <memory>
-#include "src/device.hpp"
 #include "src/vfio-server.hpp"
+#include "src/devices/vmux-device.hpp"
 
 
 class VmuxRunner{

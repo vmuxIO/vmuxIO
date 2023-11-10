@@ -1,5 +1,5 @@
 #include "src/runner.hpp"
-#include "src/device.hpp"
+#include "src/devices/vmux-device.hpp"
 #include "caps.hpp"
 #include <memory>
 

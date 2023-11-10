@@ -1,4 +1,6 @@
-#include "device.hpp"
+#pragma once
+
+#include "devices/vmux-device.hpp"
 #include "nic-emu.hpp"
 #include <cstring>
 

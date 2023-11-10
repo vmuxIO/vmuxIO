@@ -24,10 +24,6 @@
 #include <signal.h>
 #include <thread>
 
-#include "device.hpp"
-#include "devices/e1000.hpp"
-#include "devices/e810.hpp"
-#include "devices/passthrough.hpp"
 #include "src/vfio-consumer.hpp"
 #include "src/util.hpp"
 #include "src/caps.hpp"
@@ -38,6 +34,10 @@
 #include "src/vfio-server.hpp"
 #include "src/util.hpp"
 #include "src/runner.hpp"
+#include "src/devices/vmux-device.hpp"
+#include "devices/e1000.hpp"
+#include "devices/e810.hpp"
+#include "devices/passthrough.hpp"
 
 extern "C" {
 #include "libvfio-user.h"
