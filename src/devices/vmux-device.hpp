@@ -1,9 +1,9 @@
 #pragma once
 
-#include <memory>
-#include <cstdint>
 #include "vfio-consumer.hpp"
 #include "vfio-server.hpp"
+#include <cstdint>
+#include <memory>
 
 class VfioUserServer;
 
@@ -57,26 +57,23 @@ struct DeviceInfo {
 };
 
 class VmuxDevice {
-  public:
-    DeviceInfo info;
+public:
+  DeviceInfo info;
 
-    /* vfio endpoint, may be null for some devices */
-    std::shared_ptr<VfioConsumer> vfioc;
+  /* vfio endpoint, may be null for some devices */
+  std::shared_ptr<VfioConsumer> vfioc;
 
-    std::shared_ptr<VfioUserServer> vfuServer;
+  std::shared_ptr<VfioUserServer> vfuServer;
 
-    virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
-      this->vfuServer = vfu;
-    };
+  virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
+    this->vfuServer = vfu;
+  };
 
-    virtual ~VmuxDevice() = default;
+  virtual ~VmuxDevice() = default;
 };
 
 class StubDevice : public VmuxDevice {
-  public:
-    StubDevice() {
-      this->vfioc = NULL;
-    }
-    void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {};
+public:
+  StubDevice() { this->vfioc = NULL; }
+  void setup_vfu(std::shared_ptr<VfioUserServer> vfu){};
 };
-
