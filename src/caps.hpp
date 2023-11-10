@@ -1,3 +1,9 @@
+/**
+ * We keep header and implementation split here so not to pollute this project
+ * with stuff defined in the private libvfio-user header imported in the
+ * implementation.
+ */
+
 #pragma once
 
 #include <string>
