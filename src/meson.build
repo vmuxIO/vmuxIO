@@ -2,7 +2,6 @@ sources += files(
   'main.cpp',
   'caps.cpp',
   'runner.cpp',
-  'util.cpp',
   'sims/nic/e810_bm/i40e_bm.cc',
   'sims/nic/e810_bm/logger.cc',
   'sims/nic/e810_bm/i40e_adminq.cc',

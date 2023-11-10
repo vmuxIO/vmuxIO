@@ -54,7 +54,7 @@ class VfioConsumer {
             this->device_name = device_name;
         }
         VfioConsumer(std::string device_name) {
-            this->group_str = "/dev/vfio/" + get_iommu_group(device_name);
+            this->group_str = "/dev/vfio/" + Util::get_iommu_group(device_name);
             this->device_name = device_name;
         }
         ~VfioConsumer() {

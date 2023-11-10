@@ -47,10 +47,10 @@ class PassthroughDevice : public VmuxDevice {
 
   private:
     void init_pci_ids(std::string device) {
-      std::string group_arg = get_iommu_group(device);
+      std::string group_arg = Util::get_iommu_group(device);
 
       //Get Hardware Information from Device
-      std::vector<int> pci_ids = get_hardware_ids(device,group_arg);
+      std::vector<int> pci_ids = Util::get_hardware_ids(device,group_arg);
       if(pci_ids.size() != 5){
           die("Failed to parse Hardware Information, expected %d IDs got %zu\n",
                   5, pci_ids.size());

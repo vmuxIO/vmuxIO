@@ -77,7 +77,7 @@ class E1000EmulatedDevice : public VmuxDevice {
   private:
     static void send_cb(void *private_ptr, const uint8_t *buffer, uintptr_t len) {
         printf("received (and ignored) packet:\n");
-        dump_pkt((void*)buffer, (size_t)len);
+        Util::dump_pkt((void*)buffer, (size_t)len);
     }
 
     static void dma_read_cb(void *private_ptr, uintptr_t dma_address, uint8_t *buffer, uintptr_t len) {

@@ -145,7 +145,7 @@ class E810EmulatedDevice : public VmuxDevice {
 
         // set up register accesses VM<->vmux
         
-        int flags = convert_flags(region.flags);
+        int flags = Util::convert_flags(region.flags);
         flags |= VFU_REGION_FLAG_RW;
         ret = vfu_setup_region(vfu.vfu_ctx, idx,
                 region.len,
