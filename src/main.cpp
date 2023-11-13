@@ -76,11 +76,6 @@ typedef struct {
 }
 
 int _main(int argc, char **argv) {
-  auto tap = std::make_shared<Tap>();
-  tap->open_tap("tap-okelmann0");
-  tap->dumpRx();
-
-
   int ch;
   std::string device = "0000:18:00.0";
   std::vector<std::string> pciAddresses;
@@ -200,6 +195,12 @@ int _main(int argc, char **argv) {
   //            runner[0]->get_interrupts().irq_intx_pollfd_idx
   //            ].revents & POLLIN);
 
+  auto tap = std::make_shared<Tap>();
+  tap->open_tap("tap-okelmann0");
+  tap->registerEpoll(efd);
+  // tap->dumpRx();
+
+
   // runtime loop
   bool foobar = false;
   while (!quit.load()) {
@@ -213,8 +214,13 @@ int _main(int argc, char **argv) {
       int eventsc = epoll_wait(efd, events, 1024, 500);
 
       for (int i = 0; i < eventsc; i++) {
-        auto f = (interrupt_callback *)events[i].data.ptr;
-        f->callback(f->fd, f->vfu);
+        if (events[i].data.u64 == 1337) {
+          tap->recv();
+          std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx();
+        } else { 
+          auto f = (interrupt_callback *)events[i].data.ptr;
+          f->callback(f->fd, f->vfu);
+        }
       }
     }
   }

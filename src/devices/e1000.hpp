@@ -32,7 +32,11 @@ public:
   void ethRx() {
     // simulate that the NIC received a small bogus packet
     uint64_t data = 0xdeadbeef;
-    e1000_receive(e1000, (uint8_t *)&data, sizeof(data));
+    if (e1000_rx_is_ready(e1000)) {
+      e1000_receive(e1000, (uint8_t *)&data, sizeof(data));
+    } else {
+      printf("E1000EmulatedDevice: Dropping received packet because e1000 is not ready\n");
+    }
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override {
