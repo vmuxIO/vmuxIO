@@ -36,6 +36,7 @@
 #include "devices/e810.hpp"
 #include "devices/passthrough.hpp"
 #include "src/devices/vmux-device.hpp"
+#include "src/tap.hpp"
 
 extern "C" {
 #include "libvfio-user.h"
@@ -75,6 +76,10 @@ typedef struct {
 }
 
 int _main(int argc, char **argv) {
+  auto tap = std::make_shared<Tap>();
+  tap->open_tap("tap-okelmann0");
+  tap->dumpRx();
+
 
   int ch;
   std::string device = "0000:18:00.0";
