@@ -519,6 +519,7 @@ def create_servers(conf: ConfigParser,
             conf['host']['test_iface_dpdk_driv'],
             conf['host']['test_iface_vfio_driv'],
             conf['host']['test_bridge'],
+            conf.get('host', 'test_bridge_ip_net', fallback=None),
             conf['host']['test_tap'],
             conf['host']['test_macvtap'],
             conf['host']['vmux_path'],
@@ -542,6 +543,7 @@ def create_servers(conf: ConfigParser,
             conf['guest']['test_iface'],
             conf['guest']['test_iface_addr'],
             conf['guest']['test_iface_mac'],
+            conf.get('guest', 'test_iface_ip_net', fallback=None),
             conf['guest']['test_iface_driv'],
             conf['guest']['test_iface_dpdk_driv'],
             conf['guest']['tmux_socket'],
@@ -989,6 +991,7 @@ def test_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
 
             tconf = test_conf[section]
             generator = LoadLatencyTestGenerator(
+                tconf['type'] if 'type' in tconf else 'moongen',
                 {Machine(m.strip()) for m in tconf['machines'].split(',')},
                 {Interface(i.strip()) for i in tconf['interfaces'].split(',')},
                 {q.strip() for q in tconf['qemus'].split(',')},
@@ -1004,7 +1007,8 @@ def test_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
                 tconf['warmup'] == 'true',
                 tconf['cooldown'] == 'true',
                 tconf['accumulate'] == 'true',
-                tconf['outputdir']
+                tconf['outputdir'],
+                tconf['iperf_cmd'] if 'iperf_cmd' in tconf else None
             )
             generator.generate(host)
             if args.dry_run:
@@ -1032,6 +1036,7 @@ def acc_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
 
             tconf = test_conf[section]
             generator = LoadLatencyTestGenerator(
+                tconf['type'] if 'type' in tconf else 'moongen',
                 {Machine(m.strip()) for m in tconf['machines'].split(',')},
                 {Interface(i.strip()) for i in tconf['interfaces'].split(',')},
                 {q.strip() for q in tconf['qemus'].split(',')},
@@ -1047,7 +1052,8 @@ def acc_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
                 tconf['warmup'] == 'true',
                 tconf['cooldown'] == 'true',
                 tconf['accumulate'] == 'true',
-                tconf['outputdir']
+                tconf['outputdir'],
+                tconf['iperf_cmd'] if 'iperf_cmd' in tconf else None
             )
             generator.generate(host)
             generator.force_accumulate()
