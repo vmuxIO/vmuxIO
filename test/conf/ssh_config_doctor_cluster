@@ -39,5 +39,14 @@ StrictHostKeyChecking=no
 IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
+LogLevel=ERROR
+
+Host vm.river.christina
+ProxyJump river.christina
+Hostname 192.168.56.20
+User root
 StrictHostKeyChecking=no
+IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
 LogLevel=ERROR
