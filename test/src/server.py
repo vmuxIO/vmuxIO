@@ -1204,7 +1204,7 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host'):
+    def setup_test_br_tap(self: 'Host', multi_queue=True):
         """
         Setup the bridged test tap device.
 
@@ -1227,7 +1227,7 @@ class Host(Server):
         username = self.whoami()
         self.exec(f'sudo ip link show {self.test_tap} 2>/dev/null || ' +
                   f'(sudo ip tuntap add dev {self.test_tap} mode tap ' +
-                  f'user {username} multi_queue; true)')
+                  f'user {username}{" multi_queue" if multi_queue else ""}; true)')
 
         # add tap device and physical nic to bridge
         tap_output = self.exec(f'sudo ip link show {self.test_tap}')
@@ -1346,16 +1346,26 @@ class Host(Server):
         # and compile them.
         dev_type = 'pci' if machine_type == 'pc' else 'device'
         test_net_config = ''
-        if net_type == 'brtap':
+        if net_type.startswith('brtap'):
             test_net_config = (
-                f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-                f'id=admin1,ifname={self.test_tap},script=no,' +
-                'downscript=no,queues=4' +
-                f' -device virtio-net-{dev_type},id=testif,' +
-                f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
-                (',use-ioregionfd=true' if ioregionfd else '') +
-                f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
-            )
+                    f" -netdev tap,vhost={'on' if vhost else 'off'}," +
+                    f'id=admin1,ifname={self.test_tap},script=no,' +
+                    'downscript=no')
+
+            if net_type == 'brtap':
+                test_net_config += ',queues=4'
+                test_net_config += (
+                        f' -device virtio-net-{dev_type},id=testif,' +
+                        f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
+                        (',use-ioregionfd=true' if ioregionfd else '') +
+                        f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
+                )
+            elif net_type == 'brtap-e1000':
+                test_net_config += (
+                        f' -device e1000,id=testif,' +
+                        f'netdev=admin1,mac={self.guest_test_iface_mac}'
+                )
+
         elif net_type == 'macvtap':
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +

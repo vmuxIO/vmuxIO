@@ -31,6 +31,9 @@ class Interface(Enum):
     # connected to it via TAP device
     BRIDGE = "bridge"
 
+    # Bridge using QEMU E1000 instead of VirtIO NIC
+    BRIDGE_E1000 = "bridge-e1000"
+
     # MacVTap to physical NIC on host, and for VM additionally VirtIO NIC
     # connected to it
     MACVTAP = "macvtap"
@@ -273,6 +276,8 @@ class LoadLatencyTestGenerator(object):
                 host.setup_test_bridge()
             else:
                 host.setup_test_br_tap()
+        elif interface == Interface.BRIDGE_E1000:
+            host.setup_test_br_tap(multi_queue=False)
         elif interface == Interface.MACVTAP:
             host.setup_test_macvtap()
         elif interface in [Interface.VFIO, Interface.VMUX]:
@@ -309,6 +314,8 @@ class LoadLatencyTestGenerator(object):
         net_type = None
         if interface == Interface.BRIDGE:
             net_type = 'brtap'
+        if interface == Interface.BRIDGE_E1000:
+            net_type = 'brtap-e1000'
         elif interface == Interface.MACVTAP:
             net_type = 'macvtap'
         elif interface == Interface.VFIO:

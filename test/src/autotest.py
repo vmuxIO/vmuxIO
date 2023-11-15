@@ -196,7 +196,7 @@ def setup_parser() -> ArgumentParser:
     run_guest_parser.add_argument('-i',
                                   '--interface',
                                   type=str,
-                                  choices=['brtap', 'macvtap',
+                                  choices=['brtap', 'brtap-e1000', 'macvtap',
                                            'vfio', 'vmux'],
                                   default='brtap',
                                   help='Test network interface type.',
@@ -273,7 +273,7 @@ def setup_parser() -> ArgumentParser:
     setup_network_parser.add_argument('-i',
                                       '--interface',
                                       type=str,
-                                      choices=['brtap', 'macvtap',
+                                      choices=['brtap', 'brtap-e1000', 'macvtap',
                                                'vfio', 'vmux'],
                                       default='brtap',
                                       help='Test network interface type.',
@@ -682,6 +682,8 @@ def _setup_network(host: Host, interface: str) -> None:
     host.modprobe_test_iface_drivers()
     if interface == 'brtap':
         host.setup_test_br_tap()
+    elif interface == 'brtap-e1000':
+        host.setup_test_br_tap(multi_queue=False)
     elif interface == 'macvtap':
         host.setup_test_macvtap()
     elif interface == 'vfio':
