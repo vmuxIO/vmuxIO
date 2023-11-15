@@ -100,6 +100,9 @@ def main() -> None:
 
             # the actual test
 
+                                if guest.test_iface_ip_net:
+                                    debug('Assigning IP to test iface in guest')
+                                    guest.setup_test_iface_ip_net()
 
             # TODO start more services and so on
 

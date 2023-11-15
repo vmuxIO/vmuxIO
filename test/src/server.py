@@ -1182,6 +1182,7 @@ class Host(Server):
                  test_iface_dpdk_driv: str,
                  test_iface_vfio_driv: str,
                  test_bridge: str,
+                 test_bridge_ip_net: Optional[str],
                  test_tap: str,
                  test_macvtap: str,
                  vmux_path: str,
@@ -1226,6 +1227,8 @@ class Host(Server):
             The vfio driver of the test interface.
         test_bridge : str
             The network interface identifier of the test bridge interface.
+        test_bridge_ip_net : Optional[str]
+            IP net assigned to the test bridge.
         test_tap : str
             The network interface identifier of the test tap interface.
         test_macvtap : str
@@ -1283,6 +1286,7 @@ class Host(Server):
         self.admin_tap = admin_tap
         self.test_iface_vfio_driv = test_iface_vfio_driv
         self.test_bridge = test_bridge
+        self.test_bridge_ip_net = test_bridge_ip_net
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
         self.vmux_path = vmux_path
@@ -1419,6 +1423,9 @@ class Host(Server):
             setup(test_tap)
 
         buffer.flush()
+
+        if self.test_bridge_ip_net:
+            self.exec(f'sudo ip address add {self.test_bridge_ip_net} dev {self.test_bridge}')
 
     def destroy_test_br_tap(self: 'Host'):
         """
@@ -1723,12 +1730,14 @@ class Guest(Server):
     >>> Guest('server.test.de')
     Guest(fqdn='server.test.de')
     """
+    test_iface_ip_net: Optional[str]
 
     def __init__(self: 'Guest',
                  fqdn: str,
                  test_iface: str,
                  test_iface_addr: str,
                  test_iface_mac: str,
+                 test_iface_ip_net: Optional[str],
                  test_iface_driv: str,
                  test_iface_dpdk_driv: str,
                  tmux_socket: str,
@@ -1786,6 +1795,7 @@ class Guest(Server):
                          tmux_socket, moongen_dir, moonprogs_dir,
                          xdp_reflector_dir, ssh_config=ssh_config,
                          ssh_as_root=ssh_as_root)
+        self.test_iface_ip_net = test_iface_ip_net
 
     def __post_init__(self: 'Guest') -> None:
         """
@@ -1815,6 +1825,18 @@ class Guest(Server):
         guest = copy.deepcopy(self)
         guest.fqdn = MultiHost.ssh_hostname(guest.fqdn, vm_number)
         return guest
+
+    def setup_test_iface_ip_net(self: 'Guest'):
+        """
+        Assign ip address and netmask to the test interface if it exists.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
 
 
 class LoadGen(Server):
@@ -1953,3 +1975,4 @@ class LoadGen(Server):
         -------
         """
         server.tmux_kill('loadlatency')
+
