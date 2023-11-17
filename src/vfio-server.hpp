@@ -428,7 +428,7 @@ public:
         if (dma_address + len > iova_end) {
           die("DMA too big too handle without implementing loops here");
         }
-        size_t offset = iova_start - dma_address;
+        size_t offset = dma_address - iova_start;
         return (void *)(vaddr_start + offset);
       }
     }
