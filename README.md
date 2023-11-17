@@ -184,6 +184,11 @@ python3.10 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_okelmann.cfg 
 
 # Debugging
 
+## Coding style
+
+- cpp code formatting as enforced by `clang-format`
+
+
 ## Notes on IOMMU/VFs
 
 Iommu: check that it is enabled
