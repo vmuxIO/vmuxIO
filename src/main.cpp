@@ -208,7 +208,9 @@ int _main(int argc, char **argv) {
       struct epoll_event events[1024];
 
       if (foobar) {
-        std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx();
+        // simulate that the NIC received a small bogus packet
+        uint64_t data = 0xdeadbeef;
+        std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&data, sizeof(data));
         foobar = false;
       }
       int eventsc = epoll_wait(efd, events, 1024, 500);
@@ -216,7 +218,7 @@ int _main(int argc, char **argv) {
       for (int i = 0; i < eventsc; i++) {
         if (events[i].data.u64 == 1337) {
           tap->recv();
-          std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx();
+          std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&(tap->frame.buf), tap->frame_buf_used);
         } else { 
           auto f = (interrupt_callback *)events[i].data.ptr;
           f->callback(f->fd, f->vfu);

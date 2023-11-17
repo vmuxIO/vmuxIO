@@ -6,13 +6,23 @@
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
 
+#define TAP_ETH_FRAME_MAX 9000
+
+// this is what linux tuntap gives us on read()
+struct __attribute__ ((packed)) tap_eth_frame {
+  uint16_t flags;
+  uint16_t proto;
+  char buf[TAP_ETH_FRAME_MAX]; // actual ethernet packet
+};
+
 class Tap {
 public:
-  static const int MAX_BUF = 9000;
+  static const int MAX_BUF = TAP_ETH_FRAME_MAX;
 
   char ifName[IFNAMSIZ];
   int fd;
-  char buf[Tap::MAX_BUF];
+  struct tap_eth_frame frame;
+  size_t frame_buf_used; // how much frame->buf is actually filled with data
 
   ~Tap() {
     close(this->fd);
@@ -47,8 +57,10 @@ public:
   }
 
   void recv() {
-    size_t n = read(this->fd, this->buf, Tap::MAX_BUF);
+    size_t n = read(this->fd, &(this->frame), Tap::MAX_BUF);
+    this->frame_buf_used = n;
     printf("recv %zu bytes\n", n);
+    Util::dump_pkt(&this->frame.buf, this->frame_buf_used);
     if (n < 0)
       die("could not read from tap");
   }
@@ -56,7 +68,7 @@ public:
   void dumpRx() {
     while (true) {
       this->recv();
-      Util::dump_pkt(this->buf, Tap::MAX_BUF);
+      Util::dump_pkt(this->frame.buf, this->frame_buf_used);
     }
   }
 

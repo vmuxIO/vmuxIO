@@ -29,11 +29,9 @@ public:
 
   ~E1000EmulatedDevice() { drop_e1000(e1000); }
 
-  void ethRx() {
-    // simulate that the NIC received a small bogus packet
-    uint64_t data = 0xdeadbeef;
+  void ethRx(char *data, size_t len) {
     if (e1000_rx_is_ready(e1000)) {
-      e1000_receive(e1000, (uint8_t *)&data, sizeof(data));
+      e1000_receive(e1000, (uint8_t*)data, len);
     } else {
       printf("E1000EmulatedDevice: Dropping received packet because e1000 is not ready\n");
     }
@@ -73,7 +71,7 @@ public:
 
 private:
   static void send_cb(void *private_ptr, const uint8_t *buffer, uintptr_t len) {
-    printf("received (and ignored) packet:\n");
+    printf("received (and ignored) packet for tx:\n");
     Util::dump_pkt((void *)buffer, (size_t)len);
   }
 
