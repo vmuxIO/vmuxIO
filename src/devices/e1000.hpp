@@ -48,6 +48,8 @@ public:
     // set up libvfio-user callbacks
     this->init_general_callbacks(*vfu);
 
+    this->init_irqs(*vfu);
+
     int ret =
         vfu_setup_device_dma(vfu->vfu_ctx, E1000EmulatedDevice::dma_register_cb,
                              E1000EmulatedDevice::dma_unregister_cb);
@@ -96,7 +98,14 @@ private:
   }
 
   static void issue_interrupt_cb(void *private_ptr) {
-    die("Issue interrupt CB\n");
+    E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
+    int irqIdx = 0; // this emulator only registers one interrupt // TODO not true anymore
+    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, irqIdx);
+    printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno);
+    if (ret < 0) {
+      die("Cannot trigger MSIX interrupt %d", irqIdx);
+    }
+    // die("Issue interrupt CB\n");
   }
 
   void init_general_callbacks(VfioUserServer &vfu) {
@@ -178,6 +187,23 @@ private:
                                          [[maybe_unused]] uint32_t count,
                                          [[maybe_unused]] bool mask) {
     printf("irq_state_unimplemented_cb unimplemented\n");
+  }
+
+  void init_irqs(VfioUserServer &vfu) {
+    int ret = vfu_setup_device_nr_irqs(
+      vfu.vfu_ctx, VFU_DEV_INTX_IRQ, 1);
+    if (ret < 0) {
+      die("Cannot set up vfio-user irq (type %d, num %d)", VFIO_PCI_INTX_IRQ_INDEX,
+          1);
+    }
+
+    // TODO needs capability
+    ret = vfu_setup_device_nr_irqs(
+      vfu.vfu_ctx, VFU_DEV_MSI_IRQ, 1);
+    if (ret < 0) {
+      die("Cannot set up vfio-user irq (type %d, num %d)", VFIO_PCI_MSI_IRQ_INDEX,
+          1);
+    }
   }
 
   void init_bar_callbacks(VfioUserServer &vfu) {
