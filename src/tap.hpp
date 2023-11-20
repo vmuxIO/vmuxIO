@@ -8,20 +8,18 @@
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
 
-#define TAP_ETH_FRAME_MAX 9000
-
 class Tap {
 public:
-  static const int MAX_BUF = TAP_ETH_FRAME_MAX;
+  static const int MAX_BUF = 9000; // should be enough even for most jumboframes
 
   char ifName[IFNAMSIZ];
-  int fd;
+  int fd = 0;
   char rxFrame[MAX_BUF];
   size_t rxFrame_used; // how much rxFrame is actually filled with data
   char txFrame[MAX_BUF];
 
   ~Tap() {
-    close(this->fd);
+    close(this->fd); // does onthing if uninitialized (== 0)
   }
 
   int open_tap(const char *dev) {
