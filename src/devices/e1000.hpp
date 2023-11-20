@@ -12,6 +12,7 @@ private:
   E1000FFI *e1000;
   std::shared_ptr<Tap> tap;
   static const int bars_nr = 2;
+  static const int IRQ_IDX = 0; // this emulator may register multiple interrupts, but only uses the first one
 
 public:
   E1000EmulatedDevice(std::shared_ptr<Tap> tap) : tap(tap) {
@@ -103,11 +104,10 @@ private:
 
   static void issue_interrupt_cb(void *private_ptr) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
-    int irqIdx = 0; // this emulator only registers one interrupt // TODO not true anymore
-    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, irqIdx);
+    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, E1000EmulatedDevice::IRQ_IDX);
     printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno);
     if (ret < 0) {
-      die("Cannot trigger MSIX interrupt %d", irqIdx);
+      die("Cannot trigger MSIX interrupt %d", E1000EmulatedDevice::IRQ_IDX);
     }
     // die("Issue interrupt CB\n");
   }
@@ -202,12 +202,12 @@ private:
     }
 
     // TODO needs capability
-    ret = vfu_setup_device_nr_irqs(
-      vfu.vfu_ctx, VFU_DEV_MSI_IRQ, 1);
-    if (ret < 0) {
-      die("Cannot set up vfio-user irq (type %d, num %d)", VFIO_PCI_MSI_IRQ_INDEX,
-          1);
-    }
+    // ret = vfu_setup_device_nr_irqs(
+    //   vfu.vfu_ctx, VFU_DEV_MSI_IRQ, 1);
+    // if (ret < 0) {
+    //   die("Cannot set up vfio-user irq (type %d, num %d)", VFIO_PCI_MSI_IRQ_INDEX,
+    //       1);
+    // }
   }
 
   void init_bar_callbacks(VfioUserServer &vfu) {
