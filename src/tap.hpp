@@ -12,6 +12,7 @@
 
 // this is what linux tuntap gives us on read()
 struct __attribute__ ((packed)) tap_eth_frame {
+  // flags and proto seem only to be used witout IFF_NO_PI
   uint16_t flags;
   uint16_t proto;
   char buf[TAP_ETH_FRAME_MAX]; // actual ethernet packet
@@ -23,9 +24,9 @@ public:
 
   char ifName[IFNAMSIZ];
   int fd;
-  struct tap_eth_frame rxFrame;
+  char rxFrame[MAX_BUF];
   size_t rxFrame_buf_used; // how much frame->buf is actually filled with data
-  struct tap_eth_frame txFrame;
+  char txFrame[MAX_BUF];
   size_t txFrame_used; // frame.buf may not be fully used. This variable describes how much of the entire frame needs to be copied to catch all of buf.
   size_t i = offsetof(tap_eth_frame, buf);
 
@@ -48,7 +49,7 @@ public:
      *
      *        IFF_NO_PI - Do not provide packet information
      */
-    ifr.ifr_flags = IFF_TAP;
+    ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
     if (*dev)
       strncpy(ifr.ifr_name, dev, IFNAMSIZ);
 
@@ -63,21 +64,18 @@ public:
 
   void send(const char *buf, const size_t len) {
     if (len > Tap::MAX_BUF) die("Attempting to send a packet too large for vmux (%zu)", len);
-    memcpy(this->txFrame.buf, (void*)buf, len);
-    size_t i = offsetof(tap_eth_frame, buf);
-    this->txFrame_used = len + offsetof(tap_eth_frame, buf);
-    size_t n = write(this->fd, &(this->txFrame), this->txFrame_used);
-    if (n != this->txFrame_used) {
-      die("Could not send full packet (sent %zu of %zu b)", n, len);
+    memcpy(&(this->txFrame), (void*)buf, len);
+    size_t n = write(this->fd, &(this->txFrame), len);
+    if (n != len) {
+      die("Could not send full packet (sent %zu of %zu b). Is the tap interface down?", n, len);
     }
   }
 
   void recv() {
     size_t n = read(this->fd, &(this->rxFrame), Tap::MAX_BUF);
-    size_t i = offsetof(tap_eth_frame, buf);
-    this->rxFrame_buf_used = n - offsetof(tap_eth_frame, buf); // frame read minus header fields (preceding the buf field)
+    this->rxFrame_buf_used = n;
     printf("recv %zu bytes\n", n);
-    Util::dump_pkt(&this->rxFrame.buf, this->rxFrame_buf_used);
+    Util::dump_pkt(&this->rxFrame, this->rxFrame_buf_used);
     if (n < 0)
       die("could not read from tap");
   }
@@ -85,7 +83,7 @@ public:
   void dumpRx() {
     while (true) {
       this->recv();
-      Util::dump_pkt(this->rxFrame.buf, this->rxFrame_buf_used);
+      Util::dump_pkt(this->rxFrame, this->rxFrame_buf_used);
     }
   }
 
