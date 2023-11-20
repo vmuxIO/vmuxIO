@@ -10,14 +10,6 @@
 
 #define TAP_ETH_FRAME_MAX 9000
 
-// this is what linux tuntap gives us on read()
-struct __attribute__ ((packed)) tap_eth_frame {
-  // flags and proto seem only to be used witout IFF_NO_PI
-  uint16_t flags;
-  uint16_t proto;
-  char buf[TAP_ETH_FRAME_MAX]; // actual ethernet packet
-};
-
 class Tap {
 public:
   static const int MAX_BUF = TAP_ETH_FRAME_MAX;
@@ -25,14 +17,13 @@ public:
   char ifName[IFNAMSIZ];
   int fd;
   char rxFrame[MAX_BUF];
-  size_t rxFrame_buf_used; // how much frame->buf is actually filled with data
+  size_t rxFrame_used; // how much rxFrame is actually filled with data
   char txFrame[MAX_BUF];
-  size_t txFrame_used; // frame.buf may not be fully used. This variable describes how much of the entire frame needs to be copied to catch all of buf.
-  size_t i = offsetof(tap_eth_frame, buf);
+  int efd = 0; // if non-null: eventfd to registered for this->fd
 
   ~Tap() {
     close(this->fd);
-    // TODO remove Tap from epoll
+    epoll_ctl(this->efd, EPOLL_CTL_DEL, this->efd, (struct epoll_event *)NULL);
   }
 
   int open_tap(const char *dev) {
@@ -63,19 +54,22 @@ public:
   }
 
   void send(const char *buf, const size_t len) {
-    if (len > Tap::MAX_BUF) die("Attempting to send a packet too large for vmux (%zu)", len);
-    memcpy(&(this->txFrame), (void*)buf, len);
+    if (len > Tap::MAX_BUF)
+      die("Attempting to send a packet too large for vmux (%zu)", len);
+    memcpy(&(this->txFrame), (void *)buf, len);
     size_t n = write(this->fd, &(this->txFrame), len);
     if (n != len) {
-      die("Could not send full packet (sent %zu of %zu b). Is the tap interface down?", n, len);
+      die("Could not send full packet (sent %zu of %zu b). Is the tap "
+          "interface down?",
+          n, len);
     }
   }
 
   void recv() {
     size_t n = read(this->fd, &(this->rxFrame), Tap::MAX_BUF);
-    this->rxFrame_buf_used = n;
+    this->rxFrame_used = n;
     printf("recv %zu bytes\n", n);
-    Util::dump_pkt(&this->rxFrame, this->rxFrame_buf_used);
+    Util::dump_pkt(&this->rxFrame, this->rxFrame_used);
     if (n < 0)
       die("could not read from tap");
   }
@@ -83,7 +77,7 @@ public:
   void dumpRx() {
     while (true) {
       this->recv();
-      Util::dump_pkt(this->rxFrame, this->rxFrame_buf_used);
+      Util::dump_pkt(this->rxFrame, this->rxFrame_used);
     }
   }
 
@@ -94,5 +88,7 @@ public:
 
     if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, this->fd, &e))
       die("could not register tap fd to epoll");
+
+    this->efd = efd;
   }
 };

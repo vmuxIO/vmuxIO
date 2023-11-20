@@ -217,7 +217,7 @@ int _main(int argc, char **argv) {
       for (int i = 0; i < eventsc; i++) {
         if (events[i].data.u64 == 1337) {
           tap->recv();
-          std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&(tap->rxFrame), tap->rxFrame_buf_used);
+          std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&(tap->rxFrame), tap->rxFrame_used);
         } else { 
           auto f = (interrupt_callback *)events[i].data.ptr;
           f->callback(f->fd, f->vfu);
