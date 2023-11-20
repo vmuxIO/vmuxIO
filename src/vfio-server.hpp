@@ -40,12 +40,6 @@ class VfioUserServer;
 class VmuxDevice;
 class PassthroughDevice;
 
-struct epoll_callback {
-  int fd; // passed as arg1 to callback
-  void *ctx; // passed as arg2 to callback
-  void (*callback)(int, void*);
-};
-
 class VfioUserServer {
 public:
   vfu_ctx_t *vfu_ctx;

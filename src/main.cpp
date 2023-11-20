@@ -129,8 +129,6 @@ int _main(int argc, char **argv) {
   auto tap = std::make_shared<Tap>(); // TODO fix for multi-device operation
 
   tap->open_tap("tap-okelmann0");
-  tap->registerEpoll(efd);
-  // tap->dumpRx();
 
   // create vfio consumers
   for (size_t i = 0; i < pciAddresses.size(); i++) {
@@ -164,7 +162,7 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>();
     }
     if (modes[i] == "e1000-emu") {
-      device = std::make_shared<E1000EmulatedDevice>(tap);
+      device = std::make_shared<E1000EmulatedDevice>(tap, efd);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
@@ -215,13 +213,8 @@ int _main(int argc, char **argv) {
       int eventsc = epoll_wait(efd, events, 1024, 500);
 
       for (int i = 0; i < eventsc; i++) {
-        if (events[i].data.u64 == 1337) {
-          tap->recv();
-          std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&(tap->rxFrame), tap->rxFrame_used);
-        } else { 
-          auto f = (epoll_callback *)events[i].data.ptr;
-          f->callback(f->fd, f->ctx);
-        }
+        auto f = (epoll_callback *)events[i].data.ptr;
+        f->callback(f->fd, f->ctx);
       }
     }
   }

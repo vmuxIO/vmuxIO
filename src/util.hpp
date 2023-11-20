@@ -22,6 +22,12 @@
     throw std::runtime_error("See error above");                               \
   }
 
+struct epoll_callback {
+  int fd; // passed as arg1 to callback
+  void *ctx; // passed as arg2 to callback
+  void (*callback)(int, void*);
+};
+
 class Util {
 public:
   static std::string get_iommu_group(std::string pci_device) {

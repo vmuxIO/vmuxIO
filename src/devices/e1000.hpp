@@ -3,6 +3,7 @@
 #include "devices/vmux-device.hpp"
 #include "nic-emu.hpp"
 #include "tap.hpp"
+#include "util.hpp"
 #include <cstring>
 
 static bool rust_logs_initialized = false;
@@ -13,9 +14,25 @@ private:
   std::shared_ptr<Tap> tap;
   static const int bars_nr = 2;
   static const int IRQ_IDX = 0; // this emulator may register multiple interrupts, but only uses the first one
+  epoll_callback tapCallback;
+  int efd = 0; // if non-null: eventfd registered for this->tap->fd
+
+  void registerTapEpoll(std::shared_ptr<Tap> tap, int efd) {
+    this->tapCallback.fd = tap->fd;
+    this->tapCallback.callback = E1000EmulatedDevice::tap_cb;
+    this->tapCallback.ctx = this;
+    struct epoll_event e;
+    e.events = EPOLLIN;
+    e.data.ptr = &this->tapCallback;
+
+    if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, tap->fd, &e))
+      die("could not register tap fd to epoll");
+
+    this->efd = efd;
+  }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Tap> tap) : tap(tap) {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd) : tap(tap) {
     if (!rust_logs_initialized) {
       initialize_rust_logging(6); // Debug logs
       rust_logs_initialized = true;
@@ -28,9 +45,21 @@ public:
     e1000 = new_e1000(callbacks);
 
     this->init_pci_ids();
+
+    this->registerTapEpoll(tap, efd);
   }
 
-  ~E1000EmulatedDevice() { drop_e1000(e1000); }
+  ~E1000EmulatedDevice() { 
+    drop_e1000(e1000); 
+    epoll_ctl(this->efd, EPOLL_CTL_DEL, this->efd, (struct epoll_event *)NULL); // does nothing of efd is not initialized (== 0)
+  }
+
+  // forward rx event callback from tap to this E1000EmulatedDevice
+  static void tap_cb(int fd, void *this__) {
+    E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
+    this_->tap->recv();
+    this_->ethRx((char*)&(this_->tap->rxFrame), this_->tap->rxFrame_used);
+  }
 
   void ethRx(char *data, size_t len) {
     if (e1000_rx_is_ready(e1000)) {
@@ -46,12 +75,10 @@ public:
     this->init_bar_callbacks(*vfu);
 
     // set up irqs
-    // TODO
+    this->init_irqs(*vfu);
 
     // set up libvfio-user callbacks
     this->init_general_callbacks(*vfu);
-
-    this->init_irqs(*vfu);
 
     int ret =
         vfu_setup_device_dma(vfu->vfu_ctx, E1000EmulatedDevice::dma_register_cb,

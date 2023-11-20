@@ -19,11 +19,9 @@ public:
   char rxFrame[MAX_BUF];
   size_t rxFrame_used; // how much rxFrame is actually filled with data
   char txFrame[MAX_BUF];
-  int efd = 0; // if non-null: eventfd to registered for this->fd
 
   ~Tap() {
     close(this->fd);
-    epoll_ctl(this->efd, EPOLL_CTL_DEL, this->efd, (struct epoll_event *)NULL);
   }
 
   int open_tap(const char *dev) {
@@ -79,16 +77,5 @@ public:
       this->recv();
       Util::dump_pkt(this->rxFrame, this->rxFrame_used);
     }
-  }
-
-  void registerEpoll(int efd) {
-    struct epoll_event e;
-    e.events = EPOLLIN;
-    e.data.u64 = 1337;
-
-    if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, this->fd, &e))
-      die("could not register tap fd to epoll");
-
-    this->efd = efd;
   }
 };
