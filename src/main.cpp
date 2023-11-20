@@ -219,8 +219,8 @@ int _main(int argc, char **argv) {
           tap->recv();
           std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&(tap->rxFrame), tap->rxFrame_used);
         } else { 
-          auto f = (interrupt_callback *)events[i].data.ptr;
-          f->callback(f->fd, f->vfu);
+          auto f = (epoll_callback *)events[i].data.ptr;
+          f->callback(f->fd, f->ctx);
         }
       }
     }
