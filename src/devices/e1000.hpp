@@ -2,6 +2,7 @@
 
 #include "devices/vmux-device.hpp"
 #include "nic-emu.hpp"
+#include "tap.hpp"
 #include <cstring>
 
 static bool rust_logs_initialized = false;
@@ -9,10 +10,11 @@ static bool rust_logs_initialized = false;
 class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
+  std::shared_ptr<Tap> tap;
   static const int bars_nr = 2;
 
 public:
-  E1000EmulatedDevice() {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap) : tap(tap) {
     if (!rust_logs_initialized) {
       initialize_rust_logging(6); // Debug logs
       rust_logs_initialized = true;
@@ -73,8 +75,10 @@ public:
 
 private:
   static void send_cb(void *private_ptr, const uint8_t *buffer, uintptr_t len) {
-    printf("received (and ignored) packet for tx:\n");
+    E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
+    printf("received packet for tx:\n");
     Util::dump_pkt((void *)buffer, (size_t)len);
+    this_->tap->send((char*)buffer, len);
   }
 
   static void dma_read_cb(void *private_ptr, uintptr_t dma_address,

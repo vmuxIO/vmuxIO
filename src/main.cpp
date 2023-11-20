@@ -125,6 +125,13 @@ int _main(int argc, char **argv) {
         "sockets and modes");
   }
 
+  int efd = epoll_create1(0);
+  auto tap = std::make_shared<Tap>(); // TODO fix for multi-device operation
+
+  tap->open_tap("tap-okelmann0");
+  tap->registerEpoll(efd);
+  // tap->dumpRx();
+
   // create vfio consumers
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     if (pciAddresses[i] == "none") {
@@ -157,14 +164,12 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>();
     }
     if (modes[i] == "e1000-emu") {
-      device = std::make_shared<E1000EmulatedDevice>();
+      device = std::make_shared<E1000EmulatedDevice>(tap);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
     devices.push_back(device);
   }
-
-  int efd = epoll_create1(0);
 
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     vfuServers.push_back(
@@ -195,12 +200,6 @@ int _main(int argc, char **argv) {
   //            runner[0]->get_interrupts().irq_intx_pollfd_idx
   //            ].revents & POLLIN);
 
-  auto tap = std::make_shared<Tap>();
-  tap->open_tap("tap-okelmann0");
-  tap->registerEpoll(efd);
-  // tap->dumpRx();
-
-
   // runtime loop
   bool foobar = false;
   while (!quit.load()) {
@@ -218,7 +217,7 @@ int _main(int argc, char **argv) {
       for (int i = 0; i < eventsc; i++) {
         if (events[i].data.u64 == 1337) {
           tap->recv();
-          std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&(tap->frame.buf), tap->frame_buf_used);
+          std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&(tap->rxFrame.buf), tap->rxFrame_buf_used);
         } else { 
           auto f = (interrupt_callback *)events[i].data.ptr;
           f->callback(f->fd, f->vfu);
