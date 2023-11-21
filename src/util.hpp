@@ -23,9 +23,9 @@
   }
 
 struct epoll_callback {
-  int fd; // passed as arg1 to callback
+  int fd;    // passed as arg1 to callback
   void *ctx; // passed as arg2 to callback
-  void (*callback)(int, void*);
+  void (*callback)(int, void *);
 };
 
 class Util {

@@ -129,7 +129,8 @@ int _main(int argc, char **argv) {
   if (tapNames.size() == 0)
     tapNames.push_back("none");
 
-  if (sockets.size() != modes.size() || modes.size() != pciAddresses.size() || pciAddresses.size() != tapNames.size()) {
+  if (sockets.size() != modes.size() || modes.size() != pciAddresses.size() ||
+      pciAddresses.size() != tapNames.size()) {
     errno = EINVAL;
     die("Command line arguments need to specify the same number of devices, "
         "taps, sockets and modes");

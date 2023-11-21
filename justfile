@@ -20,6 +20,9 @@ default:
 help:
   just --list
 
+autoformat:
+  clang-format -i src/* devices/* || true
+
 # vmux passthrough (uses config: hosts/yourhostname.yaml)
 vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci_full"' hosts/$(hostname).yaml`:
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}

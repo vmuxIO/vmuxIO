@@ -165,7 +165,7 @@ public:
   }
 
   static void msix_callback(int fd, void *vfu_) {
-    VfioUserServer *vfu = (VfioUserServer*) vfu_;
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     // size_t irq_subindex = i - vfu.irq_msix_pollfd_idx;
     int ret = vfu_irq_trigger(vfu->vfu_ctx, fd);
     printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno);
@@ -175,28 +175,28 @@ public:
   }
 
   static void msi_callback(int fd, void *vfu_) {
-    VfioUserServer *vfu = (VfioUserServer*) vfu_;
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     (void)vfu;
     (void)fd;
     printf("msi interrupt! unimplemented\n");
   }
 
   static void intx_callback(int fd, void *vfu_) {
-    VfioUserServer *vfu = (VfioUserServer*) vfu_;
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     (void)vfu;
     (void)fd;
     printf("intx interrupt! unimplemented\n");
   }
 
   static void err_callback(int fd, void *vfu_) {
-    VfioUserServer *vfu = (VfioUserServer*) vfu_;
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     (void)vfu;
     (void)fd;
     printf("err interrupt! unimplemented\n");
   }
 
   static void req_callback(int fd, void *vfu_) {
-    VfioUserServer *vfu = (VfioUserServer*) vfu_;
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     (void)vfu;
     (void)fd;
     printf("req interrupt! unimplemented\n");
