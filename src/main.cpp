@@ -83,16 +83,21 @@ int _main(int argc, char **argv) {
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices;
   std::vector<std::shared_ptr<VfioUserServer>> vfuServers;
+  std::vector<std::shared_ptr<Tap>> taps; // network backend for emulation
   std::string group_arg;
   // int HARDWARE_REVISION; // could be set by vfu_pci_set_class:
   // vfu_ctx->pci.config_space->hdr.rid = 0x02;
   std::vector<int> pci_ids;
+  std::vector<std::string> tapNames;
   std::vector<std::string> sockets;
   std::vector<std::string> modes;
-  while ((ch = getopt(argc, argv, "hd:s:m:")) != -1) {
+  while ((ch = getopt(argc, argv, "hd:t:s:m:")) != -1) {
     switch (ch) {
     case 'd':
       pciAddresses.push_back(optarg);
+      break;
+    case 't':
+      tapNames.push_back(optarg);
       break;
     case 's':
       sockets.push_back(optarg);
@@ -104,6 +109,8 @@ int _main(int argc, char **argv) {
     case 'h':
       std::cout << "-d 0000:18:00.0                        PCI-Device (or "
                    "\"none\" if not applicable)\n"
+                << "-t tap-username0                       Tap device to use "
+                   "as backend for emulation (or \"none\" if not applicable)\n"
                 << "-s /tmp/vmux.sock                      Path of the socket\n"
                 << "-m passthrough                         vMux mode: "
                    "passthrough, emulation, e1000-emu\n";
@@ -119,16 +126,27 @@ int _main(int argc, char **argv) {
   if (modes.size() == 0)
     modes.push_back("passthrough");
 
-  if (sockets.size() != modes.size() || modes.size() != pciAddresses.size()) {
+  if (tapNames.size() == 0)
+    tapNames.push_back("none");
+
+  if (sockets.size() != modes.size() || modes.size() != pciAddresses.size() || pciAddresses.size() != tapNames.size()) {
     errno = EINVAL;
     die("Command line arguments need to specify the same number of devices, "
-        "sockets and modes");
+        "taps, sockets and modes");
   }
 
   int efd = epoll_create1(0);
-  auto tap = std::make_shared<Tap>(); // TODO fix for multi-device operation
 
-  tap->open_tap("tap-okelmann0");
+  // create taps
+  for (size_t i = 0; i < tapNames.size(); i++) {
+    if (tapNames[i] == "none") {
+      taps.push_back(NULL);
+      continue;
+    }
+    auto tap = std::make_shared<Tap>();
+    tap->open_tap(tapNames[i].c_str());
+    taps.push_back(tap);
+  }
 
   // create vfio consumers
   for (size_t i = 0; i < pciAddresses.size(); i++) {
@@ -162,7 +180,7 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>();
     }
     if (modes[i] == "e1000-emu") {
-      device = std::make_shared<E1000EmulatedDevice>(tap, efd);
+      device = std::make_shared<E1000EmulatedDevice>(taps[i], efd);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
@@ -207,7 +225,8 @@ int _main(int argc, char **argv) {
       if (foobar) {
         // simulate that the NIC received a small bogus packet
         uint64_t data = 0xdeadbeef;
-        std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])->ethRx((char*)&data, sizeof(data));
+        std::dynamic_pointer_cast<E1000EmulatedDevice>(devices[0])
+            ->ethRx((char *)&data, sizeof(data));
         foobar = false;
       }
       int eventsc = epoll_wait(efd, events, 1024, 500);

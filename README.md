@@ -159,6 +159,31 @@ Passthrough only works, if you pass through all PFs to the same VM. If you want 
 Check if you receive any packets via sysfs `/sys/class/net/eth0/statistics/rx_packets`.
 
 
+### Emulation
+
+Currently uses kernel tap device as backend.
+
+```bash
+ip tuntap add mode tap tap-username0
+ip addr add 10.2.0.1/24 dev tap-username0
+ip link set dev tap-okelmann0 up
+```
+
+Now you can start vMux and the VM. In the VM, you'll have to bind an address as well:
+
+```
+ip addr add 10.2.0.2/24 dev enp0s6
+```
+
+Now, host and VM can communicate with each other over the emulated NIC.
+
+Clean up once you are done:
+
+```bash
+ip link delete tap-username0
+```
+
+
 ## Run benchmarks
 
 See also [autotest](test/README.md) for details.
