@@ -40,13 +40,6 @@ class VfioUserServer;
 class VmuxDevice;
 class PassthroughDevice;
 
-struct interrupt_callback {
-  int fd;
-  void (*callback)(int, VfioUserServer *);
-  VfioUserServer *vfu;
-  int irq_subindex;
-};
-
 class VfioUserServer {
 public:
   vfu_ctx_t *vfu_ctx;
@@ -74,7 +67,7 @@ public:
 
   /// MSIX irqs + 1 intx + 1 msi + 1 err + 1 req
   static const size_t IC_MAX = PCI_MSIX_MAX + 4;
-  interrupt_callback ic[IC_MAX];
+  epoll_callback ic[IC_MAX];
   size_t ic_used;
 
   VfioUserServer(std::string sock, int efd,
@@ -171,7 +164,8 @@ public:
     return 0;
   }
 
-  static void msix_callback(int fd, VfioUserServer *vfu) {
+  static void msix_callback(int fd, void *vfu_) {
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     // size_t irq_subindex = i - vfu.irq_msix_pollfd_idx;
     int ret = vfu_irq_trigger(vfu->vfu_ctx, fd);
     printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno);
@@ -180,25 +174,29 @@ public:
     }
   }
 
-  static void msi_callback(int fd, VfioUserServer *vfu) {
+  static void msi_callback(int fd, void *vfu_) {
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     (void)vfu;
     (void)fd;
     printf("msi interrupt! unimplemented\n");
   }
 
-  static void intx_callback(int fd, VfioUserServer *vfu) {
+  static void intx_callback(int fd, void *vfu_) {
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     (void)vfu;
     (void)fd;
     printf("intx interrupt! unimplemented\n");
   }
 
-  static void err_callback(int fd, VfioUserServer *vfu) {
+  static void err_callback(int fd, void *vfu_) {
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     (void)vfu;
     (void)fd;
     printf("err interrupt! unimplemented\n");
   }
 
-  static void req_callback(int fd, VfioUserServer *vfu) {
+  static void req_callback(int fd, void *vfu_) {
+    VfioUserServer *vfu = (VfioUserServer *)vfu_;
     (void)vfu;
     (void)fd;
     printf("req interrupt! unimplemented\n");
@@ -211,7 +209,7 @@ public:
     for (size_t i = 0; i < eventfds.size(); i++) {
       ic[ic_used].fd = eventfds[i];
       ic[ic_used].callback = msix_callback;
-      ic[ic_used].vfu = this;
+      ic[ic_used].ctx = this;
       struct epoll_event e;
       e.events = EPOLLIN;
       e.data.ptr = &ic[ic_used++];
@@ -234,7 +232,7 @@ public:
     if (intx != 0) {
       ic[ic_used].fd = intx;
       ic[ic_used].callback = intx_callback;
-      ic[ic_used].vfu = this;
+      ic[ic_used].ctx = this;
 
       e.events = EPOLLIN;
       e.data.ptr = &ic[ic_used++];
@@ -246,7 +244,7 @@ public:
     if (msi != 0) {
       ic[ic_used].fd = msi;
       ic[ic_used].callback = msi_callback;
-      ic[ic_used].vfu = this;
+      ic[ic_used].ctx = this;
 
       e.events = EPOLLIN;
       e.data.ptr = &ic[ic_used++];
@@ -256,7 +254,7 @@ public:
 
     ic[ic_used].fd = err;
     ic[ic_used].callback = err_callback;
-    ic[ic_used].vfu = this;
+    ic[ic_used].ctx = this;
 
     e.events = EPOLLIN;
     e.data.ptr = &ic[ic_used++];
@@ -265,7 +263,7 @@ public:
 
     ic[ic_used].fd = req;
     ic[ic_used].callback = req_callback;
-    ic[ic_used].vfu = this;
+    ic[ic_used].ctx = this;
 
     e.events = EPOLLIN;
     e.data.ptr = &ic[ic_used++];
@@ -428,7 +426,7 @@ public:
         if (dma_address + len > iova_end) {
           die("DMA too big too handle without implementing loops here");
         }
-        size_t offset = iova_start - dma_address;
+        size_t offset = dma_address - iova_start;
         return (void *)(vaddr_start + offset);
       }
     }

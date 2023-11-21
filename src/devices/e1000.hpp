@@ -2,6 +2,8 @@
 
 #include "devices/vmux-device.hpp"
 #include "nic-emu.hpp"
+#include "tap.hpp"
+#include "util.hpp"
 #include <cstring>
 
 static bool rust_logs_initialized = false;
@@ -9,10 +11,28 @@ static bool rust_logs_initialized = false;
 class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
+  std::shared_ptr<Tap> tap;
   static const int bars_nr = 2;
+  static const int IRQ_IDX = 0; // this emulator may register multiple interrupts, but only uses the first one
+  epoll_callback tapCallback;
+  int efd = 0; // if non-null: eventfd registered for this->tap->fd
+
+  void registerTapEpoll(std::shared_ptr<Tap> tap, int efd) {
+    this->tapCallback.fd = tap->fd;
+    this->tapCallback.callback = E1000EmulatedDevice::tap_cb;
+    this->tapCallback.ctx = this;
+    struct epoll_event e;
+    e.events = EPOLLIN;
+    e.data.ptr = &this->tapCallback;
+
+    if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, tap->fd, &e))
+      die("could not register tap fd to epoll");
+
+    this->efd = efd;
+  }
 
 public:
-  E1000EmulatedDevice() {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd) : tap(tap) {
     if (!rust_logs_initialized) {
       initialize_rust_logging(6); // Debug logs
       rust_logs_initialized = true;
@@ -25,14 +45,28 @@ public:
     e1000 = new_e1000(callbacks);
 
     this->init_pci_ids();
+
+    this->registerTapEpoll(tap, efd);
   }
 
-  ~E1000EmulatedDevice() { drop_e1000(e1000); }
+  ~E1000EmulatedDevice() { 
+    drop_e1000(e1000); 
+    epoll_ctl(this->efd, EPOLL_CTL_DEL, this->efd, (struct epoll_event *)NULL); // does nothing of efd is not initialized (== 0)
+  }
 
-  void ethRx() {
-    // simulate that the NIC received a small bogus packet
-    uint64_t data = 0xdeadbeef;
-    e1000_receive(e1000, (uint8_t *)&data, sizeof(data));
+  // forward rx event callback from tap to this E1000EmulatedDevice
+  static void tap_cb(int fd, void *this__) {
+    E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
+    this_->tap->recv();
+    this_->ethRx((char*)&(this_->tap->rxFrame), this_->tap->rxFrame_used);
+  }
+
+  void ethRx(char *data, size_t len) {
+    if (e1000_rx_is_ready(e1000)) {
+      e1000_receive(e1000, (uint8_t*)data, len);
+    } else {
+      printf("E1000EmulatedDevice: Dropping received packet because e1000 is not ready\n");
+    }
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override {
@@ -41,7 +75,7 @@ public:
     this->init_bar_callbacks(*vfu);
 
     // set up irqs
-    // TODO
+    this->init_irqs(*vfu);
 
     // set up libvfio-user callbacks
     this->init_general_callbacks(*vfu);
@@ -69,8 +103,10 @@ public:
 
 private:
   static void send_cb(void *private_ptr, const uint8_t *buffer, uintptr_t len) {
-    printf("received (and ignored) packet:\n");
+    E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
+    printf("received packet for tx:\n");
     Util::dump_pkt((void *)buffer, (size_t)len);
+    this_->tap->send((char*)buffer, len);
   }
 
   static void dma_read_cb(void *private_ptr, uintptr_t dma_address,
@@ -94,7 +130,13 @@ private:
   }
 
   static void issue_interrupt_cb(void *private_ptr) {
-    die("Issue interrupt CB\n");
+    E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
+    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, E1000EmulatedDevice::IRQ_IDX);
+    printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno);
+    if (ret < 0) {
+      die("Cannot trigger MSIX interrupt %d", E1000EmulatedDevice::IRQ_IDX);
+    }
+    // die("Issue interrupt CB\n");
   }
 
   void init_general_callbacks(VfioUserServer &vfu) {
@@ -176,6 +218,23 @@ private:
                                          [[maybe_unused]] uint32_t count,
                                          [[maybe_unused]] bool mask) {
     printf("irq_state_unimplemented_cb unimplemented\n");
+  }
+
+  void init_irqs(VfioUserServer &vfu) {
+    int ret = vfu_setup_device_nr_irqs(
+      vfu.vfu_ctx, VFU_DEV_INTX_IRQ, 1);
+    if (ret < 0) {
+      die("Cannot set up vfio-user irq (type %d, num %d)", VFIO_PCI_INTX_IRQ_INDEX,
+          1);
+    }
+
+    // TODO needs capability
+    // ret = vfu_setup_device_nr_irqs(
+    //   vfu.vfu_ctx, VFU_DEV_MSI_IRQ, 1);
+    // if (ret < 0) {
+    //   die("Cannot set up vfio-user irq (type %d, num %d)", VFIO_PCI_MSI_IRQ_INDEX,
+    //       1);
+    // }
   }
 
   void init_bar_callbacks(VfioUserServer &vfu) {

@@ -6,6 +6,7 @@ user := `whoami`
 vmuxSock := "/tmp/vmux-" + user + ".sock"
 qemuMem := "/dev/shm/qemu-memory-" + user
 #vmuxSock := "/tmp/vmux.sock"
+vmuxTap := "tap-" + user + "0"
 linux_dir := "/scratch/" + user + "/vmux-linux"
 linux_repo := "https://github.com/vmuxio/linux"
 linux_rev := "nixos-linux-5.15.89"
@@ -19,15 +20,23 @@ default:
 help:
   just --list
 
+autoformat:
+  clang-format -i src/* devices/* || true
+
 # vmux passthrough (uses config: hosts/yourhostname.yaml)
 vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci_full"' hosts/$(hostname).yaml`:
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
 vmuxE810:
-  sudo {{proot}}/build/vmux -d none -m emulation -s {{vmuxSock}}
+  sudo {{proot}}/build/vmux -d none -t none -m emulation -s {{vmuxSock}}
 
 vmuxE1000:
-  sudo {{proot}}/build/vmux -d none -m e1000-emu -s {{vmuxSock}}
+  sudo ip link delete {{vmuxTap}} || true
+  sudo ip tuntap add mode tap {{vmuxTap}}
+  sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
+  sudo ip link set dev {{vmuxTap}} up
+  sudo {{proot}}/build/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}}
+  sudo ip link delete {{vmuxTap}}
 
 # connect to `just qemu` vm
 ssh COMMAND="":
@@ -296,7 +305,7 @@ hardware_loopback_test ETH1 ETH2 IP1 IP2 PERFARGS="" PREFIXSIZE="30":
   wait
   echo done
 
-prepare HOSTYAML:
+prepare HOSTYAML=`echo ./hosts/$(hostname).yaml`:
   sudo nix develop -c ./hosts/prepare.py {{HOSTYAML}}
 
 # prepare/configure this project for use
