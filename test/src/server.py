@@ -373,7 +373,6 @@ class Server(ABC):
         copy : Copy a file from the server to the localhost.
         __copy_ssh : Copy a file from the server to the server over SSH.
         """
-        self.__exec_local(f'mkdir -p {path_dirname(destination)}')
         self.__exec_local(f'cp {source} {destination}')
 
     def __scp_to(self: 'Server', source: str, destination: str) -> None:
@@ -497,6 +496,7 @@ class Server(ABC):
         >>> server.copy_from('/home/user/file.txt', '/home/user/file.txt')
         """
         debug(f'Copying from {self.log_name()}:{source} to {destination}')
+        self.__exec_local(f'mkdir {path_dirname(destination)} || true')
         if self.localhost:
             self.__copy_local(source, destination)
         else:

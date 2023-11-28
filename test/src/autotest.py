@@ -12,9 +12,10 @@ from colorlog import ColoredFormatter, StreamHandler, getLogger
 from sys import argv, stderr, modules
 from time import sleep
 from os import (access, R_OK, W_OK)
-from os.path import isdir, isfile, join as path_join
+from os.path import abspath, realpath, dirname, basename, isdir, isfile, join as path_join
 import readline
 from code import InteractiveConsole
+import getpass
 
 
 # project imports
@@ -24,6 +25,17 @@ from loadlatency import Machine, Interface, Reflector, LoadLatencyTestGenerator
 
 # constants
 THISMODULE: str = modules[__name__]
+FILEDIR: str = abspath(dirname(realpath(__file__)))
+PDIR: str = dirname(dirname(FILEDIR)) # this file is expected to be at ./*/*/autotest.py relative to project root
+PDIR_PARENT: str = dirname(PDIR)
+PDIR_NAME: str = basename(PDIR)
+USERNAME: str = getpass.getuser()
+CONFIG_DEFAULTS = { 
+        "projectDirectory": PDIR, 
+        "projectDirectoryName": PDIR_NAME,
+        "projectDirectoryParent": PDIR_PARENT,
+        "username": USERNAME 
+       }
 
 LOG_LEVELS: dict[int, int] = {
     0: ERROR,
@@ -418,7 +430,7 @@ def setup_and_parse_config(args: Namespace) -> ConfigParser:
     >>> setup_and_parse_config(args)
     ConfigParser(...)
     """
-    conf = ConfigParser(interpolation=ExtendedInterpolation())
+    conf = ConfigParser(defaults=CONFIG_DEFAULTS, interpolation=ExtendedInterpolation())
     conf.read(args.config.name)
     debug(f'configuration read from config file: {conf._sections}')
     return conf
@@ -977,7 +989,7 @@ def test_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
     loadgen: LoadGen
     host, guest, loadgen = create_servers(conf).values()
 
-    test_conf = ConfigParser()
+    test_conf = ConfigParser(defaults=CONFIG_DEFAULTS, interpolation=ExtendedInterpolation())
     for testconfig in args.testconfigs:
         test_conf_path = testconfig.name if hasattr(testconfig, 'name') \
             else testconfig
@@ -1022,7 +1034,7 @@ def acc_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
     loadgen: LoadGen
     host, guest, loadgen = create_servers(conf).values()
 
-    test_conf = ConfigParser()
+    test_conf = ConfigParser(defaults=CONFIG_DEFAULTS, interpolation=ExtendedInterpolation())
     for testconfig in args.testconfigs:
         test_conf_path = testconfig.name if hasattr(testconfig, 'name') \
             else testconfig
