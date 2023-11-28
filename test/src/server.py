@@ -1204,7 +1204,7 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host', multi_queue=True):
+    def setup_test_br_tap(self: 'Host', multi_queue=True): # foobar
         """
         Setup the bridged test tap device.
 
@@ -1369,7 +1369,7 @@ class Host(Server):
             )
         elif net_type == 'vfio':
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
-        elif net_type == 'vmux':
+        elif net_type in [ 'vmux-pt', 'vmux-emu' ]:
             test_net_config = \
                 f' -device vfio-user-pci,socket={self.vmux_socket_path}'
 
@@ -1444,7 +1444,7 @@ class Host(Server):
         """
         self.tmux_kill('qemu')
 
-    def start_vmux(self: 'Host') -> None:
+    def start_vmux(self: 'Host', interface: str) -> None:
         """
         Start vmux in a tmux session.
 
@@ -1454,10 +1454,16 @@ class Host(Server):
         Returns
         -------
         """
+        args = ""
+        if interface == "vmux-pt":
+            args = f'-d {self.test_iface_addr}'
+        if interface == "vmux-emu":
+            args = f'-d none -t {self.test_tap} -m e1000-emu'
+
         self.tmux_new(
             'vmux',
             f'ulimit -n 4096; sudo {self.vmux_path}'
-            f' -d {self.test_iface_addr} -s {self.vmux_socket_path}'
+            f' -s {self.vmux_socket_path} {args}'
         )
         sleep(1); # give vmux some time to start up and create the socket
         self.exec(f'sudo chmod 777 {self.vmux_socket_path}')

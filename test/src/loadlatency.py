@@ -319,7 +319,7 @@ class LoadLatencyTestGenerator(object):
         elif interface == Interface.VFIO:
             net_type = 'vfio'
         elif interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
-            net_type = 'vmux'
+            net_type = interface.value
         host.run_guest(
             net_type=net_type,
             machine_type='pc' if machine == Machine.PCVM else 'microvm',
@@ -529,7 +529,7 @@ class LoadLatencyTestGenerator(object):
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
                                 if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
-                                    host.start_vmux()
+                                    host.start_vmux(interface.value)
                                 self.run_guest(host, machine, interface,
                                                qemu_path, vhost, ioregionfd)
                                 # TODO maybe check if tmux session running
