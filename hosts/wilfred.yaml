@@ -4,7 +4,7 @@ devices:
   - name: ethDut
     pci: "51:00.0"
     pci_full: "0000:51:00.0"
-    if: enp81s0
+    if: enp81s0np0
     mac: b4:96:91:b3:8b:3c
     type: Intel E810-C 100G
     pciid: 8086:1592
