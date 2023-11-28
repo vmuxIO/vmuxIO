@@ -439,7 +439,11 @@ autotest-tmux *ARGS:
 autotest-ssh *ARGS:
   #!/usr/bin/env python3
   from configparser import ConfigParser, ExtendedInterpolation
-  conf = ConfigParser(interpolation=ExtendedInterpolation())
+  import importlib.util
+  spec = importlib.util.spec_from_file_location("default_parser", "test/src/conf.py")
+  default_parser = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(default_parser)
+  conf = default_parser.default_config_parser()
   conf.read("{{proot}}/autotest.cfg")
   import os
   os.system(f"ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
