@@ -1356,6 +1356,14 @@ class Host(Server):
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
             )
+        if net_type == 'brtap-e1000':
+            test_net_config = (
+                f" -netdev tap," +
+                f'id=admin1,ifname={self.test_tap},script=no,' +
+                'downscript=no,queues=4' +
+                f' -device e1000,' +
+                f'netdev=admin1,mac={self.guest_test_iface_mac}'
+            )
         elif net_type == 'macvtap':
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +

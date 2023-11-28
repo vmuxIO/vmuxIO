@@ -31,6 +31,9 @@ class Interface(Enum):
     # connected to it via TAP device
     BRIDGE = "bridge"
 
+    # Same as BRIDGE, but with e1000 instead of virtio-net
+    BRIDGE_E1000 = "bridge-e1000"
+
     # MacVTap to physical NIC on host, and for VM additionally VirtIO NIC
     # connected to it
     MACVTAP = "macvtap"
@@ -271,7 +274,7 @@ class LoadLatencyTestGenerator(object):
             host.modprobe_test_iface_drivers()
         if interface == Interface.PNIC:
             host.delete_nic_ip_addresses(host.test_iface)
-        elif interface == Interface.BRIDGE:
+        elif interface in [ Interface.BRIDGE, Interface.BRIDGE_E1000 ]:
             if machine == Machine.HOST:
                 host.setup_test_bridge()
             else:
@@ -314,6 +317,8 @@ class LoadLatencyTestGenerator(object):
         net_type = None
         if interface == Interface.BRIDGE:
             net_type = 'brtap'
+        if interface == Interface.BRIDGE_E1000:
+            net_type = 'brtap-e1000'
         elif interface == Interface.MACVTAP:
             net_type = 'macvtap'
         elif interface == Interface.VFIO:
