@@ -197,7 +197,7 @@ def setup_parser() -> ArgumentParser:
                                   '--interface',
                                   type=str,
                                   choices=['brtap', 'macvtap',
-                                           'vfio', 'vmux'],
+                                           'vfio', 'vmux-pt', 'vmux-emu'],
                                   default='brtap',
                                   help='Test network interface type.',
                                   )
@@ -274,7 +274,7 @@ def setup_parser() -> ArgumentParser:
                                       '--interface',
                                       type=str,
                                       choices=['brtap', 'macvtap',
-                                               'vfio', 'vmux'],
+                                               'vfio', 'vmux-pt', 'vmux-emu'],
                                       default='brtap',
                                       help='Test network interface type.',
                                       )
@@ -687,13 +687,13 @@ def _setup_network(host: Host, interface: str) -> None:
     elif interface == 'vfio':
         host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
-    elif interface == 'vmux':
+    elif interface == 'vmux-pt':
         host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
         host.start_vmux()
-    elif interface == 'nic-emu':
+    elif interface == 'vmux-emu':
         host.setup_test_br_tap(multi_queue=False)
-        host.start_nic_emu()
+        host.start_vmux()
 
 
 def setup_network(args: Namespace, conf: ConfigParser) -> None:
