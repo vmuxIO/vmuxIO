@@ -306,6 +306,9 @@ class LoadLatencyTestGenerator(object):
                 # TODO: The hardcoded driver is a dirty workaround,
                 #       we need to fix this later on
                 server.bind_device(server.test_iface_addr, 'ice')
+            elif interface in [ Interface.BRIDGE_E1000, Interface.VMUX_EMU ]:
+                server.unbind_device(server.test_iface_addr)
+                server.bind_device(server.test_iface_addr, 'e1000')
             else:
                 server.release_test_iface()
         else:
