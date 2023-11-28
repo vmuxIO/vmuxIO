@@ -197,7 +197,7 @@ def setup_parser() -> ArgumentParser:
                                   '--interface',
                                   type=str,
                                   choices=['brtap', 'macvtap',
-                                           'vfio', 'vmux', 'nic-emu'],
+                                           'vfio', 'vmux'],
                                   default='brtap',
                                   help='Test network interface type.',
                                   )
@@ -274,7 +274,7 @@ def setup_parser() -> ArgumentParser:
                                       '--interface',
                                       type=str,
                                       choices=['brtap', 'macvtap',
-                                               'vfio', 'vmux', 'nic-emu'],
+                                               'vfio', 'vmux'],
                                       default='brtap',
                                       help='Test network interface type.',
                                       )

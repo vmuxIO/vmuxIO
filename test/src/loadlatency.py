@@ -41,9 +41,6 @@ class Interface(Enum):
     # VMux-passthrough to physical NIC for the VM
     VMUX = "vmux"
 
-    # Nic-emu emulation, also sets up bridge
-    NIC_EMU = "nic-emu"
-
 
 class Reflector(Enum):
     # Reflector types
@@ -281,8 +278,6 @@ class LoadLatencyTestGenerator(object):
         elif interface in [Interface.VFIO, Interface.VMUX]:
             host.delete_nic_ip_addresses(host.test_iface)
             host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
-        elif interface == Interface.NIC_EMU:
-            host.setup_test_br_tap(multi_queue=False)
 
     def start_reflector(self, server: Server, reflector: Reflector,
                         iface: str = None):
@@ -320,8 +315,6 @@ class LoadLatencyTestGenerator(object):
             net_type = 'vfio'
         elif interface == Interface.VMUX:
             net_type = 'vmux'
-        elif interface == Interface.NIC_EMU:
-            net_type = 'nic-emu'
         host.run_guest(
             net_type=net_type,
             machine_type='pc' if machine == Machine.PCVM else 'microvm',
@@ -532,8 +525,6 @@ class LoadLatencyTestGenerator(object):
                                       f"{vhost} {ioregionfd}")
                                 if interface == Interface.VMUX:
                                     host.start_vmux()
-                                if interface == Interface.NIC_EMU:
-                                    host.start_nic_emu()
                                 self.run_guest(host, machine, interface,
                                                qemu_path, vhost, ioregionfd)
                                 # TODO maybe check if tmux session running
@@ -576,8 +567,6 @@ class LoadLatencyTestGenerator(object):
                                 host.kill_guest()
                                 if interface == Interface.VMUX:
                                     host.stop_vmux()
-                                if interface == Interface.NIC_EMU:
-                                    host.stop_nic_emu()
 
                 debug(f"Tearing down interface {interface.value}")
                 host.cleanup_network()

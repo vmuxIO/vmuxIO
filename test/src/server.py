@@ -1369,7 +1369,7 @@ class Host(Server):
             )
         elif net_type == 'vfio':
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
-        elif net_type == 'vmux' or net_type == 'nic-emu':
+        elif net_type == 'vmux':
             test_net_config = \
                 f' -device vfio-user-pci,socket={self.vmux_socket_path}'
 
@@ -1474,36 +1474,6 @@ class Host(Server):
         """
         self.tmux_kill('vmux')
 
-    def start_nic_emu(self: 'Host') -> None:
-        """
-        Start nic-emu-cli in a tmux session.
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
-        self.tmux_new(
-            'nic-emu',
-            f'sudo {self.vmux_path}'
-            f' -s {self.vmux_socket_path} --tap {self.test_tap} --mac {self.guest_test_iface_mac}'
-        )
-        # 2>&1 | tee /home/florian/outputs/nic-emu.log
-        self.exec(f'sudo chmod 777 {self.vmux_socket_path}')
-
-    def stop_nic_emu(self: 'Host') -> None:
-        """
-        Stop nic-emu-cli.
-
-        Parameters
-        ----------
-
-        Returns
-        -------
-        """
-        self.tmux_kill('nic-emu')
-
     def cleanup_network(self: 'Host') -> None:
         """
         Cleanup the network setup.
@@ -1516,10 +1486,6 @@ class Host(Server):
         """
         try:
             self.stop_vmux()
-        except:
-            pass
-        try:
-            self.stop_nic_emu()
         except:
             pass
         self.release_test_iface()
