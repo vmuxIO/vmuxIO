@@ -430,7 +430,11 @@ vfio-user-server:
 autotest-tmux *ARGS:
   #!/usr/bin/env python3
   from configparser import ConfigParser, ExtendedInterpolation
-  conf = ConfigParser(interpolation=ExtendedInterpolation())
+  import importlib.util
+  spec = importlib.util.spec_from_file_location("default_parser", "test/src/conf.py")
+  default_parser = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(default_parser)
+  conf = default_parser.default_config_parser()
   conf.read("{{proot}}/autotest.cfg")
   import os
   os.system(f"tmux -L {conf['common']['tmux_socket']} {{ARGS}}")
@@ -446,7 +450,10 @@ autotest-ssh *ARGS:
   conf = default_parser.default_config_parser()
   conf.read("{{proot}}/autotest.cfg")
   import os
-  os.system(f"ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
+  sudo = ""
+  if conf["host"]["ssh_as_root"]:
+    sudo = "sudo "
+  os.system(f"{sudo}ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
 
 # read list of hexvalues from stdin and find between which consecutive pairs arg1 lies
 rangefinder *ARGS:
