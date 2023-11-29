@@ -64,8 +64,10 @@ public:
   void recv() {
     size_t n = read(this->fd, &(this->rxFrame), Tap::MAX_BUF);
     this->rxFrame_used = n;
-    printf("recv %zu bytes\n", n);
-    Util::dump_pkt(&this->rxFrame, this->rxFrame_used);
+    if (LOG_LEVEL >= LOG_DEBUG) {
+      printf("recv %zu bytes\n", n);
+      Util::dump_pkt(&this->rxFrame, this->rxFrame_used);
+    }
     if (n < 0)
       die("could not read from tap");
   }

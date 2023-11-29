@@ -1470,7 +1470,7 @@ class Host(Server):
 
         self.tmux_new(
             'vmux',
-            f'ulimit -n 4096; sudo {self.vmux_path}'
+            f'ulimit -n 4096; sudo {self.vmux_path} -q'
             f' -s {self.vmux_socket_path} {args}'
         )
         sleep(1); # give vmux some time to start up and create the socket

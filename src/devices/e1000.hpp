@@ -34,7 +34,11 @@ private:
 public:
   E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd) : tap(tap) {
     if (!rust_logs_initialized) {
-      initialize_rust_logging(6); // Debug logs
+      if (LOG_LEVEL <= LOG_ERR) {
+        initialize_rust_logging(0);
+      } else {
+        initialize_rust_logging(6); // Debug logs
+      }
       rust_logs_initialized = true;
     }
 
@@ -104,8 +108,10 @@ public:
 private:
   static void send_cb(void *private_ptr, const uint8_t *buffer, uintptr_t len) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
-    printf("received packet for tx:\n");
-    Util::dump_pkt((void *)buffer, (size_t)len);
+    if_log_level(LOG_DEBUG, {
+      printf("received packet for tx:\n");
+      Util::dump_pkt((void *)buffer, (size_t)len);
+    });
     this_->tap->send((char*)buffer, len);
   }
 
@@ -132,7 +138,7 @@ private:
   static void issue_interrupt_cb(void *private_ptr) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
     int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, E1000EmulatedDevice::IRQ_IDX);
-    printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno);
+    if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
     if (ret < 0) {
       die("Cannot trigger MSIX interrupt %d", E1000EmulatedDevice::IRQ_IDX);
     }
