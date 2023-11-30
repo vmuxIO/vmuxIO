@@ -722,6 +722,7 @@ class Server(ABC):
                f"grep 'drv={self.test_iface_dpdk_driv}' || true")
         output: str
         if self.nixos:
+            # TODO this case can produce lots of nix-shell output which can distort the line number counting
             output = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
         else:
             output = self.exec(cmd)
@@ -1360,7 +1361,7 @@ class Host(Server):
             test_net_config = (
                 f" -netdev tap," +
                 f'id=admin1,ifname={self.test_tap},script=no,' +
-                'downscript=no,queues=4' +
+                'downscript=no' +
                 f' -device e1000,' +
                 f'netdev=admin1,mac={self.guest_test_iface_mac}'
             )

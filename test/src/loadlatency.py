@@ -278,7 +278,8 @@ class LoadLatencyTestGenerator(object):
             if machine == Machine.HOST:
                 host.setup_test_bridge()
             else:
-                host.setup_test_br_tap()
+                multi_queue = (interface != Interface.BRIDGE_E1000)
+                host.setup_test_br_tap(multi_queue=multi_queue)
         elif interface == Interface.MACVTAP:
             host.setup_test_macvtap()
         elif interface in [Interface.VFIO, Interface.VMUX_PT]:

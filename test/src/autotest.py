@@ -682,8 +682,10 @@ def _setup_network(host: Host, interface: str) -> None:
     host.setup_admin_bridge()
     host.setup_admin_tap()
     host.modprobe_test_iface_drivers()
-    if interface in [ 'brtap', 'brtap-e1000' ]:
+    if interface in [ 'brtap']:
         host.setup_test_br_tap()
+    if interface in [ 'brtap-e1000' ]:
+        host.setup_test_br_tap(multi_queue=False)
     elif interface == 'macvtap':
         host.setup_test_macvtap()
     elif interface == 'vfio':
