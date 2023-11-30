@@ -61,8 +61,10 @@ public:
   // forward rx event callback from tap to this E1000EmulatedDevice
   static void tap_cb(int fd, void *this__) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
-    this_->tap->recv();
-    this_->ethRx((char*)&(this_->tap->rxFrame), this_->tap->rxFrame_used);
+    if (e1000_rx_is_ready(this_->e1000)) {
+      this_->tap->recv();
+      this_->ethRx((char*)&(this_->tap->rxFrame), this_->tap->rxFrame_used);
+    }
   }
 
   void ethRx(char *data, size_t len) {
