@@ -1225,7 +1225,7 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host', multi_queue=True): # foobar
+    def setup_test_br_tap(self: 'Host', multi_queue=True):
         """
         Setup the bridged test tap device.
 

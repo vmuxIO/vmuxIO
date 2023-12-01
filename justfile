@@ -35,7 +35,7 @@ vmuxE1000:
   sudo ip tuntap add mode tap {{vmuxTap}}
   sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
   sudo ip link set dev {{vmuxTap}} up
-  sudo {{proot}}/result/bin/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}} -q
+  sudo {{proot}}/build/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}} -q
   sudo ip link delete {{vmuxTap}}
 
 nic-emu:
