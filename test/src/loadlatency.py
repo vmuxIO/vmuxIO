@@ -495,6 +495,9 @@ class LoadLatencyTestGenerator(object):
             info('No tests to run')
             return
 
+        host.check_cpu_freq()
+        loadgen.check_cpu_freq()
+
         debug('Initial cleanup')
         try:
             host.kill_guest()

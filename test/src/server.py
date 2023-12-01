@@ -283,6 +283,26 @@ class Server(ABC):
         return self.exec(f'test -f {path} && echo true || echo false'
                          ).strip() == 'true'
 
+    def check_cpu_freq(self: 'Server') -> None:
+        """
+        Throw if cpufreq is wrong
+        """
+        intel_path = "/sys/devices/system/cpu/intel_pstate/no_turbo"
+        amd_path = "/sys/devices/system/cpu/cpufreq/boost" # every other CPU
+        if (self.isfile(intel_path)):
+            try:
+                self.exec(f"[[ $(cat {intel_path}) -eq 1 ]]")
+            except CalledProcessError:
+                error(f"Please run on {self.fqdn}: echo 1 | sudo tee {intel_path}")
+                raise Exception(f"Wrong CPU freqency on {self.fqdn}")
+        else:
+            try:
+                self.exec(f"[[ $(cat {amd_path}) -eq 0 ]]")
+            except CalledProcessError:
+                error(f"Please run on {self.fqdn}: echo 0 | sudo tee {amd_path}")
+                raise Exception(f"Wrong CPU freqency on {self.fqdn}")
+
+
     def tmux_new(self: 'Server', session_name: str, command: str) -> None:
         """
         Start a tmux session on the server.
