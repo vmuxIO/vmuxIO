@@ -80,7 +80,7 @@ pkgs.clangStdenv.mkDerivation {
   hardeningDisable = [ "all" ];
 
   configurePhase = ''
-    meson build -Ddont_build_libnic_emu=true
+    meson build -Ddont_build_libnic_emu=true -Dbuildtype=release
   '';
   buildPhase = ''
     meson compile -C build
@@ -90,10 +90,11 @@ pkgs.clangStdenv.mkDerivation {
     mkdir -p $out/bin
     cp build/vmux $out/bin/
 
-    mkdir -p $out/lib
-    cp build/subprojects/libvfio-user/lib/libvfio-user.so $out/lib
-    cp build/subprojects/libvfio-user/lib/libvfio-user.so.0 $out/lib
-    cp build/subprojects/libvfio-user/lib/libvfio-user.so.0.0.1 $out/lib
+    # we now link libvfio-user statically
+    # mkdir -p $out/lib
+    # cp build/subprojects/libvfio-user/lib/libvfio-user.so $out/lib
+    # cp build/subprojects/libvfio-user/lib/libvfio-user.so.0 $out/lib
+    # cp build/subprojects/libvfio-user/lib/libvfio-user.so.0.0.1 $out/lib
 
     patchelf --shrink-rpath --allowed-rpath-prefixes /nix/store $out/bin/vmux
     patchelf --add-rpath $out/lib $out/bin/vmux

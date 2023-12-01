@@ -168,7 +168,7 @@ public:
     VfioUserServer *vfu = (VfioUserServer *)vfu_;
     // size_t irq_subindex = i - vfu.irq_msix_pollfd_idx;
     int ret = vfu_irq_trigger(vfu->vfu_ctx, fd);
-    printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno);
+    if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
     if (ret < 0) {
       die("Cannot trigger MSIX interrupt %d", fd);
     }

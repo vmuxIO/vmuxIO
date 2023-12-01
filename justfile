@@ -35,8 +35,15 @@ vmuxE1000:
   sudo ip tuntap add mode tap {{vmuxTap}}
   sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
   sudo ip link set dev {{vmuxTap}} up
-  sudo {{proot}}/build/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}}
+  sudo {{proot}}/build/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}} -q
   sudo ip link delete {{vmuxTap}}
+
+nic-emu:
+  sudo ip link delete {{vmuxTap}} || true
+  sudo ip tuntap add mode tap {{vmuxTap}}
+  sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
+  sudo ip link set dev {{vmuxTap}} up
+  sudo ~/nic-emu/target/release/nic-emu-cli -s /tmp/vmux-okelmann.sock -t tap-okelmann0
 
 # connect to `just qemu` vm
 ssh COMMAND="":
@@ -93,6 +100,32 @@ vm-libvfio-user:
         -s \
         -nographic
 
+vm-e1000:
+    sudo ip link delete {{vmuxTap}} || true
+    sudo ip tuntap add mode tap {{vmuxTap}}
+    sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
+    sudo ip link set dev {{vmuxTap}} up
+    sudo rm {{qemuMem}} || true
+    sudo qemu/bin/qemu-system-x86_64 \
+        -cpu host \
+        -smp 8 \
+        -enable-kvm \
+        -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -netdev tap,id=admin1,ifname={{vmuxTap}},script=no,downscript=no \
+        -device e1000,netdev=admin1,mac=02:34:56:78:9a:bc \
+        -s \
+        -nographic
+# ,queues=4
 
 # Launch a VM to test libvfio-user in a VM
 # We pass-through an e1000 device (0000:00:03.0) with vmux (or vfio)
@@ -430,7 +463,11 @@ vfio-user-server:
 autotest-tmux *ARGS:
   #!/usr/bin/env python3
   from configparser import ConfigParser, ExtendedInterpolation
-  conf = ConfigParser(interpolation=ExtendedInterpolation())
+  import importlib.util
+  spec = importlib.util.spec_from_file_location("default_parser", "test/src/conf.py")
+  default_parser = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(default_parser)
+  conf = default_parser.default_config_parser()
   conf.read("{{proot}}/autotest.cfg")
   import os
   os.system(f"tmux -L {conf['common']['tmux_socket']} {{ARGS}}")
@@ -439,10 +476,17 @@ autotest-tmux *ARGS:
 autotest-ssh *ARGS:
   #!/usr/bin/env python3
   from configparser import ConfigParser, ExtendedInterpolation
-  conf = ConfigParser(interpolation=ExtendedInterpolation())
+  import importlib.util
+  spec = importlib.util.spec_from_file_location("default_parser", "test/src/conf.py")
+  default_parser = importlib.util.module_from_spec(spec)
+  spec.loader.exec_module(default_parser)
+  conf = default_parser.default_config_parser()
   conf.read("{{proot}}/autotest.cfg")
   import os
-  os.system(f"ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
+  sudo = ""
+  if conf["host"]["ssh_as_root"]:
+    sudo = "sudo "
+  os.system(f"{sudo}ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
 
 # read list of hexvalues from stdin and find between which consecutive pairs arg1 lies
 rangefinder *ARGS:

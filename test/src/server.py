@@ -283,6 +283,26 @@ class Server(ABC):
         return self.exec(f'test -f {path} && echo true || echo false'
                          ).strip() == 'true'
 
+    def check_cpu_freq(self: 'Server') -> None:
+        """
+        Throw if cpufreq is wrong
+        """
+        intel_path = "/sys/devices/system/cpu/intel_pstate/no_turbo"
+        amd_path = "/sys/devices/system/cpu/cpufreq/boost" # every other CPU
+        if (self.isfile(intel_path)):
+            try:
+                self.exec(f"[[ $(cat {intel_path}) -eq 1 ]]")
+            except CalledProcessError:
+                error(f"Please run on {self.fqdn}: echo 1 | sudo tee {intel_path}")
+                raise Exception(f"Wrong CPU freqency on {self.fqdn}")
+        else:
+            try:
+                self.exec(f"[[ $(cat {amd_path}) -eq 0 ]]")
+            except CalledProcessError:
+                error(f"Please run on {self.fqdn}: echo 0 | sudo tee {amd_path}")
+                raise Exception(f"Wrong CPU freqency on {self.fqdn}")
+
+
     def tmux_new(self: 'Server', session_name: str, command: str) -> None:
         """
         Start a tmux session on the server.
@@ -373,7 +393,6 @@ class Server(ABC):
         copy : Copy a file from the server to the localhost.
         __copy_ssh : Copy a file from the server to the server over SSH.
         """
-        self.__exec_local(f'mkdir -p {path_dirname(destination)}')
         self.__exec_local(f'cp {source} {destination}')
 
     def __scp_to(self: 'Server', source: str, destination: str) -> None:
@@ -497,6 +516,7 @@ class Server(ABC):
         >>> server.copy_from('/home/user/file.txt', '/home/user/file.txt')
         """
         debug(f'Copying from {self.log_name()}:{source} to {destination}')
+        self.__exec_local(f'mkdir {path_dirname(destination)} || true')
         if self.localhost:
             self.__copy_local(source, destination)
         else:
@@ -722,6 +742,7 @@ class Server(ABC):
                f"grep 'drv={self.test_iface_dpdk_driv}' || true")
         output: str
         if self.nixos:
+            # TODO this case can produce lots of nix-shell output which can distort the line number counting
             output = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
         else:
             output = self.exec(cmd)
@@ -1204,7 +1225,7 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host'):
+    def setup_test_br_tap(self: 'Host', multi_queue=True):
         """
         Setup the bridged test tap device.
 
@@ -1227,7 +1248,7 @@ class Host(Server):
         username = self.whoami()
         self.exec(f'sudo ip link show {self.test_tap} 2>/dev/null || ' +
                   f'(sudo ip tuntap add dev {self.test_tap} mode tap ' +
-                  f'user {username} multi_queue; true)')
+                  f'user {username}{" multi_queue" if multi_queue else ""}; true)')
 
         # add tap device and physical nic to bridge
         tap_output = self.exec(f'sudo ip link show {self.test_tap}')
@@ -1356,6 +1377,14 @@ class Host(Server):
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
             )
+        if net_type == 'brtap-e1000':
+            test_net_config = (
+                f" -netdev tap," +
+                f'id=admin1,ifname={self.test_tap},script=no,' +
+                'downscript=no' +
+                f' -device e1000,' +
+                f'netdev=admin1,mac={self.guest_test_iface_mac}'
+            )
         elif net_type == 'macvtap':
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
@@ -1369,7 +1398,7 @@ class Host(Server):
             )
         elif net_type == 'vfio':
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
-        elif net_type == 'vmux':
+        elif net_type in [ 'vmux-pt', 'vmux-emu' ]:
             test_net_config = \
                 f' -device vfio-user-pci,socket={self.vmux_socket_path}'
 
@@ -1444,7 +1473,7 @@ class Host(Server):
         """
         self.tmux_kill('qemu')
 
-    def start_vmux(self: 'Host') -> None:
+    def start_vmux(self: 'Host', interface: str) -> None:
         """
         Start vmux in a tmux session.
 
@@ -1454,10 +1483,16 @@ class Host(Server):
         Returns
         -------
         """
+        args = ""
+        if interface == "vmux-pt":
+            args = f'-d {self.test_iface_addr}'
+        if interface == "vmux-emu":
+            args = f'-d none -t {self.test_tap} -m e1000-emu'
+
         self.tmux_new(
             'vmux',
-            f'ulimit -n 4096; sudo {self.vmux_path}'
-            f' -d {self.test_iface_addr} -s {self.vmux_socket_path}'
+            f'ulimit -n 4096; sudo {self.vmux_path} -q'
+            f' -s {self.vmux_socket_path} {args}'
         )
         sleep(1); # give vmux some time to start up and create the socket
         self.exec(f'sudo chmod 777 {self.vmux_socket_path}')

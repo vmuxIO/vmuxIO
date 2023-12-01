@@ -91,8 +91,11 @@ int _main(int argc, char **argv) {
   std::vector<std::string> tapNames;
   std::vector<std::string> sockets;
   std::vector<std::string> modes;
-  while ((ch = getopt(argc, argv, "hd:t:s:m:")) != -1) {
+  while ((ch = getopt(argc, argv, "hd:t:s:m:q")) != -1) {
     switch (ch) {
+    case 'q':
+      LOG_LEVEL = LOG_ERR;
+      break;
     case 'd':
       pciAddresses.push_back(optarg);
       break;
@@ -107,7 +110,8 @@ int _main(int argc, char **argv) {
       break;
     case '?':
     case 'h':
-      std::cout << "-d 0000:18:00.0                        PCI-Device (or "
+      std::cout << "-q                                     Quiet: reduce log level"
+                << "-d 0000:18:00.0                        PCI-Device (or "
                    "\"none\" if not applicable)\n"
                 << "-t tap-username0                       Tap device to use "
                    "as backend for emulation (or \"none\" if not applicable)\n"

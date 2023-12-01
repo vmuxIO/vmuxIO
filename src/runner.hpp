@@ -174,7 +174,7 @@ private:
       die("failed to initialize device emulation");
     }
 
-    int ret = vfu_setup_log(vfu->vfu_ctx, _log, LOG_DEBUG);
+    int ret = vfu_setup_log(vfu->vfu_ctx, _log, LOG_LEVEL);
     if (ret < 0) {
       die("failed to setup log");
     }

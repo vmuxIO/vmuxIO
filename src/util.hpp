@@ -28,6 +28,16 @@ struct epoll_callback {
   void (*callback)(int, void *);
 };
 
+static int LOG_LEVEL = LOG_DEBUG;
+
+// __builtin_expect(!! ... to replace [[unlikely]] which is unsupported on clang
+#define if_log_level(level, expr) \
+  do { \
+    if (__builtin_expect(!!(LOG_LEVEL >= level), 0)) { \
+      expr; \
+    } \
+  } while (0)
+
 class Util {
 public:
   static std::string get_iommu_group(std::string pci_device) {

@@ -12,9 +12,11 @@ from colorlog import ColoredFormatter, StreamHandler, getLogger
 from sys import argv, stderr, modules
 from time import sleep
 from os import (access, R_OK, W_OK)
-from os.path import isdir, isfile, join as path_join
+from os.path import abspath, realpath, dirname, basename, isdir, isfile, join as path_join
 import readline
 from code import InteractiveConsole
+import getpass
+from conf import default_config_parser
 
 
 # project imports
@@ -196,8 +198,8 @@ def setup_parser() -> ArgumentParser:
     run_guest_parser.add_argument('-i',
                                   '--interface',
                                   type=str,
-                                  choices=['brtap', 'macvtap',
-                                           'vfio', 'vmux'],
+                                  choices=['brtap', 'brtap-e1000', 'macvtap',
+                                           'vfio', 'vmux-pt', 'vmux-emu'],
                                   default='brtap',
                                   help='Test network interface type.',
                                   )
@@ -273,8 +275,8 @@ def setup_parser() -> ArgumentParser:
     setup_network_parser.add_argument('-i',
                                       '--interface',
                                       type=str,
-                                      choices=['brtap', 'macvtap',
-                                               'vfio', 'vmux'],
+                                      choices=['brtap', 'brtap-e1000', 'macvtap',
+                                               'vfio', 'vmux-pt', 'vmux-emu'],
                                       default='brtap',
                                       help='Test network interface type.',
                                       )
@@ -418,7 +420,7 @@ def setup_and_parse_config(args: Namespace) -> ConfigParser:
     >>> setup_and_parse_config(args)
     ConfigParser(...)
     """
-    conf = ConfigParser(interpolation=ExtendedInterpolation())
+    conf = default_config_parser()
     conf.read(args.config.name)
     debug(f'configuration read from config file: {conf._sections}')
     return conf
@@ -680,17 +682,22 @@ def _setup_network(host: Host, interface: str) -> None:
     host.setup_admin_bridge()
     host.setup_admin_tap()
     host.modprobe_test_iface_drivers()
-    if interface == 'brtap':
+    if interface in [ 'brtap']:
         host.setup_test_br_tap()
+    if interface in [ 'brtap-e1000' ]:
+        host.setup_test_br_tap(multi_queue=False)
     elif interface == 'macvtap':
         host.setup_test_macvtap()
     elif interface == 'vfio':
         host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
-    elif interface == 'vmux':
+    elif interface == 'vmux-pt':
         host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
-        host.start_vmux()
+        host.start_vmux(interface)
+    elif interface == 'vmux-emu':
+        host.setup_test_br_tap(multi_queue=False)
+        host.start_vmux(interface)
 
 
 def setup_network(args: Namespace, conf: ConfigParser) -> None:
@@ -974,7 +981,7 @@ def test_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
     loadgen: LoadGen
     host, guest, loadgen = create_servers(conf).values()
 
-    test_conf = ConfigParser()
+    test_conf = default_config_parser()
     for testconfig in args.testconfigs:
         test_conf_path = testconfig.name if hasattr(testconfig, 'name') \
             else testconfig
@@ -1019,7 +1026,7 @@ def acc_load_lat_file(args: Namespace, conf: ConfigParser) -> None:
     loadgen: LoadGen
     host, guest, loadgen = create_servers(conf).values()
 
-    test_conf = ConfigParser()
+    test_conf = default_config_parser()
     for testconfig in args.testconfigs:
         test_conf_path = testconfig.name if hasattr(testconfig, 'name') \
             else testconfig

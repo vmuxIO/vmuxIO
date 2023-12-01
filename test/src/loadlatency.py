@@ -31,6 +31,9 @@ class Interface(Enum):
     # connected to it via TAP device
     BRIDGE = "bridge"
 
+    # Same as BRIDGE, but with e1000 instead of virtio-net
+    BRIDGE_E1000 = "bridge-e1000"
+
     # MacVTap to physical NIC on host, and for VM additionally VirtIO NIC
     # connected to it
     MACVTAP = "macvtap"
@@ -39,7 +42,10 @@ class Interface(Enum):
     VFIO = "vfio"
 
     # VMux-passthrough to physical NIC for the VM
-    VMUX = "vmux"
+    VMUX_PT = "vmux-pt"
+
+    # vMux-emulation to tap backend
+    VMUX_EMU = "vmux-emu"
 
 
 class Reflector(Enum):
@@ -268,16 +274,19 @@ class LoadLatencyTestGenerator(object):
             host.modprobe_test_iface_drivers()
         if interface == Interface.PNIC:
             host.delete_nic_ip_addresses(host.test_iface)
-        elif interface == Interface.BRIDGE:
+        elif interface in [ Interface.BRIDGE, Interface.BRIDGE_E1000 ]:
             if machine == Machine.HOST:
                 host.setup_test_bridge()
             else:
-                host.setup_test_br_tap()
+                multi_queue = (interface != Interface.BRIDGE_E1000)
+                host.setup_test_br_tap(multi_queue=multi_queue)
         elif interface == Interface.MACVTAP:
             host.setup_test_macvtap()
-        elif interface in [Interface.VFIO, Interface.VMUX]:
+        elif interface in [Interface.VFIO, Interface.VMUX_PT]:
             host.delete_nic_ip_addresses(host.test_iface)
             host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
+        elif interface == Interface.VMUX_EMU:
+            host.setup_test_br_tap(multi_queue=False)
 
     def start_reflector(self, server: Server, reflector: Reflector,
                         iface: str = None):
@@ -293,11 +302,14 @@ class LoadLatencyTestGenerator(object):
                        interface: Interface, iface: str = None):
         if reflector == Reflector.MOONGEN:
             server.stop_moongen_reflector()
-            if interface in [Interface.VFIO, Interface.VMUX]:
+            if interface in [Interface.VFIO, Interface.VMUX_PT]:
                 server.unbind_device(server.test_iface_addr)
                 # TODO: The hardcoded driver is a dirty workaround,
                 #       we need to fix this later on
                 server.bind_device(server.test_iface_addr, 'ice')
+            elif interface in [ Interface.BRIDGE_E1000, Interface.VMUX_EMU ]:
+                server.unbind_device(server.test_iface_addr)
+                server.bind_device(server.test_iface_addr, 'e1000')
             else:
                 server.release_test_iface()
         else:
@@ -309,12 +321,14 @@ class LoadLatencyTestGenerator(object):
         net_type = None
         if interface == Interface.BRIDGE:
             net_type = 'brtap'
+        if interface == Interface.BRIDGE_E1000:
+            net_type = 'brtap-e1000'
         elif interface == Interface.MACVTAP:
             net_type = 'macvtap'
         elif interface == Interface.VFIO:
             net_type = 'vfio'
-        elif interface == Interface.VMUX:
-            net_type = 'vmux'
+        elif interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
+            net_type = interface.value
         host.run_guest(
             net_type=net_type,
             machine_type='pc' if machine == Machine.PCVM else 'microvm',
@@ -392,23 +406,23 @@ class LoadLatencyTestGenerator(object):
             tree[m] = {}
             for i in self.interfaces - {Interface.PNIC}:
                 if (m == Machine.MICROVM
-                        and i in [Interface.VFIO, Interface.VMUX]):
+                        and i in [Interface.VFIO, Interface.VMUX_PT]):
                     continue
                 tree[m][i] = {}
                 mac = host.test_iface_mac \
-                    if i in [Interface.VFIO, Interface.VMUX] \
+                    if i in [Interface.VFIO, Interface.VMUX_PT] \
                     else host.guest_test_iface_mac
                 for q in self.qemus:
                     qemu, _ = q.split(':')
                     tree[m][i][q] = {}
                     for v in self.vhosts:
-                        if (v and i in [Interface.VFIO, Interface.VMUX]):
+                        if (v and i in [Interface.VFIO, Interface.VMUX_PT]):
                             continue
                         tree[m][i][q][v] = {}
                         # for io in reversed(list(self.ioregionfds)):
                         for io in self.ioregionfds:
                             if io and (m != Machine.MICROVM or
-                                       i in [Interface.VFIO, Interface.VMUX]):
+                                       i in [Interface.VFIO, Interface.VMUX_PT]):
                                 continue
                             tree[m][i][q][v][io] = {}
                             for r in self.reflectors:
@@ -481,6 +495,9 @@ class LoadLatencyTestGenerator(object):
             info('No tests to run')
             return
 
+        host.check_cpu_freq()
+        loadgen.check_cpu_freq()
+
         debug('Initial cleanup')
         try:
             host.kill_guest()
@@ -523,8 +540,8 @@ class LoadLatencyTestGenerator(object):
                                 debug(f"Running guest {machine.value} " +
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
-                                if interface == Interface.VMUX:
-                                    host.start_vmux()
+                                if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
+                                    host.start_vmux(interface.value)
                                 self.run_guest(host, machine, interface,
                                                qemu_path, vhost, ioregionfd)
                                 # TODO maybe check if tmux session running
@@ -565,7 +582,7 @@ class LoadLatencyTestGenerator(object):
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
                                 host.kill_guest()
-                                if interface == Interface.VMUX:
+                                if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
                                     host.stop_vmux()
 
                 debug(f"Tearing down interface {interface.value}")
