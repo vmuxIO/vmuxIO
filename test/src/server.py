@@ -10,6 +10,7 @@ from os.path import join as path_join
 from os.path import dirname as path_dirname
 from typing import Optional
 
+BRIDGE_QUEUES: int = 0; # legacy default: 4
 
 @dataclass
 class Server(ABC):
@@ -301,6 +302,7 @@ class Server(ABC):
             except CalledProcessError:
                 error(f"Please run on {self.fqdn}: echo 0 | sudo tee {amd_path}")
                 raise Exception(f"Wrong CPU freqency on {self.fqdn}")
+
 
 
     def tmux_new(self: 'Server', session_name: str, command: str) -> None:
@@ -1238,6 +1240,9 @@ class Host(Server):
         Returns
         -------
         """
+        if BRIDGE_QUEUES == 0:
+            multi_queue = False
+
         # load kernel modules
         self.exec('sudo modprobe bridge tun tap')
 
@@ -1368,12 +1373,20 @@ class Host(Server):
         dev_type = 'pci' if machine_type == 'pc' else 'device'
         test_net_config = ''
         if net_type == 'brtap':
+            if BRIDGE_QUEUES == 0:
+                queues = ""
+                multi_queue = ""
+            else:
+                queues = f",queues={BRIDGE_QUEUES}"
+                multi_queue = ",mq=on"
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
                 f'id=admin1,ifname={self.test_tap},script=no,' +
-                'downscript=no,queues=4' +
+                f'downscript=no' +
+                queues +
                 f' -device virtio-net-{dev_type},id=testif,' +
-                f'netdev=admin1,mac={self.guest_test_iface_mac},mq=on' +
+                f'netdev=admin1,mac={self.guest_test_iface_mac}' +
+                multi_queue +
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
             )
@@ -1493,6 +1506,7 @@ class Host(Server):
             'vmux',
             f'ulimit -n 4096; sudo {self.vmux_path} -q'
             f' -s {self.vmux_socket_path} {args}'
+            # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
         )
         sleep(1); # give vmux some time to start up and create the socket
         self.exec(f'sudo chmod 777 {self.vmux_socket_path}')
