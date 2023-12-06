@@ -185,7 +185,7 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>();
     }
     if (modes[i] == "e1000-emu") {
-      device = std::make_shared<E1000EmulatedDevice>(taps[i], efd);
+      device = std::make_shared<E1000EmulatedDevice>(taps[i], efd, true);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());

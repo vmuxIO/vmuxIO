@@ -121,7 +121,7 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd) : tap(tap), irqThrottle(efd, E1000EmulatedDevice::IRQ_IDX) {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts) : tap(tap), irqThrottle(efd, E1000EmulatedDevice::IRQ_IDX) {
     if (!rust_logs_initialized) {
       if (LOG_LEVEL <= LOG_ERR) {
         initialize_rust_logging(0);
@@ -131,8 +131,12 @@ public:
       rust_logs_initialized = true;
     }
 
+    auto irq_cb = issue_interrupt_cb;
+    if (spaced_interrupts)
+      irq_cb = issue_spaced_interrupt_cb;
+
     auto callbacks = FfiCallbacks{
-        this, send_cb, dma_read_cb, dma_write_cb, issue_interrupt_cb,
+        this, send_cb, dma_read_cb, dma_write_cb, irq_cb,
     };
 
     e1000 = new_e1000(callbacks);
@@ -230,6 +234,12 @@ private:
   }
 
   static void issue_interrupt_cb(void *private_ptr) {
+    E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
+    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, E1000EmulatedDevice::IRQ_IDX);
+    if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
+  }
+
+  static void issue_spaced_interrupt_cb(void *private_ptr) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
     // spacing_s = 1 / ( 10^9 / (reg * 256) )
     // spcaing_s = (reg * 256) / 10^9
