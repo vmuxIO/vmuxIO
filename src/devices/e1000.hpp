@@ -20,7 +20,7 @@ class E1000EmulatedDevice;
 class InterruptThrottler {
   public:
   struct timespec last_interrupt_ts;
-  ulong iterrupt_spacing = 250 * 1000; // nsec
+  // ulong interrupt_spacing = 250 * 1000; // nsec
   std::atomic<bool> is_deferred;
   int timer_fd;
   int efd;
@@ -65,7 +65,8 @@ class InterruptThrottler {
     timerfd_settime(this->timer_fd, 0, &its, NULL); // foo error
   }
 
-  __attribute__((noinline)) void try_interrupt() {
+  // interrupt_spacing in ns
+  __attribute__((noinline)) void try_interrupt(ulong interrupt_spacing) {
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
@@ -73,9 +74,9 @@ class InterruptThrottler {
     clock_gettime(CLOCK_MONOTONIC, &now);
 
     ulong time_since_interrupt = Util::diff_timespec(&now, &this->last_interrupt_ts);
-    ulong defer_by = this->iterrupt_spacing - time_since_interrupt;
+    ulong defer_by = interrupt_spacing - time_since_interrupt;
     this->last_interrupt_ts = now;
-    if (time_since_interrupt < this->iterrupt_spacing) {
+    if (time_since_interrupt < interrupt_spacing) {
       if (!this->is_deferred.load()) {
         this->last_interrupt_ts.tv_nsec += defer_by;
         // ignore tv_nsec overflows. I think they will just lead to additional interrupts
@@ -230,7 +231,10 @@ private:
 
   static void issue_interrupt_cb(void *private_ptr) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
-    this_->irqThrottle.try_interrupt();
+    // spacing_s = 1 / ( 10^9 / (reg * 256) )
+    // spcaing_s = (reg * 256) / 10^9
+    ulong spacing_us = (e1000_interrupt_throtteling_reg(this_->e1000, -1) * 256);
+    this_->irqThrottle.try_interrupt(spacing_us);
     // die("Issue interrupt CB\n");
   }
 
