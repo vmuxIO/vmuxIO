@@ -4,14 +4,102 @@
 #include "nic-emu.hpp"
 #include "tap.hpp"
 #include "util.hpp"
+#include <bits/types/struct_itimerspec.h>
 #include <cstring>
+#include <ctime>
+#include <sys/timerfd.h>
+#include <time.h>
 
 static bool rust_logs_initialized = false;
+
+class E1000EmulatedDevice;
+
+/*
+ * Does many things, but the "physical" limit of e1000 of ~8000irq/s is enforced by behavioral model
+ */
+class InterruptThrottler {
+  public:
+  struct timespec last_interrupt_ts;
+  ulong iterrupt_spacing = 250 * 1000; // nsec
+  std::atomic<bool> is_deferred;
+  int timer_fd;
+  int efd;
+  int irq_idx;
+  epoll_callback timer_callback;
+  std::shared_ptr<VfioUserServer> vfuServer;
+
+  InterruptThrottler(int efd, int irq_idx): irq_idx(irq_idx) {
+    this->timer_fd = timerfd_create(CLOCK_MONOTONIC, 0); // foo error
+    this->registerEpoll(efd);
+
+  }
+
+  void registerEpoll(int efd) {
+    this->timer_callback.fd = this->timer_fd;
+    this->timer_callback.callback = InterruptThrottler::timer_cb;
+    this->timer_callback.ctx = this;
+    struct epoll_event e;
+    e.events = EPOLLIN;
+    e.data.ptr = &this->timer_callback;
+    
+    if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, this->timer_fd, &e))
+      die("could not register timer fd to epoll");
+
+    this->efd = efd;
+  }
+
+  static void timer_cb(int fd, void* this__) {
+    InterruptThrottler* this_ = (InterruptThrottler*) this__;
+    this_->is_deferred.store(false);
+    this_->send_interrupt();
+    struct itimerspec its = {};
+    timerfd_settime(this_->timer_fd, 0, &its, NULL); // foo error
+  }
+                            
+  void defer_interrupt(int duration_us) {
+    this->is_deferred.store(true);
+
+    struct itimerspec its = {};
+    its.it_value.tv_nsec = 1000 * duration_us;
+    // its.it_interval.tv_sec = 99999;
+    timerfd_settime(this->timer_fd, 0, &its, NULL); // foo error
+  }
+
+  __attribute__((noinline)) void try_interrupt() {
+    // struct itimerspec its = {};
+    // timerfd_gettime(this->timer_fd, &its); // foo error
+    // struct timespec* now = &its.it_value;
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    ulong time_since_interrupt = Util::diff_timespec(&now, &this->last_interrupt_ts);
+    ulong defer_by = this->iterrupt_spacing - time_since_interrupt;
+    this->last_interrupt_ts = now;
+    if (time_since_interrupt < this->iterrupt_spacing) {
+      if (!this->is_deferred.load()) {
+        this->last_interrupt_ts.tv_nsec += defer_by;
+        // ignore tv_nsec overflows. I think they will just lead to additional interrupts
+        this->defer_interrupt(defer_by);
+      }
+    } else {
+      this->send_interrupt();
+    }
+  }
+
+  __attribute__((noinline)) void send_interrupt() {
+    int ret = vfu_irq_trigger(this->vfuServer->vfu_ctx, this->irq_idx);
+    if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
+    if (ret < 0) {
+      die("Cannot trigger MSIX interrupt %d", this->irq_idx);
+    }
+  }
+};
 
 class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
   std::shared_ptr<Tap> tap;
+  InterruptThrottler irqThrottle;
   static const int bars_nr = 2;
   static const int IRQ_IDX = 0; // this emulator may register multiple interrupts, but only uses the first one
   epoll_callback tapCallback;
@@ -32,7 +120,7 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd) : tap(tap) {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd) : tap(tap), irqThrottle(efd, E1000EmulatedDevice::IRQ_IDX) {
     if (!rust_logs_initialized) {
       if (LOG_LEVEL <= LOG_ERR) {
         initialize_rust_logging(0);
@@ -64,6 +152,7 @@ public:
     if (e1000_rx_is_ready(this_->e1000)) {
       this_->tap->recv();
       this_->ethRx((char*)&(this_->tap->rxFrame), this_->tap->rxFrame_used);
+      // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
     }
   }
 
@@ -77,6 +166,8 @@ public:
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override {
     VmuxDevice::setup_vfu(vfu);
+    this->irqThrottle.vfuServer = vfu;
+
     // set up vfio-user register mediation
     this->init_bar_callbacks(*vfu);
 
@@ -139,11 +230,7 @@ private:
 
   static void issue_interrupt_cb(void *private_ptr) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
-    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, E1000EmulatedDevice::IRQ_IDX);
-    if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
-    if (ret < 0) {
-      die("Cannot trigger MSIX interrupt %d", E1000EmulatedDevice::IRQ_IDX);
-    }
+    this_->irqThrottle.try_interrupt();
     // die("Issue interrupt CB\n");
   }
 

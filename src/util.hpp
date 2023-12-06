@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <sys/param.h>
 #include <vector>
+#include <limits>
 
 // as per PCI spec, there can be at most 2048 MSIx inerrupts per device
 #define PCI_MSIX_MAX 2048
@@ -126,5 +127,25 @@ public:
            eth->h_dest[4], eth->h_dest[3], eth->h_dest[2], eth->h_dest[1],
            eth->h_dest[0]);
     printf("proto=%04X\n", ntohs(eth->h_proto));
+  }
+
+  static bool ts_before(const struct timespec* a, const struct timespec* b) {
+    if (a->tv_sec > b->tv_sec) {
+      return false;
+    } else {
+      return (a->tv_sec < b->tv_sec || a->tv_nsec < b->tv_nsec);
+    }
+  }
+
+  // approx. diff in nsec
+  static ulong diff_timespec(const struct timespec *time1, const struct timespec *time0) {
+    struct timespec diff = {.tv_sec = time1->tv_sec - time0->tv_sec, //
+        .tv_nsec = time1->tv_nsec - time0->tv_nsec};
+    if (diff.tv_nsec < 0) {
+      // diff.tv_nsec += 1000000000; // nsec/sec
+      // diff.tv_sec--;
+      diff.tv_nsec = std::numeric_limits<long>::max();
+    }
+    return diff.tv_nsec;
   }
 };
