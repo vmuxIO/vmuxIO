@@ -67,6 +67,7 @@ class InterruptThrottler {
 
   // interrupt_spacing in ns
   __attribute__((noinline)) void try_interrupt(ulong interrupt_spacing) {
+    // interrupt_spacing = 250000;
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
@@ -75,14 +76,17 @@ class InterruptThrottler {
 
     ulong time_since_interrupt = Util::diff_timespec(&now, &this->last_interrupt_ts);
     ulong defer_by = interrupt_spacing - time_since_interrupt;
-    this->last_interrupt_ts = now;
+    // this->last_interrupt_ts = now;
     if (time_since_interrupt < interrupt_spacing) {
       if (!this->is_deferred.load()) {
-        this->last_interrupt_ts.tv_nsec += defer_by;
+        // this->last_interrupt_ts.tv_nsec += defer_by;
+        now.tv_nsec += defer_by; // estimate interrupt time now already. Otherwise we have to set it in the timer_cb which would require an additional lock.
+        this->last_interrupt_ts = now;
         // ignore tv_nsec overflows. I think they will just lead to additional interrupts
         this->defer_interrupt(defer_by);
       }
     } else {
+      this->last_interrupt_ts = now;
       this->send_interrupt();
     }
   }
