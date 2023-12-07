@@ -28,7 +28,8 @@ class InterruptThrottler {
   int irq_idx;
   epoll_callback timer_callback;
   std::shared_ptr<VfioUserServer> vfuServer;
-  ulong factor = 1;
+  ulong factor = 10;
+  bool last_pkt_irqed = false;
 
   InterruptThrottler(int efd, int irq_idx): irq_idx(irq_idx) {
     this->timer_fd = timerfd_create(CLOCK_MONOTONIC, 0); // foo error
@@ -83,26 +84,23 @@ class InterruptThrottler {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
 
-    if (Util::ts_before(&now, &this->last_interrupt_ts)) {
-      return 1338;
-    }
     ulong time_since_interrupt = Util::ts_diff(&now, &this->last_interrupt_ts);
     ulong defer_by = this->factor * Util::ulong_min(500000, Util::ulong_diff(interrupt_spacing, time_since_interrupt));
     int we_defer = 1337;
     bool if_false = false;
     // this->last_interrupt_ts = now;
-    if (time_since_interrupt < interrupt_spacing || int_pending) {
+    if (!this->last_pkt_irqed && !int_pending) {
       we_defer = this->is_deferred.compare_exchange_strong(if_false, true);
       if (we_defer) {
         // this->last_interrupt_ts.tv_nsec += defer_by;
         now.tv_nsec += defer_by; // estimate interrupt time now already. Otherwise we have to set it in the timer_cb which would require an additional lock.
         this->last_interrupt_ts = now;
         // ignore tv_nsec overflows. I think they will just lead to additional interrupts
-        this->defer_interrupt(defer_by);
+        this->last_pkt_irqed = true;
+        this->defer_interrupt(10 * interrupt_spacing);
       }
     } else {
-      this->last_interrupt_ts = now;
-      this->send_interrupt();
+      this->last_pkt_irqed = false;
     }
 
     return we_defer;
