@@ -56,18 +56,25 @@ class InterruptThrottler {
     timerfd_settime(this_->timer_fd, 0, &its, NULL); // foo error
   }
                             
-  void defer_interrupt(int duration_us) {
+  void defer_interrupt(int duration_ns) {
     this->is_deferred.store(true);
 
     struct itimerspec its = {};
-    its.it_value.tv_nsec = 1000 * duration_us;
+    its.it_value.tv_nsec = duration_ns;
     // its.it_interval.tv_sec = 99999;
     timerfd_settime(this->timer_fd, 0, &its, NULL); // foo error
   }
 
-  // interrupt_spacing in ns
+  /* interrupt_spacing in ns
+   *
+   * Qemu to my understanding defers interrupts by min(ITR, 111us) if an interrupt is already pending. 
+   *
+   * We defer an interrupt if the last packet arrived longer than ITR us ago. 
+   *
+   * The e1000 should defer interrupts, if the last inerrupt was issued ITR us ago. 
+   */
+
   __attribute__((noinline)) void try_interrupt(ulong interrupt_spacing) {
-    // interrupt_spacing = 250000;
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
@@ -76,17 +83,17 @@ class InterruptThrottler {
 
     ulong time_since_interrupt = Util::diff_timespec(&now, &this->last_interrupt_ts);
     ulong defer_by = interrupt_spacing - time_since_interrupt;
-    // this->last_interrupt_ts = now;
+    this->last_interrupt_ts = now;
     if (time_since_interrupt < interrupt_spacing) {
       if (!this->is_deferred.load()) {
-        // this->last_interrupt_ts.tv_nsec += defer_by;
-        now.tv_nsec += defer_by; // estimate interrupt time now already. Otherwise we have to set it in the timer_cb which would require an additional lock.
-        this->last_interrupt_ts = now;
+        this->last_interrupt_ts.tv_nsec += defer_by;
+        // now.tv_nsec += defer_by; // estimate interrupt time now already. Otherwise we have to set it in the timer_cb which would require an additional lock.
+        // this->last_interrupt_ts = now;
         // ignore tv_nsec overflows. I think they will just lead to additional interrupts
         this->defer_interrupt(defer_by);
       }
     } else {
-      this->last_interrupt_ts = now;
+      // this->last_interrupt_ts = now;
       this->send_interrupt();
     }
   }
