@@ -9,6 +9,7 @@
 #include <ctime>
 #include <sys/timerfd.h>
 #include <time.h>
+#include <cstdlib>
 
 static bool rust_logs_initialized = false;
 
@@ -19,14 +20,15 @@ class E1000EmulatedDevice;
  */
 class InterruptThrottler {
   public:
-  struct timespec last_interrupt_ts;
+  struct timespec last_interrupt_ts = {};
   // ulong interrupt_spacing = 250 * 1000; // nsec
-  std::atomic<bool> is_deferred;
+  std::atomic<bool> is_deferred = false;
   int timer_fd;
   int efd;
   int irq_idx;
   epoll_callback timer_callback;
   std::shared_ptr<VfioUserServer> vfuServer;
+  ulong factor = 1;
 
   InterruptThrottler(int efd, int irq_idx): irq_idx(irq_idx) {
     this->timer_fd = timerfd_create(CLOCK_MONOTONIC, 0); // foo error
@@ -50,18 +52,18 @@ class InterruptThrottler {
 
   static void timer_cb(int fd, void* this__) {
     InterruptThrottler* this_ = (InterruptThrottler*) this__;
-    this_->is_deferred.store(false);
     this_->send_interrupt();
     struct itimerspec its = {};
     timerfd_settime(this_->timer_fd, 0, &its, NULL); // foo error
+    this_->is_deferred.store(false); // TODO events can get lost which leads to deadlocks
   }
                             
   void defer_interrupt(int duration_ns) {
-    this->is_deferred.store(true);
+    // this->is_deferred.store(true);
 
     struct itimerspec its = {};
     its.it_value.tv_nsec = duration_ns;
-    // its.it_interval.tv_sec = 99999;
+    // its.it_interval.tv_nsec = 100 * 1000 * 1000;
     timerfd_settime(this->timer_fd, 0, &its, NULL); // foo error
   }
 
@@ -74,28 +76,36 @@ class InterruptThrottler {
    * The e1000 should defer interrupts, if the last inerrupt was issued ITR us ago. 
    */
 
-  __attribute__((noinline)) void try_interrupt(ulong interrupt_spacing, bool int_pending) {
+  __attribute__((noinline)) ulong try_interrupt(ulong interrupt_spacing, bool int_pending) {
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
 
-    ulong time_since_interrupt = Util::diff_timespec(&now, &this->last_interrupt_ts);
-    ulong defer_by = interrupt_spacing - time_since_interrupt;
-    this->last_interrupt_ts = now;
-    if (time_since_interrupt < interrupt_spacing) {
-      if (!this->is_deferred.load()) {
-        this->last_interrupt_ts.tv_nsec += defer_by;
-        // now.tv_nsec += defer_by; // estimate interrupt time now already. Otherwise we have to set it in the timer_cb which would require an additional lock.
-        // this->last_interrupt_ts = now;
+    if (Util::ts_before(&now, &this->last_interrupt_ts)) {
+      return 1338;
+    }
+    ulong time_since_interrupt = Util::ts_diff(&now, &this->last_interrupt_ts);
+    ulong defer_by = this->factor * Util::ulong_min(500000, Util::ulong_diff(interrupt_spacing, time_since_interrupt));
+    int we_defer = 1337;
+    bool if_false = false;
+    // this->last_interrupt_ts = now;
+    if (time_since_interrupt < interrupt_spacing || int_pending) {
+      we_defer = this->is_deferred.compare_exchange_strong(if_false, true);
+      if (we_defer) {
+        // this->last_interrupt_ts.tv_nsec += defer_by;
+        now.tv_nsec += defer_by; // estimate interrupt time now already. Otherwise we have to set it in the timer_cb which would require an additional lock.
+        this->last_interrupt_ts = now;
         // ignore tv_nsec overflows. I think they will just lead to additional interrupts
         this->defer_interrupt(defer_by);
       }
     } else {
-      // this->last_interrupt_ts = now;
+      this->last_interrupt_ts = now;
       this->send_interrupt();
     }
+
+    return we_defer;
   }
 
   __attribute__((noinline)) void send_interrupt() {

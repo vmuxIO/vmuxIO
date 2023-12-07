@@ -138,7 +138,7 @@ public:
   }
 
   // approx. diff in nsec
-  static ulong diff_timespec(const struct timespec *time1, const struct timespec *time0) {
+  static ulong ts_diff(const struct timespec *time1, const struct timespec *time0) {
     struct timespec diff = {.tv_sec = time1->tv_sec - time0->tv_sec, //
         .tv_nsec = time1->tv_nsec - time0->tv_nsec};
     if (diff.tv_nsec < 0) {
@@ -147,5 +147,13 @@ public:
       diff.tv_nsec = std::numeric_limits<long>::max();
     }
     return diff.tv_nsec;
+  }
+  
+  static ulong ulong_diff(const ulong x, const ulong y) {
+    return x > y ? x - y : y - x;
+  }
+
+  static ulong ulong_min(const ulong x, const ulong y) {
+    return x < y ? x : y;
   }
 };
