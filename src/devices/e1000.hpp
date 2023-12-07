@@ -67,14 +67,14 @@ class InterruptThrottler {
 
   /* interrupt_spacing in ns
    *
-   * Qemu to my understanding defers interrupts by min(ITR, 111us) if an interrupt is already pending. 
+   * Qemu to my understanding defers interrupts by min(ITR, 111us) if an interrupt is still pending but last rx no interrupt was pending. It skips the interrupt, if another interrupt is already delayed. 
    *
-   * We defer an interrupt if the last packet arrived longer than ITR us ago. 
+   * We defer an interrupt if the last packet arrived longer than ITR us ago. Our BM drops interrupts, if interrupt is still raised (not masked)
    *
    * The e1000 should defer interrupts, if the last inerrupt was issued ITR us ago. 
    */
 
-  __attribute__((noinline)) void try_interrupt(ulong interrupt_spacing) {
+  __attribute__((noinline)) void try_interrupt(ulong interrupt_spacing, bool int_pending) {
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
@@ -244,18 +244,18 @@ private:
     memcpy(local_addr, buffer, len);
   }
 
-  static void issue_interrupt_cb(void *private_ptr) {
+  static void issue_interrupt_cb(void *private_ptr, bool int_pending) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
     int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, E1000EmulatedDevice::IRQ_IDX);
     if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
   }
 
-  static void issue_spaced_interrupt_cb(void *private_ptr) {
+  static void issue_spaced_interrupt_cb(void *private_ptr, bool int_pending) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
     // spacing_s = 1 / ( 10^9 / (reg * 256) )
     // spcaing_s = (reg * 256) / 10^9
     ulong spacing_us = (e1000_interrupt_throtteling_reg(this_->e1000, -1) * 256);
-    this_->irqThrottle.try_interrupt(spacing_us);
+    this_->irqThrottle.try_interrupt(spacing_us, int_pending);
     // die("Issue interrupt CB\n");
   }
 
