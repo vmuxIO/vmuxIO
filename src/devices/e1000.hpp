@@ -97,8 +97,16 @@ class InterruptThrottler {
         this->last_interrupt_ts = now;
         // ignore tv_nsec overflows. I think they will just lead to additional interrupts
         this->last_pkt_irqed = true;
-        this->defer_interrupt(10 * interrupt_spacing);
+        this->defer_interrupt(7 * interrupt_spacing); // 5: good latency and ok mpps, but 3k irq/s. 10: perfect irq/s, Good throughput and bad latency.
+      } else {
+        return we_defer;
       }
+    } else {
+    }
+
+    if (!int_pending) {
+      this->last_pkt_irqed = true;
+      this->send_interrupt();
     } else {
       this->last_pkt_irqed = false;
     }
