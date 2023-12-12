@@ -79,6 +79,7 @@ int _main(int argc, char **argv) {
   int ch;
   std::string device = "0000:18:00.0";
   std::vector<std::string> pciAddresses;
+  std::shared_ptr<GlobalInterrupts> globalIrq;
   std::vector<std::unique_ptr<VmuxRunner>> runner;
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices;
@@ -185,7 +186,7 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>();
     }
     if (modes[i] == "e1000-emu") {
-      device = std::make_shared<E1000EmulatedDevice>(taps[i], efd, true);
+      device = std::make_shared<E1000EmulatedDevice>(taps[i], efd, true, globalIrq);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());

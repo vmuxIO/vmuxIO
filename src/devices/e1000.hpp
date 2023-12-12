@@ -7,17 +7,23 @@
 #include <bits/types/struct_itimerspec.h>
 #include <cstring>
 #include <ctime>
+#include <memory>
 #include <sys/timerfd.h>
 #include <time.h>
 #include <cstdlib>
+#include "interrupts/global.hpp"
+#include "vfio-server.hpp"
 
 static bool rust_logs_initialized = false;
 
 class E1000EmulatedDevice;
+class GlobalInterrupts;
 
 class InterruptThrottler {
   public:
   std::shared_ptr<VfioUserServer> vfuServer;
+  std::shared_ptr<GlobalInterrupts> globalIrq;
+  std::atomic<ulong> spacing = 0; // us
 
   // InterruptThrottler(int efd, int irq_idx) {};
   virtual ulong try_interrupt(ulong interrupt_spacing, bool int_pending) = 0;
@@ -39,9 +45,10 @@ class InterruptThrottlerQemu: public InterruptThrottler {
   bool last_pkt_irqed = false;
 
   public: 
-  InterruptThrottlerQemu(int efd, int irq_idx): irq_idx(irq_idx) {
+  InterruptThrottlerQemu(int efd, int irq_idx, std::shared_ptr<GlobalInterrupts> irq_glob): irq_idx(irq_idx) {
     this->timer_fd = timerfd_create(CLOCK_MONOTONIC, 0); // foo error
     this->registerEpoll(efd);
+    this->globalIrq = irq_glob;
 
   }
 
@@ -88,6 +95,8 @@ class InterruptThrottlerQemu: public InterruptThrottler {
    */
 
   __attribute__((noinline)) ulong try_interrupt(ulong interrupt_spacing, bool int_pending) {
+    this->spacing = interrupt_spacing;
+    this->globalIrq->update();
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
@@ -159,7 +168,7 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts) : tap(tap), irqThrottle(efd, E1000EmulatedDevice::IRQ_IDX) {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq) : tap(tap), irqThrottle(efd, E1000EmulatedDevice::IRQ_IDX, globalIrq) {
     if (!rust_logs_initialized) {
       if (LOG_LEVEL <= LOG_ERR) {
         initialize_rust_logging(0);
@@ -208,7 +217,7 @@ public:
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override {
-    VmuxDevice::setup_vfu(vfu);
+    this->vfuServer = vfu;
     this->irqThrottle.vfuServer = vfu;
 
     // set up vfio-user register mediation
