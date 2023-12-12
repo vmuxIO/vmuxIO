@@ -79,7 +79,7 @@ int _main(int argc, char **argv) {
   int ch;
   std::string device = "0000:18:00.0";
   std::vector<std::string> pciAddresses;
-  std::shared_ptr<GlobalInterrupts> globalIrq;
+  std::shared_ptr<GlobalInterrupts> globalIrq = std::make_shared<GlobalInterrupts>();
   std::vector<std::unique_ptr<VmuxRunner>> runner;
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices;

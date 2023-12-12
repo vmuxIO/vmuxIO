@@ -1,3 +1,5 @@
+#pragma once
+
 #include <memory>
 #include <vector>
 
@@ -10,6 +12,7 @@ private:
 
 public:
   ulong spacing_max; // ns
+  ulong spacing_avg; // ns, not actual mathematical average
   ulong spacing_min; // ns
   
   void add(std::shared_ptr<InterruptThrottler> throttler);

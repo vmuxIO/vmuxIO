@@ -42,7 +42,7 @@ class InterruptThrottlerQemu: public InterruptThrottler {
   int efd;
   int irq_idx;
   epoll_callback timer_callback;
-  ulong factor = 10;
+  ulong factor = 10; // 5: good latency and ok mpps, but 3k irq/s. 10: perfect irq/s, Good throughput and bad latency.
   bool last_pkt_irqed = false;
 
   public: 
@@ -76,7 +76,7 @@ class InterruptThrottlerQemu: public InterruptThrottler {
     this_->is_deferred.store(false); // TODO events can get lost which leads to deadlocks
   }
                             
-  void defer_interrupt(int duration_ns) {
+  __attribute__((noinline)) void defer_interrupt(int duration_ns) {
     // this->is_deferred.store(true);
 
     struct itimerspec its = {};
@@ -105,7 +105,8 @@ class InterruptThrottlerQemu: public InterruptThrottler {
     clock_gettime(CLOCK_MONOTONIC, &now);
 
     ulong time_since_interrupt = Util::ts_diff(&now, &this->last_interrupt_ts);
-    ulong defer_by = this->factor * Util::ulong_min(500000, Util::ulong_diff(interrupt_spacing, time_since_interrupt));
+    // ulong defer_by = this->factor * Util::ulong_min(500000, Util::ulong_diff(interrupt_spacing, time_since_interrupt));
+    ulong defer_by = Util::ulong_max(this->globalIrq->spacing_avg, interrupt_spacing);
     int we_defer = 1337;
     bool if_false = false;
     // this->last_interrupt_ts = now;
@@ -117,7 +118,7 @@ class InterruptThrottlerQemu: public InterruptThrottler {
         this->last_interrupt_ts = now;
         // ignore tv_nsec overflows. I think they will just lead to additional interrupts
         this->last_pkt_irqed = true;
-        this->defer_interrupt(7 * interrupt_spacing); // 5: good latency and ok mpps, but 3k irq/s. 10: perfect irq/s, Good throughput and bad latency.
+        this->defer_interrupt(defer_by); 
       } else {
         return we_defer;
       }

@@ -16,5 +16,6 @@ void GlobalInterrupts::update() {
       this->spacing_max = spacing;
     }
   }
+  this->spacing_avg = (spacing_min + spacing_max) / 2;
 }
 

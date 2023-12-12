@@ -156,4 +156,8 @@ public:
   static ulong ulong_min(const ulong x, const ulong y) {
     return x < y ? x : y;
   }
+
+  static ulong ulong_max(const ulong x, const ulong y) {
+    return x > y ? x : y;
+  }
 };
