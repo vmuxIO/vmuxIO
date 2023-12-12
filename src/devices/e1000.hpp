@@ -27,6 +27,7 @@ class InterruptThrottler {
 
   // InterruptThrottler(int efd, int irq_idx) {};
   virtual ulong try_interrupt(ulong interrupt_spacing, bool int_pending) = 0;
+  virtual ~InterruptThrottler() = default;
 };
 
 /*
@@ -143,13 +144,14 @@ class InterruptThrottlerQemu: public InterruptThrottler {
   }
 };
 
+#define IRQ_IDX 0 // this emulator may register multiple interrupts, but only uses the first one
+
 class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
   std::shared_ptr<Tap> tap;
-  InterruptThrottlerQemu irqThrottle;
+  std::shared_ptr<InterruptThrottlerQemu> irqThrottle;
   static const int bars_nr = 2;
-  static const int IRQ_IDX = 0; // this emulator may register multiple interrupts, but only uses the first one
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
 
@@ -168,7 +170,9 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq) : tap(tap), irqThrottle(efd, E1000EmulatedDevice::IRQ_IDX, globalIrq) {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq) : tap(tap) {
+    this->irqThrottle = std::make_shared<InterruptThrottlerQemu>(efd, IRQ_IDX, globalIrq);
+    globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {
       if (LOG_LEVEL <= LOG_ERR) {
         initialize_rust_logging(0);
@@ -218,7 +222,7 @@ public:
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override {
     this->vfuServer = vfu;
-    this->irqThrottle.vfuServer = vfu;
+    this->irqThrottle->vfuServer = vfu;
 
     // set up vfio-user register mediation
     this->init_bar_callbacks(*vfu);
@@ -282,7 +286,7 @@ private:
 
   static void issue_interrupt_cb(void *private_ptr, bool int_pending) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
-    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, E1000EmulatedDevice::IRQ_IDX);
+    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, IRQ_IDX);
     if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
   }
 
@@ -291,7 +295,7 @@ private:
     // spacing_s = 1 / ( 10^9 / (reg * 256) )
     // spcaing_s = (reg * 256) / 10^9
     ulong spacing_us = (e1000_interrupt_throtteling_reg(this_->e1000, -1) * 256);
-    this_->irqThrottle.try_interrupt(spacing_us, int_pending);
+    this_->irqThrottle->try_interrupt(spacing_us, int_pending);
     // die("Issue interrupt CB\n");
   }
 
