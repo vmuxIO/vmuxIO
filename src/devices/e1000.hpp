@@ -13,22 +13,12 @@
 #include <cstdlib>
 #include "interrupts/global.hpp"
 #include "vfio-server.hpp"
+#include "interrupts/accurate.hpp"
 
 static bool rust_logs_initialized = false;
 
 class E1000EmulatedDevice;
 class GlobalInterrupts;
-
-class InterruptThrottler {
-  public:
-  std::shared_ptr<VfioUserServer> vfuServer;
-  std::shared_ptr<GlobalInterrupts> globalIrq;
-  std::atomic<ulong> spacing = 0; // us
-
-  // InterruptThrottler(int efd, int irq_idx) {};
-  virtual ulong try_interrupt(ulong interrupt_spacing, bool int_pending) = 0;
-  virtual ~InterruptThrottler() = default;
-};
 
 /*
  * Does many things, but the "physical" limit of e1000 of ~8000irq/s is enforced by behavioral model
@@ -151,7 +141,7 @@ class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
   std::shared_ptr<Tap> tap;
-  std::shared_ptr<InterruptThrottlerQemu> irqThrottle;
+  std::shared_ptr<InterruptThrottlerAccurate> irqThrottle;
   static const int bars_nr = 2;
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
@@ -172,7 +162,7 @@ private:
 
 public:
   E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq) : tap(tap) {
-    this->irqThrottle = std::make_shared<InterruptThrottlerQemu>(efd, IRQ_IDX, globalIrq);
+    this->irqThrottle = std::make_shared<InterruptThrottlerAccurate>(efd, IRQ_IDX, globalIrq);
     globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {
       if (LOG_LEVEL <= LOG_ERR) {
