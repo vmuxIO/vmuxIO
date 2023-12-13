@@ -27,10 +27,10 @@ class InterruptThrottlerAccurate: public InterruptThrottler {
   std::shared_ptr<VfioUserServer> vfuServer;
   ulong factor = 1;
 
-  InterruptThrottlerAccurate(int efd, int irq_idx): irq_idx(irq_idx) {
+  InterruptThrottlerAccurate(int efd, int irq_idx, std::shared_ptr<GlobalInterrupts> irq_glob): irq_idx(irq_idx) {
     this->timer_fd = timerfd_create(CLOCK_MONOTONIC, 0); // foo error
     this->registerEpoll(efd);
-
+    this->globalIrq = irq_glob;
   }
 
   void registerEpoll(int efd) {
@@ -73,7 +73,9 @@ class InterruptThrottlerAccurate: public InterruptThrottler {
    * The e1000 should defer interrupts, if the last inerrupt was issued ITR us ago. 
    */
 
-  __attribute__((noinline)) ulong try_interrupt(ulong interrupt_spacing, bool int_pending) {
+  __attribute__((noinline)) ulong try_interrupt(ulong interrupt_spacing_, bool int_pending) {
+    this->spacing = interrupt_spacing_;
+    this->globalIrq->update();
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
@@ -83,6 +85,10 @@ class InterruptThrottlerAccurate: public InterruptThrottler {
     if (Util::ts_before(&now, &this->last_interrupt_ts)) {
       return 1338;
     }
+    // ulong interrupt_spacing = Util::ulong_max(this->globalIrq->spacing_avg, interrupt_spacing_);
+    // fraction 
+    float spacing_fraction = (float)interrupt_spacing_ / (float)(this->globalIrq->spacing_max + this->globalIrq->spacing_min);
+    ulong interrupt_spacing = interrupt_spacing_ * spacing_fraction;
     ulong time_since_interrupt = Util::ts_diff(&now, &this->last_interrupt_ts);
     ulong defer_by = this->factor * Util::ulong_min(500000, Util::ulong_diff(interrupt_spacing, time_since_interrupt));
     int we_defer = 1337;
