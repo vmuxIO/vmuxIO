@@ -294,6 +294,16 @@
         KERNELDIR="${self.nixosConfigurations.host.config.boot.kernelPackages.kernel.dev}";
       });
     };
+
+    # checks used by CI (buildbot)
+    checks = let
+      nixosMachines = pkgs.lib.mapAttrs' (name: config: pkgs.lib.nameValuePair "nixos-${name}" config.config.system.build.toplevel) ((pkgs.lib.filterAttrs (_: config: config.pkgs.system == system)) self.nixosConfigurations);
+      blacklistPackages = [ "install-iso" "nspawn-template" "netboot-pixie-core" "netboot" ];
+      packages = pkgs.lib.mapAttrs' (n: pkgs.lib.nameValuePair "package-${n}") (pkgs.lib.filterAttrs (n: _v: !(builtins.elem n blacklistPackages)) self.packages.x86_64-linux);
+      devShells = pkgs.lib.mapAttrs' (n: pkgs.lib.nameValuePair "devShell-${n}") self.devShells.x86_64-linux;
+      homeConfigurations = pkgs.lib.mapAttrs' (name: config: pkgs.lib.nameValuePair "home-manager-${name}" config.activation-script) (self.legacyPackages.x86_64-linux.homeConfigurations or { });
+    in
+      nixosMachines // packages // devShells // homeConfigurations;
   })) // {
     nixosConfigurations = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
