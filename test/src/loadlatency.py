@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from logging import error, info, debug
+from logging import error, info, debug, warning
 from time import sleep
 from os.path import isfile, join as path_join
 from copy import deepcopy
+from typing import Optional
 
 from server import Server, Host, Guest, LoadGen
 
@@ -57,12 +58,16 @@ class Reflector(Enum):
     # XDP reflector
     XDP = "xdp"
 
+    # Iperf server, not really a reflector but it also runs in the VM
+    IPERF = "iperf"
+
 
 @dataclass
 class LoadLatencyTest(object):
     """
     Load latency test class
     """
+    test_type: str
     machine: Machine
     interface: Interface
     mac: str
@@ -77,6 +82,7 @@ class LoadLatencyTest(object):
     warmup: bool
     cooldown: bool
     outputdir: str
+    iperf_cmd: Optional[str]
 
     def test_infix(self):
         if self.machine == Machine.HOST:
@@ -95,6 +101,12 @@ class LoadLatencyTest(object):
             )
 
     def output_filepath(self, repetition: int):
+        if self.test_type == "iperf":
+            return path_join(
+                self.outputdir,
+                f"output_iperf_{self.test_infix()}_rep{repetition}.log"
+            )
+
         return path_join(
             self.outputdir,
             f"output_{self.test_infix()}_rep{repetition}.log"
@@ -110,6 +122,9 @@ class LoadLatencyTest(object):
         output_file = self.output_filepath(repetition)
         histogram_file = self.histogram_filepath(repetition)
 
+        if self.test_type == "iperf":
+            return isfile(output_file)
+
         return isfile(output_file) and isfile(histogram_file)
 
     def needed(self):
@@ -120,6 +135,7 @@ class LoadLatencyTest(object):
 
     def __str__(self):
         return ("LoadLatencyTest(" +
+                f"type={self.test_type}, " +
                 f"machine={self.machine.value}, " +
                 f"interface={self.interface.value}, " +
                 f"mac={self.mac}, " +
@@ -131,7 +147,8 @@ class LoadLatencyTest(object):
                 f"size={self.size}, " +
                 f"runtime={self.runtime}, " +
                 f"repetitions={self.repetitions}, " +
-                f"outputdir={self.outputdir})")
+                f"outputdir={self.outputdir}, " +
+                f"iperf_cmd={self.iperf_cmd})")
 
     def run(self, loadgen: LoadGen):
         info(f"Running test {self}")
@@ -143,9 +160,12 @@ class LoadLatencyTest(object):
             # warm-up
             sleep(10)
             try:
-                loadgen.run_l2_load_latency(self.mac, 0, 20,
-                                            histfile=remote_histogram_file,
-                                            outfile=remote_output_file)
+                if self.test_type != "iperf":
+                    loadgen.run_l2_load_latency(self.mac, 0, 20,
+                                                histfile=remote_histogram_file,
+                                                outfile=remote_output_file)
+                else:
+                    warning("Use --omit <time> in iperf cmd instead of warmup")
             except Exception as e:
                 error(f'Failed to run warm-up due to exception: {e}')
             sleep(25)
@@ -164,19 +184,26 @@ class LoadLatencyTest(object):
             try:
                 loadgen.exec(f'sudo rm -f {remote_output_file} ' +
                              f'{remote_histogram_file}')
-                loadgen.run_l2_load_latency(self.mac, self.rate,
-                                            self.runtime, self.size,
-                                            histfile=remote_histogram_file,
-                                            outfile=remote_output_file)
+                if self.test_type == "iperf":
+                    loadgen.run_iperf_client(self.iperf_cmd, self.runtime,
+                                             outfile=remote_output_file)
+                else:
+                    loadgen.run_l2_load_latency(self.mac, self.rate,
+                                                self.runtime, self.size,
+                                                histfile=remote_histogram_file,
+                                                outfile=remote_output_file)
             except Exception as e:
                 error(f'Failed to run test due to exception: {e}')
                 continue
 
             sleep(self.runtime + 5)
             try:
-                loadgen.wait_for_success(f'ls {remote_histogram_file}')
+                if self.test_type == "iperf":
+                    loadgen.wait_for_success(f'grep -Fxq "iperf Done." {remote_output_file}')
+                else:
+                    loadgen.wait_for_success(f'ls {remote_histogram_file}')
             except TimeoutError:
-                error('Waiting for histogram file to appear timed out')
+                error('Waiting for histogram file to appear or iperf output timed out')
                 continue
             sleep(1)
             # TODO here a tmux_exists function would come in handy
@@ -188,8 +215,11 @@ class LoadLatencyTest(object):
             # download results
             loadgen.copy_from(remote_output_file,
                               self.output_filepath(repetition))
-            loadgen.copy_from(remote_histogram_file,
-                              self.histogram_filepath(repetition))
+
+            # iPerf3 has no histogram
+            if self.test_type != "iperf":
+                loadgen.copy_from(remote_histogram_file,
+                                  self.histogram_filepath(repetition))
 
     def accumulate(self, force: bool = False):
         assert self.repetitions > 0, 'Reps must be greater than 0.'
@@ -227,6 +257,7 @@ class LoadLatencyTestGenerator(object):
     """
     Load latency test generator class
     """
+    test_type: str
     machines: set[Machine]
     interfaces: set[Interface]
     qemus: set[str]
@@ -241,12 +272,14 @@ class LoadLatencyTestGenerator(object):
     cooldown: bool
     accumulate: bool
     outputdir: str
+    iperf_cmd: Optional[str]
 
     full_test_tree: dict = field(init=False, repr=False, default=None)
     todo_test_tree: dict = field(init=False, repr=False, default=None)
 
     def __post_init__(self):
         info('Initializing test generator:')
+        info(f'  type       : {self.test_type}')
         info(f'  machines   : {set(m.value for m in self.machines)}')
         info(f'  interfaces : {set(i.value for i in self.interfaces)}')
         info(f'  qemus      : {self.qemus}')
@@ -261,9 +294,10 @@ class LoadLatencyTestGenerator(object):
         info(f'  cooldown   : {self.cooldown}')
         info(f'  accumulate : {self.accumulate}')
         info(f'  outputdir  : {self.outputdir}')
+        info(f'  iperf_cmd  : {self.iperf_cmd}')
 
     def generate(self, host: Host):
-        self.full_test_tree = self.create_test_tree(host)
+        self.full_test_tree = self.create_test_tree(host, iperf_cmd=self.iperf_cmd)
         self.todo_test_tree = self.create_needed_test_tree(self.full_test_tree)
 
     def setup_interface(self, host: Host, machine: Machine,
@@ -294,8 +328,12 @@ class LoadLatencyTestGenerator(object):
             server.bind_test_iface()
             server.setup_hugetlbfs()
             server.start_moongen_reflector()
-        else:
+        elif reflector == Reflector.XDP:
             server.start_xdp_reflector(iface)
+        elif reflector == Reflector.IPERF:
+            server.start_iperf_server()
+        else:
+            error(f"Unknown reflector {reflector}")
         sleep(5)
 
     def stop_reflector(self, server: Server, reflector: Reflector,
@@ -312,8 +350,12 @@ class LoadLatencyTestGenerator(object):
                 server.bind_device(server.test_iface_addr, 'e1000')
             else:
                 server.release_test_iface()
-        else:
+        elif reflector == Reflector.XDP:
             server.stop_xdp_reflector(iface)
+        elif reflector == Reflector.IPERF:
+            server.stop_iperf_server()
+        else:
+            error(f"Unknown reflector {reflector}")
 
     def run_guest(self, host: Host, machine: Machine,
                   interface: Interface, qemu: str, vhost: bool,
@@ -339,10 +381,10 @@ class LoadLatencyTestGenerator(object):
             vhost=vhost
         )
 
-    def create_interface_test_tree(self, machine: Machine,
+    def create_interface_test_tree(self, test_type: str, machine: Machine,
                                    interface: Interface, mac: str, qemu: str,
                                    vhost: bool, ioregionfd: bool,
-                                   reflector: Reflector):
+                                   reflector: Reflector, iperf_cmd: str):
         tree = {}
         for rate in self.rates:
             tree[rate] = {}
@@ -350,6 +392,7 @@ class LoadLatencyTestGenerator(object):
                 tree[rate][size] = {}
                 for runtime in self.runtimes:
                     test = LoadLatencyTest(
+                        test_type=test_type,
                         machine=machine,
                         interface=interface,
                         mac=mac,
@@ -364,11 +407,12 @@ class LoadLatencyTestGenerator(object):
                         warmup=self.warmup,
                         cooldown=self.cooldown,
                         outputdir=self.outputdir,
+                        iperf_cmd=iperf_cmd,
                     )
                     tree[rate][size][runtime] = test
         return tree
 
-    def create_test_tree(self, host: Host):
+    def create_test_tree(self, host: Host, iperf_cmd: Optional[str] = None):
         tree = {}
         count = 0
         interface_test_count = \
@@ -392,13 +436,15 @@ class LoadLatencyTestGenerator(object):
                         continue
                     tree[m][i][q][v][io][r] = \
                         self.create_interface_test_tree(
+                            test_type=self.test_type,
                             machine=m,
                             interface=i,
                             mac=mac,
                             qemu=q,
                             vhost=v,
                             ioregionfd=io,
-                            reflector=r
+                            reflector=r,
+                            iperf_cmd=iperf_cmd
                         )
                     count += interface_test_count
         # vm part
@@ -431,13 +477,15 @@ class LoadLatencyTestGenerator(object):
                                     continue
                                 tree[m][i][q][v][io][r] = \
                                     self.create_interface_test_tree(
+                                        test_type=self.test_type,
                                         machine=m,
                                         interface=i,
                                         mac=mac,
                                         qemu=qemu,
                                         vhost=v,
                                         ioregionfd=io,
-                                        reflector=r
+                                        reflector=r,
+                                        iperf_cmd=iperf_cmd
                                     )
                                 count += interface_test_count
         info(f'Generated {count} tests')
@@ -558,6 +606,10 @@ class LoadLatencyTestGenerator(object):
 
                                 debug("Detecting guest test interface")
                                 guest.detect_test_iface()
+
+                                if guest.test_iface_ip_net:
+                                    debug('Assigning IP to test iface in guest')
+                                    guest.setup_test_iface_ip_net()
 
                             for reflector, rtree in ftree.items():
                                 debug(f"Starting reflector {reflector.value}")

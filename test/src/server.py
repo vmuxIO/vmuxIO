@@ -989,6 +989,30 @@ class Server(ABC):
             iface = self.test_iface
         self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
 
+    def start_iperf_server(self: 'Server'):
+        """
+        Start the iperf server endpoint.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.tmux_new('iperf_server', 'iperf -s')
+
+    def stop_iperf_server(self: 'Server'):
+        """
+        Stop the liperf server endpoint.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.tmux_kill('iperf_server')
+
     def upload_moonprogs(self: 'Server', source_dir: str):
         """
         Upload the MoonGen programs to the server.
@@ -1064,6 +1088,7 @@ class Host(Server):
                  test_iface_dpdk_driv: str,
                  test_iface_vfio_driv: str,
                  test_bridge: str,
+                 test_bridge_ip_net: Optional[str],
                  test_tap: str,
                  test_macvtap: str,
                  vmux_path: str,
@@ -1108,6 +1133,8 @@ class Host(Server):
             The vfio driver of the test interface.
         test_bridge : str
             The network interface identifier of the test bridge interface.
+        test_bridge_ip_net : Optional[str]
+            IP net assigned to the test bridge.
         test_tap : str
             The network interface identifier of the test tap interface.
         test_macvtap : str
@@ -1165,6 +1192,7 @@ class Host(Server):
         self.admin_tap = admin_tap
         self.test_iface_vfio_driv = test_iface_vfio_driv
         self.test_bridge = test_bridge
+        self.test_bridge_ip_net = test_bridge_ip_net
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
         self.vmux_path = vmux_path
@@ -1269,6 +1297,9 @@ class Host(Server):
         self.exec(f'sudo ip link set {self.test_iface} up ' +
                   f'&& sudo ip link set {self.test_bridge} up ' +
                   f'&& sudo ip link set {self.test_tap} up')
+
+        if self.test_bridge_ip_net:
+            self.exec(f'sudo ip address add {self.test_bridge_ip_net} dev {self.test_bridge}')
 
     def destroy_test_br_tap(self: 'Host'):
         """
@@ -1560,12 +1591,14 @@ class Guest(Server):
     >>> Guest('server.test.de')
     Guest(fqdn='server.test.de')
     """
+    test_iface_ip_net: Optional[str]
 
     def __init__(self: 'Guest',
                  fqdn: str,
                  test_iface: str,
                  test_iface_addr: str,
                  test_iface_mac: str,
+                 test_iface_ip_net: Optional[str],
                  test_iface_driv: str,
                  test_iface_dpdk_driv: str,
                  tmux_socket: str,
@@ -1623,6 +1656,7 @@ class Guest(Server):
                          tmux_socket, moongen_dir, moonprogs_dir,
                          xdp_reflector_dir, ssh_config=ssh_config,
                          ssh_as_root=ssh_as_root)
+        self.test_iface_ip_net = test_iface_ip_net
 
     def __post_init__(self: 'Guest') -> None:
         """
@@ -1647,6 +1681,18 @@ class Guest(Server):
         # run commands without that, and therefore unset the nixos
         # attribute.
         self.nixos = False
+
+    def setup_test_iface_ip_net(self: 'Guest'):
+        """
+        Assign ip address and netmask to the test interface if it exists.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
 
 
 class LoadGen(Server):
@@ -1774,6 +1820,50 @@ class LoadGen(Server):
     def stop_l2_load_latency(self: 'Server'):
         """
         Stop the MoonGen L2 load latency test.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.tmux_kill('loadlatency')
+
+    def run_iperf_client(self: 'LoadGen', cmd: str,
+                         runtime: int, outfile: str = 'output.log'):
+        """
+        Run an iPerf3 test.
+
+        Parameters
+        ----------
+        cmd : str
+            Command line arguments client should be started with
+        runtime : int
+            The runtime of the test in seconds.
+        outfile : str
+            The path of the output file.
+
+        Returns
+        -------
+
+        See Also
+        --------
+
+        Example
+        -------
+        >>> LoadGen('server.test.de').run_iperf_client()
+        """
+        if cmd is None:
+            error("iperf cmd missing")
+            return
+
+        # todo: should we use the same session?
+        self.tmux_new('loadlatency',
+                      f'iperf3 --logfile {outfile} -t {runtime} {cmd}')
+
+    def stop_iperf_client(self: 'Server'):
+        """
+        Stop the iPerf3 test.
 
         Parameters
         ----------
