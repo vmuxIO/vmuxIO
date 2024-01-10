@@ -10,6 +10,7 @@
 #include <sys/timerfd.h>
 #include <time.h>
 #include <cstdlib>
+#include <algorithm>
 #include "interrupts/interface.hpp"
 
 /*
@@ -87,7 +88,8 @@ class InterruptThrottlerAccurate: public InterruptThrottler {
     }
     // ulong interrupt_spacing = Util::ulong_max(this->globalIrq->spacing_avg, interrupt_spacing_);
     // fraction 
-    float spacing_fraction = (float)interrupt_spacing_ / (float)(this->globalIrq->spacing_max + this->globalIrq->spacing_min);
+    // fraction = requested_spacing / ( gobal_spacing_sum * slow_down)
+    float spacing_fraction = (float)interrupt_spacing_ / ((float)(this->globalIrq->spacing_max + this->globalIrq->spacing_min) * this->globalIrq->slow_down);
     ulong interrupt_spacing = interrupt_spacing_ * spacing_fraction;
     ulong time_since_interrupt = Util::ts_diff(&now, &this->last_interrupt_ts);
     ulong defer_by = this->factor * Util::ulong_min(500000, Util::ulong_diff(interrupt_spacing, time_since_interrupt));

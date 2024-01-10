@@ -25,7 +25,8 @@ class InterruptThrottlerQemu: public InterruptThrottler {
   int irq_idx;
   epoll_callback timer_callback;
   ulong factor = 10; // 5: good latency and ok mpps, but 3k irq/s. 10: perfect irq/s, Good throughput and bad latency.
-  bool last_pkt_irqed = false;
+  bool mit_irq_level = false;
+  bool irq_level = false;
 
   public: 
   InterruptThrottlerQemu(int efd, int irq_idx, std::shared_ptr<GlobalInterrupts> irq_glob): irq_idx(irq_idx) {
@@ -77,7 +78,7 @@ class InterruptThrottlerQemu: public InterruptThrottler {
    * The e1000 should defer interrupts, if the last inerrupt was issued ITR us ago. 
    */
 
-  __attribute__((noinline)) ulong try_interrupt(ulong interrupt_spacing, bool int_pending) {
+  __attribute__((noinline)) ulong try_interrupt(ulong interrupt_spacing, bool no_int_pending) {
     this->spacing = interrupt_spacing;
     this->globalIrq->update();
     // struct itimerspec its = {};
@@ -86,38 +87,49 @@ class InterruptThrottlerQemu: public InterruptThrottler {
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
 
-    ulong time_since_interrupt = Util::ts_diff(&now, &this->last_interrupt_ts);
+    uint pending_ints = !no_int_pending;
+
+    // ulong time_since_interrupt = Util::ts_diff(&now, &this->last_interrupt_ts);
     // ulong defer_by = this->factor * Util::ulong_min(500000, Util::ulong_diff(interrupt_spacing, time_since_interrupt));
-    ulong defer_by = Util::ulong_max(this->globalIrq->spacing_avg, interrupt_spacing);
-    int we_defer = 1337;
+    // ulong defer_by = Util::ulong_max(this->globalIrq->spacing_avg, interrupt_spacing);
+    int mit_timer_off = 1337;
     bool if_false = false;
     // this->last_interrupt_ts = now;
-    if (!this->last_pkt_irqed && !int_pending) {
-      we_defer = this->is_deferred.compare_exchange_strong(if_false, true);
-      if (we_defer) {
-        // this->last_interrupt_ts.tv_nsec += defer_by;
-        now.tv_nsec += defer_by; // estimate interrupt time now already. Otherwise we have to set it in the timer_cb which would require an additional lock.
-        this->last_interrupt_ts = now;
-        // ignore tv_nsec overflows. I think they will just lead to additional interrupts
-        this->last_pkt_irqed = true;
-        this->defer_interrupt(defer_by); 
-      } else {
-        return we_defer;
+  
+    if (!this->mit_irq_level && pending_ints) {
+      // return if mit_timer_on
+      mit_timer_off = this->is_deferred.compare_exchange_strong(if_false, true);
+      if (!mit_timer_off) {
+        return mit_timer_off;
       }
-    } else {
+
+      // skipped check here: if MIT flag on
+
+      ulong mit_delay = interrupt_spacing; 
+      mit_delay = this->factor * Util::ulong_max(mit_delay, 128000); // spacing must not be shorter than 7813 irq/s => 128000ns.
+      
+      // we already set mit_timer_on via is_deferred.exchange()
+      this->defer_interrupt(mit_delay); 
     }
 
-    if (!int_pending) {
-      this->last_pkt_irqed = true;
-      this->send_interrupt();
-    } else {
-      this->last_pkt_irqed = false;
-    }
+    this->mit_irq_level = pending_ints != 0;
+    this->pci_set_irq(this->mit_irq_level);
 
-    return we_defer;
+    return mit_timer_off;
   }
 
   private:
+  __attribute__((noinline)) void pci_set_irq(bool level) {
+    if (this->irq_level && !level) {
+      // lower interrupt
+      this->irq_level = false;
+    } else if (!this->irq_level && level) {
+      // raise interrupt
+      this->irq_level = true;
+      this->send_interrupt();
+    }
+  }
+
   __attribute__((noinline)) void send_interrupt() {
     int ret = vfu_irq_trigger(this->vfuServer->vfu_ctx, this->irq_idx);
     if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));

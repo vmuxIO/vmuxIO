@@ -25,7 +25,7 @@ class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
   std::shared_ptr<Tap> tap;
-  std::shared_ptr<InterruptThrottlerAccurate> irqThrottle;
+  std::shared_ptr<InterruptThrottlerQemu> irqThrottle;
   static const int bars_nr = 2;
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
@@ -46,7 +46,7 @@ private:
 
 public:
   E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq) : tap(tap) {
-    this->irqThrottle = std::make_shared<InterruptThrottlerAccurate>(efd, IRQ_IDX, globalIrq);
+    this->irqThrottle = std::make_shared<InterruptThrottlerQemu>(efd, IRQ_IDX, globalIrq);
     globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {
       if (LOG_LEVEL <= LOG_ERR) {

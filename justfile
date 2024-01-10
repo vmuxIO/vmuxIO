@@ -658,3 +658,6 @@ build-linux: configure-linux
 # Linux kernel development shell
 build-linux-shell:
   {{kernel_shell}} bash
+
+irqs *ARGS:
+  python3 {{proot}}/subprojects/irq-rates.py {{ARGS}}

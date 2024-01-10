@@ -11,6 +11,7 @@
 #include <sys/param.h>
 #include <vector>
 #include <limits>
+#include <time.h>
 
 // as per PCI spec, there can be at most 2048 MSIx inerrupts per device
 #define PCI_MSIX_MAX 2048
