@@ -1,10 +1,11 @@
 # config for garnix.io CI
 builds:
   exclude:
-    # ignore some thins which usually time out within 2h
-    - 'devShells.*.host-kernel'
-    - nixosConfigurations.host
-    - 'packages.*.nesting-guest-image'
-    - 'packages.*.nesting-guest-image-noiommu'
-    - 'packages.*.nesting-host-image'
+    - '*.*'
+    # # ignore some thins which usually time out within 2h
+    # - 'devShells.*.host-kernel'
+    # - nixosConfigurations.host
+    # - 'packages.*.nesting-guest-image'
+    # - 'packages.*.nesting-guest-image-noiommu'
+    # - 'packages.*.nesting-host-image'
 
