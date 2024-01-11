@@ -17,7 +17,6 @@
  */
 class InterruptThrottlerQemu: public InterruptThrottler {
   private:
-  struct timespec last_interrupt_ts = {};
   // ulong interrupt_spacing = 250 * 1000; // nsec
   std::atomic<bool> is_deferred = false;
   int timer_fd;

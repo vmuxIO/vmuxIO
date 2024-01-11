@@ -15,6 +15,7 @@
 #include "vfio-server.hpp"
 #include "interrupts/accurate.hpp"
 #include "interrupts/qemu.hpp"
+#include "interrupts/none.hpp"
 
 static bool rust_logs_initialized = false;
 
@@ -25,7 +26,7 @@ class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
   std::shared_ptr<Tap> tap;
-  std::shared_ptr<InterruptThrottlerQemu> irqThrottle;
+  std::shared_ptr<InterruptThrottlerNone> irqThrottle;
   static const int bars_nr = 2;
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
@@ -46,7 +47,7 @@ private:
 
 public:
   E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq) : tap(tap) {
-    this->irqThrottle = std::make_shared<InterruptThrottlerQemu>(efd, IRQ_IDX, globalIrq);
+    this->irqThrottle = std::make_shared<InterruptThrottlerNone>(efd, IRQ_IDX, globalIrq);
     globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {
       if (LOG_LEVEL <= LOG_ERR) {
