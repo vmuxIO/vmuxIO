@@ -57,6 +57,10 @@
       url = "git+https://github.com/vmuxIO/qemu.git?ref=ioregionfd&submodules=1";
       flake = false;
     };
+    fastclick-src = {
+      url = "git+https://github.com/tbarbette/fastclick.git";
+      flake = false;
+    };
   };
 
   outputs = {
@@ -111,6 +115,11 @@
       };
       pktgen = pkgs.callPackage ./nix/pktgen.nix {
         dpdk = selfpkgs.dpdk;
+      };
+      fastclick = pkgs.callPackage ./nix/fastclick.nix {
+        linux = pkgs.linuxPackages_5_10.kernel;
+        selfpkgs = flakepkgs;
+        inherit self;
       };
 
       # util
