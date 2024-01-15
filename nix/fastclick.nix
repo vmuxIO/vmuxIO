@@ -5,11 +5,9 @@
 }:
 let 
   srcpack = {
-    moongen = self.inputs.moonmux-src;
-    libmoon = self.inputs.libmoon-src;
-    dpdk = self.inputs.dpdk-src;
     fastclick = self.inputs.fastclick-src;
   };
+  dpdk = pkgs.dpdk;
 in
 pkgs.stdenv.mkDerivation {
   pname = "fastclick";
@@ -46,8 +44,9 @@ pkgs.stdenv.mkDerivation {
     numactl
     luajit
     libpcap
+    dpdk
   ];
-  RTE_SDK = pkgs.dpdk;
+  RTE_SDK = dpdk;
   # RTE_KERNELDIR = "${pkgs.linux.dev}/lib/modules/${pkgs.linux.modDirVersion}/build";
   # CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
 
@@ -105,8 +104,9 @@ pkgs.stdenv.mkDerivation {
     # added by me
     "--disable-sse42"
     ];
-  CFLAGS="-O3 -msse4.1";
-  CXXFLAGS="-std=c++11 -O3 -msse4.1";
+  CFLAGS="-O3 -msse4.1 -mavx";
+  CXXFLAGS="-std=c++11 -O3 -msse4.1 -mavx";
+  NIX_LDFLAGS = "-lrte_eal -lrte_ring -lrte_mempool -lrte_ethdev -lrte_mbuf";
   enableParallelBuilding = true;
   preBuild = ''
     echo foobar
