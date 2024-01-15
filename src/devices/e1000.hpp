@@ -4,16 +4,30 @@
 #include "nic-emu.hpp"
 #include "tap.hpp"
 #include "util.hpp"
+#include <bits/types/struct_itimerspec.h>
 #include <cstring>
+#include <ctime>
+#include <memory>
+#include <sys/timerfd.h>
+#include <time.h>
+#include <cstdlib>
+#include "interrupts/global.hpp"
+#include "vfio-server.hpp"
+#include "interrupts/accurate.hpp"
+#include "interrupts/qemu.hpp"
+#include "interrupts/none.hpp"
 
 static bool rust_logs_initialized = false;
+
+
+#define IRQ_IDX 0 // this emulator may register multiple interrupts, but only uses the first one
 
 class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
   std::shared_ptr<Tap> tap;
+  std::shared_ptr<InterruptThrottlerNone> irqThrottle;
   static const int bars_nr = 2;
-  static const int IRQ_IDX = 0; // this emulator may register multiple interrupts, but only uses the first one
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
 
@@ -32,7 +46,9 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd) : tap(tap) {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq) : tap(tap) {
+    this->irqThrottle = std::make_shared<InterruptThrottlerNone>(efd, IRQ_IDX, globalIrq);
+    globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {
       if (LOG_LEVEL <= LOG_ERR) {
         initialize_rust_logging(0);
@@ -42,8 +58,12 @@ public:
       rust_logs_initialized = true;
     }
 
+    auto irq_cb = issue_interrupt_cb;
+    if (spaced_interrupts)
+      irq_cb = issue_spaced_interrupt_cb;
+
     auto callbacks = FfiCallbacks{
-        this, send_cb, dma_read_cb, dma_write_cb, issue_interrupt_cb,
+        this, send_cb, dma_read_cb, dma_write_cb, irq_cb,
     };
 
     e1000 = new_e1000(callbacks);
@@ -64,6 +84,7 @@ public:
     if (e1000_rx_is_ready(this_->e1000)) {
       this_->tap->recv();
       this_->ethRx((char*)&(this_->tap->rxFrame), this_->tap->rxFrame_used);
+      // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
     }
   }
 
@@ -76,7 +97,9 @@ public:
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override {
-    VmuxDevice::setup_vfu(vfu);
+    this->vfuServer = vfu;
+    this->irqThrottle->vfuServer = vfu;
+
     // set up vfio-user register mediation
     this->init_bar_callbacks(*vfu);
 
@@ -137,13 +160,18 @@ private:
     memcpy(local_addr, buffer, len);
   }
 
-  static void issue_interrupt_cb(void *private_ptr) {
+  static void issue_interrupt_cb(void *private_ptr, bool int_pending) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
-    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, E1000EmulatedDevice::IRQ_IDX);
+    int ret = vfu_irq_trigger(this_->vfuServer->vfu_ctx, IRQ_IDX);
     if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
-    if (ret < 0) {
-      die("Cannot trigger MSIX interrupt %d", E1000EmulatedDevice::IRQ_IDX);
-    }
+  }
+
+  static void issue_spaced_interrupt_cb(void *private_ptr, bool int_pending) {
+    E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
+    // spacing_s = 1 / ( 10^9 / (reg * 256) )
+    // spcaing_s = (reg * 256) / 10^9
+    ulong spacing_us = (e1000_interrupt_throtteling_reg(this_->e1000, -1) * 256);
+    this_->irqThrottle->try_interrupt(spacing_us, int_pending);
     // die("Issue interrupt CB\n");
   }
 

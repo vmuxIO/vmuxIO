@@ -19,7 +19,7 @@ public:
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override {
-    VmuxDevice::setup_vfu(vfu);
+    this->vfuServer = vfu;
     int ret;
 
     // set up vfio-user register passthrough

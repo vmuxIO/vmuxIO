@@ -79,6 +79,7 @@ int _main(int argc, char **argv) {
   int ch;
   std::string device = "0000:18:00.0";
   std::vector<std::string> pciAddresses;
+  std::shared_ptr<GlobalInterrupts> globalIrq;
   std::vector<std::unique_ptr<VmuxRunner>> runner;
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices;
@@ -172,6 +173,9 @@ int _main(int argc, char **argv) {
     vfioc[i]->init_msix();
   }
 
+  int nr_threads = vfioc.size() + 1; // runner threads + 1 main thread
+  globalIrq = std::make_shared<GlobalInterrupts>(nr_threads);
+
   // create devices
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     std::shared_ptr<VmuxDevice> device = NULL;
@@ -185,7 +189,7 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>();
     }
     if (modes[i] == "e1000-emu") {
-      device = std::make_shared<E1000EmulatedDevice>(taps[i], efd);
+      device = std::make_shared<E1000EmulatedDevice>(taps[i], efd, true, globalIrq);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());

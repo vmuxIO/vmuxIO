@@ -3,10 +3,10 @@
   src = pkgs.fetchFromGitHub {
     owner = "vmuxIO";
     repo = "nic-emu";
-    # rev = "05aeaaaa9bdb05b16c03ed3e96e486f670e78bf4"; # dev/peter
-    # sha256 = "sha256-tEL96zK+cYvr69mMLunku4kXESWadl0GdOJnDc8umbo=";
-    rev = "cae125d7561c342c2d7d17dc5635f70ac7e4c7b7"; # main
-    sha256 = "sha256-c3wjS4gwun2RkuOf548Uaaqapfz1pFGFs91flCxXiSc=";
+    rev = "935dad0e354d6af4da3c65fb8dabdada5a0fdc20"; # dev/peter
+    sha256 = "sha256-8QFPwbPXL7yfgXL8f2oYQ7O65QH0Tid0evkUOu3gq8M=";
+    # rev = "cae125d7561c342c2d7d17dc5635f70ac7e4c7b7"; # main
+    # sha256 = "sha256-c3wjS4gwun2RkuOf548Uaaqapfz1pFGFs91flCxXiSc=";
   };
 
   cargoLock = {

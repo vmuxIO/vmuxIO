@@ -1,7 +1,7 @@
 #pragma once
 
 #include "vfio-consumer.hpp"
-#include "vfio-server.hpp"
+// #include "vfio-server.hpp"
 #include <cstdint>
 #include <memory>
 
@@ -65,9 +65,7 @@ public:
 
   std::shared_ptr<VfioUserServer> vfuServer;
 
-  virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
-    this->vfuServer = vfu;
-  };
+  virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) = 0;
 
   virtual ~VmuxDevice() = default;
 };
