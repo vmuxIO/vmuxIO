@@ -38,6 +38,22 @@
         "url": "https://github.com/vmuxIO/dpdk"
       }
     },
+    "fastclick-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1703248830,
+        "narHash": "sha256-NmhGMUqZ5kAMQ54l0tF3LZPOZQEOUOHm4hqlnHc+rqY=",
+        "ref": "refs/heads/main",
+        "rev": "5e29d77e9bad2906265e5794881ece3496c02bd9",
+        "revCount": 12726,
+        "type": "git",
+        "url": "https://github.com/tbarbette/fastclick.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://github.com/tbarbette/fastclick.git"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -239,6 +255,7 @@
       "inputs": {
         "dpdk-lachnit-src": "dpdk-lachnit-src",
         "dpdk-src": "dpdk-src",
+        "fastclick-src": "fastclick-src",
         "flake-utils": "flake-utils",
         "libmoon-lachnit-src": "libmoon-lachnit-src",
         "libmoon-src": "libmoon-src",

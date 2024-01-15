@@ -47,6 +47,7 @@ pkgs.stdenv.mkDerivation {
     luajit
     libpcap
   ];
+  RTE_SDK = pkgs.dpdk;
   # RTE_KERNELDIR = "${pkgs.linux.dev}/lib/modules/${pkgs.linux.modDirVersion}/build";
   # CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
 
@@ -96,13 +97,23 @@ pkgs.stdenv.mkDerivation {
   #
   #   runHook postBuild
   # '';
+  configureFlags = [ 
+    "--enable-etherswitch"
+    # fastclick light config
+    "--enable-dpdk" "--enable-intel-cpu" "--verbose" "--enable-select=poll"  "--disable-dynamic-linking" "--enable-poll" "--enable-bound-port-transfer" "--enable-local" "--enable-flow" "--disable-task-stats" "--disable-cpu-load" "--enable-dpdk-packet" "--disable-clone" "--disable-dpdk-softqueue"
+
+    # added by me
+    "--disable-sse42"
+    ];
+  CFLAGS="-O3 -msse4.1";
+  CXXFLAGS="-std=c++11 -O3 -msse4.1";
   enableParallelBuilding = true;
   preBuild = ''
     echo foobar
     echo $enableParallelBuilding
     gzip --version
   '';
-  NIX_DEBUG = "1";
+  # NIX_DEBUG = "1";
   
   # installPhase = ''
   #   mkdir -p $out/bin
