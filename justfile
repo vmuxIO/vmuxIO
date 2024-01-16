@@ -346,6 +346,10 @@ build:
   chmod 600 ./nix/ssh_key
   if [[ -d build ]]; then meson build --wipe; else meson build; fi
   meson compile -C build
+  pushd subprojects/nic-emu
+  cargo build --no-default-features --features generate-bindings
+  cargo build --no-default-features --features generate-bindings --release
+  popd
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
   nix build -o {{proot}}/mgln .#moongen-lachnit
@@ -415,6 +419,9 @@ build_dpdk:
 dpdk_helloworld: dpdk-setup
   meson configure -Denable_kmods=true
   meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
+
+fastclick: 
+  sudo ./result/bin/click --dpdk "-l 2-10" -- ./test/fastclick/connect.click dev1=0000:41:01.0
 
 pktgen: 
   nix shell .#pktgen

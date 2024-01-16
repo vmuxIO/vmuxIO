@@ -7,7 +7,7 @@ let
   srcpack = {
     fastclick = self.inputs.fastclick-src;
   };
-  dpdk = pkgs.dpdk;
+  dpdk = selfpkgs.dpdk; 
 in
 pkgs.stdenv.mkDerivation {
   pname = "fastclick";
@@ -99,7 +99,8 @@ pkgs.stdenv.mkDerivation {
   configureFlags = [ 
     "--enable-etherswitch"
     # fastclick light config
-    "--enable-dpdk" "--enable-intel-cpu" "--verbose" "--enable-select=poll"  "--disable-dynamic-linking" "--enable-poll" "--enable-bound-port-transfer" "--enable-local" "--enable-flow" "--disable-task-stats" "--disable-cpu-load" "--enable-dpdk-packet" "--disable-clone" "--disable-dpdk-softqueue"
+    "--enable-dpdk" "--enable-intel-cpu" "--verbose" "--enable-select=poll"  "--disable-dynamic-linking" "--enable-poll" "--enable-bound-port-transfer" "--enable-local" "--enable-flow" "--disable-task-stats" "--disable-cpu-load" "--enable-dpdk-packet" "--disable-clone" 
+    # "--disable-dpdk-softqueue" # enable IQUEUE for debugging
 
     # added by me
     "--disable-sse42"
