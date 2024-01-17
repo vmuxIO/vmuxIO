@@ -5,12 +5,14 @@
 , libbsd, numactl, libbpf, zlib, libelf, jansson, openssl, libpcap, rdma-core
 , doxygen, python3, pciutils
 , withExamples ? []
+, withSomeSources ? true
 , shared ? false
 , machine ? (
     if stdenv.isx86_64 then "nehalem"
     else if stdenv.isAarch64 then "generic"
     else null
   )
+, ...
 }:
 
 let
@@ -83,6 +85,8 @@ in stdenv.mkDerivation {
   '' + lib.optionalString (withExamples != []) ''
     mkdir -p $examples/bin
     find examples -type f -executable -exec install {} $examples/bin \;
+  '' + lib.optionalString (withSomeSources) ''
+    cp -r ../app $out/
   '';
 
   outputs =

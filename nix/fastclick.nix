@@ -8,8 +8,8 @@ let
   srcpack = {
     fastclick = self.inputs.fastclick-src;
   };
-  dpdk = selfpkgs.dpdk; # needed for ice package thingy
-  # dpdk = self.inputs.nixpkgs2.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
+  dpdk = selfpkgs.dpdk23; # needed for ice package thingy
+  # dpdk = self.inputs.nixpkgs.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
   debug = true;
 in
 pkgs.stdenv.mkDerivation {
@@ -50,7 +50,8 @@ pkgs.stdenv.mkDerivation {
     dpdk
     hyperscan
   ];
-  RTE_SDK = dpdk;
+  # RTE_SDK = dpdk;
+  RTE_SDK = "/build/rte_sdk";
   # RTE_KERNELDIR = "${pkgs.linux.dev}/lib/modules/${pkgs.linux.modDirVersion}/build";
   # CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
 
@@ -63,6 +64,17 @@ pkgs.stdenv.mkDerivation {
     find . -type f -exec sed -i 's/\/bin\/ln/ln/g' {} \;
     # substituteInPlace ./userlevel/Makefile.in \
     #   --replace "/bin/echo" "echo"
+
+    # some variables are not correctly subsituted with our dpdk install. Substitute the values.
+    substituteInPlace ./userlevel/Makefile.in \
+      --replace "@RTE_VER_MINOR@" "0"
+    substituteInPlace ./userlevel/Makefile.in \
+      --replace "@RTE_VER_YEAR@" "21"
+    substituteInPlace ./userlevel/Makefile.in \
+      --replace "@RTE_VER_MONTH@" "0"
+
+    mkdir /build/rte_sdk
+    cp -r ${dpdk}/* /build/rte_sdk
   '';
   # postPatch = ''
   #   ls -la ./libmoon
