@@ -13,6 +13,17 @@ define( $dev1  0,
         $print false)
 
 s :: StaticSwitch(0);
+// hyperscan :: FlowHyperScan(VERBOSE true, FILE /dev/null);
+// hyperscan :: FlowHyperScan("attack", VERBOSE 1);
+// hyperscan :: FlowCounter()
+hyperscan :: FlowIPManagerMP()
+-> FlowLock
+-> StripTransportHeader
+-> FlowHyperScan("attack", VERBOSE 1)
+-> Print(TIMESTAMP false)
+-> UnstripTransportHeader
+-> Discard;
+
 
 w0 :: ToDPDKDevice($dev1);
 // w1 :: ToDPDKDevice($dev2);
@@ -24,7 +35,7 @@ elementclass Input { $label |
     c[2] -> Print(NONIP) -> Discard;
 }
 
-FromDPDKDevice($dev1) -> Print -> [0]s[0] -> w0;
+FromDPDKDevice($dev1) -> hyperscan -> [0]s[0] -> w0;
 // FromDPDKDevice($dev2) -> Input(FROMH2) -> [1]s[1] -> w1;
 
 

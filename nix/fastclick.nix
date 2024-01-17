@@ -1,5 +1,6 @@
 { self
 , pkgs
+, lib
 , selfpkgs
 , ...
 }:
@@ -7,7 +8,9 @@ let
   srcpack = {
     fastclick = self.inputs.fastclick-src;
   };
-  dpdk = selfpkgs.dpdk; 
+  dpdk = selfpkgs.dpdk; # needed for ice package thingy
+  # dpdk = self.inputs.nixpkgs2.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
+  debug = true;
 in
 pkgs.stdenv.mkDerivation {
   pname = "fastclick";
@@ -45,6 +48,7 @@ pkgs.stdenv.mkDerivation {
     luajit
     libpcap
     dpdk
+    hyperscan
   ];
   RTE_SDK = dpdk;
   # RTE_KERNELDIR = "${pkgs.linux.dev}/lib/modules/${pkgs.linux.modDirVersion}/build";
@@ -97,6 +101,7 @@ pkgs.stdenv.mkDerivation {
   #   runHook postBuild
   # '';
   configureFlags = [ 
+    "--enable-all-elements"
     "--enable-etherswitch"
     # fastclick light config
     "--enable-dpdk" "--enable-intel-cpu" "--verbose" "--enable-select=poll"  "--disable-dynamic-linking" "--enable-poll" "--enable-bound-port-transfer" "--enable-local" "--enable-flow" "--disable-task-stats" "--disable-cpu-load" "--enable-dpdk-packet" "--disable-clone" 
@@ -104,11 +109,14 @@ pkgs.stdenv.mkDerivation {
 
     # added by me
     "--disable-sse42"
+    # "--enable-flow-api"
     ];
-  CFLAGS="-O3 -msse4.1 -mavx";
-  CXXFLAGS="-std=c++11 -O3 -msse4.1 -mavx";
+  CFLAGS="-O3 -msse4.1 -mavx" + lib.optionalString debug " -g";
+  CXXFLAGS="-std=c++11 -O3 -msse4.1 -mavx" + lib.optionalString debug " -g";
   NIX_LDFLAGS = "-lrte_eal -lrte_ring -lrte_mempool -lrte_ethdev -lrte_mbuf";
+  RTE_VER_YEAR = "21"; # does this bubble through to the makefile variable? i dont think so. Then we can remove it.
   enableParallelBuilding = true;
+  hardeningDisable = [ "all" ];
   preBuild = ''
     echo foobar
     echo $enableParallelBuilding
