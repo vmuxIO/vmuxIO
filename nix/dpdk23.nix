@@ -12,7 +12,7 @@
     else if stdenv.isAarch64 then "generic"
     else null
   )
-, ...
+, linux-firmware-pinned
 }:
 
 let
@@ -58,6 +58,18 @@ in stdenv.mkDerivation {
 
   postPatch = ''
     patchShebangs config/arm buildtools
+
+    substituteInPlace drivers/net/ice/ice_ethdev.h \
+      --replace '#define ICE_PKG_FILE_DEFAULT "/lib/firmware/intel/ice/ddp/ice.pkg"' \
+      '#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
+    substituteInPlace drivers/net/ice/ice_ethdev.h --replace \
+      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/lib/firmware/intel/ice/ddp/"' \
+      '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"'
+    #exit 1
+#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"
+#define ICE_PKG_FILE_UPDATES "/lib/firmware/updates/intel/ice/ddp/ice.pkg"                    
+#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"    
+#define ICE_PKG_FILE_SEARCH_PATH_UPDATES "/lib/firmware/updates/intel/ice/ddp/"               
   '' + lib.optionalString mod ''
     # kernel_install_dir is hardcoded to `/lib/modules`; patch that.
     sed -i "s,kernel_install_dir *= *['\"].*,kernel_install_dir = '$kmod/lib/modules/${kernel.modDirVersion}'," kernel/linux/meson.build
@@ -87,6 +99,7 @@ in stdenv.mkDerivation {
     find examples -type f -executable -exec install {} $examples/bin \;
   '' + lib.optionalString (withSomeSources) ''
     cp -r ../app $out/
+    cp -r ../drivers $out/
   '';
 
   outputs =

@@ -49,6 +49,7 @@ pkgs.stdenv.mkDerivation {
     libpcap
     dpdk
     hyperscan
+    jansson
   ];
   # RTE_SDK = dpdk;
   RTE_SDK = "/build/rte_sdk";
@@ -69,9 +70,12 @@ pkgs.stdenv.mkDerivation {
     substituteInPlace ./userlevel/Makefile.in \
       --replace "@RTE_VER_MINOR@" "0"
     substituteInPlace ./userlevel/Makefile.in \
-      --replace "@RTE_VER_YEAR@" "21"
+      --replace "@RTE_VER_YEAR@" "23"
     substituteInPlace ./userlevel/Makefile.in \
       --replace "@RTE_VER_MONTH@" "0"
+
+    substituteInPlace ./lib/flowrulemanager.cc \
+      --replace "(const uint32_t *) int_rule_ids" "(const uint64_t *) int_rule_ids, true"
 
     mkdir /build/rte_sdk
     cp -r ${dpdk}/* /build/rte_sdk
@@ -121,11 +125,17 @@ pkgs.stdenv.mkDerivation {
 
     # added by me
     "--disable-sse42"
-    # "--enable-flow-api"
+    "--enable-flow-api"
+
+    # middleclick
+    "--enable-multithread" "--disable-linuxmodule" "--enable-intel-cpu" "--enable-user-multithread" "--disable-dynamic-linking" "--enable-poll" "--enable-bound-port-transfer" "--enable-dpdk" "--enable-batch" "--with-netmap=no" "--enable-zerocopy" "--disable-dpdk-pool" "--disable-dpdk-packet" "--enable-user-timestamp" "--enable-flow" "--enable-ctx"
+    # runtime tells me to add:
+    "--enable-flow-dynamic"
+
     ];
   CFLAGS="-O3 -msse4.1 -mavx" + lib.optionalString debug " -g";
   CXXFLAGS="-std=c++11 -O3 -msse4.1 -mavx" + lib.optionalString debug " -g";
-  NIX_LDFLAGS = "-lrte_eal -lrte_ring -lrte_mempool -lrte_ethdev -lrte_mbuf";
+  NIX_LDFLAGS = "-lrte_eal -lrte_ring -lrte_mempool -lrte_ethdev -lrte_mbuf -lrte_net -lrte_latencystats -lrte_cmdline -lrte_net_bond -lrte_metrics -lrte_gso -lrte_gro -lrte_net_ixgbe -lrte_net_i40e -lrte_net_bnxt -lrte_net_dpaa -lrte_bpf -lrte_bitratestats -ljansson";
   RTE_VER_YEAR = "21"; # does this bubble through to the makefile variable? i dont think so. Then we can remove it.
   enableParallelBuilding = true;
   hardeningDisable = [ "all" ];
