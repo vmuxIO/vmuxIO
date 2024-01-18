@@ -445,7 +445,7 @@ def setup_logging(args: Namespace) -> None:
     -------
     >>> setup_logging(args)
     """
-    logformat = '%(log_color)s%(asctime)s %(levelname)-8s %(message)s'
+    logformat = '%(log_color)s%(levelname)-8s %(message)s'
     formatter = ColoredFormatter(
         logformat,
         datefmt=None,

@@ -266,7 +266,8 @@ class LoadLatencyTestGenerator(object):
         self.full_test_tree = self.create_test_tree(host)
         self.todo_test_tree = self.create_needed_test_tree(self.full_test_tree)
 
-    def setup_interface(self, host: Host, machine: Machine,
+    @staticmethod
+    def setup_interface(host: Host, machine: Machine,
                         interface: Interface, bridge_mac: str = None):
         if machine != Machine.HOST:
             host.setup_admin_bridge()

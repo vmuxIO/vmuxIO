@@ -6,7 +6,7 @@ from argcomplete import autocomplete
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
-from loadlatency import Interface
+from loadlatency import Interface, Machine
 
 def setup_parser() -> ArgumentParser:
     # create the argument parser
@@ -34,6 +34,9 @@ def setup_parser() -> ArgumentParser:
                         )
     return parser
 
+
+def setup_host_interface(host: Host, interface: Interface) -> None:
+    autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface)
 
 def main() -> None:
     parser: ArgumentParser = setup_parser()
@@ -68,9 +71,19 @@ def main() -> None:
 
     host.detect_test_iface()
 
+    interface = Interface.BRIDGE
+    net_type = "brtap"
+
+    debug(f"Setting up interface {interface.value}")
+    # self.setup_interface(host, machine, interface)
+    setup_host_interface(host, interface)
+
+    if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
+        host.start_vmux(interface.value)
+
     info("Starting VM")
     host.run_guest(
-            net_type='brtap',
+            net_type=net_type,
             machine_type='pc',
             qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin"
             )
@@ -93,6 +106,8 @@ def main() -> None:
     breakpoint()
 
     host.kill_guest()
+    if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
+        host.stop_vmux()
     host.cleanup_network()
 
 
