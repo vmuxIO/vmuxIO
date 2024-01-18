@@ -38,6 +38,12 @@ def setup_parser() -> ArgumentParser:
 def setup_host_interface(host: Host, interface: Interface) -> None:
     autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface)
 
+
+def do_measure() -> None:
+    info("heureka")
+    breakpoint()
+
+
 def main() -> None:
     parser: ArgumentParser = setup_parser()
     args: Namespace = autotest.parse_args(parser)
@@ -71,11 +77,9 @@ def main() -> None:
 
     host.detect_test_iface()
 
-    interface = Interface.BRIDGE
-    net_type = "brtap"
+    interface = Interface.VMUX_PT
 
     debug(f"Setting up interface {interface.value}")
-    # self.setup_interface(host, machine, interface)
     setup_host_interface(host, interface)
 
     if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
@@ -83,7 +87,7 @@ def main() -> None:
 
     info("Starting VM")
     host.run_guest(
-            net_type=net_type,
+            net_type=Host.net_type(interface),
             machine_type='pc',
             qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin"
             )
@@ -102,8 +106,7 @@ def main() -> None:
     debug("Detecting guest test interface")
     guest.detect_test_iface()
 
-    info("heureka")
-    breakpoint()
+    do_measure()
 
     host.kill_guest()
     if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:

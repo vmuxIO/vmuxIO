@@ -9,6 +9,7 @@ from os import listdir
 from os.path import join as path_join
 from os.path import dirname as path_dirname
 from typing import Optional
+from loadlatency import Interface
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
 
@@ -1317,6 +1318,20 @@ class Host(Server):
         -------
         """
         self.exec(f'sudo ip link delete {self.test_macvtap} || true')
+
+    @staticmethod
+    def net_type(interface: Interface) -> str:
+        """
+        translates enum Interface into net_type strings used here
+        """
+        types = {}
+        types[Interface.BRIDGE] = "brtap"
+        types[Interface.BRIDGE_E1000] = "brtap-e1000"
+        types[Interface.MACVTAP] = "macvtap"
+        types[Interface.VFIO] = "vfio"
+        types[Interface.VMUX_PT] = "vmux-pt"
+        types[Interface.VMUX_EMU] = "vmux-emu"
+        return types[interface]
 
     def run_guest(self: 'Host',
                   net_type: str,
