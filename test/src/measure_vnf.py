@@ -39,7 +39,7 @@ def setup_host_interface(host: Host, interface: Interface) -> None:
     autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface)
 
 
-def do_measure() -> None:
+def do_measure(host: Host, guest: Guest, loadgen: LoadGen) -> None:
     info("heureka")
     breakpoint()
 
@@ -49,8 +49,6 @@ def main() -> None:
     args: Namespace = autotest.parse_args(parser)
     autotest.setup_logging(args)
     conf: ConfigParser = autotest.setup_and_parse_config(args)
-
-    # measure:
 
     host, guest, loadgen = autotest.create_servers(conf).values()
     host: Host = host
@@ -87,7 +85,7 @@ def main() -> None:
 
     info("Starting VM")
     host.run_guest(
-            net_type=Host.net_type(interface),
+            net_type=interface.net_type(),
             machine_type='pc',
             qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin"
             )
@@ -106,7 +104,7 @@ def main() -> None:
     debug("Detecting guest test interface")
     guest.detect_test_iface()
 
-    do_measure()
+    do_measure(host, guest, loadgen)
 
     host.kill_guest()
     if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:

@@ -47,6 +47,19 @@ class Interface(Enum):
     # vMux-emulation to tap backend
     VMUX_EMU = "vmux-emu"
 
+    def net_type(self) -> str:
+        """
+        translates enum Interface into net_type strings used here
+        """
+        types = {}
+        types[Interface.BRIDGE] = "brtap"
+        types[Interface.BRIDGE_E1000] = "brtap-e1000"
+        types[Interface.MACVTAP] = "macvtap"
+        types[Interface.VFIO] = "vfio"
+        types[Interface.VMUX_PT] = "vmux-pt"
+        types[Interface.VMUX_EMU] = "vmux-emu"
+        return types[self]
+
 
 class Reflector(Enum):
     # Reflector types
