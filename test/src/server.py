@@ -1681,7 +1681,8 @@ class LoadGen(Server):
                  xdp_reflector_dir: Optional[str] = None,
                  localhost: bool = False,
                  ssh_config: Optional[str] = None,
-                 ssh_as_root: bool = False) -> None:
+                 ssh_as_root: bool = False,
+                 **_kwargs) -> None:
         """
         Initialize the LoadGen class.
 
@@ -1729,7 +1730,8 @@ class LoadGen(Server):
                          moonprogs_dir, xdp_reflector_dir, localhost,
                          ssh_config=ssh_config, ssh_as_root=ssh_as_root)
 
-    def run_l2_load_latency(self: 'LoadGen',
+    @staticmethod
+    def run_l2_load_latency(server: Server,
                             mac: str,
                             rate: int = 10000,
                             runtime: int = 60,
@@ -1765,14 +1767,15 @@ class LoadGen(Server):
         -------
         >>> LoadGen('server.test.de').start_l2_load_latency()
         """
-        self.tmux_new('loadlatency', f'cd {self.moongen_dir}; ' +
+        server.tmux_new('loadlatency', f'cd {server.moongen_dir}; ' +
                       'sudo bin/MoonGen '
-                      f'{self.moonprogs_dir}/l2-load-latency.lua ' +
+                      f'{server.moonprogs_dir}/l2-load-latency.lua ' +
                       f'-r {rate} -f {histfile} -T {runtime} -s {size} ' +
-                      f'{self._test_iface_id} {mac} ' +
+                      f'{server._test_iface_id} {mac} ' +
                       f'2>&1 | tee {outfile}')
 
-    def stop_l2_load_latency(self: 'Server'):
+    @staticmethod
+    def stop_l2_load_latency(server: 'Server'):
         """
         Stop the MoonGen L2 load latency test.
 
@@ -1782,4 +1785,4 @@ class LoadGen(Server):
         Returns
         -------
         """
-        self.tmux_kill('loadlatency')
+        server.tmux_kill('loadlatency')

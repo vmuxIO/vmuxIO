@@ -6,7 +6,7 @@ from argcomplete import autocomplete
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
-from loadlatency import Interface, Machine
+from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 
 def setup_parser() -> ArgumentParser:
     # create the argument parser
@@ -41,6 +41,28 @@ def setup_host_interface(host: Host, interface: Interface) -> None:
 
 def do_measure(host: Host, guest: Guest, loadgen: LoadGen) -> None:
     info("heureka")
+    guest.bind_test_iface()
+    guest.setup_hugetlbfs()
+    # guest.start_moongen_reflector()
+
+    test = LoadLatencyTest(
+        machine=Machine.PCVM,
+        interface=Interface.VMUX_PT,
+        mac=loadgen.test_iface_mac,
+        qemu="measure-vnf",
+        vhost=False,
+        ioregionfd=False,
+        reflector=Reflector.MOONGEN,
+        rate=0,
+        size=64,
+        runtime=30,
+        repetitions=1,
+        warmup=False,
+        cooldown=False,
+        outputdir="/tmp/out1",
+    )
+    guest: LoadGen = guest # trust me bro, this works
+    test.run(guest)
     breakpoint()
 
 
