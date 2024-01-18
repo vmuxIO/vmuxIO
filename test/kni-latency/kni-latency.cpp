@@ -1,4 +1,4 @@
-// l2 latecny measurement based on kernel network interfaces
+// l2 latency measurement based on kernel network interfaces
 // compile with: clang++ test/timer.cpp -o timer -O3
 
 #include <cstdio>
@@ -19,13 +19,19 @@
 #include <vector>
 
 
-int main() {
+int main(int argc, char* argv[]) {
+  // parse args
+
+  if (argc != 3) {
+    printf("Usage: %s <Destination MAC> <Interface>\n", argv[0]);
+    return 1;
+  }
 
   unsigned char dst[6];
-  std::string if_name = "enp65s0np0";
+  std::string if_name = argv[2];
   int runtime_s = 10;
 
-  sscanf("B4:96:91:B3:8B:04", "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &dst[0], &dst[1], &dst[2], &dst[3], &dst[4], &dst[5]);
+  sscanf(argv[1], "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &dst[0], &dst[1], &dst[2], &dst[3], &dst[4], &dst[5]);
 
   std::vector<uint64_t> latencies_ns;
 

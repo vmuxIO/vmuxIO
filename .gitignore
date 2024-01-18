@@ -6,3 +6,4 @@ outputs*/
 .cache/
 linux-*/
 .local/
+test/kni-latency/kni-latency
