@@ -39,33 +39,6 @@ def setup_host_interface(host: Host, interface: Interface) -> None:
     autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface)
 
 
-def do_measure(host: Host, guest: Guest, loadgen: LoadGen) -> None:
-    info("heureka")
-    guest.bind_test_iface()
-    guest.setup_hugetlbfs()
-    # guest.start_moongen_reflector()
-
-    test = LoadLatencyTest(
-        machine=Machine.PCVM,
-        interface=Interface.VMUX_PT,
-        mac=loadgen.test_iface_mac,
-        qemu="measure-vnf",
-        vhost=False,
-        ioregionfd=False,
-        reflector=Reflector.MOONGEN,
-        rate=0,
-        size=64,
-        runtime=30,
-        repetitions=1,
-        warmup=False,
-        cooldown=False,
-        outputdir="/tmp/out1",
-    )
-    guest: LoadGen = guest # trust me bro, this works
-    test.run(guest)
-    breakpoint()
-
-
 def main() -> None:
     parser: ArgumentParser = setup_parser()
     args: Namespace = autotest.parse_args(parser)
@@ -126,7 +99,33 @@ def main() -> None:
     debug("Detecting guest test interface")
     guest.detect_test_iface()
 
-    do_measure(host, guest, loadgen)
+    info("heureka")
+    guest.bind_test_iface()
+    guest.setup_hugetlbfs()
+
+    loadgen.start_moongen_reflector()
+
+    test = LoadLatencyTest(
+        machine=Machine.PCVM,
+        interface=Interface.VMUX_PT,
+        mac=loadgen.test_iface_mac,
+        qemu="measure-vnf",
+        vhost=False,
+        ioregionfd=False,
+        reflector=Reflector.MOONGEN,
+        rate=1,
+        size=64,
+        runtime=30,
+        repetitions=1,
+        warmup=False,
+        cooldown=False,
+        outputdir="/tmp/out1",
+    )
+    guest: LoadGen = guest # trust me bro, this works
+    test.run(guest)
+    breakpoint()
+
+    loadgen.stop_moongen_reflector()
 
     host.kill_guest()
     if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
