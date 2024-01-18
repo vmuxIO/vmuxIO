@@ -390,7 +390,7 @@ def parse_args(parser: ArgumentParser) -> Namespace:
 
     args.verbosity = min(args.verbosity, len(LOG_LEVELS)-1)
 
-    if not args.command:
+    if hasattr(args, "command") and not args.command:
         parser.print_usage(stderr)
         print(f'{argv[0]}: error: argument missing.', file=stderr)
         exit(1)

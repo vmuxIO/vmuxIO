@@ -218,7 +218,6 @@
         meson
         ninja
         boost
-        python310.pkgs.mypy # python static typing
         gdb
         (writeScriptBin "devmem" ''
           ${busybox}/bin/devmem $@
@@ -235,6 +234,15 @@
 
         # deps for tests/autotest
         python310.pkgs.colorlog
+
+        # deps for tests
+        (pkgs.python3.withPackages (ps: [
+          # linting
+          ps.black
+          ps.flake8
+          ps.isort
+          ps.mypy
+        ]))
       ] ++ (with self.packages; [
         dpdk
         #self.packages.x86_64-linux.qemu

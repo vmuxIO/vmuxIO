@@ -1471,7 +1471,8 @@ class Host(Server):
             # f' -device virtio-blk-{dev_type},id=test2,drive=test2'
             # +
             # ' --trace virtio_mmio_read --trace virtio_mmio_write' +
-            # ' 2>trace.log'
+            # +
+            # ' 2>/tmp/trace.log'
             )
 
     def kill_guest(self: 'Host') -> None:
