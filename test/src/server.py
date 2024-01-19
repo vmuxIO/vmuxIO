@@ -1508,6 +1508,7 @@ class Host(Server):
             f'ulimit -n 4096; sudo {self.vmux_path} -q'
             f' -s {self.vmux_socket_path} {args}'
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
+            # f'; sleep 999'
         )
         sleep(1); # give vmux some time to start up and create the socket
         self.exec(f'sudo chmod 777 {self.vmux_socket_path}')
