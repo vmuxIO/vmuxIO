@@ -95,7 +95,7 @@ class Measurement:
 
         # start VM
 
-        info("Starting VM")
+        info(f"Starting VM ({interface.value})")
         self.host.run_guest(
                 net_type=interface.net_type(),
                 machine_type='pc',
