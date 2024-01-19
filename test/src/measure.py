@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
+from util import safe_cast
 
 
 def setup_parser() -> ArgumentParser:
@@ -58,7 +59,10 @@ class Measurement:
         autotest.setup_logging(self.args)
         self.config: ConfigParser = autotest.setup_and_parse_config(self.args)
 
-        self.host, self.guest, self.loadgen = autotest.create_servers(self.config).values()
+        host, guest, loadgen = autotest.create_servers(self.config).values()
+        self.host = safe_cast(Host, host)
+        self.guest = safe_cast(Guest, guest)
+        self.loadgen = safe_cast(LoadGen, loadgen)
 
         self.host.check_cpu_freq()
         self.loadgen.check_cpu_freq()

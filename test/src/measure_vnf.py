@@ -8,6 +8,8 @@ from logging import (info, debug, error, warning,
 from server import Host, Guest, LoadGen
 from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from measure import Measurement
+from util import safe_cast
+from typing import Iterator, cast
 
 
 def main() -> None:
@@ -60,8 +62,8 @@ def main() -> None:
             cooldown=False,
             outputdir="/tmp/out1",
         )
-        guest: LoadGen = guest # trust me bro, this works
-        test.run(guest)
+        guest_: LoadGen = cast(LoadGen, guest) # trust me bro, this works
+        test.run(guest_)
         breakpoint()
 
         loadgen.stop_moongen_reflector()
