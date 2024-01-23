@@ -4,7 +4,7 @@
 , pkg-config, meson, ninja, makeWrapper
 , libbsd, numactl, libbpf, zlib, libelf, jansson, openssl, libpcap, rdma-core
 , doxygen, python3, pciutils
-, withExamples ? []
+, withExamples ? [ "flow_filtering" ]
 , withSomeSources ? true
 , shared ? false
 , machine ? (

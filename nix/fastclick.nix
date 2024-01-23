@@ -178,5 +178,5 @@ pkgs.stdenv.mkDerivation {
   #   patchelf --add-rpath $out/lib/highwayhash/lib $out/bin/MoonGen
   # '';
   #
-  # dontFixup = true;
+  dontFixup = debug;
 }
