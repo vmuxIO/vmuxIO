@@ -260,6 +260,7 @@
         dpdk
         #self.packages.x86_64-linux.qemu
         qemu # nixpkgs vanilla qemu
+        docker-compose
       ]);
     in {
       # use clang over gcc because it has __builtin_dump_struct()

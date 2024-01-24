@@ -666,3 +666,9 @@ build-linux-shell:
 
 irqs *ARGS:
   python3 {{proot}}/subprojects/irq-rates.py {{ARGS}}
+
+deathstar-hotel:
+  cd subprojects/deathstarbench/wrk2; docker build -t wrk2d .
+  cd subprojects/deathstarbench/hotelReservation; docker-compose build
+  cd subprojects/deathstarbench/hotelReservation; docker-compose up
+  cd subprojects/deathstarbench/hotelReservation; docker run -ti --mount type=bind,source=$(pwd)/wrk2,target=/wrk2 --network host wrk2 wrk -D exp -t 1 -c 1 -d 1 -L -s ./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua http://localhost:5000 -R 1
