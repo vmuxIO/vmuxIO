@@ -192,7 +192,10 @@ See also [autotest](test/README.md) for details.
 nix develop
 just prepare ./hosts/christina_autotest.yaml
 sln ./test/conf/autotest_okelmann_christina.cfg autotest.cfg
+# Configurable microbenchmarks
 python3.10 ./test/autotest -vvv test-load-lat-file
+# Scripted benchmarks
+python3 ./test/src/measure_vnf.py -vvv
 ls output
 ```
 
