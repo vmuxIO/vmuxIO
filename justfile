@@ -344,6 +344,7 @@ prepare HOSTYAML=`echo ./hosts/$(hostname).yaml`:
 # prepare/configure this project for use
 build:
   chmod 600 ./nix/ssh_key
+  pushd subprojects/nic-emu; cargo build --no-default-features --features generate-bindings; cargo build --no-default-features --features generate-bindings --release; popd
   if [[ -d build ]]; then meson build --wipe; else meson build; fi
   pushd subprojects/nic-emu; cargo build --no-default-features --features generate-bindings; cargo build --no-default-features --features generate-bindings --release; popd
   meson compile -C build
@@ -419,6 +420,9 @@ build_dpdk:
 dpdk_helloworld: dpdk-setup
   meson configure -Denable_kmods=true
   meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
+
+fastclick: 
+  sudo ./result/bin/click --dpdk "-l 2-10" -- ./test/fastclick/dpdk-flow-parser.click
 
 pktgen: 
   nix shell .#pktgen

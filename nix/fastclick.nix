@@ -1,0 +1,122 @@
+{ self
+, pkgs
+, lib
+, selfpkgs
+, ...
+}:
+let
+  dpdk = selfpkgs.dpdk23; # needed for ice package thingy
+  # dpdk = self.inputs.nixpkgs.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
+  debug = true;
+in
+pkgs.stdenv.mkDerivation {
+  pname = "fastclick";
+  version = "2024.01.15-21";
+
+  src = self.inputs.fastclick-src;
+
+  nativeBuildInputs = with pkgs; [
+    coreutils
+    perl
+    python3Packages.pyelftools
+    openssl
+    (writeScriptBin "git" ''
+      echo ignoring git command
+    '')
+  ];
+  buildInputs = with pkgs; [
+    openssl
+    libbsd
+    numactl
+    luajit
+    libpcap
+    dpdk
+    hyperscan
+    jansson
+  ];
+
+  postPatch = ''
+    # sln /bin/echo ${pkgs.coreutils}/bin/echo
+    find . -type f -exec sed -i 's/\/bin\/echo/echo/g' {} \;
+    find . -type f -exec sed -i 's/\/bin\/rm/rm/g' {} \;
+    find . -type f -exec sed -i 's/\/bin\/ln/ln/g' {} \;
+    # substituteInPlace ./userlevel/Makefile.in \
+    #   --replace "/bin/echo" "echo"
+
+    # some variables are not correctly subsituted with our dpdk install. Substitute the values.
+    substituteInPlace ./userlevel/Makefile.in \
+      --replace "@RTE_VER_MINOR@" "0"
+    substituteInPlace ./userlevel/Makefile.in \
+      --replace "@RTE_VER_YEAR@" "23"
+    substituteInPlace ./userlevel/Makefile.in \
+      --replace "@RTE_VER_MONTH@" "0"
+
+    substituteInPlace ./lib/flowrulemanager.cc \
+      --replace "(const uint32_t *) int_rule_ids" "(const uint64_t *) int_rule_ids, true"
+
+    mkdir /build/rte_sdk
+    cp -r ${dpdk}/* /build/rte_sdk
+  '';
+
+  RTE_SDK = "/build/rte_sdk";
+  # RTE_KERNELDIR = "${pkgs.linux.dev}/lib/modules/${pkgs.linux.modDirVersion}/build";
+
+  configureFlags = [
+    "--enable-all-elements"
+    "--enable-etherswitch"
+    # fastclick light config
+    "--enable-dpdk"
+    "--enable-intel-cpu"
+    "--verbose"
+    "--enable-select=poll"
+    "--disable-dynamic-linking"
+    "--enable-poll"
+    "--enable-bound-port-transfer"
+    "--enable-local"
+    "--enable-flow"
+    "--disable-task-stats"
+    "--disable-cpu-load"
+    "--enable-dpdk-packet"
+    "--disable-clone"
+    # "--disable-dpdk-softqueue" # enable IQUEUE for debugging
+
+    # added by me
+    "--disable-sse42"
+    "--enable-flow-api"
+
+    # middleclick
+    "--enable-multithread"
+    "--disable-linuxmodule"
+    "--enable-intel-cpu"
+    "--enable-user-multithread"
+    "--disable-dynamic-linking"
+    "--enable-poll"
+    "--enable-bound-port-transfer"
+    "--enable-dpdk"
+    "--enable-batch"
+    "--with-netmap=no"
+    "--enable-zerocopy"
+    "--disable-dpdk-pool"
+    "--disable-dpdk-packet"
+    "--enable-user-timestamp"
+    "--enable-flow"
+    "--enable-ctx"
+    # runtime tells me to add:
+    "--enable-flow-dynamic"
+
+  ];
+
+  CFLAGS = "-O3 -msse4.1 -mavx" + lib.optionalString debug " -g";
+  CXXFLAGS = "-std=c++11 -O3 -msse4.1 -mavx" + lib.optionalString debug " -g";
+  NIX_LDFLAGS = "-lrte_eal -lrte_ring -lrte_mempool -lrte_ethdev -lrte_mbuf -lrte_net -lrte_latencystats -lrte_cmdline -lrte_net_bond -lrte_metrics -lrte_gso -lrte_gro -lrte_net_ixgbe -lrte_net_i40e -lrte_net_bnxt -lrte_net_dpaa -lrte_bpf -lrte_bitratestats -ljansson -lbsd";
+  RTE_VER_YEAR = "21"; # does this bubble through to the makefile variable? i dont think so. Then we can remove it.
+  enableParallelBuilding = true;
+  hardeningDisable = [ "all" ];
+  preBuild = ''
+    echo foobar
+    echo $enableParallelBuilding
+    gzip --version
+  '';
+
+  dontFixup = debug;
+}

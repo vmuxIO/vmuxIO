@@ -57,6 +57,10 @@
       url = "git+https://github.com/vmuxIO/qemu.git?ref=ioregionfd&submodules=1";
       flake = false;
     };
+    fastclick-src = {
+      url = "git+https://github.com/tbarbette/fastclick.git";
+      flake = false;
+    };
   };
 
   outputs = {
@@ -97,6 +101,10 @@
         inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
+      dpdk23 = pkgs.callPackage ./nix/dpdk23.nix {
+        kernel = pkgs.linuxPackages_5_10.kernel;
+        inherit (flakepkgs) linux-firmware-pinned;
+      };
       dpdk = pkgs.callPackage ./nix/dpdk.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
@@ -111,6 +119,11 @@
       };
       pktgen = pkgs.callPackage ./nix/pktgen.nix {
         dpdk = selfpkgs.dpdk;
+      };
+      fastclick = pkgs.callPackage ./nix/fastclick.nix {
+        linux = pkgs.linuxPackages_5_10.kernel;
+        selfpkgs = flakepkgs;
+        inherit self;
       };
 
       # util
