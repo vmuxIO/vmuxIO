@@ -1,5 +1,8 @@
 { config, lib, pkgs, modulesPath, linux-firmware-pinned, ... }:
 {
+  imports = [
+    ./docker.nix
+  ];
   networking.useDHCP = false;
   networking.interfaces.eth0.useDHCP = false;
   networking.interfaces.eth0.ipv4.addresses = [ {

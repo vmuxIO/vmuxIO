@@ -22,6 +22,7 @@ lib.attrsets.recursiveUpdate ({
   #} ];
 
   imports = [
+    ./docker.nix
     ./gpio.nix # enable gpio sysfs
     ./desperately-fixing-overlayfs-for-extkern.nix
     ({ config, ...}: {
