@@ -188,6 +188,8 @@ ip link delete tap-username0
 
 See also [autotest](test/README.md) for details.
 
+The buildscripts expect artefacts of `just build`, `just vm-overwrite` and `just docker-rebuild` on all physical hosts.
+
 ```bash
 nix develop
 just prepare ./hosts/christina_autotest.yaml
@@ -196,8 +198,6 @@ sln ./test/conf/autotest_okelmann_christina.cfg autotest.cfg
 python3.10 ./test/autotest -vvv test-load-lat-file
 # Scripted benchmarks
 python3 ./test/src/measure_vnf.py -vvv
-# Deathstar benchmarks
-just deathstar # build docker images on VM host
 python3 ./test/src/measure_hotel.py -vvv
 ls output
 ```
