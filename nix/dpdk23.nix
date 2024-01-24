@@ -1,9 +1,23 @@
-{ stdenv, lib
+{ stdenv
+, lib
 , kernel
 , fetchurl
-, pkg-config, meson, ninja, makeWrapper
-, libbsd, numactl, libbpf, zlib, libelf, jansson, openssl, libpcap, rdma-core
-, doxygen, python3, pciutils
+, pkg-config
+, meson
+, ninja
+, makeWrapper
+, libbsd
+, numactl
+, libbpf
+, zlib
+, libelf
+, jansson
+, openssl
+, libpcap
+, rdma-core
+, doxygen
+, python3
+, pciutils
 , withExamples ? [ "flow_filtering" ]
 , withSomeSources ? true
 , shared ? false
@@ -18,7 +32,8 @@
 let
   mod = kernel != null;
   dpdkVersion = "23.07";
-in stdenv.mkDerivation {
+in
+stdenv.mkDerivation {
   pname = "dpdk";
   version = "${dpdkVersion}" + lib.optionalString mod "-${kernel.version}";
 
@@ -65,11 +80,6 @@ in stdenv.mkDerivation {
     substituteInPlace drivers/net/ice/ice_ethdev.h --replace \
       '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "/lib/firmware/intel/ice/ddp/"' \
       '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"'
-    #exit 1
-#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"
-#define ICE_PKG_FILE_UPDATES "/lib/firmware/updates/intel/ice/ddp/ice.pkg"                    
-#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"    
-#define ICE_PKG_FILE_SEARCH_PATH_UPDATES "/lib/firmware/updates/intel/ice/ddp/"               
   '' + lib.optionalString mod ''
     # kernel_install_dir is hardcoded to `/lib/modules`; patch that.
     sed -i "s,kernel_install_dir *= *['\"].*,kernel_install_dir = '$kmod/lib/modules/${kernel.modDirVersion}'," kernel/linux/meson.build
@@ -82,10 +92,10 @@ in stdenv.mkDerivation {
   ]
   # kni kernel driver is currently not compatble with 5.11
   ++ lib.optional (mod && kernel.kernelOlder "5.11") "-Ddisable_drivers=kni"
-  ++ [(if shared then "-Ddefault_library=shared" else "-Ddefault_library=static")]
+  ++ [ (if shared then "-Ddefault_library=shared" else "-Ddefault_library=static") ]
   ++ lib.optional (machine != null) "-Dmachine=${machine}"
   ++ lib.optional mod "-Dkernel_dir=${kernel.dev}/lib/modules/${kernel.modDirVersion}/build"
-  ++ lib.optional (withExamples != []) "-Dexamples=${builtins.concatStringsSep "," withExamples}";
+  ++ lib.optional (withExamples != [ ]) "-Dexamples=${builtins.concatStringsSep "," withExamples}";
 
   postInstall = ''
     # Remove Sphinx cache files. Not only are they not useful, but they also
@@ -94,7 +104,7 @@ in stdenv.mkDerivation {
 
     wrapProgram $out/bin/dpdk-devbind.py \
       --prefix PATH : "${lib.makeBinPath [ pciutils ]}"
-  '' + lib.optionalString (withExamples != []) ''
+  '' + lib.optionalString (withExamples != [ ]) ''
     mkdir -p $examples/bin
     find examples -type f -executable -exec install {} $examples/bin \;
   '' + lib.optionalString (withSomeSources) ''
@@ -105,13 +115,13 @@ in stdenv.mkDerivation {
   outputs =
     [ "out" "doc" ]
     ++ lib.optional mod "kmod"
-    ++ lib.optional (withExamples != []) "examples";
+    ++ lib.optional (withExamples != [ ]) "examples";
 
   meta = with lib; {
     description = "Set of libraries and drivers for fast packet processing";
     homepage = "http://dpdk.org/";
     license = with licenses; [ lgpl21 gpl2 bsd2 ];
-    platforms =  platforms.linux;
+    platforms = platforms.linux;
     maintainers = with maintainers; [ magenbluten orivej mic92 zhaofengli ];
     broken = mod && kernel.isHardened;
   };
