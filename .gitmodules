@@ -10,3 +10,6 @@
 	path = subprojects/nic-emu
 	url = https://github.com/vmuxIO/nic-emu.git
 	branch = main
+[submodule "subprojects/deathstarbench"]
+	path = subprojects/deathstarbench
+	url = https://github.com/vmuxIO/DeathStarBench.git
