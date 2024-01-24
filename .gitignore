@@ -2,7 +2,8 @@ result
 .ccls-cache/
 VMs/
 __pycache__/
-outputs/
+outputs*/
 .cache/
 linux-*/
 .local/
+test/kni-latency/kni-latency

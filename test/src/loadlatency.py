@@ -47,6 +47,19 @@ class Interface(Enum):
     # vMux-emulation to tap backend
     VMUX_EMU = "vmux-emu"
 
+    def net_type(self) -> str:
+        """
+        translates enum Interface into net_type strings used here
+        """
+        types = {}
+        types[Interface.BRIDGE] = "brtap"
+        types[Interface.BRIDGE_E1000] = "brtap-e1000"
+        types[Interface.MACVTAP] = "macvtap"
+        types[Interface.VFIO] = "vfio"
+        types[Interface.VMUX_PT] = "vmux-pt"
+        types[Interface.VMUX_EMU] = "vmux-emu"
+        return types[self]
+
 
 class Reflector(Enum):
     # Reflector types
@@ -143,13 +156,13 @@ class LoadLatencyTest(object):
             # warm-up
             sleep(10)
             try:
-                loadgen.run_l2_load_latency(self.mac, 0, 20,
+                LoadGen.run_l2_load_latency(loadgen, self.mac, 0, 20,
                                             histfile=remote_histogram_file,
                                             outfile=remote_output_file)
             except Exception as e:
                 error(f'Failed to run warm-up due to exception: {e}')
             sleep(25)
-            loadgen.stop_l2_load_latency()
+            LoadGen.stop_l2_load_latency(loadgen)
 
         for repetition in range(self.repetitions):
             if self.test_done(repetition):
@@ -164,7 +177,7 @@ class LoadLatencyTest(object):
             try:
                 loadgen.exec(f'sudo rm -f {remote_output_file} ' +
                              f'{remote_histogram_file}')
-                loadgen.run_l2_load_latency(self.mac, self.rate,
+                LoadGen.run_l2_load_latency(loadgen, self.mac, self.rate,
                                             self.runtime, self.size,
                                             histfile=remote_histogram_file,
                                             outfile=remote_output_file)
@@ -183,7 +196,7 @@ class LoadLatencyTest(object):
 
             # TODO stopping still fails when the tmux session
             # does not exist
-            # loadgen.stop_l2_load_latency()
+            # LoadGen.stop_l2_load_latency(loadgen)
 
             # download results
             loadgen.copy_from(remote_output_file,
@@ -266,7 +279,8 @@ class LoadLatencyTestGenerator(object):
         self.full_test_tree = self.create_test_tree(host)
         self.todo_test_tree = self.create_needed_test_tree(self.full_test_tree)
 
-    def setup_interface(self, host: Host, machine: Machine,
+    @staticmethod
+    def setup_interface(host: Host, machine: Machine,
                         interface: Interface, bridge_mac: str = None):
         if machine != Machine.HOST:
             host.setup_admin_bridge()
