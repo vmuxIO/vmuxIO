@@ -344,12 +344,9 @@ prepare HOSTYAML=`echo ./hosts/$(hostname).yaml`:
 # prepare/configure this project for use
 build:
   chmod 600 ./nix/ssh_key
+  pushd subprojects/nic-emu; cargo build --no-default-features --features generate-bindings; cargo build --no-default-features --features generate-bindings --release; popd
   if [[ -d build ]]; then meson build --wipe; else meson build; fi
   meson compile -C build
-  pushd subprojects/nic-emu
-  cargo build --no-default-features --features generate-bindings
-  cargo build --no-default-features --features generate-bindings --release
-  popd
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
   nix build -o {{proot}}/mgln .#moongen-lachnit
