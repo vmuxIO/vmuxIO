@@ -31,9 +31,8 @@ UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 LogLevel=ERROR
 
-Host vm.rose.christina
+Host vm*.rose.christina
 ProxyJump rose.christina
-Hostname 192.168.56.20
 User root
 StrictHostKeyChecking=no
 IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
@@ -43,10 +42,106 @@ LogLevel=ERROR
 
 Host vm.river.christina
 ProxyJump river.christina
-Hostname 192.168.56.20
 User root
 StrictHostKeyChecking=no
 IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 LogLevel=ERROR
+
+# generate vm*.* hosts with:
+# start_ip=20
+# for i in $(seq 1 30); do echo 'Host vm$i.'; echo "Hostname 192.168.56.$((start_ip + i - 1))"; echo ""; done
+
+Host vm.*
+Hostname 192.168.56.20
+
+Host vm1.*
+Hostname 192.168.56.20
+
+Host vm2.*
+Hostname 192.168.56.21
+
+Host vm3.*
+Hostname 192.168.56.22
+
+Host vm4.*
+Hostname 192.168.56.23
+
+Host vm5.*
+Hostname 192.168.56.24
+
+Host vm6.*
+Hostname 192.168.56.25
+
+Host vm7.*
+Hostname 192.168.56.26
+
+Host vm8.*
+Hostname 192.168.56.27
+
+Host vm9.*
+Hostname 192.168.56.28
+
+Host vm10.*
+Hostname 192.168.56.29
+
+Host vm11.*
+Hostname 192.168.56.30
+
+Host vm12.*
+Hostname 192.168.56.31
+
+Host vm13.*
+Hostname 192.168.56.32
+
+Host vm14.*
+Hostname 192.168.56.33
+
+Host vm15.*
+Hostname 192.168.56.34
+
+Host vm16.*
+Hostname 192.168.56.35
+
+Host vm17.*
+Hostname 192.168.56.36
+
+Host vm18.*
+Hostname 192.168.56.37
+
+Host vm19.*
+Hostname 192.168.56.38
+
+Host vm20.*
+Hostname 192.168.56.39
+
+Host vm21.*
+Hostname 192.168.56.40
+
+Host vm22.*
+Hostname 192.168.56.41
+
+Host vm23.*
+Hostname 192.168.56.42
+
+Host vm24.*
+Hostname 192.168.56.43
+
+Host vm25.*
+Hostname 192.168.56.44
+
+Host vm26.*
+Hostname 192.168.56.45
+
+Host vm27.*
+Hostname 192.168.56.46
+
+Host vm28.*
+Hostname 192.168.56.47
+
+Host vm29.*
+Hostname 192.168.56.48
+
+Host vm30.*
+Hostname 192.168.56.49

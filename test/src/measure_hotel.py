@@ -48,7 +48,8 @@ def main() -> None:
 
     interface = Interface.BRIDGE
 
-    with measurement.virtual_machines(interface, num=2) as guest:
+    with measurement.virtual_machines(interface, num=2) as guests:
+        breakpoint()
         try:
             # guest: set up interfaces and networking
 

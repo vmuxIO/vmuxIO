@@ -1592,6 +1592,7 @@ class Host(Server):
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
         self.destroy_test_macvtap()
+        # TODO destroy admin interfaces!
 
 
 class Guest(Server):

@@ -4,13 +4,14 @@ import autotest as autotest
 from configparser import ConfigParser
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
-from typing import Tuple, Iterator, Any
+from typing import Tuple, Iterator, Any, Dict
 from contextlib import contextmanager
 from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from util import safe_cast
 from pathlib import Path
+import copy
 
 
 def setup_parser() -> ArgumentParser:
@@ -53,6 +54,8 @@ class Measurement:
     guest: Guest
     loadgen: LoadGen
 
+    guests: Dict[int, Guest] 
+
 
     def __init__(self):
         parser: ArgumentParser = setup_parser()
@@ -67,6 +70,8 @@ class Measurement:
 
         self.host.check_cpu_freq()
         self.loadgen.check_cpu_freq()
+
+        self.guests = dict()
 
 
     def hosts(self) -> Tuple[Host, LoadGen]:
@@ -117,7 +122,7 @@ class Measurement:
 
 
     @contextmanager
-    def virtual_machines(self, interface: Interface, num: int = 1) -> Iterator[Guest]:
+    def virtual_machines(self, interface: Interface, num: int = 1) -> Iterator[Dict[int, Guest]]:
 
         # host: inital cleanup
 
@@ -153,12 +158,22 @@ class Measurement:
                     vm_number=i
                     )
 
+            if num == 1:
+                self.guests[0] = self.guest
+            else:
+                # TODO move clone to Server or Guest
+                guest = copy.deepcopy(self.guest)
+                fqdn = guest.fqdn.split(".")
+                fqdn[0] = f"{fqdn[0]}{i}"
+                guest.fqdn = ".".join(fqdn)
+                self.guests[i] = guest
+
         breakpoint()
+        for i in MultiHost.range(num):
+            debug("Waiting for guest{num} connectivity")
+            self.guests[i].wait_for_connection(timeout=120)
 
-        debug("Waiting for guest connectivity")
-        # self.guest.wait_for_connection(timeout=120)
-
-        yield self.guest
+        yield self.guests
 
         # teardown  # TODO multihost
 
