@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from server import Host, Guest, LoadGen
+from server import Host, Guest, LoadGen, MultiHost
 import autotest as autotest
 from configparser import ConfigParser
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
@@ -133,27 +133,30 @@ class Measurement:
 
         self.host.detect_test_iface()
 
-        debug(f"Setting up interface {interface.value}")
-        setup_host_interface(self.host, interface, vm_number=num)
+        for i in MultiHost.range(num):
+            debug(f"Setting up interface {interface.value} for VM {i}")
+            setup_host_interface(self.host, interface, vm_number=i)
 
         if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
             self.host.start_vmux(interface.value)
 
         # start VM
 
-        info(f"Starting VM ({interface.value})")
+        
+        for i in MultiHost.range(num):
+            info(f"Starting VM {i} ({interface.value})")
 
-        self.host.run_guest(
-                net_type=interface.net_type(),
-                machine_type='pc',
-                qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin",
-                vm_number=num
-                )
+            self.host.run_guest(
+                    net_type=interface.net_type(),
+                    machine_type='pc',
+                    qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin",
+                    vm_number=i
+                    )
 
         breakpoint()
 
         debug("Waiting for guest connectivity")
-        self.guest.wait_for_connection(timeout=120)
+        # self.guest.wait_for_connection(timeout=120)
 
         yield self.guest
 

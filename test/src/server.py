@@ -19,6 +19,10 @@ class MultiHost:
     Starts from vm_number 1. Vm_number 0 leads to legacy outputs without numbers
     """
     @staticmethod
+    def range(num_vms: int) -> range:
+        return range(1, num_vms + 1)
+
+    @staticmethod
     def mac(base_mac: str, vm_number: int) -> str:
         if vm_number == 0: return base_mac
         base = netaddr.EUI(base_mac)
@@ -1413,6 +1417,7 @@ class Host(Server):
         # TODO this command should be build by the Guest object
         # it should take all the settings from the config file
         # and compile them.
+        net_type = "none" # TODO this breaks testing!
         dev_type = 'pci' if machine_type == 'pc' else 'device'
         test_net_config = ''
         if net_type == 'brtap':
@@ -1516,7 +1521,7 @@ class Host(Server):
             # +
             # ' --trace virtio_mmio_read --trace virtio_mmio_write' +
             # +
-            # ' 2>/tmp/trace.log'
+            # f' 2>/tmp/trace-vm{vm_number}.log'
             )
 
     def kill_guest(self: 'Host') -> None:
