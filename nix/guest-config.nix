@@ -2,18 +2,8 @@
 {
   imports = [
     ./docker.nix
+    ./networking.nix
   ];
-  networking.useDHCP = false;
-  networking.interfaces.eth0.useDHCP = false;
-  networking.interfaces.eth0.ipv4.addresses = [ {
-    address = "192.168.56.20";
-    prefixLength = 24;
-  } ];
-  networking.interfaces.eth1.useDHCP = false;
-  networking.defaultGateway = "192.168.56.1";
-  networking.nameservers = [ "10.156.33.53" ];
-  networking.hostName = "guest";
-  networking.domain = "vmux.dse.in.tum.de";
 
   services.sshd.enable = true;
 

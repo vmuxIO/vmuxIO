@@ -21,6 +21,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    nix-fast-build = {
+      url = "github:Mic92/nix-fast-build";
+      inputs.nixpgks.follows = "nixpkgs";
+    };
+
     # on flake submodules https://github.com/NixOS/nix/pull/5434
     moonmux-src = {
       url = "git+https://github.com/vmuxIO/MoonGen?ref=dpdk-21.11&submodules=1";
@@ -227,6 +232,7 @@
         just
         iperf2
         nixos-generators.packages.${system}.nixos-generate
+        self.inputs.nix-fast-build.packages.${system}.nix-fast-build
         ccls # c lang serv
         meson
         ninja
@@ -327,6 +333,33 @@
     in
       nixosMachines // packages // devShells // homeConfigurations;
   })) // {
+    all-images = let 
+      pkgs = self.packages.x86_64-linux;
+    in {
+      guest-image = pkgs.guest-image;
+      nesting-guest-image = pkgs.nesting-guest-image;
+      nesting-guest-image-noiommu = pkgs.nesting-guest-image-noiommu;
+      nesting-host-extkern-image = pkgs.nesting-host-extkern-image;
+      nesting-host-image = pkgs.nesting-guest-image;
+    } // (let 
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        flakepkgs = self.packages.x86_64-linux;
+        image = i: nixos-generators.nixosGenerate {
+          inherit pkgs;
+          modules = [ 
+            ./nix/guest-config.nix
+            ({...}: {
+             networking.vm_number = i;
+             })
+          ];
+          specialArgs = {
+            inherit (flakepkgs) linux-firmware-pinned;
+          };
+          format = "qcow";
+        };
+        nr_images = 30;
+      in builtins.listToAttrs (builtins.genList (i: { name = "guest-image${builtins.toString (i+1)}"; value = image i;}) nr_images)
+    );
     nixosConfigurations = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
       selfpkgs = self.packages.x86_64-linux;

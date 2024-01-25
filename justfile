@@ -368,28 +368,26 @@ docker-rebuild:
 
 vm-overwrite:
   #!/usr/bin/env bash
+  set -x
+  set -e
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
-  # nesting-host VM
-  nix build -o {{proot}}/VMs/nesting-host-image-ro .#nesting-host-image # read only
-  install -D -m644 {{proot}}/VMs/nesting-host-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-host-image.qcow2
-  qemu-img resize {{proot}}/VMs/nesting-host-image.qcow2 +8g
-  # nesting-host-extkern VM
-  nix build -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
-  install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
-  qemu-img resize {{proot}}/VMs/nesting-host-extkern-image.qcow2 +8g
-  # nesting-guest VM
-  nix build -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
-  install -D -m644 {{proot}}/VMs/nesting-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image.qcow2
-  qemu-img resize {{proot}}/VMs/nesting-guest-image.qcow2 +8g
-  nix build -o {{proot}}/VMs/nesting-guest-image-noiommu-ro .#nesting-guest-image-noiommu # read only
-  install -D -m644 {{proot}}/VMs/nesting-guest-image-noiommu-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image-noiommu.qcow2
-  qemu-img resize {{proot}}/VMs/nesting-guest-image-noiommu.qcow2 +8g
-  # guest VM (for autotest)
-  nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
-  for i in $(seq 1 100); do
-      install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image$i.qcow2
-      qemu-img resize {{proot}}/VMs/guest-image$i.qcow2 +8g
+
+  # build images fast
+
+  overwrite() {
+    install -D -m644 {{proot}}/VMs/ro-$1/nixos.qcow2 {{proot}}/VMs/$1.qcow2
+    qemu-img resize {{proot}}/VMs/$1.qcow2 +8g
+  }
+
+  nix-fast-build -f .#all-images --out-link {{proot}}/VMs/ro
+  overwrite nesting-host-image
+  overwrite nesting-host-extkern-image
+  overwrite nesting-guest-image
+  overwrite nesting-guest-image-noiommu
+  overwrite guest-image
+  for i in $(seq 1 30); do
+      overwrite guest-image$i
   done
 
 dpdk-setup:
