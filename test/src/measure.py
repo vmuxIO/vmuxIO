@@ -10,6 +10,7 @@ from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from util import safe_cast
+from pathlib import Path
 
 
 def setup_parser() -> ArgumentParser:
@@ -39,8 +40,8 @@ def setup_parser() -> ArgumentParser:
     return parser
 
 
-def setup_host_interface(host: Host, interface: Interface) -> None:
-    autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface)
+def setup_host_interface(host: Host, interface: Interface, vm_number: int = 0) -> None:
+    autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface, vm_number=vm_number)
 
 
 @dataclass
@@ -115,6 +116,53 @@ class Measurement:
         self.host.cleanup_network()
 
 
+    @contextmanager
+    def virtual_machines(self, interface: Interface, num: int = 1) -> Iterator[Guest]:
+
+        # host: inital cleanup
+
+        debug('Initial cleanup')
+        try:
+            self.host.kill_guest()
+        except Exception:
+            pass
+        self.host.cleanup_network()
+
+
+        # host: set up interfaces and networking
+
+        self.host.detect_test_iface()
+
+        debug(f"Setting up interface {interface.value}")
+        setup_host_interface(self.host, interface, vm_number=num)
+
+        if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
+            self.host.start_vmux(interface.value)
+
+        # start VM
+
+        info(f"Starting VM ({interface.value})")
+
+        self.host.run_guest(
+                net_type=interface.net_type(),
+                machine_type='pc',
+                qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin",
+                vm_number=num
+                )
+
+        breakpoint()
+
+        debug("Waiting for guest connectivity")
+        self.guest.wait_for_connection(timeout=120)
+
+        yield self.guest
+
+        # teardown  # TODO multihost
+
+        self.host.kill_guest()
+        if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
+            self.host.stop_vmux()
+        self.host.cleanup_network()
 
 
 

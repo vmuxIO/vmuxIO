@@ -281,10 +281,10 @@ class LoadLatencyTestGenerator(object):
 
     @staticmethod
     def setup_interface(host: Host, machine: Machine,
-                        interface: Interface, bridge_mac: str = None):
+                        interface: Interface, bridge_mac: str = None, vm_number: int = 0):
         if machine != Machine.HOST:
             host.setup_admin_bridge()
-            host.setup_admin_tap()
+            host.setup_admin_tap(vm_number=vm_number)
             host.modprobe_test_iface_drivers()
         if interface == Interface.PNIC:
             host.delete_nic_ip_addresses(host.test_iface)

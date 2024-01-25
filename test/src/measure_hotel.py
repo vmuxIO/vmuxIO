@@ -23,51 +23,14 @@ def main() -> None:
 
     # loadgen: set up interfaces and networking
 
-    debug('Binding loadgen interface')
-    try:
-        loadgen.delete_nic_ip_addresses(loadgen.test_iface)
-    except Exception:
-        pass
-    loadgen.bind_test_iface()
-    loadgen.setup_hugetlbfs()
+    # debug('Binding loadgen interface')
+    # try:
+    #     loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+    # except Exception:
+    #     pass
+    # loadgen.bind_test_iface()
+    # loadgen.setup_hugetlbfs()
 
-
-    # interface = Interface.VMUX_PT
-    # # TODO put early skip check here
-    # with measurement.virtual_machine(interface) as guest:
-    #
-    #     # guest: set up interfaces and networking
-    #
-    #     debug("Detecting guest test interface")
-    #     guest.detect_test_iface()
-    #     guest.bind_test_iface()
-    #     guest.setup_hugetlbfs()
-    #
-    #     # the actual test
-    #
-    #     loadgen.stop_moongen_reflector()
-    #     loadgen.start_moongen_reflector()
-    #
-    #     test = LoadLatencyTest(
-    #         machine=Machine.PCVM,
-    #         interface=interface,
-    #         mac=loadgen.test_iface_mac,
-    #         qemu="measure-vnf", # abuse this as comment field
-    #         vhost=False,
-    #         ioregionfd=False,
-    #         reflector=Reflector.MOONGEN,
-    #         rate=1,
-    #         size=64,
-    #         runtime=30,
-    #         repetitions=1,
-    #         warmup=False,
-    #         cooldown=False,
-    #         outputdir=OUT_DIR,
-    #     )
-    #     guest_: LoadGen = cast(LoadGen, guest) # trust me bro, this works
-    #     test.run(guest_)
-    #
-    #     loadgen.stop_moongen_reflector()
 
     # create per-VM docker-compose
     with open(f"{PROJECT_ROOT}/subprojects/deathstarbench/hotelReservation/docker-compose.yml", "r") as file:
@@ -85,7 +48,7 @@ def main() -> None:
 
     interface = Interface.BRIDGE
 
-    with measurement.virtual_machine(interface) as guest:
+    with measurement.virtual_machines(interface, num=1) as guest:
         try:
             # guest: set up interfaces and networking
 

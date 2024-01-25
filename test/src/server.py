@@ -9,8 +9,47 @@ from os import listdir
 from os.path import join as path_join
 from os.path import dirname as path_dirname
 from typing import Optional
+import netaddr
+from pathlib import Path
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
+
+class MultiHost:
+    """
+    Starts from vm_number 1. Vm_number 0 leads to legacy outputs without numbers
+    """
+    @staticmethod
+    def mac(base_mac: str, vm_number: int) -> str:
+        if vm_number == 0: return base_mac
+        base = netaddr.EUI(base_mac)
+        value = base.value + vm_number
+        fmt = netaddr.mac_unix
+        fmt.word_fmt = "%.2x"
+        return str(netaddr.EUI(value).format(fmt))
+
+    @staticmethod
+    def disk_path(root_disk_file: str, vm_number: int) -> str:
+        if vm_number == 0: return root_disk_file
+        root_disk = Path(root_disk_file)
+        root_disk = root_disk.with_name(root_disk.stem + str(vm_number) + root_disk.suffix)
+        return str(root_disk)
+
+    @staticmethod
+    def iface_name(tap_name: str, vm_number: int):
+        """
+        kernel interface name
+        """
+        if vm_number == 0: return tap_name
+        max_len = 15
+        length = max_len - len("-999")
+        return f"{tap_name[:length]}-{vm_number}"
+
+
+    @staticmethod
+    def enumerate(enumeratable: str, vm_number: int) -> str:
+        if vm_number == 0: return enumeratable
+        return f"{enumeratable}-vm{vm_number}"
+
 
 @dataclass
 class Server(ABC):
@@ -1193,7 +1232,7 @@ class Host(Server):
                   f'dev {self.admin_bridge}; true)')
         self.exec(f'sudo ip link set {self.admin_bridge} up')
 
-    def setup_admin_tap(self: 'Host'):
+    def setup_admin_tap(self: 'Host', vm_number: int = 0):
         """
         Setup the admin tap.
 
@@ -1206,12 +1245,13 @@ class Host(Server):
         Returns
         -------
         """
+        admin_tap = MultiHost.iface_name(self.admin_tap, vm_number)
         self.exec('sudo modprobe tun tap')
-        self.exec(f'sudo ip link show {self.admin_tap} 2>/dev/null' +
-                  f' || (sudo ip tuntap add {self.admin_tap} mode tap;' +
-                  f' sudo ip link set {self.admin_tap} '
+        self.exec(f'sudo ip link show {admin_tap} 2>/dev/null' +
+                  f' || (sudo ip tuntap add {admin_tap} mode tap;' +
+                  f' sudo ip link set {admin_tap} '
                   f'master {self.admin_bridge}; true)')
-        self.exec(f'sudo ip link set {self.admin_tap} up')
+        self.exec(f'sudo ip link set {admin_tap} up')
 
     def modprobe_test_iface_drivers(self):
         """
@@ -1330,6 +1370,7 @@ class Host(Server):
                   vhost: bool = True,
                   rx_queue_size: int = 256,
                   tx_queue_size: int = 256,
+                  vm_number: int = 0,
                   ) -> None:
         # TODO this function should get a Guest object as argument
         """
@@ -1363,6 +1404,8 @@ class Host(Server):
             Size of the receive queue for the test interface.
         tx_queue_size : int
             Size of the transmit queue for the test interface.
+        vm_number: int
+            If not set to 0, will start VM in a way that other VMs with different vm_number can be started at the same time.
 
         Returns
         -------
@@ -1381,11 +1424,11 @@ class Host(Server):
                 multi_queue = ",mq=on"
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-                f'id=admin1,ifname={self.test_tap},script=no,' +
+                f'id=test0,ifname={self.test_tap},script=no,' +
                 f'downscript=no' +
                 queues +
                 f' -device virtio-net-{dev_type},id=testif,' +
-                f'netdev=admin1,mac={self.guest_test_iface_mac}' +
+                f'netdev=test0,mac={self.guest_test_iface_mac}' +
                 multi_queue +
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
@@ -1393,18 +1436,18 @@ class Host(Server):
         if net_type == 'brtap-e1000':
             test_net_config = (
                 f" -netdev tap," +
-                f'id=admin1,ifname={self.test_tap},script=no,' +
+                f'id=test0,ifname={self.test_tap},script=no,' +
                 'downscript=no' +
                 f' -device e1000,' +
-                f'netdev=admin1,mac={self.guest_test_iface_mac}'
+                f'netdev=test0,mac={self.guest_test_iface_mac}'
             )
         elif net_type == 'macvtap':
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-                'id=admin1,fd=3 3<>/dev/tap$(cat ' +
+                'id=test0,fd=3 3<>/dev/tap$(cat ' +
                 f'/sys/class/net/{self.test_macvtap}/ifindex) ' +
                 f' -device virtio-net-{dev_type},id=testif,' +
-                'netdev=admin1,mac=$(cat ' +
+                'netdev=test0,mac=$(cat ' +
                 f'/sys/class/net/{self.test_macvtap}/address)' +
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
@@ -1424,6 +1467,7 @@ class Host(Server):
         disk_path = self.guest_root_disk_path
         if root_disk:
             disk_path = root_disk
+        disk_path = MultiHost.disk_path(disk_path, vm_number)
         fsdev_config = ''
         if self.fsdevs:
             for name, path in self.fsdevs.items():
@@ -1434,7 +1478,7 @@ class Host(Server):
                     f'fsdev={name}fs'
                 )
         self.tmux_new(
-            'qemu',
+            MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
             "sudo " +
             qemu_bin_path +
@@ -1444,7 +1488,7 @@ class Host(Server):
 
             # shared memory
             f' -m {mem}' +
-            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory1,prealloc=yes,id=bm,size={mem}M,share=on'
+            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory{vm_number},prealloc=yes,id=bm,size={mem}M,share=on'
             ' -numa node,memdev=bm' +
 
             ' -enable-kvm' +
@@ -1456,11 +1500,11 @@ class Host(Server):
             # ' -cdrom /home/networkadmin/images/guest_init.iso' +
             fsdev_config +
             ' -serial stdio' +
-            ' -monitor tcp:127.0.0.1:2345,server,nowait' +
-            f' -netdev tap,vhost=on,id=admin0,ifname={self.admin_tap},' +
+            (' -monitor tcp:127.0.0.1:2345,server,nowait' if debug_qemu else '') +
+            f' -netdev tap,vhost=on,id=admin0,ifname={MultiHost.iface_name(self.admin_tap, vm_number)},' +
             'script=no,downscript=no' +
             f' -device virtio-net-{dev_type},id=admif,netdev=admin0,' +
-            f'mac={self.guest_admin_iface_mac}' +
+            f'mac={MultiHost.mac(self.guest_admin_iface_mac, vm_number)}' +
             test_net_config
             # +
             # ' -drive id=test1,format=raw,file=/dev/ssd/test1,if=none,' +

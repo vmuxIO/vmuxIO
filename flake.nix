@@ -261,6 +261,7 @@
           ps.flake8
           ps.isort
           ps.mypy
+          ps.netaddr
         ]))
       ] ++ (with self.packages; [
         dpdk
