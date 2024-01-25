@@ -367,6 +367,7 @@ docker-rebuild:
   # cd subprojects/deathstarbench/hotelReservation; docker run -ti --mount type=bind,source=$(pwd)/wrk2,target=/wrk2 --network host wrk2 wrk -D exp -t 1 -c 1 -d 1 -L -s ./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua http://localhost:5000 -R 1
 
 vm-overwrite:
+  #!/usr/bin/env bash
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
   # nesting-host VM
@@ -386,8 +387,10 @@ vm-overwrite:
   qemu-img resize {{proot}}/VMs/nesting-guest-image-noiommu.qcow2 +8g
   # guest VM (for autotest)
   nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
-  install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2
-  qemu-img resize {{proot}}/VMs/guest-image.qcow2 +8g
+  for i in $(seq 1 100); do
+      install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image$i.qcow2
+      qemu-img resize {{proot}}/VMs/guest-image$i.qcow2 +8g
+  done
 
 dpdk-setup:
   modprobe vfio-pci
