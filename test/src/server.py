@@ -11,8 +11,10 @@ from os.path import dirname as path_dirname
 from typing import Optional
 import netaddr
 from pathlib import Path
+import copy
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
+MAX_VMS: int = 30; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
 
 class MultiHost:
     """
@@ -1271,7 +1273,7 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host', multi_queue=True):
+    def setup_test_br_tap(self: 'Host', multi_queue=True, vm_number: int = 0):
         """
         Setup the bridged test tap device.
 
@@ -1287,6 +1289,8 @@ class Host(Server):
         if BRIDGE_QUEUES == 0:
             multi_queue = False
 
+        test_tap = MultiHost.iface_name(self.test_tap, vm_number)
+
         # load kernel modules
         self.exec('sudo modprobe bridge tun tap')
 
@@ -1295,14 +1299,14 @@ class Host(Server):
                   f' || (sudo ip link add {self.test_bridge} type bridge; ' +
                   'true)')
         username = self.whoami()
-        self.exec(f'sudo ip link show {self.test_tap} 2>/dev/null || ' +
-                  f'(sudo ip tuntap add dev {self.test_tap} mode tap ' +
+        self.exec(f'sudo ip link show {test_tap} 2>/dev/null || ' +
+                  f'(sudo ip tuntap add dev {test_tap} mode tap ' +
                   f'user {username}{" multi_queue" if multi_queue else ""}; true)')
 
         # add tap device and physical nic to bridge
-        tap_output = self.exec(f'sudo ip link show {self.test_tap}')
+        tap_output = self.exec(f'sudo ip link show {test_tap}')
         if f'master {self.test_bridge}' not in tap_output:
-            self.exec(f'sudo ip link set {self.test_tap} ' +
+            self.exec(f'sudo ip link set {test_tap} ' +
                       f'master {self.test_bridge}')
         test_iface_output = self.exec(f'sudo ip link show {self.test_iface}')
         if f'master {self.test_bridge}' not in test_iface_output:
@@ -1312,9 +1316,9 @@ class Host(Server):
         # bring up all interfaces (nic, bridge and tap)
         self.exec(f'sudo ip link set {self.test_iface} up ' +
                   f'&& sudo ip link set {self.test_bridge} up ' +
-                  f'&& sudo ip link set {self.test_tap} up')
+                  f'&& sudo ip link set {test_tap} up')
 
-    def destroy_test_br_tap(self: 'Host'):
+    def destroy_test_br_tap(self: 'Host', vm_number: int = 0):
         """
         Destroy the bridged test tap device.
 
@@ -1324,7 +1328,7 @@ class Host(Server):
         Returns
         -------
         """
-        self.exec(f'sudo ip link delete {self.test_tap} || true')
+        self.exec(f'sudo ip link delete {MultiHost.iface_name(self.test_tap, vm_number)} || true')
         self.exec(f'sudo ip link delete {self.test_bridge} || true')
 
     def setup_test_macvtap(self: 'Host'):
@@ -1417,7 +1421,6 @@ class Host(Server):
         # TODO this command should be build by the Guest object
         # it should take all the settings from the config file
         # and compile them.
-        net_type = "none" # TODO this breaks testing!
         dev_type = 'pci' if machine_type == 'pc' else 'device'
         test_net_config = ''
         if net_type == 'brtap':
@@ -1429,7 +1432,7 @@ class Host(Server):
                 multi_queue = ",mq=on"
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-                f'id=test0,ifname={self.test_tap},script=no,' +
+                f'id=test0,ifname={MultiHost.iface_name(self.test_tap, vm_number)},script=no,' +
                 f'downscript=no' +
                 queues +
                 f' -device virtio-net-{dev_type},id=testif,' +
@@ -1441,7 +1444,7 @@ class Host(Server):
         if net_type == 'brtap-e1000':
             test_net_config = (
                 f" -netdev tap," +
-                f'id=test0,ifname={self.test_tap},script=no,' +
+                f'id=test0,ifname={MultiHost.iface_name(self.test_tap, vm_number)},script=no,' +
                 'downscript=no' +
                 f' -device e1000,' +
                 f'netdev=test0,mac={self.guest_test_iface_mac}'
@@ -1520,11 +1523,11 @@ class Host(Server):
             # f' -device virtio-blk-{dev_type},id=test2,drive=test2'
             # +
             # ' --trace virtio_mmio_read --trace virtio_mmio_write' +
-            # +
-            # f' 2>/tmp/trace-vm{vm_number}.log'
+            +
+            f' 2>/tmp/trace-vm{vm_number}.log'
             )
 
-    def kill_guest(self: 'Host') -> None:
+    def kill_guest(self: 'Host', number_vms: int = MAX_VMS) -> None:
         """
         Kill a guest VM.
 
@@ -1535,6 +1538,8 @@ class Host(Server):
         -------
         """
         self.tmux_kill('qemu')
+        for i in MultiHost.range(number_vms):
+            self.tmux_kill(MultiHost.enumerate('qemu', i))
 
     def start_vmux(self: 'Host', interface: str) -> None:
         """
@@ -1574,7 +1579,7 @@ class Host(Server):
         """
         self.tmux_kill('vmux')
 
-    def cleanup_network(self: 'Host') -> None:
+    def cleanup_network(self: 'Host', number_vms: int = MAX_VMS) -> None:
         """
         Cleanup the network setup.
 
@@ -1591,6 +1596,8 @@ class Host(Server):
         self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
+        for i in MultiHost.range(number_vms):
+            self.destroy_test_br_tap(vm_number=i)
         self.destroy_test_macvtap()
         # TODO destroy admin interfaces!
 
@@ -1699,6 +1706,15 @@ class Guest(Server):
         # run commands without that, and therefore unset the nixos
         # attribute.
         self.nixos = False
+
+    def multihost_clone(self: 'Guest', vm_number: int) -> 'Guest':
+        guest = copy.deepcopy(self)
+
+        fqdn = guest.fqdn.split(".")
+        fqdn[0] = f"{fqdn[0]}{vm_number}"
+        guest.fqdn = ".".join(fqdn)
+
+        return guest
 
 
 class LoadGen(Server):

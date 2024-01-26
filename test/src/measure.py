@@ -54,7 +54,7 @@ class Measurement:
     guest: Guest
     loadgen: LoadGen
 
-    guests: Dict[int, Guest] 
+    guests: Dict[int, Guest]  # for multihost VMs we start counting VMs at 1
 
 
     def __init__(self):
@@ -158,24 +158,19 @@ class Measurement:
                     vm_number=i
                     )
 
-            if num == 1:
-                self.guests[0] = self.guest
+            if i == 1:
+                self.guests[num] = self.guest
             else:
-                # TODO move clone to Server or Guest
-                guest = copy.deepcopy(self.guest)
-                fqdn = guest.fqdn.split(".")
-                fqdn[0] = f"{fqdn[0]}{i}"
-                guest.fqdn = ".".join(fqdn)
-                self.guests[i] = guest
+                self.guests[i] = self.guest.multihost_clone(i)
 
         breakpoint()
         for i in MultiHost.range(num):
-            debug("Waiting for guest{num} connectivity")
+            debug(f"Waiting for guest{num} connectivity")
             self.guests[i].wait_for_connection(timeout=120)
 
         yield self.guests
 
-        # teardown  # TODO multihost
+        # teardown
 
         self.host.kill_guest()
         if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
