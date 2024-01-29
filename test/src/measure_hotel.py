@@ -9,12 +9,29 @@ from server import Host, Guest, LoadGen
 from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from measure import Measurement
 from util import safe_cast
-from typing import Iterator, cast
+from typing import Iterator, cast, List, Dict
 import time
 import yaml
 from root import *
 
 OUT_DIR = "/tmp/out1"
+
+class DeathStarBench:
+
+    docker_compose: List[str] = [] # service name -> strings of content of docker-compose.yamls    
+
+    def parse_docker_compose(self):
+        # create per-VM docker-compose
+        with open(f"{PROJECT_ROOT}/subprojects/deathstarbench/hotelReservation/docker-compose.yml", "r") as file:
+            docker_compose_full = yaml.safe_load(file)
+        version = docker_compose_full["version"]
+        for service in docker_compose_full["services"].keys():
+            docker_compose = dict()
+            docker_compose["version"] = f"{version}"
+            docker_compose["services"] = dict()
+            docker_compose["services"][service] = docker_compose_full["services"]["consul"]
+            docker_compose["services"][service]["network_mode"] = "host" # --network host
+            self.docker_compose += [yaml.dump(docker_compose)]
 
 def main() -> None:
     # general measure init
@@ -31,26 +48,22 @@ def main() -> None:
     # loadgen.bind_test_iface()
     # loadgen.setup_hugetlbfs()
 
-
-    # create per-VM docker-compose
-    with open(f"{PROJECT_ROOT}/subprojects/deathstarbench/hotelReservation/docker-compose.yml", "r") as file:
-        docker_compose_full = yaml.safe_load(file)
-    version = docker_compose_full["version"]
-    docker_compose = dict()
-    docker_compose["version"] = f"version"
-    docker_compose["services"] = dict()
-    docker_compose["services"]["consul"] = docker_compose_full["services"]["consul"]
-    docker_compose["services"]["consul"]["network_mode"] = "host" # --network host
-    docker_compose_str = yaml.dump(docker_compose)
-    docker_image = docker_compose["services"]["consul"]["image"]
+    deathstar = DeathStarBench()
+    deathstar.parse_docker_compose()
+    num_vms = len(deathstar.docker_compose)
 
     docker_images = f"{measurement.config['guest']['moonprogs_dir']}/../../VMs/docker-images.tar"
 
     interface = Interface.BRIDGE
 
-    with measurement.virtual_machines(interface, num=2) as guests:
+    with measurement.virtual_machines(interface, num=64) as guests:
         breakpoint()
         try:
+            for i in range(0, num_vms):
+                guests[i].exec(f'echo "{deathstar.docker_compose[i]}" > docker-compose.yaml')
+                guests[i].exec(f"docker load -i {docker_images}")
+                guests[i].exec(f"docker-compose up -d")
+
             # guest: set up interfaces and networking
 
             # debug("Detecting guest test interface")
@@ -59,14 +72,12 @@ def main() -> None:
 
             # the actual test
 
-            guest.exec(f'echo "{docker_compose_str}" > docker-compose.yaml')
-            guest.exec(f"docker load -i {docker_images}")
-            guest.exec(f"docker-compose up -d")
 
             # TODO start more services and so on
 
             breakpoint()
-            guest.exec(f"docker-compose down")
+            for i in range(0, num_vms):
+                guests[i].exec(f"docker-compose down")
             breakpoint()
 
             loadgen.stop_moongen_reflector()

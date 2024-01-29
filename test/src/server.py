@@ -18,7 +18,7 @@ MAX_VMS: int = 30; # maximum number of VMs expected (usually for cleanup functio
 
 class MultiHost:
     """
-    Starts from vm_number 1. Vm_number 0 leads to legacy outputs without numbers
+    Starts from vm_number 1. Vm_number 0 leads to legacy outputs without numbers. -1 returns string matching all numbers.
     """
     @staticmethod
     def range(num_vms: int) -> range:
@@ -48,6 +48,7 @@ class MultiHost:
         if vm_number == 0: return tap_name
         max_len = 15
         length = max_len - len("-999")
+        if vm_number == -1: return f"{tap_name[:length]}-"
         return f"{tap_name[:length]}-{vm_number}"
 
 
@@ -150,6 +151,8 @@ class Server(ABC):
         --------
         __init__ : Initialize the object.
         """
+        # self.nixos = True
+        # return 
         self.localhost = self.fqdn == 'localhost' or self.fqdn == getfqdn()
         try:
             self.nixos = self.isfile('/etc/NIXOS')
@@ -375,7 +378,7 @@ class Server(ABC):
 
     def tmux_kill(self: 'Server', session_name: str) -> None:
         """
-        Stop a tmux session on the server.
+        Stop all tmux sessions matching session_name.
 
         Parameters
         ----------
@@ -393,8 +396,8 @@ class Server(ABC):
         """
         _ = self.exec(f'tmux -L {self.tmux_socket}' +
                       ' list-sessions | cut -d ":" -f 1 ' +
-                      f'| grep {session_name} | xargs ' +
-                      f'tmux -L {self.tmux_socket} kill-session -t || true')
+                      f'| grep {session_name} | xargs -I {{}} ' +
+                      f'tmux -L {self.tmux_socket} kill-session -t {{}} || true')
 
     def tmux_send_keys(self: 'Server', session_name: str, keys: str) -> None:
         """
@@ -1238,7 +1241,7 @@ class Host(Server):
                   f'dev {self.admin_bridge}; true)')
         self.exec(f'sudo ip link set {self.admin_bridge} up')
 
-    def setup_admin_tap(self: 'Host', vm_number: int = 0):
+    def setup_admin_tap(self: 'Host', num_vms: int = 0):
         """
         Setup the admin tap.
 
@@ -1251,13 +1254,22 @@ class Host(Server):
         Returns
         -------
         """
-        admin_tap = MultiHost.iface_name(self.admin_tap, vm_number)
         self.exec('sudo modprobe tun tap')
-        self.exec(f'sudo ip link show {admin_tap} 2>/dev/null' +
-                  f' || (sudo ip tuntap add {admin_tap} mode tap;' +
-                  f' sudo ip link set {admin_tap} '
-                  f'master {self.admin_bridge}; true)')
-        self.exec(f'sudo ip link set {admin_tap} up')
+
+        def setup(admin_tap):
+            self.exec(f'sudo ip link show {admin_tap} 2>/dev/null' +
+                      f' || (sudo ip tuntap add {admin_tap} mode tap;' +
+                      f' sudo ip link set {admin_tap} '
+                      f'master {self.admin_bridge}; true)')
+            self.exec(f'sudo ip link set {admin_tap} up')
+
+        if num_vms == 0: 
+            setup(MultiHost.iface_name(self.admin_tap, 0))
+            return
+
+        for i in MultiHost.range(num_vms):
+            admin_tap = MultiHost.iface_name(self.admin_tap, i)
+            setup(admin_tap)
 
     def modprobe_test_iface_drivers(self):
         """
@@ -1273,7 +1285,7 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host', multi_queue=True, vm_number: int = 0):
+    def setup_test_br_tap(self: 'Host', multi_queue=True, num_vms: int = 0):
         """
         Setup the bridged test tap device.
 
@@ -1289,36 +1301,44 @@ class Host(Server):
         if BRIDGE_QUEUES == 0:
             multi_queue = False
 
-        test_tap = MultiHost.iface_name(self.test_tap, vm_number)
 
         # load kernel modules
         self.exec('sudo modprobe bridge tun tap')
+        username = self.whoami()
 
-        # create bridge and tap device
+        # create bridge and add the physical NIC to it
         self.exec(f'sudo ip link show {self.test_bridge} 2>/dev/null ' +
                   f' || (sudo ip link add {self.test_bridge} type bridge; ' +
                   'true)')
-        username = self.whoami()
-        self.exec(f'sudo ip link show {test_tap} 2>/dev/null || ' +
-                  f'(sudo ip tuntap add dev {test_tap} mode tap ' +
-                  f'user {username}{" multi_queue" if multi_queue else ""}; true)')
-
-        # add tap device and physical nic to bridge
-        tap_output = self.exec(f'sudo ip link show {test_tap}')
-        if f'master {self.test_bridge}' not in tap_output:
-            self.exec(f'sudo ip link set {test_tap} ' +
-                      f'master {self.test_bridge}')
         test_iface_output = self.exec(f'sudo ip link show {self.test_iface}')
         if f'master {self.test_bridge}' not in test_iface_output:
             self.exec(f'sudo ip link set {self.test_iface} ' +
                       f'master {self.test_bridge}')
 
-        # bring up all interfaces (nic, bridge and tap)
-        self.exec(f'sudo ip link set {self.test_iface} up ' +
-                  f'&& sudo ip link set {self.test_bridge} up ' +
-                  f'&& sudo ip link set {test_tap} up')
+        def setup(test_tap):
+            # create tap and add to bridge
+            self.exec(f'sudo ip link show {test_tap} 2>/dev/null || ' +
+                      f'(sudo ip tuntap add dev {test_tap} mode tap ' +
+                      f'user {username}{" multi_queue" if multi_queue else ""}; true)')
+            tap_output = self.exec(f'sudo ip link show {test_tap}')
+            if f'master {self.test_bridge}' not in tap_output:
+                self.exec(f'sudo ip link set {test_tap} ' +
+                          f'master {self.test_bridge}')
 
-    def destroy_test_br_tap(self: 'Host', vm_number: int = 0):
+            # bring up all interfaces (nic, bridge and tap)
+            self.exec(f'sudo ip link set {self.test_iface} up ' +
+                      f'&& sudo ip link set {self.test_bridge} up ' +
+                      f'&& sudo ip link set {test_tap} up')
+
+        if num_vms == 0: 
+            setup(MultiHost.iface_name(self.admin_tap, 0))
+            return
+
+        for i in MultiHost.range(num_vms):
+            admin_tap = MultiHost.iface_name(self.admin_tap, i)
+            setup(admin_tap)
+
+    def destroy_test_br_tap(self: 'Host'):
         """
         Destroy the bridged test tap device.
 
@@ -1328,8 +1348,8 @@ class Host(Server):
         Returns
         -------
         """
-        self.exec(f'sudo ip link delete {MultiHost.iface_name(self.test_tap, vm_number)} || true')
         self.exec(f'sudo ip link delete {self.test_bridge} || true')
+        self.exec(f'ls /sys/class/net | grep {MultiHost.iface_name(self.test_bridge, -1)} | xargs -I {{}} sudo ip link delete {{}} | true')
 
     def setup_test_macvtap(self: 'Host'):
         """
@@ -1527,9 +1547,9 @@ class Host(Server):
             f' 2>/tmp/trace-vm{vm_number}.log'
             )
 
-    def kill_guest(self: 'Host', number_vms: int = MAX_VMS) -> None:
+    def kill_guest(self: 'Host') -> None:
         """
-        Kill a guest VM.
+        Kill all guest VMs.
 
         Parameters
         ----------
@@ -1538,8 +1558,6 @@ class Host(Server):
         -------
         """
         self.tmux_kill('qemu')
-        for i in MultiHost.range(number_vms):
-            self.tmux_kill(MultiHost.enumerate('qemu', i))
 
     def start_vmux(self: 'Host', interface: str) -> None:
         """
@@ -1596,8 +1614,6 @@ class Host(Server):
         self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
-        for i in MultiHost.range(number_vms):
-            self.destroy_test_br_tap(vm_number=i)
         self.destroy_test_macvtap()
         # TODO destroy admin interfaces!
 

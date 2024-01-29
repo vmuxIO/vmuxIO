@@ -12,6 +12,7 @@ from logging import (info, debug, error, warning,
 from util import safe_cast
 from pathlib import Path
 import copy
+import time
 
 
 def setup_parser() -> ArgumentParser:
@@ -41,8 +42,8 @@ def setup_parser() -> ArgumentParser:
     return parser
 
 
-def setup_host_interface(host: Host, interface: Interface, vm_number: int = 0) -> None:
-    autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface, vm_number=vm_number)
+def setup_host_interface(host: Host, interface: Interface, num_vms: int = 0) -> None:
+    autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface, num_vms=num_vms)
 
 
 @dataclass
@@ -131,16 +132,15 @@ class Measurement:
             self.host.kill_guest()
         except Exception:
             pass
+        self.host.modprobe_test_iface_drivers() # cleanup network needs device drivers
         self.host.cleanup_network()
 
 
         # host: set up interfaces and networking
-
         self.host.detect_test_iface()
 
-        for i in MultiHost.range(num):
-            debug(f"Setting up interface {interface.value} for VM {i}")
-            setup_host_interface(self.host, interface, vm_number=i)
+        debug(f"Setting up interface {interface.value} for {num} VMs")
+        setup_host_interface(self.host, interface, num_vms=num)
 
         if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
             self.host.start_vmux(interface.value)
@@ -158,10 +158,8 @@ class Measurement:
                     vm_number=i
                     )
 
-            if i == 1:
-                self.guests[num] = self.guest
-            else:
-                self.guests[i] = self.guest.multihost_clone(i)
+            self.guests[i] = self.guest.multihost_clone(i)
+
 
         breakpoint()
         for i in MultiHost.range(num):
