@@ -5,6 +5,17 @@
     ./networking.nix
   ];
 
+  services.cloud-init = { 
+    enable = true;
+    network.enable = true;
+    settings = {
+    #   datasource_list = { 
+    #     NoCloud.keep = 1;
+    #     Fallback.keep = 1;
+    #   };
+      # hostname = "foobar";
+    };
+  };
   services.sshd.enable = true;
 
   networking.firewall.enable = false;

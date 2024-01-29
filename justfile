@@ -366,7 +366,57 @@ docker-rebuild:
   # cd subprojects/deathstarbench/hotelReservation; docker-compose up
   # cd subprojects/deathstarbench/hotelReservation; docker run -ti --mount type=bind,source=$(pwd)/wrk2,target=/wrk2 --network host wrk2 wrk -D exp -t 1 -c 1 -d 1 -L -s ./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua http://localhost:5000 -R 1
 
-vm-overwrite:
+vm-init:
+  #!/usr/bin/env bash
+  mkdir -p {{proot}}/VMs/cloud-init
+  function init() {
+    start_ip=20;
+    ip="192.168.56.$((start_ip + $i - 1))"
+    echo "
+  version: 2
+  ethernets:
+    eth0:
+      addresses:
+        - $ip/255.255.255.0
+      gateway4: 192.168.1.254
+  #version: 1
+  #config:
+  #   - type: physical
+  #     name: interface0
+  #     mac_address: "02:34:56:78:9a:bc"
+  #     subnets:
+  #        - type: static
+  #          address: 192.168.1.77
+  #          netmask: 255.255.255.0
+  #          gateway: 192.168.1.254
+  # version: 2
+  # ethernets:
+  #   interface0:
+  #     match:
+  #       name: eth0
+  #     addresses:
+  #     - 192.168.56.77/255.255.255.0
+  #     gateway4: 192.168.56.1
+    " > /tmp/network-data-{{user}}.yml
+    echo "#cloud-config
+  preserve_hostname: false
+  hostname: guest$i
+  # write_files:
+  # - content: |
+  #     # My new /etc/sysconfig/samba file
+  #     SMBDOPTIONS="-D"
+  #     foo
+  #   path: /foobar
+    " > /tmp/user-data-{{user}}.yml
+    cloud-localds --network-config=/tmp/network-data-{{user}}.yml {{proot}}/VMs/cloud-init/vm1.img /tmp/user-data-{{user}}.yml
+  }
+
+  for i in $(seq 1 1000); do
+    init i
+  done
+
+
+vm-overwrite: vm-init
   #!/usr/bin/env bash
   set -x
   set -e

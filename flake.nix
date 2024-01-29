@@ -243,6 +243,7 @@
         '')
         bridge-utils
         self.packages.x86_64-linux.kmod-tools
+        cloud-utils
 
         # dependencies for hosts/prepare.py
         python310.pkgs.pyyaml
