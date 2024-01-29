@@ -408,10 +408,10 @@ vm-init:
   #     foo
   #   path: /foobar
     " > /tmp/user-data-{{user}}.yml
-    cloud-localds --network-config=/tmp/network-data-{{user}}.yml {{proot}}/VMs/cloud-init/vm1.img /tmp/user-data-{{user}}.yml
+    cloud-localds --network-config=/tmp/network-data-{{user}}.yml {{proot}}/VMs/cloud-init/vm$i.img /tmp/user-data-{{user}}.yml
   }
 
-  for i in $(seq 1 1000); do
+  for i in $(seq 1 128); do
     init i
   done
 

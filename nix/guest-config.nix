@@ -14,8 +14,18 @@
     #     Fallback.keep = 1;
     #   };
       # hostname = "foobar";
+      cloud_init_modules = [
+        "write-files"
+        "update_hostname"
+      ];
     };
+
   };
+  # disable all services but essential ones
+  # systemd.services."cloud-init".enable = false;
+  systemd.services."cloud-config".enable = false;
+  systemd.services."cloud-final".enable = false;
+
   services.sshd.enable = true;
 
   networking.firewall.enable = false;
