@@ -154,6 +154,7 @@
   boot.kernelParams = [
     "nokaslr"
     "iomem=relaxed"
+  ] ++ lib.optionals (config.networking.vm_number == 0) [
     # spdk/dpdk hugepages
     "default_hugepagesz=2MB"
     "hugepagesz=2MB"

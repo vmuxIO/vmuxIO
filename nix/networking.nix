@@ -3,7 +3,7 @@
     networking.vm_number = lib.mkOption {
       default = 0;
       example = 13;
-      description = "Number/ID of the VM. Used to set IP etc.";
+      description = "Number/ID of the VM. Used to set IP etc. If not 0, will assume scalable operation. ";
     };
   };
 
@@ -11,7 +11,7 @@
   let
     number = config.networking.vm_number;
     number-str = if number == 0 then "" else builtins.toString (number + 1);
-    ip = "192.168.56.${builtins.toString (20 + number)}";
+    ip = "192.168.56.${builtins.toString (20 + number + 1)}";
   in {
     networking.useDHCP = false;
     networking.interfaces.eth0.useDHCP = false;

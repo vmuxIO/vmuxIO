@@ -359,8 +359,8 @@
           };
           format = "qcow";
         };
-        nr_images = 30;
-      in builtins.listToAttrs (builtins.genList (i: { name = "guest-image${builtins.toString (i+1)}"; value = image i;}) nr_images)
+        nr_images = 800;
+      in builtins.listToAttrs (builtins.genList (i: { name = "guest-image${builtins.toString (i+1)}"; value = image (i+1);}) nr_images)
     );
     nixosConfigurations = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
