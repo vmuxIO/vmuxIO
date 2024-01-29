@@ -151,8 +151,8 @@ class Server(ABC):
         --------
         __init__ : Initialize the object.
         """
-        # self.nixos = True
-        # return 
+        self.nixos = True # all hosts are nixos actually
+        return 
         self.localhost = self.fqdn == 'localhost' or self.fqdn == getfqdn()
         try:
             self.nixos = self.isfile('/etc/NIXOS')
