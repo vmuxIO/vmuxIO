@@ -41,6 +41,12 @@ class MultiHost:
         return str(root_disk)
 
     @staticmethod
+    def cloud_init(disk_path: str, vm_number: int) -> str:
+        init_disk = Path(disk_path).resolve()
+        init_disk = init_disk.parent / f"cloud-init/vm{vm_number}.img"
+        return str(init_disk)
+
+    @staticmethod
     def iface_name(tap_name: str, vm_number: int):
         """
         kernel interface name
@@ -330,6 +336,23 @@ class Server(ABC):
             True if the file exists.
         """
         return self.exec(f'test -f {path} && echo true || echo false'
+                         ).strip() == 'true'
+
+    def isdir(self: 'Server', path: str) -> bool:
+        """
+        Check if a directory exists.
+
+        Parameters
+        ----------
+        path : str
+            The path to the directory.
+
+        Returns
+        -------
+        bool
+            True if the directory exists.
+        """
+        return self.exec(f'test -d {path} && echo true || echo false'
                          ).strip() == 'true'
 
     def check_cpu_freq(self: 'Server') -> None:
@@ -1066,6 +1089,26 @@ class Server(ABC):
         self.exec(f'sudo modprobe {self.test_iface_driv}')
 
 
+class BatchExec:
+    server: Server
+    batchsize: int
+    batch = []
+
+    def BatchExec(self, server: Server, batchsize: int):
+        self.server = server
+        self.batchsize = batchsize
+
+    def exec(self, cmd: str):
+        self.batch += [cmd]
+        if len(self.batch) >= self.batchsize:
+            self.flush()
+
+    def flush(self):
+        fat_cmd = "; ".join(self.batch)
+        self.exec(fat_cmd)
+        self.batch = []
+
+
 class Host(Server):
     """
     Host class.
@@ -1099,6 +1142,7 @@ class Host(Server):
     guest_vcpus: int
     guest_memory: int
     fsdevs: dict[str, str]
+    has_hugepages1g: bool
 
     def __init__(self: 'Host',
                  fqdn: str,
@@ -1223,6 +1267,7 @@ class Host(Server):
         self.guest_vcpus = guest_vcpus
         self.guest_memory = guest_memory
         self.fsdevs = fsdevs
+        self.has_hugepages1g = self.isdir("/dev/hugepages1G")
 
     def setup_admin_bridge(self: 'Host'):
         """
@@ -1331,12 +1376,12 @@ class Host(Server):
                       f'&& sudo ip link set {test_tap} up')
 
         if num_vms == 0: 
-            setup(MultiHost.iface_name(self.admin_tap, 0))
+            setup(MultiHost.iface_name(self.test_tap, 0))
             return
 
         for i in MultiHost.range(num_vms):
-            admin_tap = MultiHost.iface_name(self.admin_tap, i)
-            setup(admin_tap)
+            test_tap = MultiHost.iface_name(self.test_tap, i)
+            setup(test_tap)
 
     def destroy_test_br_tap(self: 'Host'):
         """
@@ -1496,6 +1541,10 @@ class Host(Server):
         if root_disk:
             disk_path = root_disk
         disk_path = MultiHost.disk_path(disk_path, vm_number)
+        if self.has_hugepages1g:
+            memory_backend = f' -object memory-backend-file,mem-path=/dev/hugepages/qemu-memory{vm_number},prealloc=yes,id=bm,size={mem}M,share=on'
+        else:
+            memory_backend = f' -object memory-backend-file,mem-path=/dev/shm/qemu-{vm_number},prealloc=yes,id=bm,size={mem}M,share=on'
         fsdev_config = ''
         if self.fsdevs:
             for name, path in self.fsdevs.items():
@@ -1516,9 +1565,10 @@ class Host(Server):
 
             # shared memory
             f' -m {mem}' +
-            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory{vm_number},prealloc=yes,id=bm,size={mem}M,share=on'
+            memory_backend +
             ' -numa node,memdev=bm' +
 
+            ' -display none' + # avoid opening all the vnc ports
             ' -enable-kvm' +
             f' -drive id=root,format=qcow2,file={disk_path},'
             'if=none,cache=none' +
@@ -1526,6 +1576,7 @@ class Host(Server):
             (',use-ioregionfd=true' if ioregionfd else '') +
             f',queue-size={rx_queue_size}' +
             # ' -cdrom /home/networkadmin/images/guest_init.iso' +
+            f' -drive driver=raw,file={MultiHost.cloud_init(disk_path, vm_number)},if=virtio ' +
             fsdev_config +
             ' -serial stdio' +
             (' -monitor tcp:127.0.0.1:2345,server,nowait' if debug_qemu else '') +
