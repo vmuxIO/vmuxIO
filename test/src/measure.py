@@ -160,10 +160,13 @@ class Measurement:
 
             self.guests[i] = self.guest.multihost_clone(i)
 
+            # giving each qemu instance time to allocate its memory can help starting more intances. 
+            # If multiple qemus allocate at the same time, both will fail even though one could have successfully started if it was the only one doing allocations. 
+            time.sleep(1) 
 
         breakpoint()
+        info(f"Waiting for connectivity of guests")
         for i in MultiHost.range(num):
-            debug(f"Waiting for guest{num} connectivity")
             self.guests[i].wait_for_connection(timeout=120)
 
         yield self.guests
