@@ -359,7 +359,7 @@
           };
           format = "qcow";
         };
-        nr_images = 800;
+        nr_images = 1;
       in builtins.listToAttrs (builtins.genList (i: { name = "guest-image${builtins.toString (i+1)}"; value = image (i+1);}) nr_images)
     );
     nixosConfigurations = let

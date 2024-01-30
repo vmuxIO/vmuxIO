@@ -9,10 +9,11 @@
     enable = true;
     network.enable = true;
     settings = {
-    #   datasource_list = { 
-    #     NoCloud.keep = 1;
-    #     Fallback.keep = 1;
-    #   };
+      datasource_list = { 
+        NoCloud.keep = 1;
+        ConfigDrive.keep = 1;
+        Fallback.keep = 1;
+      };
       # hostname = "foobar";
       cloud_init_modules = [
         "write-files"
@@ -25,6 +26,8 @@
   # systemd.services."cloud-init".enable = false;
   systemd.services."cloud-config".enable = false;
   systemd.services."cloud-final".enable = false;
+  # systemd.network.wait-online.timeout = 0;
+  systemd.network.wait-online.enable = false;
 
   services.sshd.enable = true;
 

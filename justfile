@@ -367,6 +367,50 @@ docker-rebuild:
   # cd subprojects/deathstarbench/hotelReservation; docker run -ti --mount type=bind,source=$(pwd)/wrk2,target=/wrk2 --network host wrk2 wrk -D exp -t 1 -c 1 -d 1 -L -s ./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua http://localhost:5000 -R 1
 
 vm-init:
+  #!/usr/bin/env python3
+  import subprocess
+  import os
+  # Create directory for VMs cloud-init
+  os.makedirs(f"{{proot}}/VMs/cloud-init", exist_ok=True)
+
+  # IP address calculation
+  import ipaddress
+  start_ip = ipaddress.IPv4Address("192.168.56.20")
+
+
+  for i in range(1, 801):
+    print(f"wrinting cloud-init {i}")
+    ip = f"{start_ip + i - 1}"
+
+    # Network configuration
+    network_config = f"""
+  version: 2
+  ethernets:
+    eth0:
+      addresses:
+        - {ip}/255.255.248.0
+      gateway4: 192.168.1.254
+    """
+    with open(f"/tmp/network-data-{{user}}.yml", "w") as file:
+      file.write(network_config)
+      
+    # User data configuration
+    user_data = f"""
+  #cloud-config
+  preserve_hostname: false
+  hostname: guest{i}
+    """
+    with open(f"/tmp/user-data-{{user}}.yml", "w") as file:
+      file.write(user_data)
+
+    # Create cloud-init disk image
+    subprocess.run(["cloud-localds", f"--network-config=/tmp/network-data-{{user}}.yml", 
+                    f"{{proot}}/VMs/cloud-init/vm{i}.img", f"/tmp/user-data-{{user}}.yml"])
+
+  import shutil
+  shutil.copy("{{proot}}/VMs/cloud-init/vm1.img", "{{proot}}/VMs/cloud-init/vm0.img")
+
+vm-init-old:
   #!/usr/bin/env bash
   mkdir -p {{proot}}/VMs/cloud-init
   function init() {
@@ -411,9 +455,10 @@ vm-init:
     cloud-localds --network-config=/tmp/network-data-{{user}}.yml {{proot}}/VMs/cloud-init/vm$i.img /tmp/user-data-{{user}}.yml
   }
 
-  for i in $(seq 1 128); do
+  for i in $(seq 1 800); do
     init i
   done
+  cp {{proot}}/VMs/cloud-init/vm1.img {{proot}}/VMs/cloud-init/vm0.img
 
 
 vm-overwrite: vm-init
@@ -430,14 +475,17 @@ vm-overwrite: vm-init
     qemu-img resize {{proot}}/VMs/$1.qcow2 +8g
   }
 
+  # when evaluating lots of images: --eval-max-memory-size 20000 --eval-workers 8 -j 16 --skip-cached
   nix-fast-build -f .#all-images --out-link {{proot}}/VMs/ro
   overwrite nesting-host-image
   overwrite nesting-host-extkern-image
   overwrite nesting-guest-image
   overwrite nesting-guest-image-noiommu
   overwrite guest-image
-  for i in $(seq 1 30); do
-      overwrite guest-image$i
+  for i in $(seq 1 800); do
+    # overwrite guest-image$i
+    install -D -m644 {{proot}}/VMs/ro-guest-image1/nixos.qcow2 {{proot}}/VMs/guest-image$i.qcow2
+    qemu-img resize {{proot}}/VMs/guest-image$i.qcow2 +8g
   done
 
 dpdk-setup:

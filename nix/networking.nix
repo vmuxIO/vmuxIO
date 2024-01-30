@@ -10,12 +10,13 @@
   config = 
   let
     number = config.networking.vm_number;
-    number-str = if number == 0 then "" else builtins.toString (number + 1);
+    # number-str = if number == 0 then "" else builtins.toString (number);
+    number-str = "";
     ip = "192.168.56.${builtins.toString (20 + number + 1)}";
   in {
     networking.useDHCP = false;
     networking.interfaces.eth0.useDHCP = false;
-    networking.interfaces.eth0.ipv4.addresses = [ {
+    networking.interfaces.eth0.ipv4.addresses = lib.optionals (number == 0) [ {
       address = ip;
       prefixLength = 24;
     } ];
