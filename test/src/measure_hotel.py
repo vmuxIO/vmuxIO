@@ -56,7 +56,8 @@ def main() -> None:
 
     interface = Interface.BRIDGE
 
-    with measurement.virtual_machines(interface, num=64) as guests:
+    breakpoint()
+    with measurement.virtual_machines(interface, num=800) as guests:
         breakpoint()
         try:
             for i in range(0, num_vms):

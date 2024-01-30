@@ -42,8 +42,8 @@ def setup_parser() -> ArgumentParser:
     return parser
 
 
-def setup_host_interface(host: Host, interface: Interface, num_vms: int = 0) -> None:
-    autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface, num_vms=num_vms)
+def setup_host_interface(host: Host, interface: Interface, vm_range: range = range(0)) -> None:
+    autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface, vm_range=vm_range)
 
 
 @dataclass
@@ -123,7 +123,8 @@ class Measurement:
 
 
     @contextmanager
-    def virtual_machines(self, interface: Interface, num: int = 1) -> Iterator[Dict[int, Guest]]:
+    def virtual_machines(self, interface: Interface, num: int = 1, batch: int = 32) -> Iterator[Dict[int, Guest]]:
+        # Batching is necessary cause if network setup takes to long, bringing up the interfaces times out, networking is permanently broken and systemds spiral into busy restarting
 
         # host: inital cleanup
 
@@ -138,37 +139,50 @@ class Measurement:
 
         # host: set up interfaces and networking
         self.host.detect_test_iface()
+    
+        # start VMs in batches of batch
+        range_ = MultiHost.range(num)
+        while range_:
+            # pop first batch
+            vm_range = range_[:batch]
+            range_ = range_[batch:]
 
-        debug(f"Setting up interface {interface.value} for {num} VMs")
-        setup_host_interface(self.host, interface, num_vms=num)
+            info(f"Starting VM {vm_range.start}-{vm_range.stop}")
+    
+            debug(f"Setting up interface {interface.value} for {num} VMs")
+            setup_host_interface(self.host, interface, vm_range=vm_range) # TODO
 
-        if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
-            self.host.start_vmux(interface.value)
+            if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
+                self.host.start_vmux(interface.value)
 
-        # start VM
+            # start VM
 
-        
-        for i in MultiHost.range(num):
-            info(f"Starting VM {i} ({interface.value})")
+            
+            for i in vm_range:
+                info(f"Starting VM {i} ({interface.value})")
 
-            self.host.run_guest(
-                    net_type=interface.net_type(),
-                    machine_type='pc',
-                    qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin",
-                    vm_number=i
-                    )
+                # self.host.run_guest(net_type=interface.net_type(), machine_type='pc', qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin", vm_number=81)
+                self.host.run_guest(
+                        net_type=interface.net_type(),
+                        machine_type='pc',
+                        qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin",
+                        vm_number=i
+                        )
 
-            self.guests[i] = self.guest.multihost_clone(i)
+                self.guests[i] = self.guest.multihost_clone(i)
 
-            # giving each qemu instance time to allocate its memory can help starting more intances. 
-            # If multiple qemus allocate at the same time, both will fail even though one could have successfully started if it was the only one doing allocations. 
-            time.sleep(1) 
+                # giving each qemu instance time to allocate its memory can help starting more intances. 
+                # If multiple qemus allocate at the same time, both will fail even though one could have successfully started if it was the only one doing allocations. 
+                time.sleep(1) 
 
-        breakpoint()
-        info(f"Waiting for connectivity of guests")
-        for i in MultiHost.range(num):
-            self.guests[i].wait_for_connection(timeout=120)
-
+            info(f"Waiting for connectivity of guests")
+            for i in vm_range:
+                try:
+                    self.guests[i].wait_for_connection(timeout=120)
+                except Exception:
+                    print("mh?")
+                    breakpoint()
+            
         yield self.guests
 
         # teardown

@@ -725,3 +725,11 @@ build-linux-shell:
 irqs *ARGS:
   python3 {{proot}}/subprojects/irq-rates.py {{ARGS}}
 
+gen-ssh-config:
+  #!/usr/bin/env python3
+  import ipaddress
+  start = ipaddress.IPv4Address("192.168.56.20")
+  for i in range(0, 800):
+    print(f"Host vm{i + 1}.*")
+    print(f"Hostname {start + i}")
+    print("")

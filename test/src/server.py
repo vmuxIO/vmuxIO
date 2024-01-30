@@ -1090,11 +1090,15 @@ class Server(ABC):
 
 
 class BatchExec:
+    """
+    Execution through ssh brings overheads of authentication etc. 
+    As a mitigation, this class helps to batch commands into a single ssh command to reduce ssh-based overheads.
+    """
     server: Server
     batchsize: int
     batch = []
 
-    def BatchExec(self, server: Server, batchsize: int):
+    def __init__(self, server: Server, batchsize: int):
         self.server = server
         self.batchsize = batchsize
 
@@ -1105,7 +1109,7 @@ class BatchExec:
 
     def flush(self):
         fat_cmd = "; ".join(self.batch)
-        self.exec(fat_cmd)
+        self.server.exec(fat_cmd)
         self.batch = []
 
 
@@ -1286,7 +1290,7 @@ class Host(Server):
                   f'dev {self.admin_bridge}; true)')
         self.exec(f'sudo ip link set {self.admin_bridge} up')
 
-    def setup_admin_tap(self: 'Host', num_vms: int = 0):
+    def setup_admin_tap(self: 'Host', vm_range: range = range(0)):
         """
         Setup the admin tap.
 
@@ -1301,20 +1305,25 @@ class Host(Server):
         """
         self.exec('sudo modprobe tun tap')
 
+        buffer = BatchExec(self, 10)
+
         def setup(admin_tap):
-            self.exec(f'sudo ip link show {admin_tap} 2>/dev/null' +
+            buffer.exec(f'sudo ip link show {admin_tap} 2>/dev/null' +
                       f' || (sudo ip tuntap add {admin_tap} mode tap;' +
                       f' sudo ip link set {admin_tap} '
                       f'master {self.admin_bridge}; true)')
-            self.exec(f'sudo ip link set {admin_tap} up')
+            buffer.exec(f'sudo ip link set {admin_tap} up')
 
-        if num_vms == 0: 
+        if len(vm_range) == 0: 
             setup(MultiHost.iface_name(self.admin_tap, 0))
+            buffer.flush()
             return
 
-        for i in MultiHost.range(num_vms):
+        for i in vm_range:
             admin_tap = MultiHost.iface_name(self.admin_tap, i)
             setup(admin_tap)
+
+        buffer.flush()
 
     def modprobe_test_iface_drivers(self):
         """
@@ -1330,7 +1339,7 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host', multi_queue=True, num_vms: int = 0):
+    def setup_test_br_tap(self: 'Host', multi_queue=True, vm_range: range = range(0)):
         """
         Setup the bridged test tap device.
 
@@ -1360,28 +1369,34 @@ class Host(Server):
             self.exec(f'sudo ip link set {self.test_iface} ' +
                       f'master {self.test_bridge}')
 
+        buffer = BatchExec(self, 10)
+
         def setup(test_tap):
             # create tap and add to bridge
-            self.exec(f'sudo ip link show {test_tap} 2>/dev/null || ' +
+            buffer.exec(f'sudo ip link show {test_tap} 2>/dev/null || ' +
                       f'(sudo ip tuntap add dev {test_tap} mode tap ' +
                       f'user {username}{" multi_queue" if multi_queue else ""}; true)')
-            tap_output = self.exec(f'sudo ip link show {test_tap}')
-            if f'master {self.test_bridge}' not in tap_output:
-                self.exec(f'sudo ip link set {test_tap} ' +
-                          f'master {self.test_bridge}')
+            buffer.exec(f'if [[ "$(sudo ip link show {test_tap})" != *"master {self.test_bridge}"* ]]; then sudo ip link set {test_tap} master {self.test_bridge}; fi')
+            # tap_output = self.exec(f'sudo ip link show {test_tap}')
+            # if f'master {self.test_bridge}' not in tap_output:
+            #     self.exec(f'sudo ip link set {test_tap} ' +
+            #               f'master {self.test_bridge}')
 
             # bring up all interfaces (nic, bridge and tap)
-            self.exec(f'sudo ip link set {self.test_iface} up ' +
+            buffer.exec(f'sudo ip link set {self.test_iface} up ' +
                       f'&& sudo ip link set {self.test_bridge} up ' +
                       f'&& sudo ip link set {test_tap} up')
 
-        if num_vms == 0: 
+        if len(vm_range) == 0: 
             setup(MultiHost.iface_name(self.test_tap, 0))
+            buffer.flush()
             return
 
-        for i in MultiHost.range(num_vms):
+        for i in vm_range:
             test_tap = MultiHost.iface_name(self.test_tap, i)
             setup(test_tap)
+
+        buffer.flush()
 
     def destroy_test_br_tap(self: 'Host'):
         """
@@ -1501,7 +1516,7 @@ class Host(Server):
                 f'downscript=no' +
                 queues +
                 f' -device virtio-net-{dev_type},id=testif,' +
-                f'netdev=test0,mac={self.guest_test_iface_mac}' +
+                f'netdev=test0,mac={MultiHost.mac(self.guest_test_iface_mac, vm_number)}' +
                 multi_queue +
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'

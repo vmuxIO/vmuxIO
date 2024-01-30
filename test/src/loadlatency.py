@@ -281,10 +281,10 @@ class LoadLatencyTestGenerator(object):
 
     @staticmethod
     def setup_interface(host: Host, machine: Machine,
-                        interface: Interface, bridge_mac: str = None, num_vms: int = 0):
+                        interface: Interface, bridge_mac: str = None, vm_range: range = range(0)):
         if machine != Machine.HOST:
             host.setup_admin_bridge()
-            host.setup_admin_tap(num_vms=num_vms)
+            host.setup_admin_tap(vm_range=vm_range)
             host.modprobe_test_iface_drivers()
         if interface == Interface.PNIC:
             host.delete_nic_ip_addresses(host.test_iface)
@@ -293,14 +293,14 @@ class LoadLatencyTestGenerator(object):
                 host.setup_test_bridge()
             else:
                 multi_queue = (interface != Interface.BRIDGE_E1000)
-                host.setup_test_br_tap(multi_queue=multi_queue, num_vms=num_vms)
+                host.setup_test_br_tap(multi_queue=multi_queue, vm_range=vm_range)
         elif interface == Interface.MACVTAP:
             host.setup_test_macvtap()
         elif interface in [Interface.VFIO, Interface.VMUX_PT]:
             host.delete_nic_ip_addresses(host.test_iface)
             host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
         elif interface == Interface.VMUX_EMU:
-            host.setup_test_br_tap(multi_queue=False, num_vms=num_vms)
+            host.setup_test_br_tap(multi_queue=False, vm_range=vm_range)
 
     def start_reflector(self, server: Server, reflector: Reflector,
                         iface: str = None):
