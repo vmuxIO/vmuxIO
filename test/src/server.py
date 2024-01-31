@@ -12,6 +12,8 @@ from typing import Optional
 import netaddr
 from pathlib import Path
 import copy
+import ipaddress
+import base64
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
 MAX_VMS: int = 30; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
@@ -25,6 +27,14 @@ class MultiHost:
         return range(1, num_vms + 1)
 
     @staticmethod
+    def ssh_hostname(ssh_hostname: str, vm_number: int):
+        if vm_number == 0: return ssh_hostname
+        fqdn = ssh_hostname.split(".")
+        fqdn[0] = f"{fqdn[0]}{vm_number}"
+        return ".".join(fqdn)
+
+
+    @staticmethod
     def mac(base_mac: str, vm_number: int) -> str:
         if vm_number == 0: return base_mac
         base = netaddr.EUI(base_mac)
@@ -32,6 +42,12 @@ class MultiHost:
         fmt = netaddr.mac_unix
         fmt.word_fmt = "%.2x"
         return str(netaddr.EUI(value).format(fmt))
+
+    @staticmethod
+    def admin_ip(vm_number: int) -> str:
+      start = ipaddress.IPv4Address("192.168.56.20")
+      return f"{start + vm_number - 1}"
+
 
     @staticmethod
     def disk_path(root_disk_file: str, vm_number: int) -> str:
@@ -261,7 +277,7 @@ class Server(ABC):
         return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'",
                             stderr=STDOUT, shell=True).decode('utf-8')
 
-    def exec(self: 'Server', command: str) -> str:
+    def exec(self: 'Server', command: str, echo: bool = True) -> str:
         """
         Execute command on the server.
 
@@ -287,11 +303,17 @@ class Server(ABC):
         >>> print(server.exec('ls -l'))
         .bashrc
         """
-        debug(f'Executing command on {self.log_name()}: {command}')
+        if echo: debug(f'Executing command on {self.log_name()}: {command}')
         if self.localhost:
             return self.__exec_local(command)
         else:
             return self.__exec_ssh(command)
+
+    def write(self: 'Server', content: str, path: str) -> None:
+        debug(f'Executing command on {self.log_name()}: Writing to file {path} the following:\n{content}')
+        # encode so we dont have to fuck aroudn with quotes (they get removed somewhere)
+        b64 = base64.b64encode(bytes(content, 'utf-8')).decode("utf-8")
+        self.exec(f"echo {b64} | base64 -d > {path}", echo=False)
 
     def whoami(self: 'Server') -> str:
         """
@@ -1791,11 +1813,7 @@ class Guest(Server):
 
     def multihost_clone(self: 'Guest', vm_number: int) -> 'Guest':
         guest = copy.deepcopy(self)
-
-        fqdn = guest.fqdn.split(".")
-        fqdn[0] = f"{fqdn[0]}{vm_number}"
-        guest.fqdn = ".".join(fqdn)
-
+        guest.fqdn = MultiHost.ssh_hostname(guest.fqdn, vm_number)
         return guest
 
 
