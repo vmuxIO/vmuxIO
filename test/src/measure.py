@@ -147,7 +147,7 @@ class Measurement:
             vm_range = range_[:batch]
             range_ = range_[batch:]
 
-            info(f"Starting VM {vm_range.start}-{vm_range.stop}")
+            info(f"Starting VM {vm_range.start}-{vm_range.stop - 1}")
     
             debug(f"Setting up interface {interface.value} for {num} VMs")
             setup_host_interface(self.host, interface, vm_range=vm_range) # TODO

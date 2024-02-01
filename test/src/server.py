@@ -44,9 +44,18 @@ class MultiHost:
         return str(netaddr.EUI(value).format(fmt))
 
     @staticmethod
-    def admin_ip(vm_number: int) -> str:
-      start = ipaddress.IPv4Address("192.168.56.20")
-      return f"{start + vm_number - 1}"
+    def ip(base_ip: str, vm_number: int) -> str:
+        """
+        Increment ips with or without subnets
+        """
+        ip = base_ip.split("/") # split subnet mask
+        start = ipaddress.IPv4Address(ip[0])
+        if len(ip) == 1:
+            return f"{start + vm_number - 1}"
+        else:
+            # re-attach subnet
+            return f"{start + vm_number - 1}/{ip[1]}"
+
 
 
     @staticmethod
@@ -1390,6 +1399,9 @@ class Host(Server):
         self.exec(f'sudo ip link show {self.test_bridge} 2>/dev/null ' +
                   f' || (sudo ip link add {self.test_bridge} type bridge; ' +
                   'true)')
+        if self.test_bridge_ip_net is not None:
+            self.exec(f'sudo ip addr add {self.test_bridge_ip_net} ' +
+                      f'dev {self.test_bridge}; true')
         test_iface_output = self.exec(f'sudo ip link show {self.test_iface}')
         if f'master {self.test_bridge}' not in test_iface_output:
             self.exec(f'sudo ip link set {self.test_iface} ' +
@@ -1424,8 +1436,8 @@ class Host(Server):
 
         buffer.flush()
 
-        if self.test_bridge_ip_net:
-            self.exec(f'sudo ip address add {self.test_bridge_ip_net} dev {self.test_bridge}')
+        # if self.test_bridge_ip_net:
+        #     self.exec(f'sudo ip address add {self.test_bridge_ip_net} dev {self.test_bridge}')
 
     def destroy_test_br_tap(self: 'Host'):
         """
@@ -1824,6 +1836,8 @@ class Guest(Server):
     def multihost_clone(self: 'Guest', vm_number: int) -> 'Guest':
         guest = copy.deepcopy(self)
         guest.fqdn = MultiHost.ssh_hostname(guest.fqdn, vm_number)
+        if guest.test_iface_ip_net is not None:
+            guest.test_iface_ip_net = MultiHost.ip(guest.test_iface_ip_net, vm_number)
         return guest
 
     def setup_test_iface_ip_net(self: 'Guest'):
@@ -1857,12 +1871,14 @@ class LoadGen(Server):
     >>> LoadGen('server.test.de')
     LoadGen(fqdn='server.test.de')
     """
+    test_iface_ip_net: Optional[str]
 
     def __init__(self: 'LoadGen',
                  fqdn: str,
                  test_iface: str,
                  test_iface_addr: str,
                  test_iface_mac: str,
+                 test_iface_ip_net: Optional[str],
                  test_iface_driv: str,
                  tmux_socket: str,
                  moongen_dir: str,
@@ -1918,6 +1934,7 @@ class LoadGen(Server):
                          test_iface_driv, tmux_socket, moongen_dir,
                          moonprogs_dir, xdp_reflector_dir, localhost,
                          ssh_config=ssh_config, ssh_as_root=ssh_as_root)
+        self.test_iface_ip_net = test_iface_ip_net
 
     @staticmethod
     def run_l2_load_latency(server: Server,
@@ -1976,3 +1993,26 @@ class LoadGen(Server):
         """
         server.tmux_kill('loadlatency')
 
+    @staticmethod
+    def start_wrk2(server: 'Server', vm_fqdn: str, duration: int = 11, rate: int = 10, connections: int = 100, threads: int = 1, outfile: str = "/tmp/outfile.log"):
+        docker_cmd = f'docker run -ti --mount type=bind,source=./wrk2,target=/wrk2 --network host wrk2d'
+        wrk_cmd = f'wrk -D exp -t {threads} -c {connections} -d {duration} -L -s ./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua http://{vm_fqdn}:5000 -R {rate}'
+        server.tmux_new('wrk2', f'cd {server.moonprogs_dir}/../../subprojects/deathstarbench/hotelReservation; ' +
+                        f'{docker_cmd} {wrk_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
+
+    @staticmethod
+    def stop_wrk2(server: 'Server'):
+        server.tmux_kill('wrk2')
+
+    def setup_test_iface_ip_net(self: 'LoadGen'):
+        """
+        Assign ip address and netmask to the test interface if it exists.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.exec(f'sudo ip link set {self.test_iface} up')
+        self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
