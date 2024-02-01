@@ -4,7 +4,7 @@ import autotest as autotest
 from configparser import ConfigParser
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
-from typing import Tuple, Iterator, Any, Dict
+from typing import Tuple, Iterator, Any, Dict, Callable
 from contextlib import contextmanager
 from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from logging import (info, debug, error, warning,
@@ -13,6 +13,7 @@ from util import safe_cast
 from pathlib import Path
 import copy
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 
 def setup_parser() -> ArgumentParser:
@@ -44,6 +45,19 @@ def setup_parser() -> ArgumentParser:
 
 def setup_host_interface(host: Host, interface: Interface, vm_range: range = range(0)) -> None:
     autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface, vm_range=vm_range)
+
+
+def end_foreach(guests: Dict[int, Guest], func: Callable[[int, Guest], None], workers: int = 8):
+    """
+    Example usage:
+        def foreach(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            guest.exec(f"docker-compose up")
+        end_foreach(guests, foreach)
+    """
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(func, i, guest) for i, guest in guests.items()]
+        for future in futures:
+            future.result()  # Waiting for all tasks to complete
 
 
 @dataclass

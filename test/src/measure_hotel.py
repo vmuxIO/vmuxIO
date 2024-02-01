@@ -7,9 +7,9 @@ from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen, MultiHost
 from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
-from measure import Measurement
+from measure import Measurement, end_foreach
 from util import safe_cast
-from typing import Iterator, cast, List, Dict
+from typing import Iterator, cast, List, Dict, Callable, Tuple
 import time
 import yaml
 import json
@@ -55,7 +55,7 @@ class DeathStarBench:
             matched_service = matched_service[0]
             service_name = matched_service[1]
             vm_number = matched_service[0]
-            ip = MultiHost.admin_ip(vm_number)
+            ip = MultiHost.ip("192.168.56.20", vm_number)
             config[key] = maybeServiceName.replace(service_name, ip)
         self.config = str(json.dumps(config))
 
@@ -64,16 +64,6 @@ def main() -> None:
     # general measure init
     measurement = Measurement()
     host, loadgen = measurement.hosts()
-
-    # loadgen: set up interfaces and networking
-
-    # debug('Binding loadgen interface')
-    # try:
-    #     loadgen.delete_nic_ip_addresses(loadgen.test_iface)
-    # except Exception:
-    #     pass
-    # loadgen.bind_test_iface()
-    # loadgen.setup_hugetlbfs()
 
     deathstar = DeathStarBench()
     deathstar.parse_docker_compose()
@@ -86,50 +76,56 @@ def main() -> None:
 
     with measurement.virtual_machines(interface, num=num_vms) as guests:
         try:
-            for i, guest in guests.items():
+            # loadgen: set up interfaces and networking
+
+            debug('Binding loadgen interface')
+            loadgen.modprobe_test_iface_drivers()
+            loadgen.release_test_iface() # bind linux driver
+            try:
+                loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+            except Exception:
+                pass
+            loadgen.setup_test_iface_ip_net()
+
+            def foreach(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                guest.setup_test_iface_ip_net()
+                
                 guest.write(deathstar.docker_compose[i], "docker-compose.yaml")
                 guest.write(deathstar.config, "config.json")
                 guest.exec(f"docker load -i {docker_images}")
                 guest.exec(f"docker-compose up -d")
-
-            # guest: set up interfaces and networking
-
-            # debug("Detecting guest test interface")
-            # interface is already bound and up (without ip)
-
+            end_foreach(guests, foreach)
 
             # the actual test
 
-                                if guest.test_iface_ip_net:
-                                    debug('Assigning IP to test iface in guest')
-                                    guest.setup_test_iface_ip_net()
+            info("Running wrk2")
 
-            # TODO start more services and so on
+            remote_output_file = "/tmp/output.log"
+            duration = 11
+            frontend_vm_number = list(filter(lambda i: i[1] == "frontend", deathstar.service_map.items()))[0][0]
+            frontend_ip = MultiHost.ip("10.1.0.20", frontend_vm_number)
+            loadgen.exec(f"sudo rm {remote_output_file} || true")
+            LoadGen.stop_wrk2(loadgen)
+            LoadGen.start_wrk2(loadgen, frontend_ip, duration=duration, outfile=remote_output_file)
+            time.sleep(duration + 1)
+            try:
+                loadgen.wait_for_success(f'[[ $(tail -n 1 {remote_output_file}) = *"AUTOTEST_DONE"* ]]')
+            except TimeoutError:
+                error('Waiting for output file to appear timed out')
+            loadgen.copy_from(remote_output_file,
+                        f"{OUT_DIR}/measure_hotel_rep0.log")
 
-            breakpoint()
-            for i, guest in guests.items():
+            LoadGen.stop_wrk2(loadgen)
+
+            # the actual test end
+
+            def foreach(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                 guest.exec(f"docker-compose down")
-            breakpoint()
+            end_foreach(guests, foreach)
 
-            loadgen.stop_moongen_reflector()
-            loadgen.start_moongen_reflector()
-
-            # TODO check if we can skip
-            time.sleep(1) # give ip link time to come up
-            info("Running kni-latency")
-            remote_output_file = "/tmp/out.log"
-            # guest.exec(
-            #         f"{measurement.config['guest']['moonprogs_dir']}/../kni-latency/kni-latency "
-            #         f"{loadgen.test_iface_mac} {guest.test_iface} "
-            #         f"| tee {remote_output_file}"
-            #         )
-            # guest.copy_from(remote_output_file,
-            #             f"{OUT_DIR}/measure_vnf_rep0.log")
-
-            loadgen.stop_moongen_reflector()
         except Exception as e:
             print(f"foo {e}")
-            breakpoint()
+            # breakpoint()
             print("...")
 
 
