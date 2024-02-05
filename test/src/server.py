@@ -56,14 +56,20 @@ class MultiHost:
             # re-attach subnet
             return f"{start + vm_number - 1}/{ip[1]}"
 
-
+    @staticmethod
+    def generic_path(path_: str, vm_number: int) -> str:
+        if vm_number == 0: return path_
+        path = Path(path_)
+        path = path.with_name(path.stem + str(vm_number) + path.suffix)
+        return str(path)
 
     @staticmethod
     def disk_path(root_disk_file: str, vm_number: int) -> str:
-        if vm_number == 0: return root_disk_file
-        root_disk = Path(root_disk_file)
-        root_disk = root_disk.with_name(root_disk.stem + str(vm_number) + root_disk.suffix)
-        return str(root_disk)
+        return MultiHost.generic_path(root_disk_file, vm_number)
+
+    @staticmethod
+    def vfu_path(vfio_user_socket_path: str, vm_number: int) -> str:
+        return MultiHost.generic_path(vfio_user_socket_path, vm_number)
 
     @staticmethod
     def cloud_init(disk_path: str, vm_number: int) -> str:
@@ -1450,7 +1456,7 @@ class Host(Server):
         -------
         """
         self.exec(f'sudo ip link delete {self.test_bridge} || true')
-        self.exec(f'ls /sys/class/net | grep {MultiHost.iface_name(self.test_bridge, -1)} | xargs -I {{}} sudo ip link delete {{}} | true')
+        self.exec(f'ls /sys/class/net | grep {MultiHost.iface_name(self.test_tap, -1)} | xargs -I {{}} sudo ip link delete {{}} | true')
 
     def setup_test_macvtap(self: 'Host'):
         """
@@ -1585,7 +1591,7 @@ class Host(Server):
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
         elif net_type in [ 'vmux-pt', 'vmux-emu' ]:
             test_net_config = \
-                f' -device vfio-user-pci,socket={self.vmux_socket_path}'
+                f' -device vfio-user-pci,socket={MultiHost.vfu_path(self.vmux_socket_path, vm_number)}'
 
         # TODO we need a different qemu build dir for vmux
         qemu_bin_path = 'qemu-system-x86_64'
@@ -1666,7 +1672,7 @@ class Host(Server):
         """
         self.tmux_kill('qemu')
 
-    def start_vmux(self: 'Host', interface: str) -> None:
+    def start_vmux(self: 'Host', interface: str, num_vms: int = 0) -> None:
         """
         Start vmux in a tmux session.
 
@@ -1678,16 +1684,20 @@ class Host(Server):
         """
         args = ""
         if interface == "vmux-pt":
-            args = f'-d {self.test_iface_addr}'
+            args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
         if interface == "vmux-emu":
-            args = f'-d none -t {self.test_tap} -m e1000-emu'
+            if num_vms == 0:
+                args = f' -s {self.vmux_socket_path} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m e1000-emu'
+            else:
+                for vm_number in MultiHost.range(num_vms):
+                    args += f' -s {MultiHost.vfu_path(self.vmux_socket_path, vm_number)} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m e1000-emu'
 
         self.tmux_new(
             'vmux',
             f'ulimit -n 4096; sudo {self.vmux_path} -q'
-            f' -s {self.vmux_socket_path} {args}'
+            f'{args}'
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
-            # f'; sleep 999'
+            f'; sleep 999'
         )
         sleep(1); # give vmux some time to start up and create the socket
         self.exec(f'sudo chmod 777 {self.vmux_socket_path}')

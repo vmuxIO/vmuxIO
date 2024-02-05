@@ -50,9 +50,9 @@ def setup_host_interface(host: Host, interface: Interface, vm_range: range = ran
 def end_foreach(guests: Dict[int, Guest], func: Callable[[int, Guest], None], workers: int = 8):
     """
     Example usage:
-        def foreach(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
             guest.exec(f"docker-compose up")
-        end_foreach(guests, foreach)
+        end_foreach(guests, foreach_parallel)
     """
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [executor.submit(func, i, guest) for i, guest in guests.items()]
@@ -167,7 +167,7 @@ class Measurement:
             setup_host_interface(self.host, interface, vm_range=vm_range) # TODO
 
             if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
-                self.host.start_vmux(interface.value)
+                self.host.start_vmux(interface.value, num_vms=num)
 
             # start VM
 
