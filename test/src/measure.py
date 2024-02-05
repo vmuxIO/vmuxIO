@@ -16,6 +16,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 
+OUT_DIR: str = "/tmp/out1"
+BRIEF: bool = False
+
+
 def setup_parser() -> ArgumentParser:
     # create the argument parser
     parser = ArgumentParser(
@@ -30,6 +34,11 @@ def setup_parser() -> ArgumentParser:
                         default='./autotest.cfg',
                         type=FileType('r'),
                         help='Configuration file path',
+                        )
+    parser.add_argument('-b',
+                        '--brief',
+                        action='store_true',
+                        help='Use test parameters that take less time.',
                         )
     parser.add_argument('-v',
                         '--verbose',
@@ -87,6 +96,9 @@ class Measurement:
         self.loadgen.check_cpu_freq()
 
         self.guests = dict()
+
+        global BRIEF
+        BRIEF = self.args.brief
 
 
     def hosts(self) -> Tuple[Host, LoadGen]:
