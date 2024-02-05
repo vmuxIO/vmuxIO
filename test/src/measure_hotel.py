@@ -145,8 +145,10 @@ def main() -> None:
     num_vms = len(deathstar.docker_compose)
 
     interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
+    rpsList = [ 10, 100 ]
     if BRIEF:
         interfaces = [ Interface.BRIDGE_E1000 ]
+        rpsList = [ 10 ]
 
     for interface in interfaces:
         with measurement.virtual_machines(interface, num=num_vms) as guests:
@@ -166,19 +168,20 @@ def main() -> None:
                     guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
                 
-                # the actual test
-                test = DeathStarBenchTest(
-                        repetitions=3 if not BRIEF else 1,
-                        app="hotelReservation",
-                        rps=10,
-                        interface=interface.value,
-                        num_vms=num_vms
-                        )
-                if test.needed():
-                    info(f"running {test}")
-                    deathstar.run(host, loadgen, guests, test)
-                else:
-                    info(f"skipping {test}")
+                for rps in rpsList:
+                    # the actual test
+                    test = DeathStarBenchTest(
+                            repetitions=3 if not BRIEF else 1,
+                            app="hotelReservation",
+                            rps=rps,
+                            interface=interface.value,
+                            num_vms=num_vms
+                            )
+                    if test.needed():
+                        info(f"running {test}")
+                        deathstar.run(host, loadgen, guests, test)
+                    else:
+                        info(f"skipping {test}")
 
             except Exception as e:
                 print(f"foo {e}")
