@@ -35,6 +35,11 @@ def setup_parser() -> ArgumentParser:
                         type=FileType('r'),
                         help='Configuration file path',
                         )
+    parser.add_argument('-o',
+                        '--outdir',
+                        default=OUT_DIR,
+                        help='Directory to expect old results in and write new ones to',
+                        )
     parser.add_argument('-b',
                         '--brief',
                         action='store_true',
@@ -98,7 +103,9 @@ class Measurement:
         self.guests = dict()
 
         global BRIEF
+        global OUT_DIR
         BRIEF = self.args.brief
+        OUT_DIR = self.args.outdir
 
 
     def hosts(self) -> Tuple[Host, LoadGen]:
