@@ -255,6 +255,9 @@
         # deps for tests/autotest
         python310.pkgs.colorlog
 
+        # deps for deathstarbench/socialNetwork
+        python3.pkgs.aiohttp
+
         # deps for tests
         (pkgs.python3.withPackages (ps: [
           # linting
