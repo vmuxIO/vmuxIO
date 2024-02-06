@@ -53,6 +53,7 @@ class DeathStarBench:
     service_map: Dict[int, str] = {} # vm id -> service name
     extra_hosts: str = "" # /etc/hosts format
     frontend_url: str = "host:port"
+    script: str # path to wrk2 lua script
 
     def __init__(self, app: str, moonprogs_dir: str):
         assert app in [ 
@@ -63,6 +64,17 @@ class DeathStarBench:
 
         self.app = app
         self.docker_image_tar = f"{moonprogs_dir}/../../VMs/docker-images-{self.app}.tar"
+
+        self.parse_docker_compose()
+        
+        if self.app == "hotelReservation":
+            frontend_ip = MultiHost.ip("10.1.0.20", self.vm_number_of("frontend"))
+            self.frontend_url = f"{frontend_ip}:5000"
+            self.script = "./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua"
+        if self.app == "socialNetwork":
+            frontend_ip = MultiHost.ip("10.1.0.20", self.vm_number_of("nginx-thrift"))
+            self.frontend_url = f"{frontend_ip}:8080"
+            self.script = "./wrk2/scripts/social-network/mixed-workload.lua"
 
     def parse_docker_compose(self):
         # create per-VM docker-compose
@@ -107,8 +119,8 @@ class DeathStarBench:
         return str(json.dumps(config))
 
 
-    def install_social_configs(self, guest: Guest):
-        assert self.app == "socialNetwork"
+    def install_configs(self, guest: Guest):
+        # assert self.app == "socialNetwork"
 
         guest.update_extra_hosts(self.extra_hosts)
         guest.exec("rm -r ./* || true")
@@ -126,23 +138,26 @@ class DeathStarBench:
     def run(self, host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: DeathStarBenchTest):
         assert test.app == self.app
 
+        # setup docker-compose env
+
         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
             if self.app == "hotelReservation":
-                guest.write(self.parse_hotel_config(), "config.json")
-                frontend_ip = MultiHost.ip("10.1.0.20", self.vm_number_of("frontend"))
-                self.frontend_url = f"{frontend_ip}:5000"
+                # guest.write(self.parse_hotel_config(), "config.json")
+                self.install_configs(guest)
             if self.app == "socialNetwork":
-                self.install_social_configs(guest)
-                frontend_ip = MultiHost.ip("10.1.0.20", self.vm_number_of("nginx-thrift"))
-                self.frontend_url = f"{frontend_ip}:8080"
+                self.install_configs(guest)
 
             guest.write(self.docker_compose[i], "docker-compose.yml")
             guest.exec(f"docker load -i {self.docker_image_tar}")
         end_foreach(guests, foreach_parallel)
 
+        # start docker-compose
+
         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
             guest.exec(f"docker-compose up -d")
         end_foreach(guests, foreach_parallel)
+
+        # run actual test
 
         info(f"Running wrk2 {test.repetitions} times")
 
@@ -152,12 +167,7 @@ class DeathStarBench:
             local_output_file = test.output_filepath(repetition)
             loadgen.exec(f"sudo rm {remote_output_file} || true")
             LoadGen.stop_wrk2(loadgen)
-            script = ""
-            if self.app == "hotelReservation":
-                script = "./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua"
-            if self.app == "socialNetwork":
-                script = "./wrk2/scripts/social-network/mixed-workload.lua"
-            LoadGen.start_wrk2(loadgen, self.frontend_url, script, duration=duration_s, outfile=remote_output_file)
+            LoadGen.start_wrk2(loadgen, self.frontend_url, self.script, duration=duration_s, outfile=remote_output_file)
             time.sleep(duration_s + 1)
             try:
                 loadgen.wait_for_success(f'[[ $(tail -n 1 {remote_output_file}) = *"AUTOTEST_DONE"* ]]')
@@ -167,7 +177,7 @@ class DeathStarBench:
 
             LoadGen.stop_wrk2(loadgen)
 
-        # the actual test end
+        # stop docker-compose
 
         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
             guest.exec(f"docker-compose down")
@@ -185,10 +195,9 @@ def main() -> None:
     BRIEF = M_BRIEF
 
     moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
-    # app = "hotelReservation"
-    app = "socialNetwork"
+    app = "hotelReservation"
+    # app = "socialNetwork"
     deathstar = DeathStarBench(app, moonprogs_dir)
-    deathstar.parse_docker_compose()
     num_vms = len(deathstar.docker_compose)
 
     interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
