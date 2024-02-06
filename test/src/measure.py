@@ -190,7 +190,6 @@ class Measurement:
 
             # start VM
 
-            
             for i in vm_range:
                 info(f"Starting VM {i} ({interface.value})")
 

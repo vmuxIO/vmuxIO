@@ -47,17 +47,26 @@ class DeathStarBenchTest:
 
 class DeathStarBench:
 
+    app: str
     docker_image_tar: str
-    config = ""
     docker_compose: Dict[int, str] = {} # vm id -> strings of content of docker-compose.yamls    
     service_map: Dict[int, str] = {} # vm id -> service name
+    extra_hosts: str = "" # /etc/hosts format
+    frontend_url: str = "host:port"
 
-    def __init__(self, docker_image_tar: str):
-        self.docker_image_tar = docker_image_tar
+    def __init__(self, app: str, moonprogs_dir: str):
+        assert app in [ 
+            "hotelReservation",
+            "socialNetwork",
+            # "mediaMicroservices",
+        ] # others are not implemented
+
+        self.app = app
+        self.docker_image_tar = f"{moonprogs_dir}/../../VMs/docker-images-{self.app}.tar"
 
     def parse_docker_compose(self):
         # create per-VM docker-compose
-        with open(f"{PROJECT_ROOT}/subprojects/deathstarbench/hotelReservation/docker-compose.yml", "r") as file:
+        with open(f"{PROJECT_ROOT}/subprojects/deathstarbench/{self.app}/docker-compose.yml", "r") as file:
             docker_compose_full = yaml.safe_load(file)
         version = docker_compose_full["version"]
         vm_number = 1
@@ -68,15 +77,21 @@ class DeathStarBench:
             docker_compose["services"][service] = docker_compose_full["services"][service]
             docker_compose["services"][service]["network_mode"] = "host" # --network host
             docker_compose["services"][service]["depends_on"] = dict() # ignore stated dependencies (cant be resolved because they are not local)
-            docker_compose["services"][service]["volumes"] = [ "./config.json:/config.json" ]
+            if self.app == "hotelReservation":
+                docker_compose["services"][service]["volumes"] = [ "./config.json:/config.json" ]
 
             self.docker_compose[vm_number] = str(yaml.dump(docker_compose))
             self.service_map[vm_number] = service
+            self.extra_hosts += f"{MultiHost.ip('192.168.56.20', vm_number)} {service}\n"
             vm_number += 1
         # breakpoint()
         # print("fo")
 
-    def parse_config(self):
+    def parse_hotel_config(self) -> str:
+        """
+        return string containing config json
+        """
+        assert self.app == "hotelReservation"
         with open(f"{PROJECT_ROOT}/subprojects/deathstarbench/hotelReservation/config.json", "r") as file:
             config = json.load(file)
 
@@ -89,15 +104,43 @@ class DeathStarBench:
             vm_number = matched_service[0]
             ip = MultiHost.ip("192.168.56.20", vm_number)
             config[key] = maybeServiceName.replace(service_name, ip)
-        self.config = str(json.dumps(config))
+        return str(json.dumps(config))
+
+
+    def install_social_configs(self, guest: Guest):
+        assert self.app == "socialNetwork"
+
+        guest.update_extra_hosts(self.extra_hosts)
+        guest.exec("rm -r ./* || true")
+        local_dir = f"{PROJECT_ROOT}/subprojects/deathstarbench/{self.app}/*"
+        guest.copy_to(local_dir, "./", recursive=True)
+
+    def vm_number_of(self, service_name: str) -> int:
+        try:
+            ret = list(filter(lambda i: i[1] == service_name, self.service_map.items()))[0][0]
+            return ret
+        except IndexError:
+            raise Exception(f"DeathStarBench.vm_number_of: service {service_name} not found")
+
 
     def run(self, host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: DeathStarBenchTest):
-        assert test.app == "hotelReservation" # others are not implemented
+        assert test.app == self.app
 
         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-            guest.write(self.docker_compose[i], "docker-compose.yaml")
-            guest.write(self.config, "config.json")
+            if self.app == "hotelReservation":
+                guest.write(self.parse_hotel_config(), "config.json")
+                frontend_ip = MultiHost.ip("10.1.0.20", self.vm_number_of("frontend"))
+                self.frontend_url = f"{frontend_ip}:5000"
+            if self.app == "socialNetwork":
+                self.install_social_configs(guest)
+                frontend_ip = MultiHost.ip("10.1.0.20", self.vm_number_of("nginx-thrift"))
+                self.frontend_url = f"{frontend_ip}:8080"
+
+            guest.write(self.docker_compose[i], "docker-compose.yml")
             guest.exec(f"docker load -i {self.docker_image_tar}")
+        end_foreach(guests, foreach_parallel)
+
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
             guest.exec(f"docker-compose up -d")
         end_foreach(guests, foreach_parallel)
 
@@ -105,13 +148,16 @@ class DeathStarBench:
 
         remote_output_file = "/tmp/output.log"
         duration_s = 61 if not BRIEF else 11
-        frontend_vm_number = list(filter(lambda i: i[1] == "frontend", self.service_map.items()))[0][0]
-        frontend_ip = MultiHost.ip("10.1.0.20", frontend_vm_number)
         for repetition in range(test.repetitions):
             local_output_file = test.output_filepath(repetition)
             loadgen.exec(f"sudo rm {remote_output_file} || true")
             LoadGen.stop_wrk2(loadgen)
-            LoadGen.start_wrk2(loadgen, frontend_ip, duration=duration_s, outfile=remote_output_file)
+            script = ""
+            if self.app == "hotelReservation":
+                script = "./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua"
+            if self.app == "socialNetwork":
+                script = "./wrk2/scripts/social-network/mixed-workload.lua"
+            LoadGen.start_wrk2(loadgen, self.frontend_url, script, duration=duration_s, outfile=remote_output_file)
             time.sleep(duration_s + 1)
             try:
                 loadgen.wait_for_success(f'[[ $(tail -n 1 {remote_output_file}) = *"AUTOTEST_DONE"* ]]')
@@ -138,10 +184,11 @@ def main() -> None:
     OUT_DIR = M_OUT_DIR
     BRIEF = M_BRIEF
 
-    docker_image_tar = f"{measurement.config['guest']['moonprogs_dir']}/../../VMs/docker-images.tar"
-    deathstar = DeathStarBench(docker_image_tar)
+    moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
+    # app = "hotelReservation"
+    app = "socialNetwork"
+    deathstar = DeathStarBench(app, moonprogs_dir)
     deathstar.parse_docker_compose()
-    deathstar.parse_config()
     num_vms = len(deathstar.docker_compose)
 
     interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
@@ -172,7 +219,7 @@ def main() -> None:
                     # the actual test
                     test = DeathStarBenchTest(
                             repetitions=3 if not BRIEF else 1,
-                            app="hotelReservation",
+                            app=app,
                             rps=rps,
                             interface=interface.value,
                             num_vms=num_vms

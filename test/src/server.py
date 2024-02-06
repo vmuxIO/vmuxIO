@@ -482,7 +482,7 @@ class Server(ABC):
         _ = self.exec(f'tmux -L {self.tmux_socket}' +
                       f' send-keys -t {session_name} {keys}')
 
-    def __copy_local(self: 'Server', source: str, destination: str) -> None:
+    def __copy_local(self: 'Server', source: str, destination: str, recursive: bool = False) -> None:
         """
         Copy a file from the localhost to the server.
 
@@ -503,9 +503,13 @@ class Server(ABC):
         copy : Copy a file from the server to the localhost.
         __copy_ssh : Copy a file from the server to the server over SSH.
         """
-        self.__exec_local(f'cp {source} {destination}')
+        options = ""
+        if recursive:
+            options += " -r"
 
-    def __scp_to(self: 'Server', source: str, destination: str) -> None:
+        self.__exec_local(f'cp{options} {source} {destination}')
+
+    def __scp_to(self: 'Server', source: str, destination: str, recursive: bool = False) -> None:
         """
         Copy a file from the localhost to the server.
 
@@ -531,6 +535,9 @@ class Server(ABC):
         options = ""
         if self.ssh_config is not None:
             options = f" -F {self.ssh_config}"
+
+        if recursive:
+            options += " -r"
 
         sudo = ""
         if self.ssh_as_root == True:
@@ -571,7 +578,7 @@ class Server(ABC):
 
         self.__exec_local(f'{sudo}scp{options} {self.fqdn}:{source} {destination}')
 
-    def copy_to(self: 'Server', source: str, destination: str) -> None:
+    def copy_to(self: 'Server', source: str, destination: str, recursive: bool = False) -> None:
         """
         Copy a file from the localhost to the server.
 
@@ -597,9 +604,9 @@ class Server(ABC):
         """
         debug(f'Copying {source} to {self.log_name()}:{destination}')
         if self.localhost:
-            self.__copy_local(source, destination)
+            self.__copy_local(source, destination, recursive=recursive)
         else:
-            self.__scp_to(source, destination)
+            self.__scp_to(source, destination, recursive=recursive)
 
     def copy_from(self: 'Server', source: str, destination: str) -> None:
         """
@@ -1125,6 +1132,12 @@ class Server(ABC):
         """
         self.exec(f'sudo modprobe {self.test_iface_driv}')
 
+    def update_extra_hosts(self, extra_hosts: str):
+        self.write(extra_hosts, "/tmp/extra_hosts")
+        self.exec("rm /etc/hosts")
+        self.exec("cat /etc/static/hosts > /etc/hosts")
+        self.exec("cat /tmp/extra_hosts >> /etc/hosts")
+
 
 class BatchExec:
     """
@@ -1145,6 +1158,8 @@ class BatchExec:
             self.flush()
 
     def flush(self):
+        if len(self.batch) == 0:
+            return
         fat_cmd = "; ".join(self.batch)
         self.server.exec(fat_cmd)
         self.batch = []
@@ -2004,9 +2019,9 @@ class LoadGen(Server):
         server.tmux_kill('loadlatency')
 
     @staticmethod
-    def start_wrk2(server: 'Server', vm_fqdn: str, duration: int = 11, rate: int = 10, connections: int = 100, threads: int = 1, outfile: str = "/tmp/outfile.log"):
+    def start_wrk2(server: 'Server', url: str, script_path: str, duration: int = 11, rate: int = 10, connections: int = 100, threads: int = 1, outfile: str = "/tmp/outfile.log"):
         docker_cmd = f'docker run -ti --mount type=bind,source=./wrk2,target=/wrk2 --network host wrk2d'
-        wrk_cmd = f'wrk -D exp -t {threads} -c {connections} -d {duration} -L -s ./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua http://{vm_fqdn}:5000 -R {rate}'
+        wrk_cmd = f'wrk -D exp -t {threads} -c {connections} -d {duration} -L -s {script_path} http://{url} -R {rate}'
         server.tmux_new('wrk2', f'cd {server.moonprogs_dir}/../../subprojects/deathstarbench/hotelReservation; ' +
                         f'{docker_cmd} {wrk_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
 
