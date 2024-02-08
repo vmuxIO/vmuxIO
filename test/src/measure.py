@@ -14,6 +14,7 @@ from pathlib import Path
 import copy
 import time
 from concurrent.futures import ThreadPoolExecutor
+import subprocess
 
 
 OUT_DIR: str = "/tmp/out1"
@@ -107,6 +108,9 @@ class Measurement:
         BRIEF = self.args.brief
         OUT_DIR = self.args.outdir
 
+        if BRIEF:
+            subprocess.run(["sudo", "rm", "-r", OUT_DIR])
+
 
     def hosts(self) -> Tuple[Host, LoadGen]:
         return (self.host, self.loadgen)
@@ -171,8 +175,17 @@ class Measurement:
 
 
         # host: set up interfaces and networking
+
         self.host.detect_test_iface()
-    
+
+        if interface == Interface.VMUX_EMU:
+            # vmux taps need to be there all from the start (no batching)
+            debug(f"Setting up interface {interface.value} for {num} VMs")
+            setup_host_interface(self.host, interface, vm_range=range(1, num+1))
+
+        if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
+            self.host.start_vmux(interface.value, num_vms=num)
+
         # start VMs in batches of batch
         range_ = MultiHost.range(num)
         while range_:
@@ -181,12 +194,10 @@ class Measurement:
             range_ = range_[batch:]
 
             info(f"Starting VM {vm_range.start}-{vm_range.stop - 1}")
-    
-            debug(f"Setting up interface {interface.value} for {num} VMs")
-            setup_host_interface(self.host, interface, vm_range=vm_range) # TODO
-
-            if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU ]:
-                self.host.start_vmux(interface.value, num_vms=num)
+   
+            if interface != Interface.VMUX_EMU:
+                debug(f"Setting up interface {interface.value} for {num} VMs")
+                setup_host_interface(self.host, interface, vm_range=vm_range)
 
             # start VM
 

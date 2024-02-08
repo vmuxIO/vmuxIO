@@ -669,6 +669,13 @@ class Server(ABC):
         raise TimeoutError(f'Execution on {self.log_name()} of command ' +
                            f'{command} timed out after {timeout} seconds')
 
+    def test(self: 'Server', command: str) -> bool:
+        try:
+            _ = self.exec(command)
+            return True
+        except CalledProcessError:
+            return False
+
     def wait_for_connection(self: 'Server', timeout: int = 10
                             ) -> None:
         """
@@ -2019,10 +2026,10 @@ class LoadGen(Server):
         server.tmux_kill('loadlatency')
 
     @staticmethod
-    def start_wrk2(server: 'Server', url: str, script_path: str, duration: int = 11, rate: int = 10, connections: int = 100, threads: int = 1, outfile: str = "/tmp/outfile.log"):
+    def start_wrk2(server: 'Server', url: str, script_path: str, duration: int = 11, rate: int = 10, connections: int = 100, threads: int = 1, outfile: str = "/tmp/outfile.log", workdir: str ="./"):
         docker_cmd = f'docker run -ti --mount type=bind,source=./wrk2,target=/wrk2 --network host wrk2d'
         wrk_cmd = f'wrk -D exp -t {threads} -c {connections} -d {duration} -L -s {script_path} http://{url} -R {rate}'
-        server.tmux_new('wrk2', f'cd {server.moonprogs_dir}/../../subprojects/deathstarbench/hotelReservation; ' +
+        server.tmux_new('wrk2', f'cd {workdir}; ' +
                         f'{docker_cmd} {wrk_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
 
     @staticmethod
