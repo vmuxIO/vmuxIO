@@ -470,7 +470,7 @@ vm-init-old:
   cp {{proot}}/VMs/cloud-init/vm1.img {{proot}}/VMs/cloud-init/vm0.img
 
 
-vm-overwrite: vm-init
+vm-overwrite NUM="35": vm-init
   #!/usr/bin/env bash
   set -x
   set -e
@@ -491,10 +491,10 @@ vm-overwrite: vm-init
   overwrite nesting-guest-image
   overwrite nesting-guest-image-noiommu
   overwrite guest-image
-  for i in $(seq 1 800); do
+  for i in $(seq 1 {{NUM}}); do
     # overwrite guest-image$i
     install -D -m644 {{proot}}/VMs/ro-guest-image1/nixos.qcow2 {{proot}}/VMs/guest-image$i.qcow2
-    qemu-img resize {{proot}}/VMs/guest-image$i.qcow2 +8g
+    qemu-img resize {{proot}}/VMs/guest-image$i.qcow2 +16g
   done
 
 dpdk-setup:

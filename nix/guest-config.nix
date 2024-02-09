@@ -31,6 +31,10 @@
 
   services.sshd.enable = true;
 
+  services.resolved.extraConfig = ''
+    # attempt to provide a DNS resolver where docker containers expect one
+    DNSStubListenerExtra=127.0.0.11
+  '';
   networking.firewall.enable = false;
   # networking.firewall.allowedTCPPorts = [22];
 
