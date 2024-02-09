@@ -8,8 +8,8 @@ from logging import (info, debug, error, warning,
 from server import Host, Guest, LoadGen, MultiHost
 from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from measure import Measurement, end_foreach
-from util import safe_cast
-from typing import Iterator, cast, List, Dict, Callable, Tuple
+from util import safe_cast, product_dict
+from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
 from os.path import isfile, join as path_join
 import yaml
@@ -42,6 +42,18 @@ class DeathStarBenchTest:
     def needed(self):
         for repetition in range(self.repetitions):
             if not self.test_done(repetition):
+                return True
+        return False
+
+    @staticmethod
+    def any_needed(test_matrix: Dict[str, List[Any]]) -> bool:
+        """
+        Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
+        """
+        for test_args in product_dict(test_matrix):
+            test = DeathStarBenchTest(**test_args)
+            if test.needed():
+                debug(f"any_needed: needs {test}")
                 return True
         return False
 
@@ -165,6 +177,7 @@ class DeathStarBench:
 
         # complete setup
 
+        connections = 16
         if self.app == "socialNetwork":
             frontend_guest = guests[self.vm_number_of(self.frontend)]
             if not frontend_guest.test("[[ -f /inited-social ]]"):
@@ -172,7 +185,6 @@ class DeathStarBench:
                 url = self.frontend_url.split(":")
                 assert len(url) == 2
                 social_graph = "socfb-Reed98"
-                connections = 16
                 # doesnt fail if run twice
                 loadgen.exec(f"cd {PROJECT_ROOT}/subprojects/deathstarbench/socialNetwork; nix develop {PROJECT_ROOT}# --command python3 scripts/init_social_graph.py --graph {social_graph} --limit {connections} --ip {url[0]} --port {url[1]} 2>&1 | tee /tmp/init-social.log")
                 frontend_guest.exec("touch /inited-social")
@@ -183,7 +195,7 @@ class DeathStarBench:
                 url = self.frontend_url.split("/")[0]
                 prefix = f"{PROJECT_ROOT}/subprojects/deathstarbench/mediaMicroservices"
                 # i think this fails if run twice
-                loadgen.exec(f"cd {prefix}; nix develop {PROJECT_ROOT}# --command python3 scripts/write_movie_info.py -c {prefix}/datasets/tmdb/casts.json -m {prefix}/datasets/tmdb/movies.json --server_address http://{url} 2>&1 | tee /tmp/init-media.log")
+                loadgen.exec(f"cd {prefix}; nix develop {PROJECT_ROOT}# --command python3 scripts/write_movie_info.py -c {prefix}/datasets/tmdb/casts.json -m {prefix}/datasets/tmdb/movies.json --limt {connections} --server_address http://{url} 2>&1 | tee /tmp/init-media.log")
                 frontend_guest.exec("./scripts/register_users.sh")
                 frontend_guest.exec("./scripts/register_movies.sh")
                 frontend_guest.exec("touch /inited-media")
@@ -230,18 +242,33 @@ def main() -> None:
     interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
     rpsList = [ 10, 100 ]
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
+    repetitions = 3
     if BRIEF:
         interfaces = [ Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_EMU ]
+        # interfaces = [ Interface.VMUX_EMU ]
         rpsList = [ 10 ]
-        # apps = [ "hotelReservation" ]
+        apps = [ "hotelReservation" ]
         # apps = [ "socialNetwork" ]
-        apps = [ "mediaMicroservices" ]
+        # apps = [ "mediaMicroservices" ]
+        repetitions = 1
+
 
     for app in apps:
+        
         moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
         deathstar = DeathStarBench(app, moonprogs_dir)
         num_vms = len(deathstar.docker_compose)
+
+        test_matrix = dict(
+            interface=[ interface.value for interface in interfaces],
+            rps=rpsList,
+            app=[ app ],
+            repetitions=[ repetitions ],
+            num_vms=[ num_vms ]
+            )
+        if not DeathStarBenchTest.any_needed(test_matrix):
+            warning(f"Skipping app {app}: All measurements done already.")
+            continue
 
         for interface in interfaces:
             with measurement.virtual_machines(interface, num=num_vms) as guests:
@@ -264,7 +291,7 @@ def main() -> None:
                     for rps in rpsList:
                         # the actual test
                         test = DeathStarBenchTest(
-                                repetitions=3 if not BRIEF else 1,
+                                repetitions=repetitions,
                                 app=app,
                                 rps=rps,
                                 interface=interface.value,
