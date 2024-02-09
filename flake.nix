@@ -246,26 +246,28 @@
         cloud-utils
 
         # dependencies for hosts/prepare.py
-        python310.pkgs.pyyaml
         yq
         # not available in 22.05 yet
         # python310.pkgs.types-pyyaml
         ethtool
 
-        # deps for tests/autotest
-        python310.pkgs.colorlog
-
-        # deps for deathstarbench/socialNetwork
-        python3.pkgs.aiohttp
-
         # deps for tests
         (pkgs.python3.withPackages (ps: [
+          # deps for tests/autotest
+          ps.colorlog
+          ps.netaddr
+
+          # dependencies for hosts/prepare.py
+          ps.pyyaml
+
+          # deps for deathstarbench/socialNetwork
+          ps.aiohttp
+
           # linting
           ps.black
           ps.flake8
           ps.isort
           ps.mypy
-          ps.netaddr
         ]))
       ] ++ (with self.packages; [
         dpdk
