@@ -1,17 +1,19 @@
 { pkgs, lib, ... }: pkgs.maven.buildMavenPackage rec {
-  pname = "jd-cli";
-  version = "1.2.1";
+  pname = "ycsb";
+  version = "0.17.0";
 
   src = pkgs.fetchFromGitHub {
-    owner = "intoolswetrust";
-    repo = pname;
-    rev = "${pname}-${version}";
-    hash = "sha256-rRttA5H0A0c44loBzbKH7Waoted3IsOgxGCD2VM0U/Q=";
+    owner = "brianfrankcooper";
+    repo = "YCSB";
+    rev = "${version}";
+    hash = "sha256-STp6sTeaYrGPe8cr0UJshy9ARrzKwmv6AzEP5aOl1bQ=";
   };
 
-  mvnHash = "sha256-kLpjMj05uC94/5vGMwMlFzLKNFOKeyNvq/vmB6pHTAo=";
+  mvnHash = "";
 
   nativeBuildInputs = with pkgs; [ makeWrapper maven ];
+
+  mvnParameters = "-Dmaven.test.skip=true";
 
   installPhase = ''
     mkdir -p $out/bin $out/share/jd-cli
