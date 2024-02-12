@@ -130,6 +130,7 @@
         selfpkgs = flakepkgs;
         inherit self;
       };
+      ycsb = pkgs.callPackage ./nix/ycsb.nix { };
 
       # util
       xdp-reflector = pkgs.callPackage ./nix/xdp-reflector.nix {
