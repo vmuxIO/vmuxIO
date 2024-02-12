@@ -213,15 +213,16 @@ class DeathStarBench:
                 frontend_guest.exec("touch /inited-social")
         if self.app == "mediaMicroservices":
             frontend_guest = guests[self.vm_number_of(self.frontend)]
-            if not frontend_guest.test("[[ -f /inited-media ]]"):
-                warning("Media microservices seem uninitialized. Populating with data...")
-                url = self.frontend_url.split("/")[0]
-                prefix = f"{PROJECT_ROOT}/subprojects/deathstarbench/mediaMicroservices"
-                # i think this fails if run twice
-                loadgen.exec(f"cd {prefix}; nix develop {PROJECT_ROOT}# --command python3 scripts/write_movie_info.py -c {prefix}/datasets/tmdb/casts.json -m {prefix}/datasets/tmdb/movies.json --limit {connections} --server_address http://{url} 2>&1 | tee /tmp/init-media.log")
-                frontend_guest.exec("./scripts/register_users.sh")
-                frontend_guest.exec("./scripts/register_movies.sh")
-                frontend_guest.exec("touch /inited-media")
+            # if True or not frontend_guest.test("[[ -f /inited-media ]]"):
+            #     warning("Media microservices seem uninitialized. Populating with data...")
+            # tests fails if this is not run after a VM/docker-compose restart
+            url = self.frontend_url.split("/")[0]
+            prefix = f"{PROJECT_ROOT}/subprojects/deathstarbench/mediaMicroservices"
+            # i think this fails if run twice
+            loadgen.exec(f"cd {prefix}; nix develop {PROJECT_ROOT}# --command python3 scripts/write_movie_info.py -c {prefix}/datasets/tmdb/casts.json -m {prefix}/datasets/tmdb/movies.json --limit {connections} --server_address http://{url} 2>&1 | tee /tmp/init-media.log")
+            frontend_guest.exec("./scripts/register_users.sh")
+            frontend_guest.exec("./scripts/register_movies.sh")
+            frontend_guest.exec("touch /inited-media")
 
         # run actual test
 
