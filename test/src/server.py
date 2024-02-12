@@ -289,8 +289,9 @@ class Server(ABC):
         if self.ssh_as_root == True:
             sudo = "sudo "
 
-        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'",
-                            stderr=STDOUT, shell=True).decode('utf-8')
+        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'" 
+                            # + " 2>&1 | tee /tmp/foo"
+                            , stderr=STDOUT, shell=True).decode('utf-8')
 
     def exec(self: 'Server', command: str, echo: bool = True) -> str:
         """
@@ -1596,7 +1597,7 @@ class Host(Server):
                 f'id=test0,ifname={MultiHost.iface_name(self.test_tap, vm_number)},script=no,' +
                 'downscript=no' +
                 f' -device e1000,' +
-                f'netdev=test0,mac={self.guest_test_iface_mac}'
+                f'netdev=test0,mac={MultiHost.mac(self.guest_test_iface_mac, vm_number)}'
             )
         elif net_type == 'macvtap':
             test_net_config = (
@@ -1722,7 +1723,7 @@ class Host(Server):
             f'; sleep 999'
         )
         sleep(1); # give vmux some time to start up and create the socket
-        self.exec(f'sudo chmod 777 {self.vmux_socket_path}')
+        self.exec(f'sudo chmod 777 {self.vmux_socket_path} || true') # this should be applied to all MultiHost.vfu_paths, but usually we dont need it anyways
 
     def stop_vmux(self: 'Host') -> None:
         """
@@ -1882,7 +1883,8 @@ class Guest(Server):
         Returns
         -------
         """
-        self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
+        # sometimes the VM needs a bit of extra time until it can assign an IP
+        self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
 
 
 class LoadGen(Server):
@@ -2026,7 +2028,7 @@ class LoadGen(Server):
         server.tmux_kill('loadlatency')
 
     @staticmethod
-    def start_wrk2(server: 'Server', url: str, script_path: str, duration: int = 11, rate: int = 10, connections: int = 100, threads: int = 1, outfile: str = "/tmp/outfile.log", workdir: str ="./"):
+    def start_wrk2(server: 'Server', url: str, script_path: str, duration: int = 11, rate: int = 10, connections: int = 16, threads: int = 8, outfile: str = "/tmp/outfile.log", workdir: str ="./"):
         docker_cmd = f'docker run -ti --mount type=bind,source=./wrk2,target=/wrk2 --network host wrk2d'
         wrk_cmd = f'wrk -D exp -t {threads} -c {connections} -d {duration} -L -s {script_path} http://{url} -R {rate}'
         server.tmux_new('wrk2', f'cd {workdir}; ' +

@@ -19,6 +19,7 @@ import subprocess
 
 OUT_DIR: str = "/tmp/out1"
 BRIEF: bool = False
+NUM_WORKERS: int = 8 # with 16, it already starts failing on rose
 
 
 def setup_parser() -> ArgumentParser:
@@ -62,7 +63,7 @@ def setup_host_interface(host: Host, interface: Interface, vm_range: range = ran
     autotest.LoadLatencyTestGenerator.setup_interface(host, Machine.PCVM, interface, vm_range=vm_range)
 
 
-def end_foreach(guests: Dict[int, Guest], func: Callable[[int, Guest], None], workers: int = 8):
+def end_foreach(guests: Dict[int, Guest], func: Callable[[int, Guest], None], workers: int = NUM_WORKERS):
     """
     Example usage:
         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]

@@ -97,6 +97,25 @@ class DeathStarBench:
             self.frontend_url = f"{frontend_ip}:8080/wrk2-api/review/compose"
             self.script = "./wrk2/scripts/media-microservices/compose-review.lua"
 
+    @staticmethod
+    def find_errors(out_dir: str) -> bool:
+        """
+          Socket errors: connect 0, read 0, write 0, timeout 156
+          Non-2xx or 3xx responses: 529
+        """
+        failure = False
+        out = ""
+        try:
+            match = "Non-2xx or 3xx responses"
+            out = subprocess.check_output(["grep", "-r", match, out_dir])
+        except subprocess.CalledProcessError:
+            failure = True
+
+        errors_found = not failure
+        if errors_found:
+            error(f"Some wrk2 tests returned errors:\n{out}")
+        return errors_found
+
     def parse_docker_compose(self):
         # create per-VM docker-compose
         with open(f"{PROJECT_ROOT}/subprojects/deathstarbench/{self.app}/docker-compose.yml", "r") as file:
@@ -161,13 +180,17 @@ class DeathStarBench:
         assert test.app == self.app
 
         # setup docker-compose env
-
-        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-            self.docker_compose_cleanup(guest)
-            self.install_configs(guest)
-            guest.write(self.docker_compose[i], "docker-compose.yml")
-            guest.exec(f"docker load -i {self.docker_image_tar}")
-        end_foreach(guests, foreach_parallel)
+        try:
+            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                self.docker_compose_cleanup(guest)
+                self.install_configs(guest)
+                guest.write(self.docker_compose[i], "docker-compose.yml")
+                guest.exec(f"docker load -i {self.docker_image_tar}")
+            end_foreach(guests, foreach_parallel)
+        except Exception as e:
+            print(f"foo2 {e}")
+            breakpoint()
+            print("...")
 
         # start docker-compose
 
@@ -195,7 +218,7 @@ class DeathStarBench:
                 url = self.frontend_url.split("/")[0]
                 prefix = f"{PROJECT_ROOT}/subprojects/deathstarbench/mediaMicroservices"
                 # i think this fails if run twice
-                loadgen.exec(f"cd {prefix}; nix develop {PROJECT_ROOT}# --command python3 scripts/write_movie_info.py -c {prefix}/datasets/tmdb/casts.json -m {prefix}/datasets/tmdb/movies.json --limt {connections} --server_address http://{url} 2>&1 | tee /tmp/init-media.log")
+                loadgen.exec(f"cd {prefix}; nix develop {PROJECT_ROOT}# --command python3 scripts/write_movie_info.py -c {prefix}/datasets/tmdb/casts.json -m {prefix}/datasets/tmdb/movies.json --limit {connections} --server_address http://{url} 2>&1 | tee /tmp/init-media.log")
                 frontend_guest.exec("./scripts/register_users.sh")
                 frontend_guest.exec("./scripts/register_movies.sh")
                 frontend_guest.exec("touch /inited-media")
@@ -240,16 +263,16 @@ def main() -> None:
     BRIEF = M_BRIEF
 
     interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
-    rpsList = [ 10, 100 ]
+    rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
-    repetitions = 3
+    repetitions = 4
     if BRIEF:
         interfaces = [ Interface.BRIDGE_E1000 ]
         # interfaces = [ Interface.VMUX_EMU ]
         rpsList = [ 10 ]
-        apps = [ "hotelReservation" ]
+        # apps = [ "hotelReservation" ]
         # apps = [ "socialNetwork" ]
-        # apps = [ "mediaMicroservices" ]
+        apps = [ "mediaMicroservices" ]
         repetitions = 1
 
 
@@ -307,6 +330,8 @@ def main() -> None:
                     print(f"foo {e}")
                     breakpoint()
                     print("...")
+
+    DeathStarBench.find_errors(OUT_DIR)
 
 if __name__ == "__main__":
     main()
