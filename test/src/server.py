@@ -325,8 +325,11 @@ class Server(ABC):
         else:
             return self.__exec_ssh(command)
 
-    def write(self: 'Server', content: str, path: str) -> None:
-        debug(f'Executing command on {self.log_name()}: Writing to file {path} the following:\n{content}')
+    def write(self: 'Server', content: str, path: str, verbose: bool = False) -> None:
+        if verbose:
+            debug(f'Executing command on {self.log_name()}: Writing to file {path} the following:\n{content}')
+        else:
+            debug(f'Executing command on {self.log_name()}: Writing to file {path}')
         # encode so we dont have to fuck aroudn with quotes (they get removed somewhere)
         b64 = base64.b64encode(bytes(content, 'utf-8')).decode("utf-8")
         self.exec(f"echo {b64} | base64 -d > {path}", echo=False)
@@ -1111,6 +1114,26 @@ class Server(ABC):
         if not iface:
             iface = self.test_iface
         self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
+
+
+    def start_ycsb(self, fqdn: str, rate: int, threads: int = 8, outfile: str = "/tmp/outfile.log", load: bool = False):
+        # some general usage docs: https://github.com/brianfrankcooper/YCSB/wiki/Running-a-Workload
+        # docs for generic -p parameters: https://github.com/brianfrankcooper/YCSB/wiki/Core-Properties
+        # docs for redis -p parameters: https://github.com/brianfrankcooper/YCSB/blob/master/redis/README.md
+        ycsb_path = f"{self.moonprogs_dir}/../../ycsb"
+        workloads_path = f"{ycsb_path}/share/workloads"
+        if not load:
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 -threads {threads}' # -target {rate}'
+        else:
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped load redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 -threads {threads}'
+        self.tmux_new('ycsb', f'{ycsb_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
+        # error indicating strings: in live-status updates: READ-FAILED WRITE-FAILED end-report:
+        # [READ], Return=ERROR
+
+
+    def stop_ycsb(self):
+        self.tmux_kill("ycsb")
+
 
     def upload_moonprogs(self: 'Server', source_dir: str):
         """
@@ -2037,6 +2060,16 @@ class LoadGen(Server):
     @staticmethod
     def stop_wrk2(server: 'Server'):
         server.tmux_kill('wrk2')
+
+    def start_redis(self):
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        redis_cmd = f"redis-server \\*:6379 --protected-mode no"
+        nix_cmd = f"nix shell --inputs-from {project_root} nixpkgs#redis --command {redis_cmd}"
+        self.tmux_new("redis", f"{nix_cmd}; sleep 999")
+
+
+    def stop_redis(self):
+        self.tmux_kill("redis")
 
     def setup_test_iface_ip_net(self: 'LoadGen'):
         """

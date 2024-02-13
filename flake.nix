@@ -245,6 +245,7 @@
         bridge-utils
         self.packages.x86_64-linux.kmod-tools
         cloud-utils
+        redis
 
         # dependencies for hosts/prepare.py
         yq

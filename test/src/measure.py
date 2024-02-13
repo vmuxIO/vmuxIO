@@ -1,4 +1,8 @@
 from dataclasses import dataclass
+from util import safe_cast, product_dict
+from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
+from os.path import isfile, join as path_join
+from abc import ABC, abstractmethod
 from server import Host, Guest, LoadGen, MultiHost
 import autotest as autotest
 from configparser import ConfigParser
@@ -236,6 +240,56 @@ class Measurement:
             self.host.stop_vmux()
         self.host.cleanup_network()
 
+@dataclass
+class AbstractBenchTest(ABC):
+    repetitions: int
 
+    @abstractmethod
+    def test_infix(self) -> str:
+        # example: return f"{self.app}_{self.interface}_{self.num_vms}vms_{self.rps}rps"
+        return "error"
+
+    def output_filepath(self, repetition: int):
+        return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.log")
+
+    def test_done(self, repetition: int):
+        output_file = self.output_filepath(repetition)
+        return isfile(output_file)
+
+    def needed(self):
+        for repetition in range(self.repetitions):
+            if not self.test_done(repetition):
+                return True
+        return False
+
+    @classmethod
+    def any_needed(cls, test_matrix: Dict[str, List[Any]]) -> bool:
+        """
+        Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
+        """
+        for test_args in product_dict(test_matrix):
+            test = cls(**test_args)
+            if test.needed():
+                debug(f"any_needed: needs {test}")
+                return True
+        return False
+
+    @staticmethod
+    def find_errors(out_dir: str, error_indicators: List[str]) -> bool:
+        """
+        See if output files match any error_indicator strings
+        """
+        failure = False
+        out = ""
+        try:
+            for match in error_indicators:
+                out = out + "\n" + str(subprocess.check_output(["grep", "-r", match, out_dir]))
+        except subprocess.CalledProcessError:
+            failure = True
+
+        errors_found = not failure
+        if errors_found:
+            error(f"Some wrk2 tests returned errors:\n{out}")
+        return errors_found
 
 
