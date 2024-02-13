@@ -637,7 +637,7 @@ class Server(ABC):
         >>> server.copy_from('/home/user/file.txt', '/home/user/file.txt')
         """
         debug(f'Copying from {self.log_name()}:{source} to {destination}')
-        self.__exec_local(f'mkdir {path_dirname(destination)} || true')
+        self.__exec_local(f'mkdir -p {path_dirname(destination)} || true')
         if self.localhost:
             self.__copy_local(source, destination)
         else:

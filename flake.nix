@@ -258,6 +258,7 @@
           # deps for tests/autotest
           ps.colorlog
           ps.netaddr
+          ps.pandas
 
           # dependencies for hosts/prepare.py
           ps.pyyaml
