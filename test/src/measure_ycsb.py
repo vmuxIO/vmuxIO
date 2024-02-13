@@ -25,8 +25,8 @@ class YcsbTest(AbstractBenchTest):
     def output_path_per_vm(self, repetition: int, vm_number: int) -> str:
         return str(Path(OUT_DIR) / f"ycsbVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
-    def summarize(self) -> DataFrame:
-        data = self.parse_results()
+    def summarize(self, repetition: int) -> DataFrame:
+        data = self.parse_results(repetition)
         denominators = ["repetitions", "rps", "interface", "num_vms", "op"]
         mean = data.groupby(denominators).mean(numeric_only=True)
         std = data.groupby(denominators).std(numeric_only=True)
@@ -36,17 +36,17 @@ class YcsbTest(AbstractBenchTest):
         del df["vm_number"]
         return df
 
-    def parse_results(self) -> DataFrame:
+    def parse_results(self, repetition: int) -> DataFrame:
         df = DataFrame()
         for vm_number in MultiHost.range(self.num_vms):
-            for repetition in range(self.repetitions):
-                df = pd.concat([df, self.parse_result(repetition, vm_number)])
+            df = pd.concat([df, self.parse_result(repetition, vm_number)])
         return df
 
     def parse_result(self, repetition: int, vm_number: int) -> DataFrame:
         def find(haystack: List[str], needle: str) -> str:
             matches = [line for line in haystack if needle in line ]
-            assert len(matches) == 1
+            if len(matches) != 1:
+                raise Exception("Seemingly an error occured during execution")
             value = matches[0].split(" ")[-1]
             return value
 
@@ -129,7 +129,12 @@ class Ycsb():
             end_foreach(guests, foreach_parallel)
             local_output_file = test.output_filepath(repetition)
             with open(local_output_file, 'w') as file:
-                file.write(test.summarize().to_string()) # to_string preserves all cols
+                try:
+                    # to_string preserves all cols
+                    summary = test.summarize(repetition).to_string()
+                except Exception as e:
+                    summary = str(e)
+                file.write(summary) 
         loadgen.stop_redis()
         pass
         
@@ -145,16 +150,13 @@ def main() -> None:
     BRIEF = M_BRIEF
 
     interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
-    rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
-    vm_nums = [ 2 ]
+    rpsList = [ 10, 100 ]
+    vm_nums = [ 2, 4 ]
     repetitions = 4
     if BRIEF:
         interfaces = [ Interface.BRIDGE_E1000 ]
         # interfaces = [ Interface.VMUX_EMU ]
         rpsList = [ 10 ]
-        # apps = [ "hotelReservation" ]
-        # apps = [ "socialNetwork" ]
-        apps = [ "mediaMicroservices" ]
         repetitions = 1
 
     # test = YcsbTest(
@@ -183,41 +185,35 @@ def main() -> None:
 
         for interface in interfaces:
             with measurement.virtual_machines(interface, num=num_vms) as guests:
+                # loadgen: set up interfaces and networking
+
+                debug('Binding loadgen interface')
+                loadgen.modprobe_test_iface_drivers()
+                loadgen.release_test_iface() # bind linux driver
                 try:
-                    # loadgen: set up interfaces and networking
+                    loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+                except Exception:
+                    pass
+                loadgen.setup_test_iface_ip_net()
 
-                    debug('Binding loadgen interface')
-                    loadgen.modprobe_test_iface_drivers()
-                    loadgen.release_test_iface() # bind linux driver
-                    try:
-                        loadgen.delete_nic_ip_addresses(loadgen.test_iface)
-                    except Exception:
-                        pass
-                    loadgen.setup_test_iface_ip_net()
+                def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                    guest.setup_test_iface_ip_net()
+                end_foreach(guests, foreach_parallel)
+                
+                for rps in rpsList:
+                    # the actual test
+                    test = YcsbTest(
+                            repetitions=repetitions,
+                            rps=rps,
+                            interface=interface.value,
+                            num_vms=num_vms
+                            )
+                    if test.needed():
+                        info(f"running {test}")
+                        ycsb.run(host, loadgen, guests, test)
+                    else:
+                        info(f"skipping {test}")
 
-                    def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                        guest.setup_test_iface_ip_net()
-                    end_foreach(guests, foreach_parallel)
-                    
-                    for rps in rpsList:
-                        # the actual test
-                        test = YcsbTest(
-                                repetitions=repetitions,
-                                rps=rps,
-                                interface=interface.value,
-                                num_vms=num_vms
-                                )
-                        if test.needed():
-                            info(f"running {test}")
-                            ycsb.run(host, loadgen, guests, test)
-                            df = test.parse_results()
-                        else:
-                            info(f"skipping {test}")
-
-                except Exception as e:
-                    print(f"foo {e}")
-                    breakpoint()
-                    print("...")
 
     YcsbTest.find_errors(OUT_DIR, ["READ-ERROR", "WRITE-ERROR"])
 
