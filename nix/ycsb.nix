@@ -18,11 +18,14 @@ pkgs.stdenv.mkDerivation rec {
     mkdir -p $out/lib
     mkdir -p $out/share
     cp -r ./bin/* $out/bin
+    cp -r ./* $out/share
+
+    # IMHO lib is how it should work, but we need ycsb-wrapped anyways which probably completely replaces lib with share
     cp -r ./lib/* $out/lib
-    cp -r ./workloads $out/share
 
     makeWrapper $out/bin/ycsb.sh $out/bin/ycsb-wrapped \
-      --prefix PATH : ${lib.makeBinPath [ pkgs.jre ]}
+      --prefix PATH : ${lib.makeBinPath [ pkgs.jre ]} \
+      --set YCSB_HOME $out/share
   '';
 
   # meta = with lib; {
