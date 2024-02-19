@@ -161,4 +161,27 @@ public:
   static ulong ulong_max(const ulong x, const ulong y) {
     return x > y ? x : y;
   }
+
+  // takes a mac_str and writes its binary representation to mac_out
+  static int str_to_mac(const char* mac_str, uint8_t (*mac)[6]) {
+    int matches = sscanf(mac_str, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &(*mac)[0], &(*mac)[1], &(*mac)[2], &(*mac)[3], &(*mac)[4], &(*mac)[5]);
+    if (matches == 6) {
+      return 0;
+    } else {
+      return matches;
+    }
+  }
+
+  // Function to increment the MAC address
+  static void intcrement_mac(uint8_t* macArray, uint increment) {
+    unsigned long incrementValue = increment;
+    for (int i = 5; i >= 0; i--) {
+        incrementValue += macArray[i]; // Add the increment to the current byte value
+        macArray[i] = incrementValue & 0xFF; // Assign the new value to the current byte
+        incrementValue >>= 8; // Handle overflow to the next byte
+        if (incrementValue == 0) {
+            break; // No overflow, no need to continue
+        }
+    }
+  }
 };
