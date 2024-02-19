@@ -1744,9 +1744,10 @@ class Host(Server):
                 for vm_number in MultiHost.range(num_vms):
                     args += f' -s {MultiHost.vfu_path(self.vmux_socket_path, vm_number)} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m e1000-emu'
 
+        base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         self.tmux_new(
             'vmux',
-            f'ulimit -n 4096; sudo {self.vmux_path} -q'
+            f'ulimit -n 4096; sudo {self.vmux_path} -q -b {base_mac}'
             f'{args}'
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
             f'; sleep 999'
