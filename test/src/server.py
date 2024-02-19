@@ -1116,14 +1116,20 @@ class Server(ABC):
         self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
 
 
-    def start_ycsb(self, fqdn: str, rate: int, threads: int = 8, outfile: str = "/tmp/outfile.log", load: bool = False):
+    def start_ycsb(self, fqdn: str, rate: int = 100, runtime: int = 8, threads: int = 8, outfile: str = "/tmp/outfile.log", load: bool = False):
+        """
+        runtime: in secs
+        load: load test data instead of running a test. Ignores many arguments.
+        """
         # some general usage docs: https://github.com/brianfrankcooper/YCSB/wiki/Running-a-Workload
         # docs for generic -p parameters: https://github.com/brianfrankcooper/YCSB/wiki/Core-Properties
         # docs for redis -p parameters: https://github.com/brianfrankcooper/YCSB/blob/master/redis/README.md
         ycsb_path = f"{self.moonprogs_dir}/../../ycsb"
         workloads_path = f"{ycsb_path}/share/workloads"
         if not load:
-            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 -threads {threads}' # -target {rate}'
+            ops = rate * runtime
+            core_properties = f"-p operationcount={ops}"
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 {core_properties} -threads {threads} -target {rate}'
         else:
             ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped load redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 -threads {threads}'
         self.tmux_new('ycsb', f'{ycsb_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
