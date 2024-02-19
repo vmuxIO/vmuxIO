@@ -225,11 +225,7 @@ class Measurement:
 
             info(f"Waiting for connectivity of guests")
             for i in vm_range:
-                try:
-                    self.guests[i].wait_for_connection(timeout=120)
-                except Exception:
-                    print("mh?")
-                    breakpoint()
+                self.guests[i].wait_for_connection(timeout=120)
             
         yield self.guests
 

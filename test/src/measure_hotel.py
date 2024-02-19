@@ -221,6 +221,8 @@ class DeathStarBench:
 
     def docker_compose_cleanup(self, guest: Guest):
         guest.exec("docker-compose down || true")
+        # obsolete volumes quickly fill up VM images
+        guest.exec("docker volume prune -f || true")
         # maybe also docker compose rm and docker volume rm
 
     def install_configs(self, guest: Guest):
@@ -241,17 +243,12 @@ class DeathStarBench:
         assert test.app == self.app
 
         # setup docker-compose env
-        try:
-            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                self.docker_compose_cleanup(guest)
-                self.install_configs(guest)
-                guest.write(self.docker_compose[i], "docker-compose.yml")
-                guest.exec(f"docker load -i {self.docker_image_tar}")
-            end_foreach(guests, foreach_parallel)
-        except Exception as e:
-            print(f"foo2 {e}")
-            breakpoint()
-            print("...")
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            self.docker_compose_cleanup(guest)
+            self.install_configs(guest)
+            guest.write(self.docker_compose[i], "docker-compose.yml")
+            guest.exec(f"docker load -i {self.docker_image_tar}")
+        end_foreach(guests, foreach_parallel)
 
         # start docker-compose
 
@@ -371,41 +368,35 @@ def main() -> None:
                 continue
 
             with measurement.virtual_machines(interface, num=num_vms) as guests:
+                # loadgen: set up interfaces and networking
+
+                debug('Binding loadgen interface')
+                loadgen.modprobe_test_iface_drivers()
+                loadgen.release_test_iface() # bind linux driver
                 try:
-                    # loadgen: set up interfaces and networking
+                    loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+                except Exception:
+                    pass
+                loadgen.setup_test_iface_ip_net()
 
-                    debug('Binding loadgen interface')
-                    loadgen.modprobe_test_iface_drivers()
-                    loadgen.release_test_iface() # bind linux driver
-                    try:
-                        loadgen.delete_nic_ip_addresses(loadgen.test_iface)
-                    except Exception:
-                        pass
-                    loadgen.setup_test_iface_ip_net()
-
-                    def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                        guest.setup_test_iface_ip_net()
-                    end_foreach(guests, foreach_parallel)
-                    
-                    for rps in rpsList:
-                        # the actual test
-                        test = DeathStarBenchTest(
-                                repetitions=repetitions,
-                                app=app,
-                                rps=rps,
-                                interface=interface.value,
-                                num_vms=num_vms
-                                )
-                        if test.needed():
-                            info(f"running {test}")
-                            deathstar.run(host, loadgen, guests, test)
-                        else:
-                            info(f"skipping {test}")
-
-                except Exception as e:
-                    print(f"foo {e}")
-                    breakpoint()
-                    print("...")
+                def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                    guest.setup_test_iface_ip_net()
+                end_foreach(guests, foreach_parallel)
+                
+                for rps in rpsList:
+                    # the actual test
+                    test = DeathStarBenchTest(
+                            repetitions=repetitions,
+                            app=app,
+                            rps=rps,
+                            interface=interface.value,
+                            num_vms=num_vms
+                            )
+                    if test.needed():
+                        info(f"running {test}")
+                        deathstar.run(host, loadgen, guests, test)
+                    else:
+                        info(f"skipping {test}")
 
     DeathStarBench.find_errors(OUT_DIR)
 
