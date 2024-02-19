@@ -360,6 +360,14 @@ build:
   nix build -o {{proot}}/ycsb .#ycsb
   nix build -o {{proot}}/vmux-nixbuild .#vmux
 
+update:
+  # update nix flake inputs
+  nix flake update
+  # use `nix flake lock --update-input INPUT` to update a selected input only
+
+  # update git submodules to the latest version of their branch
+  git submodule update --remote --recursive
+  # use `git submodule update --remote -- PATH` to update a selected git submodule only
 
 docker-rebuild:
   cd subprojects/deathstarbench/wrk2; docker build -t wrk2d .
