@@ -12,6 +12,7 @@
 #include <rte_lcore.h>
 #include <rte_mbuf.h>
 #include "src/util.hpp"
+#include "src/drivers/driver.hpp"
 
 #define RX_RING_SIZE 1024
 #define TX_RING_SIZE 1024
@@ -229,12 +230,32 @@ dpdk_main(int argc, char *argv[])
 	if (rte_lcore_count() > 1)
 		printf("\nWARNING: Too many lcores enabled. Only 1 used.\n");
 
-	/* Call lcore_main on the main core only. Called on single lcore. 8< */
-	lcore_main();
-	/* >8 End of called on single lcore. */
-
-	/* clean up the EAL */
-	rte_eal_cleanup();
-
 	return 0;
 }
+
+class Dpdk : public Driver {
+public:
+	Dpdk(int argc, char *argv[]) {
+		dpdk_main(argc, argv);
+	}
+
+	virtual ~Dpdk() {
+		/* clean up the EAL */
+		rte_eal_cleanup();
+	}
+
+	// blocks, busy waiting!
+	void run() {
+		/* Call lcore_main on the main core only. Called on single lcore. 8< */
+		lcore_main();
+		/* >8 End of called on single lcore. */
+	}
+
+	virtual void send(const char *buf, const size_t len) {
+
+	}
+
+  virtual void recv() {
+
+  }
+};

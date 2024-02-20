@@ -7,18 +7,14 @@
 #include <linux/if_tun.h>
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
+#include "src/drivers/driver.hpp"
 
-class Tap {
+class Tap : public Driver {
 public:
-  static const int MAX_BUF = 9000; // should be enough even for most jumboframes
 
   char ifName[IFNAMSIZ];
-  int fd = 0;
-  char rxFrame[MAX_BUF];
-  size_t rxFrame_used; // how much rxFrame is actually filled with data
-  char txFrame[MAX_BUF];
 
-  ~Tap() {
+  virtual ~Tap() {
     close(this->fd); // does onthing if uninitialized (== 0)
   }
 

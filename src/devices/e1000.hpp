@@ -25,13 +25,16 @@ static bool rust_logs_initialized = false;
 class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
-  std::shared_ptr<Tap> tap;
+  std::shared_ptr<Driver> driver;
   std::shared_ptr<InterruptThrottlerNone> irqThrottle;
   static const int bars_nr = 2;
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
 
-  void registerTapEpoll(std::shared_ptr<Tap> tap, int efd) {
+  void registerTapEpoll(std::shared_ptr<Driver> tap, int efd) {
+    if (tap->fd == 0)
+      die("E1000 only supports fd (push) based based drivers")
+
     this->tapCallback.fd = tap->fd;
     this->tapCallback.callback = E1000EmulatedDevice::tap_cb;
     this->tapCallback.ctx = this;
@@ -46,7 +49,7 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq, const uint8_t (*mac_addr)[6]) : tap(tap) {
+  E1000EmulatedDevice(std::shared_ptr<Driver> driver, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq, const uint8_t (*mac_addr)[6]) : driver(driver) {
     this->irqThrottle = std::make_shared<InterruptThrottlerNone>(efd, IRQ_IDX, globalIrq);
     globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {
@@ -70,7 +73,7 @@ public:
 
     this->init_pci_ids();
 
-    this->registerTapEpoll(tap, efd);
+    this->registerTapEpoll(driver, efd);
   }
 
   ~E1000EmulatedDevice() { 
@@ -82,8 +85,8 @@ public:
   static void tap_cb(int fd, void *this__) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
     if (e1000_rx_is_ready(this_->e1000)) {
-      this_->tap->recv();
-      this_->ethRx((char*)&(this_->tap->rxFrame), this_->tap->rxFrame_used);
+      this_->driver->recv();
+      this_->ethRx((char*)&(this_->driver->rxFrame), this_->driver->rxFrame_used);
       // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
     }
   }
@@ -137,7 +140,7 @@ private:
       printf("received packet for tx:\n");
       Util::dump_pkt((void *)buffer, (size_t)len);
     });
-    this_->tap->send((char*)buffer, len);
+    this_->driver->send((char*)buffer, len);
   }
 
   static void dma_read_cb(void *private_ptr, uintptr_t dma_address,

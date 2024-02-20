@@ -86,7 +86,7 @@ int _main(int argc, char **argv) {
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices;
   std::vector<std::shared_ptr<VfioUserServer>> vfuServers;
-  std::vector<std::shared_ptr<Tap>> taps; // network backend for emulation
+  std::vector<std::shared_ptr<Driver>> drivers; // network backend for emulation
   std::string group_arg;
   // int HARDWARE_REVISION; // could be set by vfu_pci_set_class:
   // vfu_ctx->pci.config_space->hdr.rid = 0x02;
@@ -94,13 +94,17 @@ int _main(int argc, char **argv) {
   std::vector<std::string> tapNames;
   std::vector<std::string> sockets;
   std::vector<std::string> modes;
-  while ((ch = getopt(argc, argv, "hd:t:s:m:b:q")) != -1) {
+  bool useDpdk = false;
+  while ((ch = getopt(argc, argv, "hd:t:s:m:b:qu")) != -1) {
     switch (ch) {
     case 'q':
       LOG_LEVEL = LOG_ERR;
       break;
     case 'b':
       base_mac_str = optarg;
+      break;
+    case 'u':
+      useDpdk = true;
       break;
     case 'd':
       pciAddresses.push_back(optarg);
@@ -120,6 +124,7 @@ int _main(int argc, char **argv) {
           << "-q                                     Quiet: reduce log level\n"
           << "-b " << base_mac_str << "                   Start assigning MAC "
              "address to emulated devices starting from this base\n"
+          << "-u                                     Use dpdk backend instead of linux taps\n"
           << "-d 0000:18:00.0                        PCI-Device (or "
              "\"none\" if not applicable)\n"
           << "-t tap-username0                       Tap device to use "
@@ -133,21 +138,6 @@ int _main(int argc, char **argv) {
     }
   }
 
-  char** dpdk_argv = &(argv[optind-1]); // first arg is at index 0: "--"
-  size_t dpdk_argc;
-  if (optind < argc) {
-    // -- arg used
-    dpdk_argc = argc - optind + 1; // account for first arg
-  } else {
-    // no -- arg
-    dpdk_argc = 0;
-  }
-
-  dpdk_main(dpdk_argc, dpdk_argv);
-  die("dpdk done");
-
-  // input validation
-
   if (sockets.size() == 0)
     sockets.push_back("/tmp/vmux.sock");
 
@@ -157,8 +147,12 @@ int _main(int argc, char **argv) {
   if (tapNames.size() == 0)
     tapNames.push_back("none");
 
-  if (sockets.size() != modes.size() || modes.size() != pciAddresses.size() ||
-      pciAddresses.size() != tapNames.size()) {
+  if (sockets.size() != modes.size() || modes.size() != pciAddresses.size()) {
+    errno = EINVAL;
+    die("Command line arguments need to specify the same number of devices, "
+        "sockets and modes");
+  }
+  if (!useDpdk && pciAddresses.size() != tapNames.size()) {
     errno = EINVAL;
     die("Command line arguments need to specify the same number of devices, "
         "taps, sockets and modes");
@@ -168,15 +162,34 @@ int _main(int argc, char **argv) {
 
   int efd = epoll_create1(0);
 
-  // create taps
-  for (size_t i = 0; i < tapNames.size(); i++) {
-    if (tapNames[i] == "none") {
-      taps.push_back(NULL);
-      continue;
+  if (!useDpdk) {
+    // create taps
+    for (size_t i = 0; i < tapNames.size(); i++) {
+      if (tapNames[i] == "none") {
+        drivers.push_back(NULL);
+        continue;
+      }
+      auto tap = std::make_shared<Tap>();
+      tap->open_tap(tapNames[i].c_str());
+      drivers.push_back(tap);
     }
-    auto tap = std::make_shared<Tap>();
-    tap->open_tap(tapNames[i].c_str());
-    taps.push_back(tap);
+  } else {
+    // init dpdk
+    // move to after vfu sock creation
+    char** dpdk_argv = &(argv[optind-1]); // first arg is at index 0: "--"
+    size_t dpdk_argc;
+    if (optind < argc) {
+      // -- arg used
+      dpdk_argc = argc - optind + 1; // account for first arg
+    } else {
+      // no -- arg
+      dpdk_argc = 0;
+    }
+
+    auto dpdk = std::make_shared<Dpdk>(dpdk_argc, dpdk_argv);
+    for (size_t i = 0; i < sockets.size(); i++) {
+      drivers.push_back(dpdk); // everyone shares a single dpdk backend
+    }
   }
 
   // create vfio consumers
@@ -227,8 +240,7 @@ int _main(int argc, char **argv) {
       Util::intcrement_mac(mac_addr, i);
 
       // create device
-      device =
-          std::make_shared<E1000EmulatedDevice>(taps[i], efd, true, globalIrq, &mac_addr);
+      device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true, globalIrq, &mac_addr);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
