@@ -2,6 +2,7 @@
  * Copyright(c) 2010-2015 Intel Corporation
  */
 
+#include <rte_mbuf_ptype.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -10,6 +11,7 @@
 #include <rte_cycles.h>
 #include <rte_lcore.h>
 #include <rte_mbuf.h>
+#include "src/util.hpp"
 
 #define RX_RING_SIZE 1024
 #define TX_RING_SIZE 1024
@@ -136,8 +138,8 @@ lcore_main(void)
 	/* Main work of application loop. 8< */
 	for (;;) {
 		/*
-		 * Receive packets on a port and forward them on the paired
-		 * port. The mapping is 0 -> 1, 1 -> 0, 2 -> 3, 3 -> 2, etc.
+		 * Receive packets on a port and forward them on the same
+		 * port. 
 		 */
 		RTE_ETH_FOREACH_DEV(port) {
 
@@ -149,8 +151,25 @@ lcore_main(void)
 			if (unlikely(nb_rx == 0))
 				continue;
 
-			/* Send burst of TX packets, to second port of pair. */
-			const uint16_t nb_tx = rte_eth_tx_burst(port ^ 1, 0,
+			if_log_level(LOG_DEBUG, 
+				for (int i = 0; i < nb_rx; i++) {
+					struct rte_mbuf* buf = bufs[i];
+					if (buf->l2_type == RTE_PTYPE_L2_ETHER) {
+						// struct rte_ether_hdr* header = (struct rte_ether_hdr*) buf.buf_addr;
+						struct rte_ether_hdr* header = rte_pktmbuf_mtod(bufs[i], struct rte_ether_hdr *);
+						char src_addr[RTE_ETHER_ADDR_FMT_SIZE];
+						char dst_addr[RTE_ETHER_ADDR_FMT_SIZE];
+						rte_ether_format_addr(src_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->src_addr);
+						rte_ether_format_addr(dst_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->dst_addr);
+						printf("ethernet (%d bytes) %s -> %s\n", buf->buf_len, src_addr, dst_addr);
+					} else {
+						printf("non ethernet packet: l2 type: %d\n", buf->l2_type);
+					}
+				}
+			);
+
+			/* Send burst of TX packets, back to same port. */
+			const uint16_t nb_tx = rte_eth_tx_burst(port, 0,
 					bufs, nb_rx);
 
 			/* Free any unsent packets. */
@@ -187,8 +206,8 @@ dpdk_main(int argc, char *argv[])
 
 	/* Check that there is an even number of ports to send/receive on. */
 	nb_ports = rte_eth_dev_count_avail();
-	if (nb_ports < 2 || (nb_ports & 1))
-		rte_exit(EXIT_FAILURE, "Error: number of ports must be even\n");
+	if (nb_ports != 1)
+		rte_exit(EXIT_FAILURE, "Error: number of ports must be 1. Is %d.\n", nb_ports);
 
 	/* Creates a new mempool in memory to hold the mbufs. */
 

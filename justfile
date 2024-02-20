@@ -38,6 +38,9 @@ vmuxE1000:
   sudo {{proot}}/build/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}} -q -b 52:54:00:fa:00:60
   sudo ip link delete {{vmuxTap}}
 
+vmuxDpdk:
+  sudo {{proot}}/build/vmux -- -l 1 -n 1
+
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true
   sudo ip tuntap add mode tap {{vmuxTap}}
