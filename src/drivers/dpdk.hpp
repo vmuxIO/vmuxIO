@@ -169,8 +169,8 @@ lcore_main(void)
  * The main function, which does initialization and calls the per-lcore
  * functions.
  */
-int
-foo_main(int argc, char *argv[])
+inline int
+dpdk_main(int argc, char *argv[])
 {
 	struct rte_mempool *mbuf_pool;
 	unsigned nb_ports;
@@ -203,7 +203,7 @@ foo_main(int argc, char *argv[])
 	/* Initializing all ports. 8< */
 	RTE_ETH_FOREACH_DEV(portid)
 		if (port_init(portid, mbuf_pool) != 0)
-			rte_exit(EXIT_FAILURE, "Cannot init port %"PRIu16 "\n",
+			rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
 					portid);
 	/* >8 End of initializing all ports. */
 

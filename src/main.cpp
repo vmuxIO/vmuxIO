@@ -37,6 +37,7 @@
 #include "devices/passthrough.hpp"
 #include "src/devices/vmux-device.hpp"
 #include "src/tap.hpp"
+#include "src/drivers/dpdk.hpp"
 
 extern "C" {
 #include "libvfio-user.h"
@@ -115,7 +116,7 @@ int _main(int argc, char **argv) {
       break;
     case '?':
     case 'h':
-      std::cout
+      std::cout << argv[0] << " [VMUX-OPTIONS] [-- DPDK-OPTIONS]\n"
           << "-q                                     Quiet: reduce log level\n"
           << "-b " << base_mac_str << "                   Start assigning MAC "
              "address to emulated devices starting from this base\n"
@@ -131,6 +132,19 @@ int _main(int argc, char **argv) {
       break;
     }
   }
+
+  char** dpdk_argv = &(argv[optind-1]); // first arg is at index 0: "--"
+  size_t dpdk_argc;
+  if (optind < argc) {
+    // -- arg used
+    dpdk_argc = argc - optind + 1; // account for first arg
+  } else {
+    // no -- arg
+    dpdk_argc = 0;
+  }
+
+  dpdk_main(dpdk_argc, dpdk_argv);
+  die("dpdk done");
 
   // input validation
 
