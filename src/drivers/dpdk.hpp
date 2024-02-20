@@ -110,15 +110,55 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 }
 /* >8 End of main functional part of port initialization. */
 
-/*
- * The lcore main. This is the main thread that does the work, reading from
- * an input port and writing to an output port.
- */
+static void
+lcore_poll_once(void) {
+	uint16_t port;
 
- /* Basic forwarding application lcore. 8< */
-static __rte_noreturn void
-lcore_main(void)
-{
+	/*
+	 * Receive packets on a port and forward them on the same
+	 * port. 
+	 */
+	RTE_ETH_FOREACH_DEV(port) {
+
+		/* Get burst of RX packets, from first port of pair. */
+		struct rte_mbuf *bufs[BURST_SIZE];
+		const uint16_t nb_rx = rte_eth_rx_burst(port, 0,
+				bufs, BURST_SIZE);
+
+		if (unlikely(nb_rx == 0))
+			continue;
+
+		if_log_level(LOG_DEBUG, 
+			for (int i = 0; i < nb_rx; i++) {
+				struct rte_mbuf* buf = bufs[i];
+				if (buf->l2_type == RTE_PTYPE_L2_ETHER) {
+					// struct rte_ether_hdr* header = (struct rte_ether_hdr*) buf.buf_addr;
+					struct rte_ether_hdr* header = rte_pktmbuf_mtod(bufs[i], struct rte_ether_hdr *);
+					char src_addr[RTE_ETHER_ADDR_FMT_SIZE];
+					char dst_addr[RTE_ETHER_ADDR_FMT_SIZE];
+					rte_ether_format_addr(src_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->src_addr);
+					rte_ether_format_addr(dst_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->dst_addr);
+					printf("ethernet (%d bytes) %s -> %s\n", buf->buf_len, src_addr, dst_addr);
+				} else {
+					printf("non ethernet packet: l2 type: %d\n", buf->l2_type);
+				}
+			}
+		);
+
+		/* Send burst of TX packets, back to same port. */
+		const uint16_t nb_tx = rte_eth_tx_burst(port, 0,
+				bufs, nb_rx);
+
+		/* Free any unsent packets. */
+		if (unlikely(nb_tx < nb_rx)) {
+			uint16_t buf;
+			for (buf = nb_tx; buf < nb_rx; buf++)
+				rte_pktmbuf_free(bufs[buf]);
+		}
+	}
+}
+
+static void lcore_init_checks() {
 	uint16_t port;
 
 	/*
@@ -132,58 +172,29 @@ lcore_main(void)
 			printf("WARNING, port %u is on remote NUMA node to "
 					"polling thread.\n\tPerformance will "
 					"not be optimal.\n", port);
+}
+
+/*
+ * The lcore main. This is the main thread that does the work, reading from
+ * an input port and writing to an output port.
+ */
+
+ /* Basic forwarding application lcore. 8< */
+static __rte_noreturn void
+lcore_main(void)
+{
+	lcore_init_checks();
 
 	printf("\nCore %u forwarding packets. [Ctrl+C to quit]\n",
 			rte_lcore_id());
 
 	/* Main work of application loop. 8< */
 	for (;;) {
-		/*
-		 * Receive packets on a port and forward them on the same
-		 * port. 
-		 */
-		RTE_ETH_FOREACH_DEV(port) {
-
-			/* Get burst of RX packets, from first port of pair. */
-			struct rte_mbuf *bufs[BURST_SIZE];
-			const uint16_t nb_rx = rte_eth_rx_burst(port, 0,
-					bufs, BURST_SIZE);
-
-			if (unlikely(nb_rx == 0))
-				continue;
-
-			if_log_level(LOG_DEBUG, 
-				for (int i = 0; i < nb_rx; i++) {
-					struct rte_mbuf* buf = bufs[i];
-					if (buf->l2_type == RTE_PTYPE_L2_ETHER) {
-						// struct rte_ether_hdr* header = (struct rte_ether_hdr*) buf.buf_addr;
-						struct rte_ether_hdr* header = rte_pktmbuf_mtod(bufs[i], struct rte_ether_hdr *);
-						char src_addr[RTE_ETHER_ADDR_FMT_SIZE];
-						char dst_addr[RTE_ETHER_ADDR_FMT_SIZE];
-						rte_ether_format_addr(src_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->src_addr);
-						rte_ether_format_addr(dst_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->dst_addr);
-						printf("ethernet (%d bytes) %s -> %s\n", buf->buf_len, src_addr, dst_addr);
-					} else {
-						printf("non ethernet packet: l2 type: %d\n", buf->l2_type);
-					}
-				}
-			);
-
-			/* Send burst of TX packets, back to same port. */
-			const uint16_t nb_tx = rte_eth_tx_burst(port, 0,
-					bufs, nb_rx);
-
-			/* Free any unsent packets. */
-			if (unlikely(nb_tx < nb_rx)) {
-				uint16_t buf;
-				for (buf = nb_tx; buf < nb_rx; buf++)
-					rte_pktmbuf_free(bufs[buf]);
-			}
-		}
+		lcore_poll_once();
 	}
-	/* >8 End of loop. */
 }
 /* >8 End Basic forwarding application lcore. */
+
 
 /*
  * The main function, which does initialization and calls the per-lcore
@@ -245,9 +256,12 @@ public:
 	}
 
 	// blocks, busy waiting!
-	void run() {
+	void poll_once() {
+		lcore_init_checks();
+		lcore_poll_once();
+
 		/* Call lcore_main on the main core only. Called on single lcore. 8< */
-		lcore_main();
+		// lcore_main();
 		/* >8 End of called on single lcore. */
 	}
 
@@ -256,6 +270,5 @@ public:
 	}
 
   virtual void recv() {
-
   }
 };
