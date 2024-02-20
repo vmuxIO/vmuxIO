@@ -272,8 +272,8 @@
           ps.isort
           ps.mypy
         ]))
-      ] ++ (with self.packages; [
-        dpdk
+      ] ++ (with self.packages.x86_64-linux; [
+        dpdk23
         #self.packages.x86_64-linux.qemu
         qemu # nixpkgs vanilla qemu
         docker-compose
