@@ -2,7 +2,7 @@
 
 #include "devices/vmux-device.hpp"
 #include "nic-emu.hpp"
-#include "tap.hpp"
+#include "src/drivers/tap.hpp"
 #include "util.hpp"
 #include <bits/types/struct_itimerspec.h>
 #include <cstring>

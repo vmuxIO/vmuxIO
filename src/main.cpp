@@ -36,7 +36,7 @@
 #include "devices/e810.hpp"
 #include "devices/passthrough.hpp"
 #include "src/devices/vmux-device.hpp"
-#include "src/tap.hpp"
+#include "src/drivers/tap.hpp"
 #include "src/drivers/dpdk.hpp"
 
 extern "C" {
