@@ -121,6 +121,15 @@ class Measurement:
         return (self.host, self.loadgen)
 
 
+    @staticmethod
+    def estimated_boottime(num_vms: int) -> float:
+        """
+        estimated time to boot this system in seconds
+        """
+        vm_boot = (num_vms / 32) * 60 * 2 # time taken to boot a batch of VMs
+        return vm_boot
+
+
     @contextmanager
     def virtual_machine(self, interface: Interface) -> Iterator[Guest]:
         # host: inital cleanup

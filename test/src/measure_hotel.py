@@ -48,13 +48,6 @@ class DeathStarBenchTest:
                 return True
         return False
 
-    def estimated_boottime(self) -> float:
-        """
-        estimated time to boot this system in seconds
-        """
-        vm_boot = (self.num_vms / 32) * 60 * 2 # time taken to boot a batch of VMs
-        return vm_boot
-
     def estimated_runtime(self) -> float:
         """
         estimate time needed to run this benchmark excluding boottime in seconds
@@ -96,7 +89,7 @@ class DeathStarBenchTest:
         for test_args in product_dict(reboot_matrix):
             test_args = {**test_args, **kwargs_no_reboot}
             test = DeathStarBenchTest(**test_args)
-            needed_s += test.estimated_boottime()
+            needed_s += Measurement.estimated_boottime(test.num_vms)
 
         info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
 
