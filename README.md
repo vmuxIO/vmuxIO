@@ -198,6 +198,7 @@ sln ./test/conf/autotest_okelmann_christina.cfg autotest.cfg
 python3.10 ./test/autotest -vvv test-load-lat-file
 # Scripted benchmarks
 python3 ./test/src/measure_vnf.py -vvv
+python3 ./test/src/measure_ycsb.py -vvv
 just docker-rebuild
 python3 ./test/src/measure_hotel.py -vvv
 ls output
