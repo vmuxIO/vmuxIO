@@ -18,7 +18,6 @@ DURATION_S: int
 class YcsbTest(AbstractBenchTest):
     rps: int # requests per second
     interface: str # network interface used
-    num_vms: int
 
     def test_infix(self):
         return f"ycsb_{self.num_vms}vms_{self.interface}_{self.rps}rps"

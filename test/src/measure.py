@@ -245,14 +245,23 @@ class Measurement:
             self.host.stop_vmux()
         self.host.cleanup_network()
 
+
 @dataclass
 class AbstractBenchTest(ABC):
     repetitions: int
+    num_vms: int
 
     @abstractmethod
     def test_infix(self) -> str:
         # example: return f"{self.app}_{self.interface}_{self.num_vms}vms_{self.rps}rps"
-        return "error"
+        raise Exception("unimplemented")
+
+    @abstractmethod
+    def estimated_runtime(self) -> float:
+        """
+        estimate time needed to run this benchmark excluding boottime in seconds
+        """
+        raise Exception("unimplemented")
 
     def output_filepath(self, repetition: int):
         return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.log")
@@ -297,4 +306,35 @@ class AbstractBenchTest(ABC):
             error(f"Some wrk2 tests returned errors:\n{out}")
         return errors_found
 
+    @classmethod
+    def estimate_time(cls, test_matrix: Dict[str, List[Any]], args_reboot: List[str]) -> float:
+        """
+        Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
+        kwargs_reboot: test_matrix keys. Changing these parameters requires a reboot.
+        """
+        total = 0
+        needed = 0
+        needed_s = 0.0
+        for test_args in product_dict(test_matrix):
+            test = cls(**test_args)
+            total += 1
+            if test.needed():
+                needed += 1
+                needed_s += test.estimated_runtime()
+
+        # args not relevant for reboots
+        args_no_reboot = [ key for key in test_matrix.keys() if key not in args_reboot ]
+        # example (1st) test parameters not relevant for reboots
+        kwargs_no_reboot = {key: test_matrix[key][0] for key in args_no_reboot }
+        # test parameters relevant for reboots:
+        reboot_matrix = {key: value for key, value in test_matrix.items() if key in args_reboot}
+        # loop over all reboots
+        for test_args in product_dict(reboot_matrix):
+            test_args = {**test_args, **kwargs_no_reboot}
+            test = cls(**test_args)
+            needed_s += Measurement.estimated_boottime(test.num_vms)
+
+        info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
+
+        return needed_s
 

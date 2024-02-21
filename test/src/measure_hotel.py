@@ -7,7 +7,7 @@ from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen, MultiHost
 from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
-from measure import Measurement, end_foreach
+from measure import AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
@@ -22,31 +22,16 @@ OUT_DIR: str
 BRIEF: bool
 DURATION_S: int
 
-# TODO deduplicate code via abstrations from measure.py
 
 @dataclass
-class DeathStarBenchTest:
+class DeathStarBenchTest(AbstractBenchTest):
     repetitions: int
     app: str # e.g. hotelReservation
     rps: int # requests per second
     interface: str # network interface used
-    num_vms: int
 
     def test_infix(self):
         return f"{self.app}_{self.interface}_{self.num_vms}vms_{self.rps}rps"
-
-    def output_filepath(self, repetition: int):
-        return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.log")
-
-    def test_done(self, repetition: int):
-        output_file = self.output_filepath(repetition)
-        return isfile(output_file)
-
-    def needed(self):
-        for repetition in range(self.repetitions):
-            if not self.test_done(repetition):
-                return True
-        return False
 
     def estimated_runtime(self) -> float:
         """
@@ -59,54 +44,9 @@ class DeathStarBenchTest:
         if self.app == "socialNetwork":
             app_setup = (self.num_vms / 27) * 60 * 1.5
         if self.app == "mediaMicroservices":
-            app_setup = (self.num_vms / 27) * 60 * 2 # TODO
+            app_setup = (self.num_vms / 27) * 60 * 2 # this value is estimated, not measured
 
         return measurements + app_setup
-
-    @staticmethod
-    def estimate_time(test_matrix: Dict[str, List[Any]], args_reboot: List[str]) -> float:
-        """
-        Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
-        kwargs_reboot: test_matrix keys. Changing these parameters requires a reboot.
-        """
-        total = 0
-        needed = 0
-        needed_s = 0.0
-        for test_args in product_dict(test_matrix):
-            test = DeathStarBenchTest(**test_args)
-            total += 1
-            if test.needed():
-                needed += 1
-                needed_s += test.estimated_runtime()
-
-        # args not relevant for reboots
-        args_no_reboot = [ key for key in test_matrix.keys() if key not in args_reboot ]
-        # example (1st) test parameters not relevant for reboots
-        kwargs_no_reboot = {key: test_matrix[key][0] for key in args_no_reboot }
-        # test parameters relevant for reboots:
-        reboot_matrix = {key: value for key, value in test_matrix.items() if key in args_reboot}
-        # loop over all reboots
-        for test_args in product_dict(reboot_matrix):
-            test_args = {**test_args, **kwargs_no_reboot}
-            test = DeathStarBenchTest(**test_args)
-            needed_s += Measurement.estimated_boottime(test.num_vms)
-
-        info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
-
-        return needed_s
-
-
-    @staticmethod
-    def any_needed(test_matrix: Dict[str, List[Any]]) -> bool:
-        """
-        Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
-        """
-        for test_args in product_dict(test_matrix):
-            test = DeathStarBenchTest(**test_args)
-            if test.needed():
-                debug(f"any_needed: needs {test}")
-                return True
-        return False
 
 
 class DeathStarBench:
