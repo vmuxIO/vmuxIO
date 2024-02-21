@@ -39,7 +39,7 @@ vmuxE1000:
   sudo ip link delete {{vmuxTap}}
 
 vmuxDpdk:
-  sudo {{proot}}/build/vmux -u -d none -m e1000-emu -- -l 1 -n 1
+  sudo {{proot}}/build/vmux -u -d none -m e1000-emu -s {{vmuxSock}} -- -l 1 -n 1
 
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true

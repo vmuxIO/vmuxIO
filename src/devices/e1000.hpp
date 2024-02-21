@@ -92,6 +92,7 @@ public:
       }
       // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
     }
+    this_->driver->rxFrame_used = 0; // busy polling: reset rxFrame to denote it has been used.
   }
 
   void ethRx(char *data, size_t len) {

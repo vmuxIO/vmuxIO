@@ -296,7 +296,8 @@ int _main(int argc, char **argv) {
         foobar = false;
       }
       if (useDpdk) {
-        drivers[0]->recv(); // dpdk: do busy polling // TODO support multiple VMs
+        E1000EmulatedDevice::driver_cb(0, devices[0].get()); // TODO multi-VM support
+        // drivers[0]->recv(); // dpdk: do busy polling // TODO support multiple VMs
       }
       int eventsc = epoll_wait(efd, events, 1024, poll_timeout);
       // printf("poll main %d\n", eventsc);
