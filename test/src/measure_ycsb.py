@@ -25,6 +25,16 @@ class YcsbTest(AbstractBenchTest):
     def output_path_per_vm(self, repetition: int, vm_number: int) -> str:
         return str(Path(OUT_DIR) / f"ycsbVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
+    def estimated_runtime(self) -> float:
+        """
+        estimate time needed to run this benchmark excluding boottime in seconds
+        """
+        app_setup = 0 # diff "running DeathStarBenchTest" "Running wrk2 x times"
+        measurements = self.repetitions * DURATION_S
+        app_setup = (self.num_vms / 19) * 60 * 1 # TODO wrong
+
+        return measurements + app_setup
+
     def summarize(self, repetition: int) -> DataFrame:
         data = self.parse_results(repetition)
         denominators = ["repetitions", "rps", "interface", "num_vms", "op"]
@@ -174,22 +184,35 @@ def main() -> None:
     # df = test.summarize()
     # breakpoint()
 
+    # plan the measurement
+    test_matrix = dict(
+        repetitions=[ repetitions ],
+        rps=rpsList,
+        interface=[ interface.value for interface in interfaces],
+        num_vms=vm_nums
+        )
+    info(f"Execution plan:")
+    YcsbTest.estimate_time(test_matrix, ["interface", "num_vms"])
+
     for num_vms in vm_nums:
         
         moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
         ycsb = Ycsb(moonprogs_dir)
 
-        test_matrix = dict(
-            interface=[ interface.value for interface in interfaces],
-            rps=rpsList,
-            repetitions=[ repetitions ],
-            num_vms=[ num_vms ]
-            )
-        if not YcsbTest.any_needed(test_matrix):
-            warning(f"Skipping num_vms {num_vms}: All measurements done already.")
-            continue
-
         for interface in interfaces:
+
+            # skip VM boots if possible
+            test_matrix = dict(
+                interface=[ interface.value ],
+                rps=rpsList,
+                repetitions=[ repetitions ],
+                num_vms=[ num_vms ]
+                )
+            if not YcsbTest.any_needed(test_matrix):
+                warning(f"Skipping num_vms {num_vms}: All measurements done already.")
+                continue
+
+            # boot VMs
             with measurement.virtual_machines(interface, num=num_vms) as guests:
                 # loadgen: set up interfaces and networking
 

@@ -289,6 +289,8 @@ def main() -> None:
         num_vms = len(deathstar.docker_compose)
 
         for interface in interfaces:
+
+            # skip VM boots if possible
             test_matrix = dict(
                 interface=[ interface.value ],
                 rps=rpsList,
@@ -300,6 +302,7 @@ def main() -> None:
                 warning(f"Skipping app {app} with {interface.value}: All measurements done already.")
                 continue
 
+            # boot VMs
             with measurement.virtual_machines(interface, num=num_vms) as guests:
                 # loadgen: set up interfaces and networking
 
