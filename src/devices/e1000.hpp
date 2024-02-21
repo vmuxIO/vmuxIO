@@ -31,19 +31,20 @@ private:
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
 
-  void registerTapEpoll(std::shared_ptr<Driver> tap, int efd) {
-    if (tap->fd == 0)
-      die("E1000 only supports fd (push) based based drivers")
+  void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
+    if (driver->fd == 0)
+      return;
+      // die("E1000 only supports drivers that offer fds to wait on")
 
-    this->tapCallback.fd = tap->fd;
-    this->tapCallback.callback = E1000EmulatedDevice::tap_cb;
+    this->tapCallback.fd = driver->fd;
+    this->tapCallback.callback = E1000EmulatedDevice::driver_cb;
     this->tapCallback.ctx = this;
     struct epoll_event e;
     e.events = EPOLLIN;
     e.data.ptr = &this->tapCallback;
 
-    if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, tap->fd, &e))
-      die("could not register tap fd to epoll");
+    if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, driver->fd, &e))
+      die("could not register driver fd to epoll");
 
     this->efd = efd;
   }
@@ -73,7 +74,7 @@ public:
 
     this->init_pci_ids();
 
-    this->registerTapEpoll(driver, efd);
+    this->registerDriverEpoll(driver, efd);
   }
 
   ~E1000EmulatedDevice() { 
@@ -82,11 +83,13 @@ public:
   }
 
   // forward rx event callback from tap to this E1000EmulatedDevice
-  static void tap_cb(int fd, void *this__) {
+  static void driver_cb(int fd, void *this__) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
     if (e1000_rx_is_ready(this_->e1000)) {
       this_->driver->recv();
-      this_->ethRx((char*)&(this_->driver->rxFrame), this_->driver->rxFrame_used);
+      if (this_->driver->rxFrame_used > 0) {
+        this_->ethRx((char*)&(this_->driver->rxFrame), this_->driver->rxFrame_used);
+      }
       // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
     }
   }

@@ -277,6 +277,12 @@ int _main(int argc, char **argv) {
   //            ].revents & POLLIN);
 
   // runtime loop
+  int poll_timeout;
+  if (useDpdk) {
+    poll_timeout = 0; // dpdk: busy polling
+  } else {
+    poll_timeout = 500; // default: event based
+  }
   bool foobar = false;
   while (!quit.load()) {
     for (size_t i = 0; i < runner.size(); i++) {
@@ -289,7 +295,11 @@ int _main(int argc, char **argv) {
             ->ethRx((char *)&data, sizeof(data));
         foobar = false;
       }
-      int eventsc = epoll_wait(efd, events, 1024, 500);
+      if (useDpdk) {
+        drivers[0]->recv(); // dpdk: do busy polling // TODO support multiple VMs
+      }
+      int eventsc = epoll_wait(efd, events, 1024, poll_timeout);
+      // printf("poll main %d\n", eventsc);
 
       for (int i = 0; i < eventsc; i++) {
         auto f = (epoll_callback *)events[i].data.ptr;

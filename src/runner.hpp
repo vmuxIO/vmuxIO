@@ -77,6 +77,7 @@ private:
 
     while (running.load()) {
       int ret = poll(&pfd, 1, 500);
+      // printf("poll runner\n");
 
       if (pfd.revents & POLLIN) {
         ret = vfu_run_ctx(vfu->vfu_ctx);

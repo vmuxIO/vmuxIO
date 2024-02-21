@@ -2,7 +2,9 @@
  * Copyright(c) 2010-2015 Intel Corporation
  */
 
+#include <fcntl.h>
 #include <rte_mbuf_ptype.h>
+#include <rte_memcpy.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -266,9 +268,69 @@ public:
 	}
 
 	virtual void send(const char *buf, const size_t len) {
-
+		// lcore_init_checks();
+		// uint16_t port;
+		// RTE_ETH_FOREACH_DEV(port) {
+		// 	/* Send burst of TX packets, back to same port. */
+		// 	const uint16_t nb_tx = rte_eth_tx_burst(port, 0,
+		// 			bufs, nb_rx);
+		//
+		// 	/* Free any unsent packets. */
+		// 	if (unlikely(nb_tx < nb_rx)) {
+		// 		uint16_t buf;
+		// 		for (buf = nb_tx; buf < nb_rx; buf++)
+		// 			rte_pktmbuf_free(bufs[buf]);
+		// 	}
+		// }
 	}
 
   virtual void recv() {
+		lcore_init_checks();
+		uint16_t port;
+
+		/*
+	 	 * Receive packets on a port and forward them on the same
+	 	 * port. 
+	 	 */
+		RTE_ETH_FOREACH_DEV(port) {
+
+			/* Get burst of RX packets, from first port of pair. */
+			struct rte_mbuf *bufs[BURST_SIZE];
+			const uint16_t nb_rx = rte_eth_rx_burst(port, 0,
+					bufs, BURST_SIZE);
+
+			if (unlikely(nb_rx == 0))
+				continue;
+
+			if_log_level(LOG_DEBUG, 
+				for (int i = 0; i < nb_rx; i++) {
+					struct rte_mbuf* buf = bufs[i];
+					if (buf->l2_type == RTE_PTYPE_L2_ETHER) {
+						// struct rte_ether_hdr* header = (struct rte_ether_hdr*) buf.buf_addr;
+						struct rte_ether_hdr* header = rte_pktmbuf_mtod(bufs[i], struct rte_ether_hdr *);
+						char src_addr[RTE_ETHER_ADDR_FMT_SIZE];
+						char dst_addr[RTE_ETHER_ADDR_FMT_SIZE];
+						rte_ether_format_addr(src_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->src_addr);
+						rte_ether_format_addr(dst_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->dst_addr);
+						printf("ethernet (%d bytes) %s -> %s\n", buf->buf_len, src_addr, dst_addr);
+
+					} else {
+						printf("non ethernet packet: l2 type: %d\n", buf->l2_type);
+					}
+				}
+			);
+
+			// place packet in vmux buffer
+			printf("dropping %d packets\n", nb_rx - 1);
+			struct rte_mbuf* buf = bufs[0]; // we checked before that there is at least one packet
+			void* pkt = rte_pktmbuf_mtod(buf, void*);
+			if (buf->nb_segs != 1)
+				die("This rx buffer has multiple segments. Unimplemented.");
+			if (buf->pkt_len >= this->MAX_BUF)
+				die("Cant handle packets of size %d", buf->pkt_len);
+			rte_memcpy(this->rxFrame, pkt, buf->pkt_len);
+			this->rxFrame_used = buf->pkt_len;
+      Util::dump_pkt(&this->rxFrame, this->rxFrame_used);
+		}
   }
 };

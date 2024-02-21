@@ -22,7 +22,7 @@ public:
     struct ifreq ifr;
     int fd, err;
 
-    if ((fd = open("/dev/net/tun", O_RDWR)) < 0) // TODO noblock plz
+    if ((fd = open("/dev/net/tun", O_RDWR)) < 0)
       die("Cannot open /dev/net/tun");
 
     memset(&ifr, 0, sizeof(ifr));
