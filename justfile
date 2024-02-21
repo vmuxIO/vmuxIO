@@ -348,8 +348,8 @@ build:
   if [[ -d build ]]; then meson build --wipe; else meson build; fi
   pushd subprojects/nic-emu; cargo build --no-default-features --features generate-bindings; cargo build --no-default-features --features generate-bindings --release; popd
   meson compile -C build
-  # meson build_release -Dbuildtype=release
-  # meson compile -C build_release
+  meson build_release -Dbuildtype=release
+  meson compile -C build_release
   clang++ {{proot}}/test/kni-latency/kni-latency.cpp -o {{proot}}/test/kni-latency/kni-latency -O3
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
