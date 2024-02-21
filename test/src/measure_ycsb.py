@@ -29,9 +29,14 @@ class YcsbTest(AbstractBenchTest):
         """
         estimate time needed to run this benchmark excluding boottime in seconds
         """
-        app_setup = 0 # diff "running DeathStarBenchTest" "Running wrk2 x times"
-        measurements = self.repetitions * DURATION_S
-        app_setup = (self.num_vms / 19) * 60 * 1 # TODO wrong
+        app_setup = 3 # diff "running YcsbTest" "Running wrk2 x times"
+
+        # repetition contains 
+        # DURATION_S 
+        # + wait_for_results(0 in underload, 10s in overload)
+        # + 5s initial time sleep
+        # + 3s other overhead
+        measurements = self.repetitions * ( DURATION_S + 18 )
 
         return measurements + app_setup
 
@@ -114,7 +119,7 @@ class Ycsb():
 
         remote_output_file = "/tmp/ycsb-run.log"
         for repetition in range(test.repetitions):
-            time.sleep(5) # 10 errors without this, but also with this. But is it all just vmux-emu errrors due to duplicate macs?
+            time.sleep(5) # 10 errors without this, but also with this. But is it all just vmux-emu errrors due to duplicate macs? 
             # prepare test
             def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                 guest.exec(f"sudo rm {remote_output_file} || true")
