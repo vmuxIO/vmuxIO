@@ -236,6 +236,13 @@ class Server(ABC):
             else:
                 return True
 
+    def __cmd_with_package(self: 'Server', package: str) -> str:
+        """
+        Returns a prefix for a console command. The prefix ensures package to be available to command.
+        Command will not run in a shell!
+        """
+        return f"nix shell --inputs-from {self.moonprogs_dir} nixpkgs#{package} --command"
+
     def __exec_local(self: 'Server', command: str) -> str:
         """
         Execute a command on the localhost.
@@ -777,7 +784,7 @@ class Server(ABC):
         cmd = f'sudo dpdk-devbind.py -b {driver} {dev_addr}'
 
         if self.nixos:
-            _ = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
+            _ = self.exec(f'{self.__cmd_with_package("dpdk")} sh -c "{cmd}"')
         else:
             _ = self.exec(cmd)
 
@@ -796,7 +803,7 @@ class Server(ABC):
         cmd = f'sudo dpdk-devbind.py -u {dev_addr}'
 
         if self.nixos:
-            _ = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
+            _ = self.exec(f'{self.__cmd_with_package("dpdk")} sh -c "{cmd}"')
         else:
             _ = self.exec(cmd)
 
@@ -813,7 +820,7 @@ class Server(ABC):
         cmd = f'cd {self.moongen_dir}/bin/libmoon; sudo ./bind-interfaces.sh'
 
         if self.nixos:
-            _ = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
+            _ = self.exec(f'{self.__cmd_with_package("dpdk")} sh -c "{cmd}"')
         else:
             _ = self.exec(cmd)
 
@@ -870,8 +877,8 @@ class Server(ABC):
                f"grep 'drv={self.test_iface_dpdk_driv}' || true")
         output: str
         if self.nixos:
-            # TODO this case can produce lots of nix-shell output which can distort the line number counting
-            output = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
+            # nix shell prints debug output to stderr. We discard stderr.
+            output = self.exec(f'{self.__cmd_with_package("dpdk")} sh -c "{cmd}" 2>/dev/null')
         else:
             output = self.exec(cmd)
 
@@ -1781,6 +1788,7 @@ class Host(Server):
             self.stop_vmux()
         except:
             pass
+        self.modprobe_test_iface_drivers()
         self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
