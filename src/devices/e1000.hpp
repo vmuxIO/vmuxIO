@@ -46,7 +46,7 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq) : tap(tap) {
+  E1000EmulatedDevice(std::shared_ptr<Tap> tap, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq, const uint8_t (*mac_addr)[6]) : tap(tap) {
     this->irqThrottle = std::make_shared<InterruptThrottlerNone>(efd, IRQ_IDX, globalIrq);
     globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {
@@ -66,7 +66,7 @@ public:
         this, send_cb, dma_read_cb, dma_write_cb, irq_cb,
     };
 
-    e1000 = new_e1000(callbacks);
+    e1000 = new_e1000(callbacks, mac_addr);
 
     this->init_pci_ids();
 

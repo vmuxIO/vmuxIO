@@ -1,5 +1,5 @@
 iommu_on: true
-hugepages1G: 8
+hugepages1G: 0
 devices:
   - name: ethDut
     pci: "41:00.0"

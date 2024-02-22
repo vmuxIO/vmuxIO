@@ -1,19 +1,40 @@
 { config, lib, pkgs, modulesPath, linux-firmware-pinned, ... }:
 {
-  networking.useDHCP = false;
-  networking.interfaces.eth0.useDHCP = false;
-  networking.interfaces.eth0.ipv4.addresses = [ {
-    address = "192.168.56.20";
-    prefixLength = 24;
-  } ];
-  networking.interfaces.eth1.useDHCP = false;
-  networking.defaultGateway = "192.168.56.1";
-  networking.nameservers = [ "10.156.33.53" ];
-  networking.hostName = "guest";
-  networking.domain = "vmux.dse.in.tum.de";
+  imports = [
+    ./docker.nix
+    ./networking.nix
+  ];
+
+  services.cloud-init = { 
+    enable = true;
+    network.enable = true;
+    settings = {
+      datasource_list = { 
+        NoCloud.keep = 1;
+        ConfigDrive.keep = 1;
+        Fallback.keep = 1;
+      };
+      # hostname = "foobar";
+      cloud_init_modules = [
+        "write-files"
+        "update_hostname"
+      ];
+    };
+
+  };
+  # disable all services but essential ones
+  # systemd.services."cloud-init".enable = false;
+  systemd.services."cloud-config".enable = false;
+  systemd.services."cloud-final".enable = false;
+  # systemd.network.wait-online.timeout = 0;
+  systemd.network.wait-online.enable = false;
 
   services.sshd.enable = true;
 
+  services.resolved.extraConfig = ''
+    # attempt to provide a DNS resolver where docker containers expect one
+    DNSStubListenerExtra=127.0.0.11
+  '';
   networking.firewall.enable = false;
   # networking.firewall.allowedTCPPorts = [22];
 
@@ -140,6 +161,7 @@
   boot.kernelParams = [
     "nokaslr"
     "iomem=relaxed"
+  ] ++ lib.optionals (config.networking.vm_number == 0) [
     # spdk/dpdk hugepages
     "default_hugepagesz=2MB"
     "hugepagesz=2MB"

@@ -186,28 +186,40 @@ ip link delete tap-username0
 
 ## Run benchmarks
 
-See also [autotest](test/README.md) for details.
+
+To run passthrough tests on the DOS infrastructure, run autotest on `christina`. 
+Ssh configs are set up there to work with `./test/conf/ssh_config_doctor_cluster`.
+The buildscripts expect artefacts of `just build`, `just vm-overwrite` and `just docker-rebuild` on all involved physical hosts.
+
+Write a config for the hosts you use: autotest_$DUT_$LOADGEN.cfg
 
 ```bash
 nix develop
-just prepare ./hosts/christina_autotest.yaml
-sln ./test/conf/autotest_okelmann_christina.cfg autotest.cfg
-# Configurable microbenchmarks
-python3.10 ./test/autotest -vvv test-load-lat-file
-# Scripted benchmarks
-python3 ./test/src/measure_vnf.py -vvv
-ls output
+sln ./test/conf/autotest_rose_wilfred.cfg autotest.cfg 
 ```
 
-To run passthrough tests on the DOS infrastructure, run autotest on `christina`. 
-Ssh configs are set up there to work with `./testconf/ssh_config_doctor_cluster` and `autotest_rose_wilfred_okelmann.cfg`).
-Take care to check out and build vmux on rose and wilfred - and replace relevant variables like username and paths in the configs.
+Run scripted use-cases/benchmarks:
 
-Run it with:
 ```bash
-python3.10 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_okelmann.cfg run-guest -i vmux
-python3.10 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_okelmann.cfg test-load-lat-file -t test/conf/tests_passthrough_multihost.cfg
+python3 ./test/src/measure_vnf.py -c ./test/conf/autotest_rose_wilfred.cfg -vvv
+python3 ./test/src/measure_ycsb.py -c ./test/conf/autotest_rose_wilfred.cfg -vvv
+python3 ./test/src/measure_hotel.py -c ./test/conf/autotest_rose_wilfred.cfg -vvv
+ls /tmp/out1 # artefacts
 ```
+
+Autotest micro-benchmarks:
+
+```bash
+# tests for big VMs:
+python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred.cfg run-guest -i vmux
+python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred.cfg test-load-lat-file -t test/conf/tests_multihost.cfg
+# tests for small VMs:
+python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_scalable.cfg run-guest -i vmux
+python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_scalable.cfg test-load-lat-file -t test/conf/tests_scalable_multihost.cfg
+ls ./outputs # artefacts
+```
+
+See also [autotest](test/README.md) for details.
 
 
 # Debugging

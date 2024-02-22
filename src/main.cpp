@@ -77,6 +77,7 @@ typedef struct {
 
 int _main(int argc, char **argv) {
   int ch;
+  std::string base_mac_str = "52:54:00:fa:00:60";
   std::string device = "0000:18:00.0";
   std::vector<std::string> pciAddresses;
   std::shared_ptr<GlobalInterrupts> globalIrq;
@@ -92,10 +93,13 @@ int _main(int argc, char **argv) {
   std::vector<std::string> tapNames;
   std::vector<std::string> sockets;
   std::vector<std::string> modes;
-  while ((ch = getopt(argc, argv, "hd:t:s:m:q")) != -1) {
+  while ((ch = getopt(argc, argv, "hd:t:s:m:b:q")) != -1) {
     switch (ch) {
     case 'q':
       LOG_LEVEL = LOG_ERR;
+      break;
+    case 'b':
+      base_mac_str = optarg;
       break;
     case 'd':
       pciAddresses.push_back(optarg);
@@ -111,19 +115,24 @@ int _main(int argc, char **argv) {
       break;
     case '?':
     case 'h':
-      std::cout << "-q                                     Quiet: reduce log level"
-                << "-d 0000:18:00.0                        PCI-Device (or "
-                   "\"none\" if not applicable)\n"
-                << "-t tap-username0                       Tap device to use "
-                   "as backend for emulation (or \"none\" if not applicable)\n"
-                << "-s /tmp/vmux.sock                      Path of the socket\n"
-                << "-m passthrough                         vMux mode: "
-                   "passthrough, emulation, e1000-emu\n";
+      std::cout
+          << "-q                                     Quiet: reduce log level\n"
+          << "-b " << base_mac_str << "                   Start assigning MAC "
+             "address to emulated devices starting from this base\n"
+          << "-d 0000:18:00.0                        PCI-Device (or "
+             "\"none\" if not applicable)\n"
+          << "-t tap-username0                       Tap device to use "
+             "as backend for emulation (or \"none\" if not applicable)\n"
+          << "-s /tmp/vmux.sock                      Path of the socket\n"
+          << "-m passthrough                         vMux mode: "
+             "passthrough, emulation, e1000-emu\n";
       return 0;
     default:
       break;
     }
   }
+
+  // input validation
 
   if (sockets.size() == 0)
     sockets.push_back("/tmp/vmux.sock");
@@ -140,6 +149,8 @@ int _main(int argc, char **argv) {
     die("Command line arguments need to specify the same number of devices, "
         "taps, sockets and modes");
   }
+  
+  // start setting up vmux
 
   int efd = epoll_create1(0);
 
@@ -189,7 +200,21 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>();
     }
     if (modes[i] == "e1000-emu") {
-      device = std::make_shared<E1000EmulatedDevice>(taps[i], efd, true, globalIrq);
+      // parse base mac
+      uint8_t base_mac[6];
+      int ret = Util::str_to_mac(base_mac_str.c_str(), &base_mac);
+      if (ret) {
+        die("Could not parse base MAC address (%d)", ret);
+      }
+      
+      // increment base_mac
+      uint8_t mac_addr[6];
+      memcpy(mac_addr, base_mac, sizeof(mac_addr));
+      Util::intcrement_mac(mac_addr, i);
+
+      // create device
+      device =
+          std::make_shared<E1000EmulatedDevice>(taps[i], efd, true, globalIrq, &mac_addr);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());

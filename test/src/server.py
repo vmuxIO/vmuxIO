@@ -9,8 +9,90 @@ from os import listdir
 from os.path import join as path_join
 from os.path import dirname as path_dirname
 from typing import Optional
+import netaddr
+from pathlib import Path
+import copy
+import ipaddress
+import base64
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
+MAX_VMS: int = 35; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
+
+class MultiHost:
+    """
+    Starts from vm_number 1. Vm_number 0 leads to legacy outputs without numbers. -1 returns string matching all numbers.
+    """
+    @staticmethod
+    def range(num_vms: int) -> range:
+        return range(1, num_vms + 1)
+
+    @staticmethod
+    def ssh_hostname(ssh_hostname: str, vm_number: int):
+        if vm_number == 0: return ssh_hostname
+        fqdn = ssh_hostname.split(".")
+        fqdn[0] = f"{fqdn[0]}{vm_number}"
+        return ".".join(fqdn)
+
+    @staticmethod
+    def mac(base_mac: str, vm_number: int) -> str:
+        if vm_number == 0: return base_mac
+        base = netaddr.EUI(base_mac)
+        value = base.value + vm_number
+        fmt = netaddr.mac_unix
+        fmt.word_fmt = "%.2x"
+        return str(netaddr.EUI(value).format(fmt))
+
+    @staticmethod
+    def ip(base_ip: str, vm_number: int) -> str:
+        """
+        Increment ips with or without subnets
+        """
+        ip = base_ip.split("/") # split subnet mask
+        start = ipaddress.IPv4Address(ip[0])
+        if len(ip) == 1:
+            return f"{start + vm_number - 1}"
+        else:
+            # re-attach subnet
+            return f"{start + vm_number - 1}/{ip[1]}"
+
+    @staticmethod
+    def generic_path(path_: str, vm_number: int) -> str:
+        if vm_number == 0: return path_
+        path = Path(path_)
+        path = path.with_name(path.stem + str(vm_number) + path.suffix)
+        return str(path)
+
+    @staticmethod
+    def disk_path(root_disk_file: str, vm_number: int) -> str:
+        return MultiHost.generic_path(root_disk_file, vm_number)
+
+    @staticmethod
+    def vfu_path(vfio_user_socket_path: str, vm_number: int) -> str:
+        return MultiHost.generic_path(vfio_user_socket_path, vm_number)
+
+    @staticmethod
+    def cloud_init(disk_path: str, vm_number: int) -> str:
+        init_disk = Path(disk_path).resolve()
+        init_disk = init_disk.parent / f"cloud-init/vm{vm_number}.img"
+        return str(init_disk)
+
+    @staticmethod
+    def iface_name(tap_name: str, vm_number: int):
+        """
+        kernel interface name
+        """
+        if vm_number == 0: return tap_name
+        max_len = 15
+        length = max_len - len("-999")
+        if vm_number == -1: return f"{tap_name[:length]}-"
+        return f"{tap_name[:length]}-{vm_number}"
+
+
+    @staticmethod
+    def enumerate(enumeratable: str, vm_number: int) -> str:
+        if vm_number == 0: return enumeratable
+        return f"{enumeratable}-vm{vm_number}"
+
 
 @dataclass
 class Server(ABC):
@@ -105,6 +187,8 @@ class Server(ABC):
         --------
         __init__ : Initialize the object.
         """
+        self.nixos = True # all hosts are nixos actually
+        return 
         self.localhost = self.fqdn == 'localhost' or self.fqdn == getfqdn()
         try:
             self.nixos = self.isfile('/etc/NIXOS')
@@ -150,6 +234,13 @@ class Server(ABC):
                 return False
             else:
                 return True
+
+    def __cmd_with_package(self: 'Server', package: str) -> str:
+        """
+        Returns a prefix for a console command. The prefix ensures package to be available to command.
+        Command will not run in a shell!
+        """
+        return f"nix shell --inputs-from {self.moonprogs_dir} nixpkgs#{package} --command"
 
     def __exec_local(self: 'Server', command: str) -> str:
         """
@@ -204,10 +295,11 @@ class Server(ABC):
         if self.ssh_as_root == True:
             sudo = "sudo "
 
-        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'",
-                            stderr=STDOUT, shell=True).decode('utf-8')
+        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'" 
+                            # + " 2>&1 | tee /tmp/foo"
+                            , stderr=STDOUT, shell=True).decode('utf-8')
 
-    def exec(self: 'Server', command: str) -> str:
+    def exec(self: 'Server', command: str, echo: bool = True) -> str:
         """
         Execute command on the server.
 
@@ -233,11 +325,20 @@ class Server(ABC):
         >>> print(server.exec('ls -l'))
         .bashrc
         """
-        debug(f'Executing command on {self.log_name()}: {command}')
+        if echo: debug(f'Executing command on {self.log_name()}: {command}')
         if self.localhost:
             return self.__exec_local(command)
         else:
             return self.__exec_ssh(command)
+
+    def write(self: 'Server', content: str, path: str, verbose: bool = False) -> None:
+        if verbose:
+            debug(f'Executing command on {self.log_name()}: Writing to file {path} the following:\n{content}')
+        else:
+            debug(f'Executing command on {self.log_name()}: Writing to file {path}')
+        # encode so we dont have to fuck aroudn with quotes (they get removed somewhere)
+        b64 = base64.b64encode(bytes(content, 'utf-8')).decode("utf-8")
+        self.exec(f"echo {b64} | base64 -d > {path}", echo=False)
 
     def whoami(self: 'Server') -> str:
         """
@@ -282,6 +383,23 @@ class Server(ABC):
             True if the file exists.
         """
         return self.exec(f'test -f {path} && echo true || echo false'
+                         ).strip() == 'true'
+
+    def isdir(self: 'Server', path: str) -> bool:
+        """
+        Check if a directory exists.
+
+        Parameters
+        ----------
+        path : str
+            The path to the directory.
+
+        Returns
+        -------
+        bool
+            True if the directory exists.
+        """
+        return self.exec(f'test -d {path} && echo true || echo false'
                          ).strip() == 'true'
 
     def check_cpu_freq(self: 'Server') -> None:
@@ -330,7 +448,7 @@ class Server(ABC):
 
     def tmux_kill(self: 'Server', session_name: str) -> None:
         """
-        Stop a tmux session on the server.
+        Stop all tmux sessions matching session_name.
 
         Parameters
         ----------
@@ -348,8 +466,8 @@ class Server(ABC):
         """
         _ = self.exec(f'tmux -L {self.tmux_socket}' +
                       ' list-sessions | cut -d ":" -f 1 ' +
-                      f'| grep {session_name} | xargs ' +
-                      f'tmux -L {self.tmux_socket} kill-session -t || true')
+                      f'| grep {session_name} | xargs -I {{}} ' +
+                      f'tmux -L {self.tmux_socket} kill-session -t {{}} || true')
 
     def tmux_send_keys(self: 'Server', session_name: str, keys: str) -> None:
         """
@@ -374,7 +492,7 @@ class Server(ABC):
         _ = self.exec(f'tmux -L {self.tmux_socket}' +
                       f' send-keys -t {session_name} {keys}')
 
-    def __copy_local(self: 'Server', source: str, destination: str) -> None:
+    def __copy_local(self: 'Server', source: str, destination: str, recursive: bool = False) -> None:
         """
         Copy a file from the localhost to the server.
 
@@ -395,9 +513,13 @@ class Server(ABC):
         copy : Copy a file from the server to the localhost.
         __copy_ssh : Copy a file from the server to the server over SSH.
         """
-        self.__exec_local(f'cp {source} {destination}')
+        options = ""
+        if recursive:
+            options += " -r"
 
-    def __scp_to(self: 'Server', source: str, destination: str) -> None:
+        self.__exec_local(f'cp{options} {source} {destination}')
+
+    def __scp_to(self: 'Server', source: str, destination: str, recursive: bool = False) -> None:
         """
         Copy a file from the localhost to the server.
 
@@ -423,6 +545,9 @@ class Server(ABC):
         options = ""
         if self.ssh_config is not None:
             options = f" -F {self.ssh_config}"
+
+        if recursive:
+            options += " -r"
 
         sudo = ""
         if self.ssh_as_root == True:
@@ -463,7 +588,7 @@ class Server(ABC):
 
         self.__exec_local(f'{sudo}scp{options} {self.fqdn}:{source} {destination}')
 
-    def copy_to(self: 'Server', source: str, destination: str) -> None:
+    def copy_to(self: 'Server', source: str, destination: str, recursive: bool = False) -> None:
         """
         Copy a file from the localhost to the server.
 
@@ -489,9 +614,9 @@ class Server(ABC):
         """
         debug(f'Copying {source} to {self.log_name()}:{destination}')
         if self.localhost:
-            self.__copy_local(source, destination)
+            self.__copy_local(source, destination, recursive=recursive)
         else:
-            self.__scp_to(source, destination)
+            self.__scp_to(source, destination, recursive=recursive)
 
     def copy_from(self: 'Server', source: str, destination: str) -> None:
         """
@@ -518,7 +643,7 @@ class Server(ABC):
         >>> server.copy_from('/home/user/file.txt', '/home/user/file.txt')
         """
         debug(f'Copying from {self.log_name()}:{source} to {destination}')
-        self.__exec_local(f'mkdir {path_dirname(destination)} || true')
+        self.__exec_local(f'mkdir -p {path_dirname(destination)} || true')
         if self.localhost:
             self.__copy_local(source, destination)
         else:
@@ -553,6 +678,13 @@ class Server(ABC):
 
         raise TimeoutError(f'Execution on {self.log_name()} of command ' +
                            f'{command} timed out after {timeout} seconds')
+
+    def test(self: 'Server', command: str) -> bool:
+        try:
+            _ = self.exec(command)
+            return True
+        except CalledProcessError:
+            return False
 
     def wait_for_connection(self: 'Server', timeout: int = 10
                             ) -> None:
@@ -651,7 +783,7 @@ class Server(ABC):
         cmd = f'sudo dpdk-devbind.py -b {driver} {dev_addr}'
 
         if self.nixos:
-            _ = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
+            _ = self.exec(f'{self.__cmd_with_package("dpdk")} sh -c "{cmd}"')
         else:
             _ = self.exec(cmd)
 
@@ -670,7 +802,7 @@ class Server(ABC):
         cmd = f'sudo dpdk-devbind.py -u {dev_addr}'
 
         if self.nixos:
-            _ = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
+            _ = self.exec(f'{self.__cmd_with_package("dpdk")} sh -c "{cmd}"')
         else:
             _ = self.exec(cmd)
 
@@ -687,7 +819,7 @@ class Server(ABC):
         cmd = f'cd {self.moongen_dir}/bin/libmoon; sudo ./bind-interfaces.sh'
 
         if self.nixos:
-            _ = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
+            _ = self.exec(f'{self.__cmd_with_package("dpdk")} sh -c "{cmd}"')
         else:
             _ = self.exec(cmd)
 
@@ -744,8 +876,8 @@ class Server(ABC):
                f"grep 'drv={self.test_iface_dpdk_driv}' || true")
         output: str
         if self.nixos:
-            # TODO this case can produce lots of nix-shell output which can distort the line number counting
-            output = self.exec(f'nix-shell -p dpdk --run "{cmd}"')
+            # nix shell prints debug output to stderr. We discard stderr.
+            output = self.exec(f'{self.__cmd_with_package("dpdk")} sh -c "{cmd}" 2>/dev/null')
         else:
             output = self.exec(cmd)
 
@@ -989,6 +1121,32 @@ class Server(ABC):
             iface = self.test_iface
         self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
 
+
+    def start_ycsb(self, fqdn: str, rate: int = 100, runtime: int = 8, threads: int = 8, outfile: str = "/tmp/outfile.log", load: bool = False):
+        """
+        runtime: in secs
+        load: load test data instead of running a test. Ignores many arguments.
+        """
+        # some general usage docs: https://github.com/brianfrankcooper/YCSB/wiki/Running-a-Workload
+        # docs for generic -p parameters: https://github.com/brianfrankcooper/YCSB/wiki/Core-Properties
+        # docs for redis -p parameters: https://github.com/brianfrankcooper/YCSB/blob/master/redis/README.md
+        ycsb_path = f"{self.moonprogs_dir}/../../ycsb"
+        workloads_path = f"{ycsb_path}/share/workloads"
+        if not load:
+            ops = rate * runtime
+            core_properties = f"-p operationcount={ops}"
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 {core_properties} -threads {threads} -target {rate}'
+        else:
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped load redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 -threads {threads}'
+        self.tmux_new('ycsb', f'{ycsb_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
+        # error indicating strings: in live-status updates: READ-FAILED WRITE-FAILED end-report:
+        # [READ], Return=ERROR
+
+
+    def stop_ycsb(self):
+        self.tmux_kill("ycsb")
+
+
     def upload_moonprogs(self: 'Server', source_dir: str):
         """
         Upload the MoonGen programs to the server.
@@ -1016,6 +1174,38 @@ class Server(ABC):
         -------
         """
         self.exec(f'sudo modprobe {self.test_iface_driv}')
+
+    def update_extra_hosts(self, extra_hosts: str):
+        self.write(extra_hosts, "/tmp/extra_hosts")
+        self.exec("rm /etc/hosts")
+        self.exec("cat /etc/static/hosts > /etc/hosts")
+        self.exec("cat /tmp/extra_hosts >> /etc/hosts")
+
+
+class BatchExec:
+    """
+    Execution through ssh brings overheads of authentication etc. 
+    As a mitigation, this class helps to batch commands into a single ssh command to reduce ssh-based overheads.
+    """
+    server: Server
+    batchsize: int
+    batch = []
+
+    def __init__(self, server: Server, batchsize: int):
+        self.server = server
+        self.batchsize = batchsize
+
+    def exec(self, cmd: str):
+        self.batch += [cmd]
+        if len(self.batch) >= self.batchsize:
+            self.flush()
+
+    def flush(self):
+        if len(self.batch) == 0:
+            return
+        fat_cmd = "; ".join(self.batch)
+        self.server.exec(fat_cmd)
+        self.batch = []
 
 
 class Host(Server):
@@ -1051,6 +1241,7 @@ class Host(Server):
     guest_vcpus: int
     guest_memory: int
     fsdevs: dict[str, str]
+    has_hugepages1g: bool
 
     def __init__(self: 'Host',
                  fqdn: str,
@@ -1064,6 +1255,7 @@ class Host(Server):
                  test_iface_dpdk_driv: str,
                  test_iface_vfio_driv: str,
                  test_bridge: str,
+                 test_bridge_ip_net: Optional[str],
                  test_tap: str,
                  test_macvtap: str,
                  vmux_path: str,
@@ -1108,6 +1300,8 @@ class Host(Server):
             The vfio driver of the test interface.
         test_bridge : str
             The network interface identifier of the test bridge interface.
+        test_bridge_ip_net : Optional[str]
+            IP net assigned to the test bridge.
         test_tap : str
             The network interface identifier of the test tap interface.
         test_macvtap : str
@@ -1165,6 +1359,7 @@ class Host(Server):
         self.admin_tap = admin_tap
         self.test_iface_vfio_driv = test_iface_vfio_driv
         self.test_bridge = test_bridge
+        self.test_bridge_ip_net = test_bridge_ip_net
         self.test_tap = test_tap
         self.test_macvtap = test_macvtap
         self.vmux_path = vmux_path
@@ -1175,6 +1370,7 @@ class Host(Server):
         self.guest_vcpus = guest_vcpus
         self.guest_memory = guest_memory
         self.fsdevs = fsdevs
+        self.has_hugepages1g = self.isdir("/dev/hugepages1G")
 
     def setup_admin_bridge(self: 'Host'):
         """
@@ -1193,7 +1389,7 @@ class Host(Server):
                   f'dev {self.admin_bridge}; true)')
         self.exec(f'sudo ip link set {self.admin_bridge} up')
 
-    def setup_admin_tap(self: 'Host'):
+    def setup_admin_tap(self: 'Host', vm_range: range = range(0)):
         """
         Setup the admin tap.
 
@@ -1207,11 +1403,26 @@ class Host(Server):
         -------
         """
         self.exec('sudo modprobe tun tap')
-        self.exec(f'sudo ip link show {self.admin_tap} 2>/dev/null' +
-                  f' || (sudo ip tuntap add {self.admin_tap} mode tap;' +
-                  f' sudo ip link set {self.admin_tap} '
-                  f'master {self.admin_bridge}; true)')
-        self.exec(f'sudo ip link set {self.admin_tap} up')
+
+        buffer = BatchExec(self, 10)
+
+        def setup(admin_tap):
+            buffer.exec(f'sudo ip link show {admin_tap} 2>/dev/null' +
+                      f' || (sudo ip tuntap add {admin_tap} mode tap;' +
+                      f' sudo ip link set {admin_tap} '
+                      f'master {self.admin_bridge}; true)')
+            buffer.exec(f'sudo ip link set {admin_tap} up')
+
+        if len(vm_range) == 0: 
+            setup(MultiHost.iface_name(self.admin_tap, 0))
+            buffer.flush()
+            return
+
+        for i in vm_range:
+            admin_tap = MultiHost.iface_name(self.admin_tap, i)
+            setup(admin_tap)
+
+        buffer.flush()
 
     def modprobe_test_iface_drivers(self):
         """
@@ -1227,7 +1438,7 @@ class Host(Server):
         self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.exec(f'sudo modprobe {self.test_iface_vfio_driv}')
 
-    def setup_test_br_tap(self: 'Host', multi_queue=True):
+    def setup_test_br_tap(self: 'Host', multi_queue=True, vm_range: range = range(0)):
         """
         Setup the bridged test tap device.
 
@@ -1243,32 +1454,54 @@ class Host(Server):
         if BRIDGE_QUEUES == 0:
             multi_queue = False
 
+
         # load kernel modules
         self.exec('sudo modprobe bridge tun tap')
+        username = self.whoami()
 
-        # create bridge and tap device
+        # create bridge and add the physical NIC to it
         self.exec(f'sudo ip link show {self.test_bridge} 2>/dev/null ' +
                   f' || (sudo ip link add {self.test_bridge} type bridge; ' +
                   'true)')
-        username = self.whoami()
-        self.exec(f'sudo ip link show {self.test_tap} 2>/dev/null || ' +
-                  f'(sudo ip tuntap add dev {self.test_tap} mode tap ' +
-                  f'user {username}{" multi_queue" if multi_queue else ""}; true)')
-
-        # add tap device and physical nic to bridge
-        tap_output = self.exec(f'sudo ip link show {self.test_tap}')
-        if f'master {self.test_bridge}' not in tap_output:
-            self.exec(f'sudo ip link set {self.test_tap} ' +
-                      f'master {self.test_bridge}')
+        if self.test_bridge_ip_net is not None:
+            self.exec(f'sudo ip addr add {self.test_bridge_ip_net} ' +
+                      f'dev {self.test_bridge}; true')
         test_iface_output = self.exec(f'sudo ip link show {self.test_iface}')
         if f'master {self.test_bridge}' not in test_iface_output:
             self.exec(f'sudo ip link set {self.test_iface} ' +
                       f'master {self.test_bridge}')
 
-        # bring up all interfaces (nic, bridge and tap)
-        self.exec(f'sudo ip link set {self.test_iface} up ' +
-                  f'&& sudo ip link set {self.test_bridge} up ' +
-                  f'&& sudo ip link set {self.test_tap} up')
+        buffer = BatchExec(self, 10)
+
+        def setup(test_tap):
+            # create tap and add to bridge
+            buffer.exec(f'sudo ip link show {test_tap} 2>/dev/null || ' +
+                      f'(sudo ip tuntap add dev {test_tap} mode tap ' +
+                      f'user {username}{" multi_queue" if multi_queue else ""}; true)')
+            buffer.exec(f'if [[ "$(sudo ip link show {test_tap})" != *"master {self.test_bridge}"* ]]; then sudo ip link set {test_tap} master {self.test_bridge}; fi')
+            # tap_output = self.exec(f'sudo ip link show {test_tap}')
+            # if f'master {self.test_bridge}' not in tap_output:
+            #     self.exec(f'sudo ip link set {test_tap} ' +
+            #               f'master {self.test_bridge}')
+
+            # bring up all interfaces (nic, bridge and tap)
+            buffer.exec(f'sudo ip link set {self.test_iface} up ' +
+                      f'&& sudo ip link set {self.test_bridge} up ' +
+                      f'&& sudo ip link set {test_tap} up')
+
+        if len(vm_range) == 0: 
+            setup(MultiHost.iface_name(self.test_tap, 0))
+            buffer.flush()
+            return
+
+        for i in vm_range:
+            test_tap = MultiHost.iface_name(self.test_tap, i)
+            setup(test_tap)
+
+        buffer.flush()
+
+        # if self.test_bridge_ip_net:
+        #     self.exec(f'sudo ip address add {self.test_bridge_ip_net} dev {self.test_bridge}')
 
     def destroy_test_br_tap(self: 'Host'):
         """
@@ -1280,8 +1513,8 @@ class Host(Server):
         Returns
         -------
         """
-        self.exec(f'sudo ip link delete {self.test_tap} || true')
         self.exec(f'sudo ip link delete {self.test_bridge} || true')
+        self.exec(f'ls /sys/class/net | grep {MultiHost.iface_name(self.test_tap, -1)} | xargs -I {{}} sudo ip link delete {{}} | true')
 
     def setup_test_macvtap(self: 'Host'):
         """
@@ -1330,6 +1563,7 @@ class Host(Server):
                   vhost: bool = True,
                   rx_queue_size: int = 256,
                   tx_queue_size: int = 256,
+                  vm_number: int = 0,
                   ) -> None:
         # TODO this function should get a Guest object as argument
         """
@@ -1363,6 +1597,8 @@ class Host(Server):
             Size of the receive queue for the test interface.
         tx_queue_size : int
             Size of the transmit queue for the test interface.
+        vm_number: int
+            If not set to 0, will start VM in a way that other VMs with different vm_number can be started at the same time.
 
         Returns
         -------
@@ -1381,11 +1617,11 @@ class Host(Server):
                 multi_queue = ",mq=on"
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-                f'id=admin1,ifname={self.test_tap},script=no,' +
+                f'id=test0,ifname={MultiHost.iface_name(self.test_tap, vm_number)},script=no,' +
                 f'downscript=no' +
                 queues +
                 f' -device virtio-net-{dev_type},id=testif,' +
-                f'netdev=admin1,mac={self.guest_test_iface_mac}' +
+                f'netdev=test0,mac={MultiHost.mac(self.guest_test_iface_mac, vm_number)}' +
                 multi_queue +
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
@@ -1393,18 +1629,18 @@ class Host(Server):
         if net_type == 'brtap-e1000':
             test_net_config = (
                 f" -netdev tap," +
-                f'id=admin1,ifname={self.test_tap},script=no,' +
+                f'id=test0,ifname={MultiHost.iface_name(self.test_tap, vm_number)},script=no,' +
                 'downscript=no' +
                 f' -device e1000,' +
-                f'netdev=admin1,mac={self.guest_test_iface_mac}'
+                f'netdev=test0,mac={MultiHost.mac(self.guest_test_iface_mac, vm_number)}'
             )
         elif net_type == 'macvtap':
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
-                'id=admin1,fd=3 3<>/dev/tap$(cat ' +
+                'id=test0,fd=3 3<>/dev/tap$(cat ' +
                 f'/sys/class/net/{self.test_macvtap}/ifindex) ' +
                 f' -device virtio-net-{dev_type},id=testif,' +
-                'netdev=admin1,mac=$(cat ' +
+                'netdev=test0,mac=$(cat ' +
                 f'/sys/class/net/{self.test_macvtap}/address)' +
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
@@ -1413,7 +1649,7 @@ class Host(Server):
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
         elif net_type in [ 'vmux-pt', 'vmux-emu' ]:
             test_net_config = \
-                f' -device vfio-user-pci,socket={self.vmux_socket_path}'
+                f' -device vfio-user-pci,socket={MultiHost.vfu_path(self.vmux_socket_path, vm_number)}'
 
         # TODO we need a different qemu build dir for vmux
         qemu_bin_path = 'qemu-system-x86_64'
@@ -1424,6 +1660,11 @@ class Host(Server):
         disk_path = self.guest_root_disk_path
         if root_disk:
             disk_path = root_disk
+        disk_path = MultiHost.disk_path(disk_path, vm_number)
+        if self.has_hugepages1g:
+            memory_backend = f' -object memory-backend-file,mem-path=/dev/hugepages/qemu-memory{vm_number},prealloc=yes,id=bm,size={mem}M,share=on'
+        else:
+            memory_backend = f' -object memory-backend-file,mem-path=/dev/shm/qemu-{vm_number},prealloc=yes,id=bm,size={mem}M,share=on'
         fsdev_config = ''
         if self.fsdevs:
             for name, path in self.fsdevs.items():
@@ -1434,7 +1675,7 @@ class Host(Server):
                     f'fsdev={name}fs'
                 )
         self.tmux_new(
-            'qemu',
+            MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
             "sudo " +
             qemu_bin_path +
@@ -1444,9 +1685,10 @@ class Host(Server):
 
             # shared memory
             f' -m {mem}' +
-            f' -object memory-backend-file,mem-path=/dev/shm/qemu-memory1,prealloc=yes,id=bm,size={mem}M,share=on'
+            memory_backend +
             ' -numa node,memdev=bm' +
 
+            ' -display none' + # avoid opening all the vnc ports
             ' -enable-kvm' +
             f' -drive id=root,format=qcow2,file={disk_path},'
             'if=none,cache=none' +
@@ -1454,13 +1696,14 @@ class Host(Server):
             (',use-ioregionfd=true' if ioregionfd else '') +
             f',queue-size={rx_queue_size}' +
             # ' -cdrom /home/networkadmin/images/guest_init.iso' +
+            f' -drive driver=raw,file={MultiHost.cloud_init(disk_path, vm_number)},if=virtio ' +
             fsdev_config +
             ' -serial stdio' +
-            ' -monitor tcp:127.0.0.1:2345,server,nowait' +
-            f' -netdev tap,vhost=on,id=admin0,ifname={self.admin_tap},' +
+            (' -monitor tcp:127.0.0.1:2345,server,nowait' if debug_qemu else '') +
+            f' -netdev tap,vhost=on,id=admin0,ifname={MultiHost.iface_name(self.admin_tap, vm_number)},' +
             'script=no,downscript=no' +
             f' -device virtio-net-{dev_type},id=admif,netdev=admin0,' +
-            f'mac={self.guest_admin_iface_mac}' +
+            f'mac={MultiHost.mac(self.guest_admin_iface_mac, vm_number)}' +
             test_net_config
             # +
             # ' -drive id=test1,format=raw,file=/dev/ssd/test1,if=none,' +
@@ -1471,13 +1714,13 @@ class Host(Server):
             # f' -device virtio-blk-{dev_type},id=test2,drive=test2'
             # +
             # ' --trace virtio_mmio_read --trace virtio_mmio_write' +
-            # +
-            # ' 2>/tmp/trace.log'
+            +
+            f' 2>/tmp/trace-vm{vm_number}.log'
             )
 
     def kill_guest(self: 'Host') -> None:
         """
-        Kill a guest VM.
+        Kill all guest VMs.
 
         Parameters
         ----------
@@ -1487,7 +1730,7 @@ class Host(Server):
         """
         self.tmux_kill('qemu')
 
-    def start_vmux(self: 'Host', interface: str) -> None:
+    def start_vmux(self: 'Host', interface: str, num_vms: int = 0) -> None:
         """
         Start vmux in a tmux session.
 
@@ -1499,19 +1742,24 @@ class Host(Server):
         """
         args = ""
         if interface == "vmux-pt":
-            args = f'-d {self.test_iface_addr}'
+            args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
         if interface == "vmux-emu":
-            args = f'-d none -t {self.test_tap} -m e1000-emu'
+            if num_vms == 0:
+                args = f' -s {self.vmux_socket_path} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m e1000-emu'
+            else:
+                for vm_number in MultiHost.range(num_vms):
+                    args += f' -s {MultiHost.vfu_path(self.vmux_socket_path, vm_number)} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m e1000-emu'
 
+        base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         self.tmux_new(
             'vmux',
-            f'ulimit -n 4096; sudo {self.vmux_path} -q'
-            f' -s {self.vmux_socket_path} {args}'
+            f'ulimit -n 4096; sudo {self.vmux_path} -q -b {base_mac}'
+            f'{args}'
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
-            # f'; sleep 999'
+            f'; sleep 999'
         )
         sleep(1); # give vmux some time to start up and create the socket
-        self.exec(f'sudo chmod 777 {self.vmux_socket_path}')
+        self.exec(f'sudo chmod 777 {self.vmux_socket_path} || true') # this should be applied to all MultiHost.vfu_paths, but usually we dont need it anyways
 
     def stop_vmux(self: 'Host') -> None:
         """
@@ -1525,7 +1773,7 @@ class Host(Server):
         """
         self.tmux_kill('vmux')
 
-    def cleanup_network(self: 'Host') -> None:
+    def cleanup_network(self: 'Host', number_vms: int = MAX_VMS) -> None:
         """
         Cleanup the network setup.
 
@@ -1539,10 +1787,12 @@ class Host(Server):
             self.stop_vmux()
         except:
             pass
+        self.modprobe_test_iface_drivers()
         self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
         self.destroy_test_br_tap()
         self.destroy_test_macvtap()
+        # TODO destroy admin interfaces!
 
 
 class Guest(Server):
@@ -1562,12 +1812,14 @@ class Guest(Server):
     >>> Guest('server.test.de')
     Guest(fqdn='server.test.de')
     """
+    test_iface_ip_net: Optional[str]
 
     def __init__(self: 'Guest',
                  fqdn: str,
                  test_iface: str,
                  test_iface_addr: str,
                  test_iface_mac: str,
+                 test_iface_ip_net: Optional[str],
                  test_iface_driv: str,
                  test_iface_dpdk_driv: str,
                  tmux_socket: str,
@@ -1625,6 +1877,7 @@ class Guest(Server):
                          tmux_socket, moongen_dir, moonprogs_dir,
                          xdp_reflector_dir, ssh_config=ssh_config,
                          ssh_as_root=ssh_as_root)
+        self.test_iface_ip_net = test_iface_ip_net
 
     def __post_init__(self: 'Guest') -> None:
         """
@@ -1650,6 +1903,26 @@ class Guest(Server):
         # attribute.
         self.nixos = False
 
+    def multihost_clone(self: 'Guest', vm_number: int) -> 'Guest':
+        guest = copy.deepcopy(self)
+        guest.fqdn = MultiHost.ssh_hostname(guest.fqdn, vm_number)
+        if guest.test_iface_ip_net is not None:
+            guest.test_iface_ip_net = MultiHost.ip(guest.test_iface_ip_net, vm_number)
+        return guest
+
+    def setup_test_iface_ip_net(self: 'Guest'):
+        """
+        Assign ip address and netmask to the test interface if it exists.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        # sometimes the VM needs a bit of extra time until it can assign an IP
+        self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
+
 
 class LoadGen(Server):
     """
@@ -1669,12 +1942,14 @@ class LoadGen(Server):
     >>> LoadGen('server.test.de')
     LoadGen(fqdn='server.test.de')
     """
+    test_iface_ip_net: Optional[str]
 
     def __init__(self: 'LoadGen',
                  fqdn: str,
                  test_iface: str,
                  test_iface_addr: str,
                  test_iface_mac: str,
+                 test_iface_ip_net: Optional[str],
                  test_iface_driv: str,
                  tmux_socket: str,
                  moongen_dir: str,
@@ -1730,6 +2005,7 @@ class LoadGen(Server):
                          test_iface_driv, tmux_socket, moongen_dir,
                          moonprogs_dir, xdp_reflector_dir, localhost,
                          ssh_config=ssh_config, ssh_as_root=ssh_as_root)
+        self.test_iface_ip_net = test_iface_ip_net
 
     @staticmethod
     def run_l2_load_latency(server: Server,
@@ -1787,3 +2063,37 @@ class LoadGen(Server):
         -------
         """
         server.tmux_kill('loadlatency')
+
+    @staticmethod
+    def start_wrk2(server: 'Server', url: str, script_path: str, duration: int = 11, rate: int = 10, connections: int = 16, threads: int = 8, outfile: str = "/tmp/outfile.log", workdir: str ="./"):
+        docker_cmd = f'docker run -ti --mount type=bind,source=./wrk2,target=/wrk2 --network host wrk2d'
+        wrk_cmd = f'wrk -D exp -t {threads} -c {connections} -d {duration} -L -s {script_path} http://{url} -R {rate}'
+        server.tmux_new('wrk2', f'cd {workdir}; ' +
+                        f'{docker_cmd} {wrk_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
+
+    @staticmethod
+    def stop_wrk2(server: 'Server'):
+        server.tmux_kill('wrk2')
+
+    def start_redis(self):
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        redis_cmd = f"redis-server \\*:6379 --protected-mode no"
+        nix_cmd = f"nix shell --inputs-from {project_root} nixpkgs#redis --command {redis_cmd}"
+        self.tmux_new("redis", f"{nix_cmd}; sleep 999")
+
+
+    def stop_redis(self):
+        self.tmux_kill("redis")
+
+    def setup_test_iface_ip_net(self: 'LoadGen'):
+        """
+        Assign ip address and netmask to the test interface if it exists.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        self.exec(f'sudo ip link set {self.test_iface} up')
+        self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')

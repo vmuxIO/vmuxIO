@@ -3,8 +3,8 @@
   src = pkgs.fetchFromGitHub {
     owner = "vmuxIO";
     repo = "nic-emu";
-    rev = "935dad0e354d6af4da3c65fb8dabdada5a0fdc20"; # dev/peter
-    sha256 = "sha256-8QFPwbPXL7yfgXL8f2oYQ7O65QH0Tid0evkUOu3gq8M=";
+    rev = "5d082302d1ccabdf5f2fec7f6cbcf8b8fb80d0f1"; # dev/peter
+    sha256 = "sha256-eG5jsSg5I+CRenQ33ELwUe76YrjMGLYhwmOttTqY3xo=";
     # rev = "cae125d7561c342c2d7d17dc5635f70ac7e4c7b7"; # main
     # sha256 = "sha256-c3wjS4gwun2RkuOf548Uaaqapfz1pFGFs91flCxXiSc=";
   };
@@ -12,7 +12,7 @@
   cargoLock = {
     lockFile = src + "/Cargo.lock";
     outputHashes = {
-      "libvfio-user-0.1.0" = "sha256-jxWy2/g3jVyGsdfEGxA+WoYMzQZwztSsDV+IwoJ82xk=";
+      "libvfio-user-0.1.0" = "sha256-gnveaOFTYNGG8ygF8avf9jFYxZc7GhieuJvGw8e6BLA=";
     };
   };
 

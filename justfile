@@ -35,7 +35,7 @@ vmuxE1000:
   sudo ip tuntap add mode tap {{vmuxTap}}
   sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
   sudo ip link set dev {{vmuxTap}} up
-  sudo {{proot}}/build/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}} -q
+  sudo {{proot}}/build/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}} -q -b 52:54:00:fa:00:60
   sudo ip link delete {{vmuxTap}}
 
 nic-emu:
@@ -348,8 +348,8 @@ build:
   if [[ -d build ]]; then meson build --wipe; else meson build; fi
   pushd subprojects/nic-emu; cargo build --no-default-features --features generate-bindings; cargo build --no-default-features --features generate-bindings --release; popd
   meson compile -C build
-  # meson build_release -Dbuildtype=release
-  # meson compile -C build_release
+  meson build_release -Dbuildtype=release
+  meson compile -C build_release
   clang++ {{proot}}/test/kni-latency/kni-latency.cpp -o {{proot}}/test/kni-latency/kni-latency -O3
   nix build -o {{proot}}/mg .#moongen
   nix build -o {{proot}}/mg21 .#moongen21
@@ -357,30 +357,104 @@ build:
   nix build -o {{proot}}/qemu .#qemu
   nix build -o {{proot}}/xdp .#xdp-reflector
   nix build -o {{proot}}/qemu-ioregionfd .#qemu-ioregionfd
+  nix build -o {{proot}}/ycsb .#ycsb
   nix build -o {{proot}}/vmux-nixbuild .#vmux
 
-vm-overwrite:
+update:
+  # update nix flake inputs
+  nix flake update
+  # use `nix flake lock --update-input INPUT` to update a selected input only
+
+  # update git submodules to the latest version of their branch
+  git submodule update --remote --recursive
+  # use `git submodule update --remote -- PATH` to update a selected git submodule only
+
+docker-rebuild:
+  cd subprojects/deathstarbench/wrk2; docker build -t wrk2d .
+
+  cd subprojects/deathstarbench/hotelReservation; docker-compose build
+  docker image save -o {{proot}}/VMs/docker-images-hotelReservation.tar $(yq -r ".services[] | .image" subprojects/deathstarbench/hotelReservation/docker-compose.yml)
+  # cd subprojects/deathstarbench/hotelReservation; docker-compose up
+  # cd subprojects/deathstarbench/hotelReservation; docker run -ti --mount type=bind,source=$(pwd)/wrk2,target=/wrk2 --network host wrk2 wrk -D exp -t 1 -c 1 -d 1 -L -s ./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua http://localhost:5000 -R 1
+
+  cd subprojects/deathstarbench/socialNetwork; docker-compose build
+  docker image save -o {{proot}}/VMs/docker-images-socialNetwork.tar $(yq -r ".services[] | .image" subprojects/deathstarbench/socialNetwork/docker-compose.yml)
+
+  cd subprojects/deathstarbench/mediaMicroservices; docker-compose build
+  docker image save -o {{proot}}/VMs/docker-images-mediaMicroservices.tar $(yq -r ".services[] | .image" subprojects/deathstarbench/mediaMicroservices/docker-compose.yml)
+
+
+vm-init:
+  #!/usr/bin/env python3
+  import subprocess
+  import os
+  # Create directory for VMs cloud-init
+  os.makedirs(f"{{proot}}/VMs/cloud-init", exist_ok=True)
+
+  # IP address calculation
+  import ipaddress
+  start_ip = ipaddress.IPv4Address("192.168.56.20")
+
+
+  for i in range(1, 801):
+    print(f"wrinting cloud-init {i}")
+    ip = f"{start_ip + i - 1}"
+
+    # Network configuration
+    network_config = f"""
+  version: 2
+  ethernets:
+    eth0:
+      addresses:
+        - {ip}/255.255.248.0
+      gateway4: 192.168.1.254
+    """
+    with open(f"/tmp/network-data-{{user}}.yml", "w") as file:
+      file.write(network_config)
+      
+    # User data configuration
+    user_data = f"""
+  #cloud-config
+  preserve_hostname: false
+  hostname: guest{i}
+    """
+    with open(f"/tmp/user-data-{{user}}.yml", "w") as file:
+      file.write(user_data)
+
+    # Create cloud-init disk image
+    subprocess.run(["cloud-localds", f"--network-config=/tmp/network-data-{{user}}.yml", 
+                    f"{{proot}}/VMs/cloud-init/vm{i}.img", f"/tmp/user-data-{{user}}.yml"])
+
+  import shutil
+  shutil.copy("{{proot}}/VMs/cloud-init/vm1.img", "{{proot}}/VMs/cloud-init/vm0.img")
+
+
+vm-overwrite NUM="35": vm-init
+  #!/usr/bin/env bash
+  set -x
+  set -e
   mkdir -p {{proot}}/VMs
   nix build -o {{proot}}/VMs/kernel nixpkgs#linux
-  # nesting-host VM
-  nix build -o {{proot}}/VMs/nesting-host-image-ro .#nesting-host-image # read only
-  install -D -m644 {{proot}}/VMs/nesting-host-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-host-image.qcow2
-  qemu-img resize {{proot}}/VMs/nesting-host-image.qcow2 +8g
-  # nesting-host-extkern VM
-  nix build -o {{proot}}/VMs/nesting-host-extkern-image-ro .#nesting-host-extkern-image # read only
-  install -D -m644 {{proot}}/VMs/nesting-host-extkern-image-ro/nixos.qcow2 {{host_extkern_image}}
-  qemu-img resize {{proot}}/VMs/nesting-host-extkern-image.qcow2 +8g
-  # nesting-guest VM
-  nix build -o {{proot}}/VMs/nesting-guest-image-ro .#nesting-guest-image # read only
-  install -D -m644 {{proot}}/VMs/nesting-guest-image-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image.qcow2
-  qemu-img resize {{proot}}/VMs/nesting-guest-image.qcow2 +8g
-  nix build -o {{proot}}/VMs/nesting-guest-image-noiommu-ro .#nesting-guest-image-noiommu # read only
-  install -D -m644 {{proot}}/VMs/nesting-guest-image-noiommu-ro/nixos.qcow2 {{proot}}/VMs/nesting-guest-image-noiommu.qcow2
-  qemu-img resize {{proot}}/VMs/nesting-guest-image-noiommu.qcow2 +8g
-  # guest VM (for autotest)
-  nix build -o {{proot}}/VMs/guest-image-ro .#guest-image # read only
-  install -D -m644 {{proot}}/VMs/guest-image-ro/nixos.qcow2 {{proot}}/VMs/guest-image.qcow2
-  qemu-img resize {{proot}}/VMs/guest-image.qcow2 +8g
+
+  # build images fast
+
+  overwrite() {
+    install -D -m644 {{proot}}/VMs/ro-$1/nixos.qcow2 {{proot}}/VMs/$1.qcow2
+    qemu-img resize {{proot}}/VMs/$1.qcow2 +8g
+  }
+
+  # when evaluating lots of images: --eval-max-memory-size 20000 --eval-workers 8 -j 16 --skip-cached
+  nix-fast-build -f .#all-images --out-link {{proot}}/VMs/ro
+  overwrite nesting-host-image
+  overwrite nesting-host-extkern-image
+  overwrite nesting-guest-image
+  overwrite nesting-guest-image-noiommu
+  overwrite guest-image
+  for i in $(seq 1 {{NUM}}); do
+    # overwrite guest-image$i
+    install -D -m644 {{proot}}/VMs/ro-guest-image1/nixos.qcow2 {{proot}}/VMs/guest-image$i.qcow2
+    qemu-img resize {{proot}}/VMs/guest-image$i.qcow2 +16g
+  done
 
 dpdk-setup:
   modprobe vfio-pci
@@ -666,3 +740,12 @@ build-linux-shell:
 
 irqs *ARGS:
   python3 {{proot}}/subprojects/irq-rates.py {{ARGS}}
+
+gen-ssh-config:
+  #!/usr/bin/env python3
+  import ipaddress
+  start = ipaddress.IPv4Address("192.168.56.20")
+  for i in range(0, 800):
+    print(f"Host vm{i + 1}.*")
+    print(f"Hostname {start + i}")
+    print("")
