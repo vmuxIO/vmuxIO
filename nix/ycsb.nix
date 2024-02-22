@@ -28,10 +28,10 @@ pkgs.stdenv.mkDerivation rec {
       --set YCSB_HOME $out/share
   '';
 
-  # meta = with lib; {
-  #   description = "Simple command line wrapper around JD Core Java Decompiler project";
-  #   homepage = "https://github.com/intoolswetrust/jd-cli";
-  #   license = licenses.gpl3Plus;
-  #   maintainers = with maintainers; [ majiir ];
-  # };
+  meta = with lib; {
+    description = "Yahoo! Cloud Serving Benchmark";
+    homepage = "https://github.com/brianfrankcooper/YCSB";
+    license = licenses.asl20;
+    maintainers = with maintainers; [ pogobanane ];
+  };
 }

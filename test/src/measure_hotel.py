@@ -25,7 +25,6 @@ DURATION_S: int
 
 @dataclass
 class DeathStarBenchTest(AbstractBenchTest):
-    repetitions: int
     app: str # e.g. hotelReservation
     rps: int # requests per second
     interface: str # network interface used
@@ -50,7 +49,6 @@ class DeathStarBenchTest(AbstractBenchTest):
 
 
 class DeathStarBench:
-
     app: str
     docker_image_tar: str
     docker_compose: Dict[int, str] # vm id -> strings of content of docker-compose.yamls    
@@ -130,27 +128,6 @@ class DeathStarBench:
             self.service_map[vm_number] = service
             self.extra_hosts += f"{MultiHost.ip('192.168.56.20', vm_number)} {service}\n"
             vm_number += 1
-        # breakpoint()
-        # print("fo")
-
-    def parse_hotel_config(self) -> str:
-        """
-        return string containing config json
-        """
-        assert self.app == "hotelReservation"
-        with open(f"{PROJECT_ROOT}/subprojects/deathstarbench/hotelReservation/config.json", "r") as file:
-            config = json.load(file)
-
-        for key, maybeServiceName in config.items():
-            matched_service = list(filter(lambda item: item[1] == maybeServiceName.split(":")[0], self.service_map.items()))
-            assert len(matched_service) < 2 # we expect 1 or none match
-            if len(matched_service) == 0: continue # no match, nothing to replace
-            matched_service = matched_service[0]
-            service_name = matched_service[1]
-            vm_number = matched_service[0]
-            ip = MultiHost.ip("192.168.56.20", vm_number)
-            config[key] = maybeServiceName.replace(service_name, ip)
-        return str(json.dumps(config))
 
     def docker_compose_cleanup(self, guest: Guest):
         guest.exec("docker-compose down || true")
@@ -170,7 +147,6 @@ class DeathStarBench:
             return ret
         except IndexError:
             raise Exception(f"DeathStarBench.vm_number_of: service {service_name} not found")
-
 
     def run(self, host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: DeathStarBenchTest):
         assert test.app == self.app
@@ -199,7 +175,7 @@ class DeathStarBench:
                 url = self.frontend_url.split(":")
                 assert len(url) == 2
                 social_graph = "socfb-Reed98"
-                # doesnt fail if run twice
+                # doesnt fail if run twice, so we could remove the -f /inited-social check
                 loadgen.exec(f"cd {PROJECT_ROOT}/subprojects/deathstarbench/socialNetwork; nix develop {PROJECT_ROOT}# --command python3 scripts/init_social_graph.py --graph {social_graph} --limit {connections} --ip {url[0]} --port {url[1]} 2>&1 | tee /tmp/init-social.log")
                 frontend_guest.exec("touch /inited-social")
         if self.app == "mediaMicroservices":
@@ -209,7 +185,6 @@ class DeathStarBench:
             # tests fails if this is not run after a VM/docker-compose restart
             url = self.frontend_url.split("/")[0]
             prefix = f"{PROJECT_ROOT}/subprojects/deathstarbench/mediaMicroservices"
-            # i think this fails if run twice
             loadgen.exec(f"cd {prefix}; nix develop {PROJECT_ROOT}# --command python3 scripts/write_movie_info.py -c {prefix}/datasets/tmdb/casts.json -m {prefix}/datasets/tmdb/movies.json --limit {connections} --server_address http://{url} 2>&1 | tee /tmp/init-media.log")
             frontend_guest.exec("./scripts/register_users.sh")
             frontend_guest.exec("./scripts/register_movies.sh")

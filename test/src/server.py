@@ -16,7 +16,7 @@ import ipaddress
 import base64
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
-MAX_VMS: int = 30; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
+MAX_VMS: int = 35; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
 
 class MultiHost:
     """
@@ -32,7 +32,6 @@ class MultiHost:
         fqdn = ssh_hostname.split(".")
         fqdn[0] = f"{fqdn[0]}{vm_number}"
         return ".".join(fqdn)
-
 
     @staticmethod
     def mac(base_mac: str, vm_number: int) -> str:

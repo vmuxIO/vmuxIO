@@ -428,56 +428,6 @@ vm-init:
   import shutil
   shutil.copy("{{proot}}/VMs/cloud-init/vm1.img", "{{proot}}/VMs/cloud-init/vm0.img")
 
-vm-init-old:
-  #!/usr/bin/env bash
-  mkdir -p {{proot}}/VMs/cloud-init
-  function init() {
-    start_ip=20;
-    ip="192.168.56.$((start_ip + $i - 1))"
-    echo "
-  version: 2
-  ethernets:
-    eth0:
-      addresses:
-        - $ip/255.255.255.0
-      gateway4: 192.168.1.254
-  #version: 1
-  #config:
-  #   - type: physical
-  #     name: interface0
-  #     mac_address: "02:34:56:78:9a:bc"
-  #     subnets:
-  #        - type: static
-  #          address: 192.168.1.77
-  #          netmask: 255.255.255.0
-  #          gateway: 192.168.1.254
-  # version: 2
-  # ethernets:
-  #   interface0:
-  #     match:
-  #       name: eth0
-  #     addresses:
-  #     - 192.168.56.77/255.255.255.0
-  #     gateway4: 192.168.56.1
-    " > /tmp/network-data-{{user}}.yml
-    echo "#cloud-config
-  preserve_hostname: false
-  hostname: guest$i
-  # write_files:
-  # - content: |
-  #     # My new /etc/sysconfig/samba file
-  #     SMBDOPTIONS="-D"
-  #     foo
-  #   path: /foobar
-    " > /tmp/user-data-{{user}}.yml
-    cloud-localds --network-config=/tmp/network-data-{{user}}.yml {{proot}}/VMs/cloud-init/vm$i.img /tmp/user-data-{{user}}.yml
-  }
-
-  for i in $(seq 1 800); do
-    init i
-  done
-  cp {{proot}}/VMs/cloud-init/vm1.img {{proot}}/VMs/cloud-init/vm0.img
-
 
 vm-overwrite NUM="35": vm-init
   #!/usr/bin/env bash
