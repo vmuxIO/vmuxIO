@@ -14,6 +14,11 @@ public:
 
   char ifName[IFNAMSIZ];
 
+  Tap() {
+    this->alloc_rx_lists(1);
+    this->alloc_rx_bufs();
+  }
+
   virtual ~Tap() {
     close(this->fd); // does onthing if uninitialized (== 0)
   }
@@ -58,20 +63,25 @@ public:
   }
 
   void recv() {
-    size_t n = read(this->fd, &(this->rxFrame), Tap::MAX_BUF);
-    this->rxFrame_used = n;
+    size_t n = read(this->fd, this->rxBufs[0], Tap::MAX_BUF);
+    this->rxBuf_used[0] = n;
+    this->nb_bufs_used = 1;
     if (LOG_LEVEL >= LOG_DEBUG) {
       printf("recv %zu bytes\n", n);
-      Util::dump_pkt(&this->rxFrame, this->rxFrame_used);
+      Util::dump_pkt(this->rxBufs[0], this->rxBuf_used[0]);
     }
     if (n < 0)
       die("could not read from tap");
   }
 
+  virtual void recv_consumed() {
+    this->nb_bufs_used = 0;
+  }
+
   void dumpRx() {
     while (true) {
       this->recv();
-      Util::dump_pkt(this->rxFrame, this->rxFrame_used);
+      Util::dump_pkt(this->rxBufs[0], this->rxBuf_used[0]);
     }
   }
 };

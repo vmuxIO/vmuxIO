@@ -240,8 +240,12 @@ lcore_main(void)
 class Dpdk : public Driver {
 private:
 	struct rte_mempool *mbuf_pool;
+	struct rte_mbuf *bufs[BURST_SIZE];
+
 public:
 	Dpdk(int argc, char *argv[]) {
+		this->alloc_rx_lists(BURST_SIZE);
+
 		/*
  	 	 * The main function, which does initialization and calls the per-lcore
  	 	 * functions.
@@ -302,7 +306,7 @@ public:
 	}
 
 	virtual void send(const char *buf, const size_t len) {
-		lcore_init_checks();
+		// lcore_init_checks(); ignore cpu locality for now
 		uint16_t port;
 		RTE_ETH_FOREACH_DEV(port) {
 			// prepare packet buffer
@@ -329,7 +333,7 @@ public:
 	}
 
   virtual void recv() {
-		lcore_init_checks();
+		// lcore_init_checks(); ignore cpu locality for now
 		uint16_t port;
 
 		/*
@@ -339,29 +343,34 @@ public:
 		RTE_ETH_FOREACH_DEV(port) {
 
 			/* Get burst of RX packets, from first port of pair. */
-			struct rte_mbuf *bufs[BURST_SIZE];
 			const uint16_t nb_rx = rte_eth_rx_burst(port, 0,
-					bufs, BURST_SIZE);
+					this->bufs, BURST_SIZE);
 
 			if (unlikely(nb_rx == 0))
 				continue;
 
-			// place packet in vmux buffer
-			if (nb_rx - 1 > 0)
-				printf("dropping %d packets\n", nb_rx - 1);
-			struct rte_mbuf* buf = bufs[0]; // we checked before that there is at least one packet
-			void* pkt = rte_pktmbuf_mtod(buf, void*);
-			if (buf->nb_segs != 1)
-				die("This rx buffer has multiple segments. Unimplemented.");
-			if (buf->pkt_len >= this->MAX_BUF)
-				die("Cant handle packets of size %d", buf->pkt_len);
-			rte_memcpy(this->rxFrame, pkt, buf->pkt_len);
-			this->rxFrame_used = buf->pkt_len;
-			if_log_level(LOG_DEBUG, Util::dump_pkt(&this->rxFrame, this->rxFrame_used));
-
-      // free pkt
-			for (uint16_t buf = 0; buf < nb_rx; buf++)
-				rte_pktmbuf_free(bufs[buf]);
+			// place packets in vmux buffers
+			for (uint16_t i = 0; i < nb_rx; i++) {
+				struct rte_mbuf* buf = this->bufs[i]; // we checked before that there is at least one packet
+				char* pkt = rte_pktmbuf_mtod(buf, char*);
+				if (buf->nb_segs != 1)
+					die("This rx buffer has multiple segments. Unimplemented.");
+				if (buf->pkt_len >= this->MAX_BUF)
+					die("Cant handle packets of size %d", buf->pkt_len);
+				// rte_memcpy(this->rxBufs[i], pkt, buf->pkt_len);
+				this->rxBufs[i] = pkt;
+				this->rxBuf_used[i] = buf->pkt_len;
+				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
+			}
+			this->nb_bufs_used = nb_rx;
 		}
+  }
+
+  virtual void recv_consumed() {
+    // free pkt
+		for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++)
+			rte_pktmbuf_free(this->bufs[buf]);
+		
+    this->nb_bufs_used = 0;
   }
 };

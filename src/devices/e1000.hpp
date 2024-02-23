@@ -87,12 +87,13 @@ public:
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
     if (e1000_rx_is_ready(this_->e1000)) {
       this_->driver->recv();
-      if (this_->driver->rxFrame_used > 0) {
-        this_->ethRx((char*)&(this_->driver->rxFrame), this_->driver->rxFrame_used);
+      for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
+        while(!e1000_rx_is_ready(this_->e1000)) {}
+        this_->ethRx(this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]);
       }
+      this_->driver->recv_consumed();
       // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
     }
-    this_->driver->rxFrame_used = 0; // busy polling: reset rxFrame to denote it has been used.
   }
 
   void ethRx(char *data, size_t len) {
