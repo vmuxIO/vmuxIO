@@ -23,6 +23,45 @@
 #define MBUF_CACHE_SIZE 250
 #define BURST_SIZE 32
 
+// from dpdk/app/test/packet_burst_generator.c
+static void
+copy_buf_to_pkt_segs(void *buf, unsigned len, struct rte_mbuf *pkt,
+		unsigned offset)
+{
+	struct rte_mbuf *seg;
+	void *seg_buf;
+	unsigned copy_len;
+
+	seg = pkt;
+	while (offset >= seg->data_len) {
+		offset -= seg->data_len;
+		seg = seg->next;
+	}
+	copy_len = seg->data_len - offset;
+	seg_buf = rte_pktmbuf_mtod_offset(seg, char *, offset);
+	while (len > copy_len) {
+		rte_memcpy(seg_buf, buf, (size_t) copy_len);
+		len -= copy_len;
+		buf = ((char *) buf + copy_len);
+		seg = seg->next;
+		seg_buf = rte_pktmbuf_mtod(seg, void *);
+	}
+	rte_memcpy(seg_buf, buf, (size_t) len);
+}
+
+// from dpdk/app/test/packet_burst_generator.c
+static inline void
+copy_buf_to_pkt(void *buf, unsigned len, struct rte_mbuf *pkt, unsigned offset)
+{
+	if (offset + len <= pkt->data_len) {
+		rte_memcpy(rte_pktmbuf_mtod_offset(pkt, char *, offset), buf,
+			   (size_t) len);
+		return;
+	}
+	copy_buf_to_pkt_segs(buf, len, pkt, offset);
+}
+
+
 /* basicfwd.c: Basic DPDK skeleton forwarding example. */
 
 /*
@@ -198,58 +237,53 @@ lcore_main(void)
 /* >8 End Basic forwarding application lcore. */
 
 
-/*
- * The main function, which does initialization and calls the per-lcore
- * functions.
- */
-inline int
-dpdk_main(int argc, char *argv[])
-{
-	struct rte_mempool *mbuf_pool;
-	unsigned nb_ports;
-	uint16_t portid;
-
-	/* Initializion the Environment Abstraction Layer (EAL). 8< */
-	int ret = rte_eal_init(argc, argv);
-	if (ret < 0)
-		rte_exit(EXIT_FAILURE, "Error with EAL initialization\n");
-	/* >8 End of initialization the Environment Abstraction Layer (EAL). */
-
-	argc -= ret;
-	argv += ret;
-
-	/* Check that there is an even number of ports to send/receive on. */
-	nb_ports = rte_eth_dev_count_avail();
-	if (nb_ports != 1)
-		rte_exit(EXIT_FAILURE, "Error: number of ports must be 1. Is %d.\n", nb_ports);
-
-	/* Creates a new mempool in memory to hold the mbufs. */
-
-	/* Allocates mempool to hold the mbufs. 8< */
-	mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
-		MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
-	/* >8 End of allocating mempool to hold mbuf. */
-
-	if (mbuf_pool == NULL)
-		rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
-
-	/* Initializing all ports. 8< */
-	RTE_ETH_FOREACH_DEV(portid)
-		if (port_init(portid, mbuf_pool) != 0)
-			rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
-					portid);
-	/* >8 End of initializing all ports. */
-
-	if (rte_lcore_count() > 1)
-		printf("\nWARNING: Too many lcores enabled. Only 1 used.\n");
-
-	return 0;
-}
-
 class Dpdk : public Driver {
+private:
+	struct rte_mempool *mbuf_pool;
 public:
 	Dpdk(int argc, char *argv[]) {
-		dpdk_main(argc, argv);
+		/*
+ 	 	 * The main function, which does initialization and calls the per-lcore
+ 	 	 * functions.
+ 	 	 */
+		struct rte_mempool *mbuf_pool;
+		unsigned nb_ports;
+		uint16_t portid;
+
+		/* Initializion the Environment Abstraction Layer (EAL). 8< */
+		int ret = rte_eal_init(argc, argv);
+		if (ret < 0)
+			rte_exit(EXIT_FAILURE, "Error with EAL initialization\n");
+		/* >8 End of initialization the Environment Abstraction Layer (EAL). */
+
+		argc -= ret;
+		argv += ret;
+
+		/* Check that there is an even number of ports to send/receive on. */
+		nb_ports = rte_eth_dev_count_avail();
+		if (nb_ports != 1)
+			rte_exit(EXIT_FAILURE, "Error: number of ports must be 1. Is %d.\n", nb_ports);
+
+		/* Creates a new mempool in memory to hold the mbufs. */
+
+		/* Allocates mempool to hold the mbufs. 8< */
+		mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
+			MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
+		this->mbuf_pool = mbuf_pool;
+		/* >8 End of allocating mempool to hold mbuf. */
+
+		if (mbuf_pool == NULL)
+			rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
+
+		/* Initializing all ports. 8< */
+		RTE_ETH_FOREACH_DEV(portid)
+			if (port_init(portid, mbuf_pool) != 0)
+				rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
+						portid);
+		/* >8 End of initializing all ports. */
+
+		if (rte_lcore_count() > 1)
+			printf("\nWARNING: Too many lcores enabled. Only 1 used.\n");
 	}
 
 	virtual ~Dpdk() {
@@ -268,20 +302,30 @@ public:
 	}
 
 	virtual void send(const char *buf, const size_t len) {
-		// lcore_init_checks();
-		// uint16_t port;
-		// RTE_ETH_FOREACH_DEV(port) {
-		// 	/* Send burst of TX packets, back to same port. */
-		// 	const uint16_t nb_tx = rte_eth_tx_burst(port, 0,
-		// 			bufs, nb_rx);
-		//
-		// 	/* Free any unsent packets. */
-		// 	if (unlikely(nb_tx < nb_rx)) {
-		// 		uint16_t buf;
-		// 		for (buf = nb_tx; buf < nb_rx; buf++)
-		// 			rte_pktmbuf_free(bufs[buf]);
-		// 	}
-		// }
+		lcore_init_checks();
+		uint16_t port;
+		RTE_ETH_FOREACH_DEV(port) {
+			// prepare packet buffer
+			struct rte_mbuf *pkt;
+			pkt = rte_pktmbuf_alloc(this->mbuf_pool);
+			if (pkt == NULL) {
+				return; // drop packet
+			}
+			pkt->data_len = len;
+			pkt->pkt_len = len;
+			pkt->nb_segs = 1;
+			copy_buf_to_pkt((void*)buf, len, pkt, 0);
+
+			/* Send burst of TX packets. */
+			const uint16_t nb_tx = rte_eth_tx_burst(port, 0,
+					&pkt, 1);
+			if (nb_tx != 1) {
+				printf("\nWARNING: Sending packet failed. \n");
+			}
+
+			/* Free packets. */
+			rte_pktmbuf_free(pkt);
+		}
 	}
 
   virtual void recv() {
@@ -331,6 +375,10 @@ public:
 			rte_memcpy(this->rxFrame, pkt, buf->pkt_len);
 			this->rxFrame_used = buf->pkt_len;
       Util::dump_pkt(&this->rxFrame, this->rxFrame_used);
+
+      // free pkt
+			for (uint16_t buf = 0; buf < nb_rx; buf++)
+				rte_pktmbuf_free(bufs[buf]);
 		}
   }
 };
