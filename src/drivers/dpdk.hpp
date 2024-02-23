@@ -346,26 +346,9 @@ public:
 			if (unlikely(nb_rx == 0))
 				continue;
 
-			if_log_level(LOG_DEBUG, 
-				for (int i = 0; i < nb_rx; i++) {
-					struct rte_mbuf* buf = bufs[i];
-					if (buf->l2_type == RTE_PTYPE_L2_ETHER) {
-						// struct rte_ether_hdr* header = (struct rte_ether_hdr*) buf.buf_addr;
-						struct rte_ether_hdr* header = rte_pktmbuf_mtod(bufs[i], struct rte_ether_hdr *);
-						char src_addr[RTE_ETHER_ADDR_FMT_SIZE];
-						char dst_addr[RTE_ETHER_ADDR_FMT_SIZE];
-						rte_ether_format_addr(src_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->src_addr);
-						rte_ether_format_addr(dst_addr, RTE_ETHER_ADDR_FMT_SIZE, &header->dst_addr);
-						printf("ethernet (%d bytes) %s -> %s\n", buf->buf_len, src_addr, dst_addr);
-
-					} else {
-						printf("non ethernet packet: l2 type: %d\n", buf->l2_type);
-					}
-				}
-			);
-
 			// place packet in vmux buffer
-			printf("dropping %d packets\n", nb_rx - 1);
+			if (nb_rx - 1 > 0)
+				printf("dropping %d packets\n", nb_rx - 1);
 			struct rte_mbuf* buf = bufs[0]; // we checked before that there is at least one packet
 			void* pkt = rte_pktmbuf_mtod(buf, void*);
 			if (buf->nb_segs != 1)
@@ -374,7 +357,7 @@ public:
 				die("Cant handle packets of size %d", buf->pkt_len);
 			rte_memcpy(this->rxFrame, pkt, buf->pkt_len);
 			this->rxFrame_used = buf->pkt_len;
-      Util::dump_pkt(&this->rxFrame, this->rxFrame_used);
+			if_log_level(LOG_DEBUG, Util::dump_pkt(&this->rxFrame, this->rxFrame_used));
 
       // free pkt
 			for (uint16_t buf = 0; buf < nb_rx; buf++)
