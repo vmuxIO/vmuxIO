@@ -12,6 +12,9 @@
 #include <vector>
 #include <limits>
 #include <time.h>
+#include <generic/rte_cycles.h>
+#include <rte_cycles.h>
+#include <generic/rte_pause.h>
 
 // as per PCI spec, there can be at most 2048 MSIx inerrupts per device
 #define PCI_MSIX_MAX 2048
@@ -183,5 +186,13 @@ public:
             break; // No overflow, no need to continue
         }
     }
+  }
+
+  // approximates rte_get_timer_hz() as 3GHz
+  static void rte_delay_us_block(uint us) {
+    const uint64_t start = rte_get_timer_cycles();
+	  const uint64_t ticks = (uint64_t)us * 3000000000 / 1E6;
+	  while ((rte_get_timer_cycles() - start) < ticks)
+	  	rte_pause();
   }
 };

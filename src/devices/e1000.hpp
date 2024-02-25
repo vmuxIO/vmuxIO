@@ -88,7 +88,11 @@ public:
     if (e1000_rx_is_ready(this_->e1000)) {
       this_->driver->recv();
       for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
-        while(!e1000_rx_is_ready(this_->e1000)) {}
+        while(!e1000_rx_is_ready(this_->e1000)) {
+          // blocking pause to reduce memory contention while spinning.
+          // 100us seem to yield good results.
+          Util::rte_delay_us_block(100);
+        }
         this_->ethRx(this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]);
       }
       this_->driver->recv_consumed();
