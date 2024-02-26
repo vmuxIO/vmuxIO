@@ -38,8 +38,29 @@ vmuxE1000:
   sudo {{proot}}/build/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}} -q -b 52:54:00:fa:00:60
   sudo ip link delete {{vmuxTap}}
 
+vmuxE1000b BRIDGE="br-okelmann" IF="enp65s0np0":
+  sudo ip link set {{IF}} down || true
+  sudo ip link delete {{vmuxTap}} || true
+  sudo ip link delete {{BRIDGE}} || true
+
+  sudo ip link add {{BRIDGE}} type bridge
+  sudo ip addr add 10.2.0.1/24 dev {{BRIDGE}}
+  sudo ip link set {{IF}} master {{BRIDGE}}
+
+  sudo ip tuntap add mode tap {{vmuxTap}}
+  sudo ip link set {{vmuxTap}} master {{BRIDGE}}
+
+  sudo ip link set dev {{IF}} up
+  sudo ip link set dev {{BRIDGE}} up
+  sudo ip link set dev {{vmuxTap}} up
+  sudo {{proot}}/build_release/vmux -d none -t {{vmuxTap}} -m e1000-emu -s {{vmuxSock}} -q -b 52:54:00:fa:00:60
+
+  sudo ip link set {{IF}} down || true
+  sudo ip link delete {{vmuxTap}} || true
+  sudo ip link delete {{BRIDGE}} || true
+
 vmuxDpdk:
-  sudo {{proot}}/build/vmux -u -q -d none -m e1000-emu -s {{vmuxSock}} -- -l 1 -n 1
+  sudo {{proot}}/build_release/vmux -u -q -d none -m e1000-emu -s {{vmuxSock}} -- -l 1 -n 1
 
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true
