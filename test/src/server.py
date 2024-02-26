@@ -1647,7 +1647,7 @@ class Host(Server):
             )
         elif net_type == 'vfio':
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
-        elif net_type in [ 'vmux-pt', 'vmux-emu' ]:
+        elif net_type in [ 'vmux-pt', 'vmux-emu', 'vmux-dpdk' ]:
             test_net_config = \
                 f' -device vfio-user-pci,socket={MultiHost.vfu_path(self.vmux_socket_path, vm_number)}'
 
@@ -1741,9 +1741,12 @@ class Host(Server):
         -------
         """
         args = ""
+        dpdk_args = ""
         if interface == "vmux-pt":
             args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
-        if interface == "vmux-emu":
+        if interface == "vmux-dpdk":
+            dpdk_args += " -u -- -l 1 -n 1"
+        if interface in [ "vmux-emu", "vmux-dpdk"]:
             if num_vms == 0:
                 args = f' -s {self.vmux_socket_path} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m e1000-emu'
             else:
@@ -1755,6 +1758,7 @@ class Host(Server):
             'vmux',
             f'ulimit -n 4096; sudo {self.vmux_path} -q -b {base_mac}'
             f'{args}'
+            f'{dpdk_args}'
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
             f'; sleep 999'
         )

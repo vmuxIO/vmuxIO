@@ -199,7 +199,7 @@ def setup_parser() -> ArgumentParser:
                                   '--interface',
                                   type=str,
                                   choices=['brtap', 'brtap-e1000', 'macvtap',
-                                           'vfio', 'vmux-pt', 'vmux-emu'],
+                                           'vfio', 'vmux-pt', 'vmux-emu', 'vmux-dpdk'],
                                   default='brtap',
                                   help='Test network interface type.',
                                   )
@@ -276,7 +276,7 @@ def setup_parser() -> ArgumentParser:
                                       '--interface',
                                       type=str,
                                       choices=['brtap', 'brtap-e1000', 'macvtap',
-                                               'vfio', 'vmux-pt', 'vmux-emu'],
+                                               'vfio', 'vmux-pt', 'vmux-emu', 'vmux-dpdk'],
                                       default='brtap',
                                       help='Test network interface type.',
                                       )
@@ -640,7 +640,7 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
         qemu_path = args.qemu_path \
             if args.qemu_path \
             else (conf['host']['vmux_qemu_path']
-                  if args.interface in ['vfio', 'vmux']
+                  if args.interface in ['vfio', 'vmux'] # pretty sure these never match because they have been renamed
                   else conf['host']['qemu_path'])
 
         host.run_guest(args.interface, args.machine, vcpus, memory, disk,
@@ -700,6 +700,10 @@ def _setup_network(host: Host, interface: str) -> None:
         host.start_vmux(interface)
     elif interface == 'vmux-emu':
         host.setup_test_br_tap(multi_queue=False)
+        host.start_vmux(interface)
+    elif interface == 'vmux-dpdk':
+        host.delete_nic_ip_addresses(host.test_iface)
+        host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
         host.start_vmux(interface)
 
 
