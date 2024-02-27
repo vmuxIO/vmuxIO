@@ -422,9 +422,18 @@ public:
 #define FULL_MASK 0xffffffff /* full mask */
 #define EMPTY_MASK 0x0 /* empty mask */
 
-		flow = generate_ipv4_flow(port_id, selected_queue,
-					SRC_IP, EMPTY_MASK,
-					DEST_IP, FULL_MASK, &error);
+		struct rte_ether_addr src_mac;
+		struct rte_ether_addr src_mask;
+		struct rte_ether_addr dest_mac;
+		struct rte_ether_addr dest_mask;
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);
+		rte_ether_unformat_addr("52:54:00:fa:00:60", &dest_mac);
+		rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
+
+		flow = generate_eth_flow(port_id, selected_queue,
+					&src_mac, &src_mask,
+					&dest_mac, &dest_mask, &error);
 		/* >8 End of create flow and the flow rule. */
 		if (!flow) {
 		printf("Flow can't be created %d message: %s\n",
