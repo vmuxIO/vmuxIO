@@ -22,6 +22,32 @@ sims_flags = [
   '-Wno-pointer-arith'
 ]
 
+dpdk_flags = [
+  '-msse4.1',
+  '-mavx'
+]
+
+dpdk_link_args = [
+  '-lrte_eal',
+  '-lrte_ring', 
+  '-lrte_mempool', 
+  '-lrte_ethdev', 
+  '-lrte_mbuf', 
+  '-lrte_net', 
+  '-lrte_latencystats', 
+  '-lrte_cmdline', 
+  '-lrte_net_bond', 
+  '-lrte_metrics', 
+  '-lrte_gso', 
+  '-lrte_gro', 
+  '-lrte_net_ixgbe', 
+  '-lrte_net_i40e', 
+  '-lrte_net_bnxt', 
+  '-lrte_net_dpaa', 
+  '-lrte_bpf', 
+  '-lrte_bitratestats', 
+  ]
+
 libvfio_user = subproject('libvfio-user')
 libvfio_user_dep = libvfio_user.get_variable('libvfio_user_dep')
 
@@ -42,11 +68,11 @@ boost_dep = dependency('boost')
 exe = executable('vmux', 'src/main.cpp',
   sources,
   include_directories : incdir,
-  cpp_args : libvfio_user_cppflags + sims_flags,
+  cpp_args : libvfio_user_cppflags + sims_flags + dpdk_flags,
   c_args : sims_flags,
   # dependencies : [libvfio_user_dep, cxx.find_library('boost_fiber')],
   # link_args : '-lboost',
-  link_args : ['-lboost_fiber', '-lboost_context', '-lboost_timer', '-lboost_chrono'],
+  link_args : ['-lboost_fiber', '-lboost_context', '-lboost_timer', '-lboost_chrono'] + dpdk_link_args,
   dependencies : [libvfio_user_dep, boost_dep, nic_emu_dep],
   install : true)
 

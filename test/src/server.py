@@ -5,9 +5,10 @@ from logging import debug, warning, error
 from time import sleep
 from datetime import datetime
 from abc import ABC
-from os import listdir
+from os import listdir, remove
 from os.path import join as path_join
 from os.path import dirname as path_dirname
+from os.path import dirname as path_getsize
 from typing import Optional
 import netaddr
 from pathlib import Path
@@ -1606,7 +1607,32 @@ class Host(Server):
         # TODO this command should be build by the Guest object
         # it should take all the settings from the config file
         # and compile them.
+
+        # Build misc parameters
+
         dev_type = 'pci' if machine_type == 'pc' else 'device'
+        # TODO we need a different qemu build dir for vmux
+        qemu_bin_path = 'qemu-system-x86_64'
+        if qemu_build_dir:
+            qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
+        cpus = vcpus if vcpus else self.guest_vcpus
+        mem = memory if memory else self.guest_memory
+        disk_path = self.guest_root_disk_path
+        if root_disk:
+            disk_path = root_disk
+        disk_path = MultiHost.disk_path(disk_path, vm_number)
+        fsdev_config = ''
+        if self.fsdevs:
+            for name, path in self.fsdevs.items():
+                fsdev_config += (
+                    f' -fsdev local,path={path},security_model=none,' +
+                    f'id={name}fs' +
+                    f' -device virtio-9p-{dev_type},mount_tag={name},' +
+                    f'fsdev={name}fs'
+                )
+
+        # Build test network parameters
+
         test_net_config = ''
         if net_type == 'brtap':
             if BRIDGE_QUEUES == 0:
@@ -1647,33 +1673,23 @@ class Host(Server):
             )
         elif net_type == 'vfio':
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
-        elif net_type in [ 'vmux-pt', 'vmux-emu' ]:
+        elif net_type in [ 'vmux-pt', 'vmux-emu', 'vmux-dpdk' ]:
             test_net_config = \
                 f' -device vfio-user-pci,socket={MultiHost.vfu_path(self.vmux_socket_path, vm_number)}'
 
-        # TODO we need a different qemu build dir for vmux
-        qemu_bin_path = 'qemu-system-x86_64'
-        if qemu_build_dir:
-            qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
-        cpus = vcpus if vcpus else self.guest_vcpus
-        mem = memory if memory else self.guest_memory
-        disk_path = self.guest_root_disk_path
-        if root_disk:
-            disk_path = root_disk
-        disk_path = MultiHost.disk_path(disk_path, vm_number)
+        # Build memory backend parameter
+
         if self.has_hugepages1g:
-            memory_backend = f' -object memory-backend-file,mem-path=/dev/hugepages/qemu-memory{vm_number},prealloc=yes,id=bm,size={mem}M,share=on'
+            memory_path = f'/dev/hugepages/qemu-memory{vm_number}'
         else:
-            memory_backend = f' -object memory-backend-file,mem-path=/dev/shm/qemu-{vm_number},prealloc=yes,id=bm,size={mem}M,share=on'
-        fsdev_config = ''
-        if self.fsdevs:
-            for name, path in self.fsdevs.items():
-                fsdev_config += (
-                    f' -fsdev local,path={path},security_model=none,' +
-                    f'id={name}fs' +
-                    f' -device virtio-9p-{dev_type},mount_tag={name},' +
-                    f'fsdev={name}fs'
-                )
+            memory_path = f'/dev/shm/qemu-{vm_number}'
+        # if path_getsize(memory_path) != mem * 1024 * 1024:
+        if self.test("[[ $(stat --printf='%s' {memory_path}) -eq {mem*1024*1024} ]]"):
+            self.exec(f"sudo rm {memory_path}")
+        memory_backend = f' -object memory-backend-file,mem-path={memory_path},prealloc=yes,id=bm,size={mem}M,share=on'
+
+        # Actually start qemu in tmux
+
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
@@ -1741,9 +1757,12 @@ class Host(Server):
         -------
         """
         args = ""
+        dpdk_args = ""
         if interface == "vmux-pt":
             args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
-        if interface == "vmux-emu":
+        if interface == "vmux-dpdk":
+            dpdk_args += " -u -- -l 1 -n 1"
+        if interface in [ "vmux-emu", "vmux-dpdk"]:
             if num_vms == 0:
                 args = f' -s {self.vmux_socket_path} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m e1000-emu'
             else:
@@ -1755,6 +1774,7 @@ class Host(Server):
             'vmux',
             f'ulimit -n 4096; sudo {self.vmux_path} -q -b {base_mac}'
             f'{args}'
+            f'{dpdk_args}'
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
             f'; sleep 999'
         )

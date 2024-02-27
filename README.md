@@ -201,9 +201,9 @@ sln ./test/conf/autotest_rose_wilfred.cfg autotest.cfg
 Run scripted use-cases/benchmarks:
 
 ```bash
-python3 ./test/src/measure_vnf.py -c ./test/conf/autotest_rose_wilfred.cfg -vvv
-python3 ./test/src/measure_ycsb.py -c ./test/conf/autotest_rose_wilfred.cfg -vvv
-python3 ./test/src/measure_hotel.py -c ./test/conf/autotest_rose_wilfred.cfg -vvv
+python3 ./test/src/measure_vnf.py -c ./test/conf/autotest_rose_wilfred_small.cfg -vvv
+python3 ./test/src/measure_ycsb.py -c ./test/conf/autotest_rose_wilfred_small.cfg -vvv
+python3 ./test/src/measure_hotel.py -c ./test/conf/autotest_rose_wilfred_small.cfg -vvv
 ls /tmp/out1 # artefacts
 ```
 
@@ -211,11 +211,11 @@ Autotest micro-benchmarks:
 
 ```bash
 # tests for big VMs:
-python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred.cfg run-guest -i vmux
+python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred.cfg run-guest -i vmux-pt
 python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred.cfg test-load-lat-file -t test/conf/tests_multihost.cfg
-# tests for small VMs:
-python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_scalable.cfg run-guest -i vmux
-python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_scalable.cfg test-load-lat-file -t test/conf/tests_scalable_multihost.cfg
+# tests for medium VMs:
+python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_medium.cfg run-guest -i vmux-pt
+python3 ./test/autotest -vvv -c test/conf/autotest_rose_wilfred_medium.cfg test-load-lat-file -t test/conf/tests_scalable_multihost.cfg
 ls ./outputs # artefacts
 ```
 

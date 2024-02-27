@@ -7,18 +7,19 @@
 #include <linux/if_tun.h>
 #include <sys/epoll.h>
 #include <sys/ioctl.h>
+#include "src/drivers/driver.hpp"
 
-class Tap {
+class Tap : public Driver {
 public:
-  static const int MAX_BUF = 9000; // should be enough even for most jumboframes
 
   char ifName[IFNAMSIZ];
-  int fd = 0;
-  char rxFrame[MAX_BUF];
-  size_t rxFrame_used; // how much rxFrame is actually filled with data
-  char txFrame[MAX_BUF];
 
-  ~Tap() {
+  Tap() {
+    this->alloc_rx_lists(1);
+    this->alloc_rx_bufs();
+  }
+
+  virtual ~Tap() {
     close(this->fd); // does onthing if uninitialized (== 0)
   }
 
@@ -26,7 +27,7 @@ public:
     struct ifreq ifr;
     int fd, err;
 
-    if ((fd = open("/dev/net/tun", O_RDWR)) < 0) // TODO noblock plz
+    if ((fd = open("/dev/net/tun", O_RDWR)) < 0)
       die("Cannot open /dev/net/tun");
 
     memset(&ifr, 0, sizeof(ifr));
@@ -62,20 +63,25 @@ public:
   }
 
   void recv() {
-    size_t n = read(this->fd, &(this->rxFrame), Tap::MAX_BUF);
-    this->rxFrame_used = n;
+    size_t n = read(this->fd, this->rxBufs[0], Tap::MAX_BUF);
+    this->rxBuf_used[0] = n;
+    this->nb_bufs_used = 1;
     if (LOG_LEVEL >= LOG_DEBUG) {
       printf("recv %zu bytes\n", n);
-      Util::dump_pkt(&this->rxFrame, this->rxFrame_used);
+      Util::dump_pkt(this->rxBufs[0], this->rxBuf_used[0]);
     }
     if (n < 0)
       die("could not read from tap");
   }
 
+  virtual void recv_consumed() {
+    this->nb_bufs_used = 0;
+  }
+
   void dumpRx() {
     while (true) {
       this->recv();
-      Util::dump_pkt(this->rxFrame, this->rxFrame_used);
+      Util::dump_pkt(this->rxBufs[0], this->rxBuf_used[0]);
     }
   }
 };

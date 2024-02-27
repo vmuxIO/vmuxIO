@@ -1,6 +1,6 @@
 { fetchFromGitHub
 , pkgs
-, libnic-emu
+, flakepkgs
 }:
 let 
   srcpack = {
@@ -20,7 +20,7 @@ let
       fetchSubmodules = true;
       sha256 = "sha256-9bT1eQvjw87JjVc05Eia8CRVACEfcQf9a3JDrMy4GUg=";
     };
-    nic-emu = libnic-emu.src;
+    nic-emu = flakepkgs.libnic-emu.src;
   };
 in
 pkgs.clangStdenv.mkDerivation {
@@ -40,8 +40,8 @@ pkgs.clangStdenv.mkDerivation {
     chmod -R u+w $sourceRoot/subprojects/nic-emu
 
     # we build libnic-emu artifacts in another package and use dont_build_libnic_emu=true
-    cp ${libnic-emu}/lib/libnic_emu.a $sourceRoot/
-    cp ${libnic-emu}/lib/include/* $sourceRoot/src
+    cp ${flakepkgs.libnic-emu}/lib/libnic_emu.a $sourceRoot/
+    cp ${flakepkgs.libnic-emu}/lib/include/* $sourceRoot/src
   '';
 
   nativeBuildInputs = with pkgs; [
@@ -71,10 +71,11 @@ pkgs.clangStdenv.mkDerivation {
     luajit
     libpcap
     (boost.override { enableStatic = true; enableShared = false; })
+    flakepkgs.dpdk23
 
     json_c
     cmocka
-    libnic-emu
+    flakepkgs.libnic-emu
   ];
 
   hardeningDisable = [ "all" ];

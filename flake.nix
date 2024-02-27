@@ -88,7 +88,7 @@
     packages = {
       default = selfpkgs.vmux;
 
-      vmux = pkgs.callPackage ./nix/vmux.nix { inherit (flakepkgs) libnic-emu; };
+      vmux = pkgs.callPackage ./nix/vmux.nix { inherit flakepkgs; };
       libnic-emu = pkgs.callPackage ./nix/nic-emu.nix {};
 
       # moongen/dpdk
@@ -272,8 +272,8 @@
           ps.isort
           ps.mypy
         ]))
-      ] ++ (with self.packages; [
-        dpdk
+      ] ++ (with self.packages.x86_64-linux; [
+        dpdk23
         #self.packages.x86_64-linux.qemu
         qemu # nixpkgs vanilla qemu
         docker-compose
