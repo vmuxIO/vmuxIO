@@ -500,7 +500,7 @@ public:
 		}
 	}
 
-  virtual void recv() {
+  virtual void recv(int vm_id) {
 		// lcore_init_checks(); ignore cpu locality for now
 		uint16_t port = 0;
 
@@ -508,16 +508,18 @@ public:
 	 	 * Receive packets on a port and forward them on the same
 	 	 * port. 
 	 	 */
-		for (int queue_id = 0; queue_id < 2; queue_id++) {
+		// for (int queue_id = 0; queue_id < 2; queue_id++) {
+		int queue_id = vm_id;
 
 			/* Get burst of RX packets, from first port of pair. */
 			const uint16_t nb_rx = rte_eth_rx_burst(port, queue_id,
 					this->bufs, BURST_SIZE);
 
 			if (unlikely(nb_rx == 0))
-				continue;
+				return;
+				// continue;
 
-			// place packets in vmux buffers
+			// pass pointers to packet buffers via rxBufs to behavioral model
 			for (uint16_t i = 0; i < nb_rx; i++) {
 				struct rte_mbuf* buf = this->bufs[i]; // we checked before that there is at least one packet
 				char* pkt = rte_pktmbuf_mtod(buf, char*);
@@ -532,10 +534,10 @@ public:
 				if_log_level(LOG_ERR, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}
 			this->nb_bufs_used = nb_rx;
-		}
+		// }
   }
 
-  virtual void recv_consumed() {
+  virtual void recv_consumed(int vm_id) {
     // free pkt
 		for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++)
 			rte_pktmbuf_free(this->bufs[buf]);

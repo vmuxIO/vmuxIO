@@ -84,7 +84,8 @@ int _main(int argc, char **argv) {
   std::shared_ptr<GlobalInterrupts> globalIrq;
   std::vector<std::unique_ptr<VmuxRunner>> runner;
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
-  std::vector<std::shared_ptr<VmuxDevice>> devices;
+  std::vector<std::shared_ptr<VmuxDevice>> devices; // all devices
+  std::vector<std::shared_ptr<VmuxDevice>> pollingDevices; // devices backed by poll based drivers
   std::vector<std::shared_ptr<VfioUserServer>> vfuServers;
   std::vector<std::shared_ptr<Driver>> drivers; // network backend for emulation
   std::string group_arg;
@@ -245,6 +246,8 @@ int _main(int argc, char **argv) {
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
     devices.push_back(device);
+    if (useDpdk)
+      pollingDevices.push_back(device);
   }
 
   for (size_t i = 0; i < pciAddresses.size(); i++) {
@@ -295,9 +298,9 @@ int _main(int argc, char **argv) {
             ->ethRx((char *)&data, sizeof(data));
         foobar = false;
       }
-      if (useDpdk) {
-        E1000EmulatedDevice::driver_cb(0, devices[0].get()); // TODO multi-VM support
-        // drivers[0]->recv(); // dpdk: do busy polling // TODO support multiple VMs
+      for (size_t j = 0; j < pollingDevices.size(); j++) {
+        // dpdk: do busy polling
+        E1000EmulatedDevice::driver_cb(j, devices[j].get());
       }
       int eventsc = epoll_wait(efd, events, 1024, poll_timeout);
       // printf("poll main %d\n", eventsc);
