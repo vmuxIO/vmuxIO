@@ -158,6 +158,15 @@ int _main(int argc, char **argv) {
     die("Command line arguments need to specify the same number of devices, "
         "taps, sockets and modes");
   }
+
+  // parse base mac
+  uint8_t base_mac[6];
+  int ret = Util::str_to_mac(base_mac_str.c_str(), &base_mac);
+  if (ret) {
+    errno = EINVAL;
+    die("Could not parse base MAC address (%d)", ret);
+  }
+      
   
   // start setting up vmux
 
@@ -187,7 +196,7 @@ int _main(int argc, char **argv) {
       dpdk_argc = 0;
     }
 
-    auto dpdk = std::make_shared<Dpdk>(dpdk_argc, dpdk_argv);
+    auto dpdk = std::make_shared<Dpdk>(sockets.size(), &base_mac, dpdk_argc, dpdk_argv);
     for (size_t i = 0; i < sockets.size(); i++) {
       drivers.push_back(dpdk); // everyone shares a single dpdk backend
     }
@@ -228,13 +237,6 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>();
     }
     if (modes[i] == "e1000-emu") {
-      // parse base mac
-      uint8_t base_mac[6];
-      int ret = Util::str_to_mac(base_mac_str.c_str(), &base_mac);
-      if (ret) {
-        die("Could not parse base MAC address (%d)", ret);
-      }
-      
       // increment base_mac
       uint8_t mac_addr[6];
       memcpy(mac_addr, base_mac, sizeof(mac_addr));

@@ -3,6 +3,7 @@
  */
 
 #include <cstdint>
+#include <cstring>
 #include <fcntl.h>
 #include <rte_mbuf_ptype.h>
 #include <rte_memcpy.h>
@@ -364,7 +365,7 @@ private:
 	uint16_t port_id;
 
 public:
-	Dpdk(int argc, char *argv[]) {
+	Dpdk(int num_vms, const uint8_t (*mac_addr)[6], int argc, char *argv[]) {
 		this->alloc_rx_lists(BURST_SIZE);
 
 		/*
@@ -401,8 +402,7 @@ public:
 			rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
 		static uint16_t port_id = 0;
-		static uint16_t nr_queues = 5;
-		static uint8_t selected_queue = 1;
+		static uint16_t nr_queues = num_vms;
 		struct rte_flow *flow;
 		struct rte_flow_error error;
 		this->port_id = port_id;
@@ -428,20 +428,24 @@ public:
 		struct rte_ether_addr dest_mask;
 		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
 		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);
-		rte_ether_unformat_addr("52:54:00:fa:00:60", &dest_mac);
+		// rte_ether_unformat_addr("52:54:00:fa:00:60", &dest_mac);
 		rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
 
-		flow = generate_eth_flow(port_id, selected_queue,
-					&src_mac, &src_mask,
-					&dest_mac, &dest_mask, &error);
-		/* >8 End of create flow and the flow rule. */
-		if (!flow) {
-		printf("Flow can't be created %d message: %s\n",
-			error.type,
-			error.message ? error.message : "(no stated reason)");
-		rte_exit(EXIT_FAILURE, "error in creating flow");
+		for (int queue_nb = 0; queue_nb < num_vms; queue_nb++) {
+			memcpy(&dest_mac, mac_addr, 6);
+			Util::intcrement_mac((uint8_t*)&dest_mac, queue_nb);
+			flow = generate_eth_flow(port_id, queue_nb,
+						&src_mac, &src_mask,
+						&dest_mac, &dest_mask, &error);
+			/* >8 End of create flow and the flow rule. */
+			if (!flow) {
+			printf("Flow can't be created %d message: %s\n",
+				error.type,
+				error.message ? error.message : "(no stated reason)");
+			rte_exit(EXIT_FAILURE, "error in creating flow");
+			}
+			/* >8 End of creating flow for send packet with. */
 		}
-		/* >8 End of creating flow for send packet with. */
 
 
 		if (rte_lcore_count() > 1)
@@ -500,6 +504,7 @@ public:
 		}
 	}
 
+	// each recv(vm) call must be followed up with a recv_consumed(vm) call. No other VMs may receive in between. Otherwise it is unclear which VM owns which buffers
   virtual void recv(int vm_id) {
 		// lcore_init_checks(); ignore cpu locality for now
 		uint16_t port = 0;
@@ -530,8 +535,8 @@ public:
 				// rte_memcpy(this->rxBufs[i], pkt, buf->pkt_len);
 				this->rxBufs[i] = pkt;
 				this->rxBuf_used[i] = buf->pkt_len;
-				printf("queue %d: ", queue_id);
-				if_log_level(LOG_ERR, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
+				if_log_level(LOG_DEBUG, printf("queue %d: ", queue_id));
+				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}
 			this->nb_bufs_used = nb_rx;
 		// }
