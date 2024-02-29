@@ -11,6 +11,7 @@
 #include <string>
 
 class E810EmulatedDevice : public VmuxDevice {
+  static const unsigned BAR_REGS = 0;
 private:
   std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
                                         //
@@ -141,10 +142,17 @@ private:
 
       int flags = Util::convert_flags(region.flags);
       flags |= VFU_REGION_FLAG_RW;
-      ret = vfu_setup_region(vfu.vfu_ctx, idx, region.len,
-                             &(this->expected_access_callback), flags, NULL,
-                             0,      // nr. items in bar_mmap_areas
-                             -1, 0); // fd -1 and offset 0 because fd is unused
+      if (idx == E810EmulatedDevice::BAR_REGS) { // the bm only serves registers on bar 2
+        ret = vfu_setup_region(vfu.vfu_ctx, idx, region.len,
+                               &(this->expected_access_callback), flags, NULL,
+                               0,      // nr. items in bar_mmap_areas
+                               -1, 0); // fd -1 and offset 0 because fd is unused
+      } else {
+        ret = vfu_setup_region(vfu.vfu_ctx, idx, region.len,
+                               &(this->unexpected_access_callback), flags, NULL,
+                               0,      // nr. items in bar_mmap_areas
+                               -1, 0); // fd -1 and offset 0 because fd is unused
+      }
       if (ret < 0) {
         die("failed to setup BAR region %d", idx);
       }
@@ -166,13 +174,31 @@ private:
              idx, (uint)region.len);
     }
   }
+
+  static ssize_t unexpected_access_callback(
+      [[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char *const buf,
+      [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
+      [[maybe_unused]] const bool is_write) {
+    printf("WARN: unexpected vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
+           offset, is_write);
+    return 0;
+  }
+
   static ssize_t expected_access_callback(
       [[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char *const buf,
       [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
       [[maybe_unused]] const bool is_write) {
-    printf("a vfio register/DMA access callback was \
-                triggered (at 0x%lx, is write %d.\n",
+    printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
            offset, is_write);
+    E810EmulatedDevice *device =
+        (E810EmulatedDevice *)vfu_get_private(vfu_ctx);
+    if (is_write) {
+      device->model->RegWrite(E810EmulatedDevice::BAR_REGS, offset, buf, count);
+      return count;
+    } else {
+      device->model->RegRead(E810EmulatedDevice::BAR_REGS, offset, buf, count);
+      return count;
+    }
     return 0;
   }
 };
