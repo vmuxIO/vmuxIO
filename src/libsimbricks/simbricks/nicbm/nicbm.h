@@ -29,6 +29,9 @@
 #include <cstring>
 #include <deque>
 #include <set>
+// #include "devices/e810.hpp"
+#include "vfio-server.hpp"
+#include "devices/vmux-device.hpp"
 #include "util.hpp"
 #include <memory>
 
@@ -61,13 +64,30 @@ class TimedEvent {
 
 /*
  * Adaptor to replace the simbricks class Runner
+ * Impl in e810.hpp.
  */
 class CallbackAdaptor {
+  private:
   public:
+    std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
+    // std::shared_ptr<E810EmulatedDevice> dev; 
+    CallbackAdaptor() {}
+
     /* these three are for `Runner::Device`. */
     void IssueDma(nicbm::DMAOp &op) {
-      printf("CallbackAdaptor::IssueDma:\n");
-      __builtin_dump_struct(&op, &printf);
+      printf("CallbackAdaptor::IssueDma: read %d, addr %lx, len %zu\n", !op.write_, op.dma_addr_, op.len_);
+      // __builtin_dump_struct(&op, &printf); // dump_struct doesnt work on classes
+      void *local_addr = this->vfu->dma_local_addr(op.dma_addr_, op.len_);
+      if (!local_addr) {
+        die("Could not translate DMA address");
+      }
+      if (op.write_) {
+        memcpy(local_addr, op.data_, op.len_);
+      } else {
+        memcpy(op.data_, local_addr, op.len_);
+      }
+      // TODO i40e_bm::DmaComplete
+      // dev->model->DmaComplete();
     }
     void MsiIssue(uint8_t vec) {
       printf("CallbackAdaptor::MsiIssue(%d)\n", vec);

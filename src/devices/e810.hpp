@@ -13,8 +13,6 @@
 class E810EmulatedDevice : public VmuxDevice {
   static const unsigned BAR_REGS = 0;
 private:
-  std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
-                                        //
   /** we don't pass the entire device to the model, but only the callback
    * adaptor. We choose this approach, because we don't want to purpose
    * build the device to fit the simbricks code, and don't want to change
@@ -24,6 +22,8 @@ private:
   SimbricksProtoPcieDevIntro deviceIntro = SimbricksProtoPcieDevIntro();
 
 public:
+  std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
+
   E810EmulatedDevice() {
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
@@ -36,6 +36,8 @@ public:
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
+    this->vfuServer = vfu;
+    this->callbacks->vfu = vfu;
     // set up vfio-user register mediation
     this->init_bar_callbacks(*vfu);
 
@@ -113,14 +115,31 @@ private:
     // device->model->SignalInterrupt(1, 1); // just as an example: do stuff
     return 0;
   }
+
+  // TODO join with E1000 dma_register_cb
   static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                               [[maybe_unused]] vfu_dma_info_t *info) {
     printf("dma register cb\n");
+    std::shared_ptr<VfioUserServer> vfu_ =
+        ((E810EmulatedDevice *)vfu_get_private(vfu_ctx))->vfuServer;
+    VfioUserServer *vfu =
+        vfu_.get(); // lets hope vfu_ stays around until end of this function
+                    // and map_dma_here only borrows vfu
+    uint32_t flags = 0; // unused here
+
+    VfioUserServer::map_dma_here(vfu_ctx, vfu, info, &flags);
   }
   static void dma_unregister_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                                 [[maybe_unused]] vfu_dma_info_t *info) {
     printf("dma unregister cb\n");
+    std::shared_ptr<VfioUserServer> vfu_ =
+        ((E810EmulatedDevice *)vfu_get_private(vfu_ctx))->vfuServer;
+    VfioUserServer *vfu =
+        vfu_.get(); // lets hope vfu_ stays around until end of this function
+                    // and map_dma_here only borrows vfu
+    VfioUserServer::unmap_dma_here(vfu_ctx, vfu, info);
   }
+
   static void irq_state_unimplemented_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                                          [[maybe_unused]] uint32_t start,
                                          [[maybe_unused]] uint32_t count,

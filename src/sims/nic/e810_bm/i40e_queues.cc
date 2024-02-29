@@ -102,7 +102,8 @@ void queue_base::trigger_fetch() {
 #ifdef DEBUG_QUEUES
   std::cout << "    dma addr = " << dma->dma_addr_ << logger::endl;
 #endif
-  dev.runner_->IssueDma(*dma);
+  // dev.runner_->IssueDma(*dma);
+  dev.vmux->IssueDma(*dma);
 }
 
 void queue_base::trigger_process() {
