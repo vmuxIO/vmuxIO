@@ -17,19 +17,20 @@ private:
    * adaptor. We choose this approach, because we don't want to purpose
    * build the device to fit the simbricks code, and don't want to change
    * the simbricks code too much to fit the vmux code. **/
-  std::shared_ptr<nicbm::CallbackAdaptor> callbacks;
+  std::shared_ptr<nicbm::Runner::CallbackAdaptor> callbacks;
 
   SimbricksProtoPcieDevIntro deviceIntro = SimbricksProtoPcieDevIntro();
 
 public:
-  std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
+  std::shared_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
 
   E810EmulatedDevice() {
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
-    this->model = std::make_unique<i40e::i40e_bm>();
+    this->model = std::make_shared<i40e::i40e_bm>();
 
-    this->callbacks = std::make_shared<nicbm::CallbackAdaptor>();
+    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>();
+    this->callbacks->model = this->model;
 
     this->model->vmux = this->callbacks;
     this->init_pci_ids();

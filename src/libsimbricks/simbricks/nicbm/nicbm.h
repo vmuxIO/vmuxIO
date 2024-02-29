@@ -29,7 +29,6 @@
 #include <cstring>
 #include <deque>
 #include <set>
-// #include "devices/e810.hpp"
 #include "vfio-server.hpp"
 #include "devices/vmux-device.hpp"
 #include "util.hpp"
@@ -62,64 +61,6 @@ class TimedEvent {
   int priority_;
 };
 
-/*
- * Adaptor to replace the simbricks class Runner
- * Impl in e810.hpp.
- */
-class CallbackAdaptor {
-  private:
-  public:
-    std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
-    // std::shared_ptr<E810EmulatedDevice> dev; 
-    CallbackAdaptor() {}
-
-    /* these three are for `Runner::Device`. */
-    void IssueDma(nicbm::DMAOp &op) {
-      printf("CallbackAdaptor::IssueDma: read %d, addr %lx, len %zu\n", !op.write_, op.dma_addr_, op.len_);
-      // __builtin_dump_struct(&op, &printf); // dump_struct doesnt work on classes
-      void *local_addr = this->vfu->dma_local_addr(op.dma_addr_, op.len_);
-      if (!local_addr) {
-        die("Could not translate DMA address");
-      }
-      if (op.write_) {
-        memcpy(local_addr, op.data_, op.len_);
-      } else {
-        memcpy(op.data_, local_addr, op.len_);
-      }
-      // TODO i40e_bm::DmaComplete
-      // dev->model->DmaComplete();
-    }
-    void MsiIssue(uint8_t vec) {
-      printf("CallbackAdaptor::MsiIssue(%d)\n", vec);
-    }
-    void MsiXIssue(uint8_t vec) {
-      printf("CallbackAdaptor::MsiXIssue(%d)\n", vec);
-    }
-    void IntXIssue(bool level) {
-      printf("CallbackAdaptor::IntXIssue(%d)\n", level);
-    }
-    void EthSend(const void *data, size_t len) {
-      printf("CallbackAdaptor::EthSend(len=%zu)\n", len);
-    }
-
-    void EventSchedule(nicbm::TimedEvent &evt) {
-      printf("CallbackAdaptor::EventSchedule\n");
-    }
-    void EventCancel(nicbm::TimedEvent &evt) {
-      printf("CallbackAdaptor::EventCancel\n");
-    }
-
-    uint64_t TimePs() const {
-     die("unimplemented");
-     return 0;
-    }
-    uint64_t GetMacAddr() const {
-     die("unimplemented");
-     return 0;
-    }
-};
-
-
 /**
  * The Runner drives the main simulation loop. It's initialized with a reference
  * to a device it should manage, and then once `runMain` is called, it will
@@ -130,6 +71,7 @@ class Runner {
  public:
 
   class Device;
+  class CallbackAdaptor;
 
   /**
    * Replaces the Runner class. Adapts behavioral models from simbricks or other libraries to an libvfio-user-ish interface. 
@@ -240,6 +182,64 @@ class Runner {
      */
     virtual void DevctrlUpdate(struct SimbricksProtoPcieH2DDevctrl &devctrl);
   };
+
+/*
+ * Adaptor to replace the simbricks class Runner
+ * Impl in e810.hpp.
+ */
+class CallbackAdaptor {
+  private:
+  public:
+    std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
+    std::shared_ptr<Device> model; 
+    CallbackAdaptor() {}
+
+    /* these three are for `Runner::Device`. */
+    void IssueDma(nicbm::DMAOp &op) {
+      printf("CallbackAdaptor::IssueDma: read %d, addr %lx, len %zu\n", !op.write_, op.dma_addr_, op.len_);
+      // __builtin_dump_struct(&op, &printf); // dump_struct doesnt work on classes
+      void *local_addr = this->vfu->dma_local_addr(op.dma_addr_, op.len_);
+      if (!local_addr) {
+        die("Could not translate DMA address");
+      }
+      if (op.write_) {
+        memcpy(local_addr, op.data_, op.len_);
+      } else {
+        memcpy(op.data_, local_addr, op.len_);
+      }
+      model->DmaComplete(op);
+    }
+    void MsiIssue(uint8_t vec) {
+      printf("CallbackAdaptor::MsiIssue(%d)\n", vec);
+    }
+    void MsiXIssue(uint8_t vec) {
+      printf("CallbackAdaptor::MsiXIssue(%d)\n", vec);
+    }
+    void IntXIssue(bool level) {
+      printf("CallbackAdaptor::IntXIssue(%d)\n", level);
+    }
+    void EthSend(const void *data, size_t len) {
+      printf("CallbackAdaptor::EthSend(len=%zu)\n", len);
+    }
+
+    void EventSchedule(nicbm::TimedEvent &evt) {
+      printf("CallbackAdaptor::EventSchedule\n");
+    }
+    void EventCancel(nicbm::TimedEvent &evt) {
+      printf("CallbackAdaptor::EventCancel\n");
+    }
+
+    uint64_t TimePs() const {
+     die("unimplemented");
+     return 0;
+    }
+    uint64_t GetMacAddr() const {
+     die("unimplemented");
+     return 0;
+    }
+};
+
+
 
  protected:
   struct EventCmp {
