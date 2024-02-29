@@ -167,14 +167,14 @@ def main() -> None:
     OUT_DIR = M_OUT_DIR
     BRIEF = M_BRIEF
 
-    interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
+    interfaces = [ Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.BRIDGE_E1000, Interface.BRIDGE ]
     rpsList = [ 10, 100, 500, 1000, 5000, 10000, 50000, 1000000 ]
     vm_nums = [ 1, 2, 4 ]
-    repetitions = 4
+    repetitions = 3
     DURATION_S = 61 if not BRIEF else 11
     if BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_EMU ]
+        interfaces = [ Interface.VMUX_DPDK ]
         rpsList = [ 10 ]
         repetitions = 1
         vm_nums = [ 4 ]

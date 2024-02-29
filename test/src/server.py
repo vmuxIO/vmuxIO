@@ -1684,7 +1684,7 @@ class Host(Server):
         else:
             memory_path = f'/dev/shm/qemu-{vm_number}'
         # if path_getsize(memory_path) != mem * 1024 * 1024:
-        if self.test("[[ $(stat --printf='%s' {memory_path}) -eq {mem*1024*1024} ]]"):
+        if self.test("[[ -f {memory_path} && $(stat --printf='%s' {memory_path}) -eq {mem*1024*1024} ]]"):
             self.exec(f"sudo rm {memory_path}")
         memory_backend = f' -object memory-backend-file,mem-path={memory_path},prealloc=yes,id=bm,size={mem}M,share=on'
 

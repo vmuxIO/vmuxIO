@@ -2,6 +2,10 @@
  * Copyright(c) 2010-2015 Intel Corporation
  */
 
+#pragma once
+
+#include <cstdint>
+#include <cstring>
 #include <fcntl.h>
 #include <rte_mbuf_ptype.h>
 #include <rte_memcpy.h>
@@ -15,6 +19,7 @@
 #include <rte_mbuf.h>
 #include "src/util.hpp"
 #include "src/drivers/driver.hpp"
+#include "src/drivers/flow_blocks.hpp"
 
 #define RX_RING_SIZE 1024
 #define TX_RING_SIZE 1024
@@ -60,6 +65,124 @@ copy_buf_to_pkt(void *buf, unsigned len, struct rte_mbuf *pkt, unsigned offset)
 	}
 	copy_buf_to_pkt_segs(buf, len, pkt, offset);
 }
+
+#define CHECK_INTERVAL 1000  /* 100ms */
+#define MAX_REPEAT_TIMES 90  /* 9s (90 * 100ms) in total */
+
+static void
+assert_link_status(uint16_t port_id)
+{
+	struct rte_eth_link link;
+	uint8_t rep_cnt = MAX_REPEAT_TIMES;
+	int link_get_err = -EINVAL;
+
+	memset(&link, 0, sizeof(link));
+	do {
+		link_get_err = rte_eth_link_get(port_id, &link);
+		if (link_get_err == 0 && link.link_status == RTE_ETH_LINK_UP)
+			break;
+		rte_delay_ms(CHECK_INTERVAL);
+	} while (--rep_cnt);
+
+	if (link_get_err < 0)
+		rte_exit(EXIT_FAILURE, ":: error: link get is failing: %s\n",
+			 rte_strerror(-link_get_err));
+	if (link.link_status == RTE_ETH_LINK_DOWN)
+		rte_exit(EXIT_FAILURE, ":: error: link is still down\n");
+}
+
+/* Port initialization used in flow filtering. 8< */
+static void
+filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mbuf_pool)
+{
+	int ret;
+	uint16_t i;
+	/* Ethernet port configured with default settings. 8< */
+	struct rte_eth_conf port_conf = {
+		.txmode = {
+			.offloads =
+				RTE_ETH_TX_OFFLOAD_VLAN_INSERT |
+				RTE_ETH_TX_OFFLOAD_IPV4_CKSUM  |
+				RTE_ETH_TX_OFFLOAD_UDP_CKSUM   |
+				RTE_ETH_TX_OFFLOAD_TCP_CKSUM   |
+				RTE_ETH_TX_OFFLOAD_SCTP_CKSUM  |
+				RTE_ETH_TX_OFFLOAD_TCP_TSO,
+		},
+	};
+	struct rte_eth_txconf txq_conf;
+	struct rte_eth_rxconf rxq_conf;
+	struct rte_eth_dev_info dev_info;
+
+	ret = rte_eth_dev_info_get(port_id, &dev_info);
+	if (ret != 0)
+		rte_exit(EXIT_FAILURE,
+			"Error during getting device (port %u) info: %s\n",
+			port_id, strerror(-ret));
+
+	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
+	printf(":: initializing port: %d\n", port_id);
+	ret = rte_eth_dev_configure(port_id,
+				nr_queues, nr_queues, &port_conf);
+	if (ret < 0) {
+		rte_exit(EXIT_FAILURE,
+			":: cannot configure device: err=%d, port=%u\n",
+			ret, port_id);
+	}
+
+	rxq_conf = dev_info.default_rxconf;
+	rxq_conf.offloads = port_conf.rxmode.offloads;
+	/* >8 End of ethernet port configured with default settings. */
+
+	/* Configuring number of RX and TX queues connected to single port. 8< */
+	for (i = 0; i < nr_queues; i++) {
+		ret = rte_eth_rx_queue_setup(port_id, i, 512,
+				     rte_eth_dev_socket_id(port_id),
+				     &rxq_conf,
+				     mbuf_pool);
+		if (ret < 0) {
+			rte_exit(EXIT_FAILURE,
+				":: Rx queue setup failed: err=%d, port=%u\n",
+				ret, port_id);
+		}
+	}
+
+	txq_conf = dev_info.default_txconf;
+	txq_conf.offloads = port_conf.txmode.offloads;
+
+	for (i = 0; i < nr_queues; i++) {
+		ret = rte_eth_tx_queue_setup(port_id, i, 512,
+				rte_eth_dev_socket_id(port_id),
+				&txq_conf);
+		if (ret < 0) {
+			rte_exit(EXIT_FAILURE,
+				":: Tx queue setup failed: err=%d, port=%u\n",
+				ret, port_id);
+		}
+	}
+	/* >8 End of Configuring RX and TX queues connected to single port. */
+
+	/* Setting the RX port to promiscuous mode. 8< */
+	ret = rte_eth_promiscuous_enable(port_id);
+	if (ret != 0)
+		rte_exit(EXIT_FAILURE,
+			":: promiscuous mode enable failed: err=%s, port=%u\n",
+			rte_strerror(-ret), port_id);
+	/* >8 End of setting the RX port to promiscuous mode. */
+
+	/* Starting the port. 8< */
+	ret = rte_eth_dev_start(port_id);
+	if (ret < 0) {
+		rte_exit(EXIT_FAILURE,
+			"rte_eth_dev_start:err=%d, port=%u\n",
+			ret, port_id);
+	}
+	/* >8 End of starting the port. */
+
+	assert_link_status(port_id);
+
+	printf(":: initializing port: %d done\n", port_id);
+}
+/* >8 End of Port initialization used in flow filtering. */
 
 
 /* basicfwd.c: Basic DPDK skeleton forwarding example. */
@@ -241,9 +364,10 @@ class Dpdk : public Driver {
 private:
 	struct rte_mempool *mbuf_pool;
 	struct rte_mbuf *bufs[BURST_SIZE];
+	uint16_t port_id;
 
 public:
-	Dpdk(int argc, char *argv[]) {
+	Dpdk(int num_vms, const uint8_t (*mac_addr)[6], int argc, char *argv[]) {
 		this->alloc_rx_lists(BURST_SIZE);
 
 		/*
@@ -279,21 +403,71 @@ public:
 		if (mbuf_pool == NULL)
 			rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
+		static uint16_t port_id = 0;
+		static uint16_t nr_queues = num_vms;
+		struct rte_flow *flow;
+		struct rte_flow_error error;
+		this->port_id = port_id;
+
 		/* Initializing all ports. 8< */
-		RTE_ETH_FOREACH_DEV(portid)
-			if (port_init(portid, mbuf_pool) != 0)
-				rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
-						portid);
+		filtering_init_port(port_id, nr_queues, mbuf_pool);
+		// RTE_ETH_FOREACH_DEV(portid)
+		// 	if (port_init(portid, mbuf_pool) != 0)
+		// 		rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
+		// 				portid);
 		/* >8 End of initializing all ports. */
+
+		/* Create flow for send packet with. 8< */
+
+#define SRC_IP ((0<<24) + (0<<16) + (0<<8) + 0) /* src ip = 0.0.0.0 */
+#define DEST_IP ((192<<24) + (168<<16) + (1<<8) + 1) /* dest ip = 192.168.1.1 */
+#define FULL_MASK 0xffffffff /* full mask */
+#define EMPTY_MASK 0x0 /* empty mask */
+
+		struct rte_ether_addr src_mac;
+		struct rte_ether_addr src_mask;
+		struct rte_ether_addr dest_mac;
+		struct rte_ether_addr dest_mask;
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);
+		// rte_ether_unformat_addr("52:54:00:fa:00:60", &dest_mac);
+		rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
+
+		for (int queue_nb = 0; queue_nb < num_vms; queue_nb++) {
+			memcpy(&dest_mac, mac_addr, 6);
+			Util::intcrement_mac((uint8_t*)&dest_mac, queue_nb);
+			flow = generate_eth_flow(port_id, queue_nb,
+						&src_mac, &src_mask,
+						&dest_mac, &dest_mask, &error);
+			/* >8 End of create flow and the flow rule. */
+			if (!flow) {
+			printf("Flow can't be created %d message: %s\n",
+				error.type,
+				error.message ? error.message : "(no stated reason)");
+			rte_exit(EXIT_FAILURE, "error in creating flow");
+			}
+			/* >8 End of creating flow for send packet with. */
+		}
+
 
 		if (rte_lcore_count() > 1)
 			printf("\nWARNING: Too many lcores enabled. Only 1 used.\n");
 	}
 
 	virtual ~Dpdk() {
-		/* clean up the EAL */
-		rte_eal_cleanup();
-	}
+		struct rte_flow_error error;
+		int ret;
+
+		/* closing and releasing resources */
+		rte_flow_flush(this->port_id, &error);
+		ret = rte_eth_dev_stop(this->port_id);
+		if (ret < 0)
+			printf("Failed to stop port %u: %s",
+		       	 this->port_id, rte_strerror(-ret));
+		rte_eth_dev_close(this->port_id);
+			/* clean up the EAL */
+			rte_eal_cleanup();
+		}
 
 	// blocks, busy waiting!
 	void poll_once() {
@@ -332,24 +506,27 @@ public:
 		}
 	}
 
-  virtual void recv() {
+	// each recv(vm) call must be followed up with a recv_consumed(vm) call. No other VMs may receive in between. Otherwise it is unclear which VM owns which buffers
+  virtual void recv(int vm_id) {
 		// lcore_init_checks(); ignore cpu locality for now
-		uint16_t port;
+		uint16_t port = 0;
 
 		/*
 	 	 * Receive packets on a port and forward them on the same
 	 	 * port. 
 	 	 */
-		RTE_ETH_FOREACH_DEV(port) {
+		// for (int queue_id = 0; queue_id < 2; queue_id++) {
+		int queue_id = vm_id;
 
 			/* Get burst of RX packets, from first port of pair. */
-			const uint16_t nb_rx = rte_eth_rx_burst(port, 0,
+			const uint16_t nb_rx = rte_eth_rx_burst(port, queue_id,
 					this->bufs, BURST_SIZE);
 
 			if (unlikely(nb_rx == 0))
-				continue;
+				return;
+				// continue;
 
-			// place packets in vmux buffers
+			// pass pointers to packet buffers via rxBufs to behavioral model
 			for (uint16_t i = 0; i < nb_rx; i++) {
 				struct rte_mbuf* buf = this->bufs[i]; // we checked before that there is at least one packet
 				char* pkt = rte_pktmbuf_mtod(buf, char*);
@@ -360,13 +537,14 @@ public:
 				// rte_memcpy(this->rxBufs[i], pkt, buf->pkt_len);
 				this->rxBufs[i] = pkt;
 				this->rxBuf_used[i] = buf->pkt_len;
+				if_log_level(LOG_DEBUG, printf("queue %d: ", queue_id));
 				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}
 			this->nb_bufs_used = nb_rx;
-		}
+		// }
   }
 
-  virtual void recv_consumed() {
+  virtual void recv_consumed(int vm_id) {
     // free pkt
 		for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++)
 			rte_pktmbuf_free(this->bufs[buf]);

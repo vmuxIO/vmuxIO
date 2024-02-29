@@ -62,7 +62,7 @@ public:
     }
   }
 
-  void recv() {
+  void recv(int _vm_number) {
     size_t n = read(this->fd, this->rxBufs[0], Tap::MAX_BUF);
     this->rxBuf_used[0] = n;
     this->nb_bufs_used = 1;
@@ -74,13 +74,13 @@ public:
       die("could not read from tap");
   }
 
-  virtual void recv_consumed() {
+  virtual void recv_consumed(int _vm_number) {
     this->nb_bufs_used = 0;
   }
 
   void dumpRx() {
     while (true) {
-      this->recv();
+      this->recv(0);
       Util::dump_pkt(this->rxBufs[0], this->rxBuf_used[0]);
     }
   }

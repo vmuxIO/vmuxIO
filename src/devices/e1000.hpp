@@ -83,10 +83,10 @@ public:
   }
 
   // forward rx event callback from tap to this E1000EmulatedDevice
-  static void driver_cb(int fd, void *this__) {
+  static void driver_cb(int vm_number, void *this__) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
     if (e1000_rx_is_ready(this_->e1000)) {
-      this_->driver->recv();
+      this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
       for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
         while(!e1000_rx_is_ready(this_->e1000)) {
           // blocking pause to reduce memory contention while spinning.
@@ -95,7 +95,7 @@ public:
         }
         this_->ethRx(this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]);
       }
-      this_->driver->recv_consumed();
+      this_->driver->recv_consumed(vm_number);
       // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
     }
   }
