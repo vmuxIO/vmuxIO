@@ -2,6 +2,8 @@
  * Copyright(c) 2010-2015 Intel Corporation
  */
 
+#pragma once
+
 #include <cstdint>
 #include <cstring>
 #include <fcntl.h>
