@@ -37,7 +37,8 @@ void control_queue_pair::create_cqp() {
     cqp_ctx_fetch *dma = new cqp_ctx_fetch(*this, 64, cqp_ctx);
     dma->dma_addr_ = base;
     dma->len_ = 64;
-    dev.runner_->IssueDma(*dma);
+    // dev.runner_->IssueDma(*dma);
+    dev.vmux->IssueDma(*dma);
     enabled = true;
     dev.regs.reg_PFPE_CQPTAIL = 0;
     if (dev.regs.reg_PFPE_CCQPLOW == 0){
@@ -137,7 +138,8 @@ void control_queue_pair::trigger_fetch() {
   std::cout << "cqe addr: "<< dma->dma_addr_<<logger::endl;
   dma->len_ = 64;
   dma->pos = 0;
-  dev.runner_->IssueDma(*dma);
+  // dev.runner_->IssueDma(*dma);
+  dev.vmux->IssueDma(*dma);
 
 }
 
@@ -170,7 +172,8 @@ void control_queue_pair::admin_desc_ctx::data_write(uint64_t addr, size_t data_l
   data_dma->write_ = true;
   data_dma->dma_addr_ = addr;
   memcpy(data_dma->data_, buf, data_len);
-  dev.runner_->IssueDma(*data_dma);
+  // dev.runner_->IssueDma(*data_dma);
+  dev.vmux->IssueDma(*data_dma);
 }
 
 void control_queue_pair::admin_desc_ctx::desc_compl_prepare(uint16_t retval,
