@@ -960,6 +960,10 @@ void i40e_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
     abort();
   }
 
+  // TODO implement delays
+  this->vmux->MsiXIssue(vec);
+  return;
+
   uint64_t curtime = runner_->TimePs();
   uint64_t newtime = curtime + mindelay;
   if (iev.armed && iev.time_ <= newtime) {
