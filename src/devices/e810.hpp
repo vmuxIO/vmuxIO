@@ -24,12 +24,12 @@ private:
 public:
   std::shared_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
 
-  E810EmulatedDevice() {
+  E810EmulatedDevice(const uint8_t (*mac_addr)[6]) {
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
     this->model = std::make_shared<i40e::i40e_bm>();
 
-    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>();
+    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>(mac_addr);
     this->callbacks->model = this->model;
 
     this->model->vmux = this->callbacks;

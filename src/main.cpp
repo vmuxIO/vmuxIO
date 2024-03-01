@@ -96,6 +96,7 @@ int _main(int argc, char **argv) {
   std::vector<std::string> sockets;
   std::vector<std::string> modes;
   bool useDpdk = false;
+  uint8_t mac_addr[6];
   while ((ch = getopt(argc, argv, "hd:t:s:m:b:qu")) != -1) {
     switch (ch) {
     case 'q':
@@ -227,6 +228,12 @@ int _main(int argc, char **argv) {
   // create devices
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     std::shared_ptr<VmuxDevice> device = NULL;
+
+    // increment base_mac
+    memcpy(mac_addr, base_mac, sizeof(mac_addr));
+    Util::intcrement_mac(mac_addr, i);
+
+    // create device
     if (modes[i] == "passthrough") {
       device = std::make_shared<PassthroughDevice>(vfioc[i], pciAddresses[i]);
     }
@@ -234,15 +241,9 @@ int _main(int argc, char **argv) {
       device = std::make_shared<StubDevice>();
     }
     if (modes[i] == "emulation") {
-      device = std::make_shared<E810EmulatedDevice>();
+      device = std::make_shared<E810EmulatedDevice>(&mac_addr);
     }
     if (modes[i] == "e1000-emu") {
-      // increment base_mac
-      uint8_t mac_addr[6];
-      memcpy(mac_addr, base_mac, sizeof(mac_addr));
-      Util::intcrement_mac(mac_addr, i);
-
-      // create device
       device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true, globalIrq, &mac_addr);
     }
     if (device == NULL)

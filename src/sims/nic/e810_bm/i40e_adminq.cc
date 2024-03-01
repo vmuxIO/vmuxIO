@@ -226,7 +226,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
         reinterpret_cast<struct ice_aqc_manage_mac_read *>(d->params.raw);
     ar->num_addr = 1;
     struct ice_aqc_manage_mac_read_resp ard;
-    uint64_t mac = dev.runner_->GetMacAddr();
+    // uint64_t mac = dev.runner_->GetMacAddr();
+    uint64_t mac = dev.vmux->GetMacAddr();
 #ifdef DEBUG_ADMINQ
     cout <<  "    mac = " << mac << logger::endl;
 #endif

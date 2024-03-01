@@ -189,10 +189,12 @@ class Runner {
  */
 class CallbackAdaptor {
   private:
+    const uint8_t (*mac_addr)[6];
   public:
     std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
     std::shared_ptr<Device> model; 
-    CallbackAdaptor() {}
+
+    CallbackAdaptor(const uint8_t (*mac_addr)[6]) : mac_addr(mac_addr) {}
 
     /* these three are for `Runner::Device`. */
     void IssueDma(nicbm::DMAOp &op) {
@@ -234,8 +236,9 @@ class CallbackAdaptor {
      return 0;
     }
     uint64_t GetMacAddr() const {
-     die("unimplemented");
-     return 0;
+     uint64_t mac = 0;
+     memcpy(&mac, this->mac_addr, sizeof(*this->mac_addr));
+     return mac;
     }
 };
 
