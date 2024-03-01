@@ -1,6 +1,7 @@
 #pragma once
 
 #include "libsimbricks/simbricks/nicbm/nicbm.h"
+#include "libvfio-user.h"
 #include "sims/nic/e810_bm/e810_bm.h"
 #include "src/devices/vmux-device.hpp"
 #include "util.hpp"
@@ -43,7 +44,14 @@ public:
     this->init_bar_callbacks(*vfu);
 
     // set up irqs
-    // TODO
+    this->init_irqs(*vfu);
+
+    // init pci capas
+    // capa copied from physical E810
+    unsigned char msix_capa[] = { 0x11, 0xa0, 0xff, 0x07, 0x03, 0x00, 0x00, 0x00, 0x03, 0x80, 0x00, 0x00 };
+    int ret = vfu_pci_add_capability(vfu->vfu_ctx, 0, 0, msix_capa);
+    if (ret < 0)
+      die("add cap error");
 
     // set up libvfio-user callbacks
     // vfu.setup_passthrough_callbacks(this->vfioc);
@@ -109,6 +117,16 @@ private:
             type);
     }
   }
+
+  void init_irqs(VfioUserServer &vfu) {
+    int ret = vfu_setup_device_nr_irqs(
+      vfu.vfu_ctx, VFU_DEV_MSIX_IRQ, 2048); // TODO constant
+    if (ret < 0) {
+      die("Cannot set up vfio-user irq (type %d, num %d)", VFU_DEV_MSIX_IRQ,
+          1);
+    }
+  }
+
   static int reset_device_cb(vfu_ctx_t *vfu_ctx,
                              [[maybe_unused]] vfu_reset_type_t type) {
     E810EmulatedDevice *device = (E810EmulatedDevice *)vfu_get_private(vfu_ctx);
