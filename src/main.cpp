@@ -244,7 +244,7 @@ int _main(int argc, char **argv) {
       device = std::make_shared<StubDevice>();
     }
     if (modes[i] == "emulation") {
-      device = std::make_shared<E810EmulatedDevice>(drivers[i], &mac_addr);
+      device = std::make_shared<E810EmulatedDevice>(drivers[i], efd, &mac_addr);
     }
     if (modes[i] == "e1000-emu") {
       device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true, globalIrq, &mac_addr);
@@ -306,7 +306,7 @@ int _main(int argc, char **argv) {
       }
       for (size_t j = 0; j < pollingDevices.size(); j++) {
         // dpdk: do busy polling
-        E1000EmulatedDevice::driver_cb(j, devices[j].get());
+        E1000EmulatedDevice::driver_cb(j, devices[j].get()); // TODO add E810
       }
       int eventsc = epoll_wait(efd, events, 1024, poll_timeout);
       // printf("poll main %d\n", eventsc);

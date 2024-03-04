@@ -24,10 +24,32 @@ private:
   SimbricksProtoPcieDevIntro deviceIntro = SimbricksProtoPcieDevIntro();
 
   const uint8_t mac_addr[6] = {};
+
+  epoll_callback tapCallback;
+  int efd = 0; // if non-null: eventfd registered for this->tap->fd
+
+  void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
+    if (driver->fd == 0)
+      return;
+      // die("E1000 only supports drivers that offer fds to wait on")
+
+    this->tapCallback.fd = driver->fd;
+    this->tapCallback.callback = E810EmulatedDevice::driver_cb;
+    this->tapCallback.ctx = this;
+    struct epoll_event e;
+    e.events = EPOLLIN;
+    e.data.ptr = &this->tapCallback;
+
+    if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, driver->fd, &e))
+      die("could not register driver fd to epoll");
+
+    this->efd = efd;
+  }
+
 public:
   std::shared_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
 
-  E810EmulatedDevice(std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6]) : VmuxDevice(driver) {
+  E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6]) : VmuxDevice(driver) {
     this->driver = driver;
     memcpy((void*)this->mac_addr, mac_addr, 6);
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
@@ -35,6 +57,7 @@ public:
     this->model = std::make_shared<i40e::i40e_bm>();
 
     this->init_pci_ids();
+    this->registerDriverEpoll(driver, efd);
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
@@ -62,6 +85,16 @@ public:
     // vfu.setup_passthrough_callbacks(this->vfioc);
     this->init_general_callbacks(*vfu);
   };
+
+  // forward rx event callback from tap to this E1000EmulatedDevice
+  static void driver_cb(int vm_number, void *this__) {
+    E810EmulatedDevice *this_ = (E810EmulatedDevice*) this__;
+    this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
+    for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
+      this_->model->EthRx(0, this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
+    }
+    this_->driver->recv_consumed(vm_number);
+  }
 
   void init_pci_ids() {
     this->model->SetupIntro(this->deviceIntro);
