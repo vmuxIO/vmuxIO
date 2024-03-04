@@ -58,6 +58,7 @@ public:
 
     this->init_pci_ids();
     this->registerDriverEpoll(driver, efd);
+    this->rx_callback = E810EmulatedDevice::driver_cb;
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {

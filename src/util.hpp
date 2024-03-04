@@ -27,10 +27,12 @@
     throw std::runtime_error("See error above");                               \
   }
 
+typedef void (*callback_fn)(int, void *);
+
 struct epoll_callback {
   int fd;    // passed as arg1 to callback
   void *ctx; // passed as arg2 to callback
-  void (*callback)(int, void *);
+  callback_fn callback;
 };
 
 static int LOG_LEVEL = LOG_DEBUG;

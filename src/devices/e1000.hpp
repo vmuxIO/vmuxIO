@@ -74,6 +74,7 @@ public:
     this->init_pci_ids();
 
     this->registerDriverEpoll(driver, efd);
+    this->rx_callback = E1000EmulatedDevice::driver_cb;
   }
 
   ~E1000EmulatedDevice() { 

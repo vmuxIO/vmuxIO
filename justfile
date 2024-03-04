@@ -64,8 +64,11 @@ vmuxE1000b BRIDGE="br-okelmann" IF="enp65s0np0":
   sudo ip link delete {{vmuxTap}} || true
   sudo ip link delete {{BRIDGE}} || true
 
-vmuxDpdk:
+vmuxDpdkE1000:
   sudo {{proot}}/build_release/vmux -u -q -d none -m e1000-emu -s {{vmuxSock}} -- -l 1 -n 1
+
+vmuxDpdkE810:
+  sudo {{proot}}/build_release/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
 
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true

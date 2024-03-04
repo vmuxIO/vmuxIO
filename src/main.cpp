@@ -307,7 +307,7 @@ int _main(int argc, char **argv) {
       }
       for (size_t j = 0; j < pollingDevices.size(); j++) {
         // dpdk: do busy polling
-        E1000EmulatedDevice::driver_cb(j, devices[j].get()); // TODO add E810
+        devices[j]->rx_callback(j, devices[j].get());
       }
       int eventsc = epoll_wait(efd, events, 1024, poll_timeout);
       // printf("poll main %d\n", eventsc);

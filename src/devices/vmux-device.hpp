@@ -69,9 +69,11 @@ public:
 
   std::shared_ptr<Driver> driver;
 
+  callback_fn rx_callback;
+
   virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) = 0;
 
-  VmuxDevice(std::shared_ptr<Driver> driver) : driver(driver) {};
+  VmuxDevice(std::shared_ptr<Driver> driver) : driver(driver), rx_callback(NULL) {};
 
   virtual ~VmuxDevice() = default;
 };
