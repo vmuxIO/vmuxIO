@@ -25,7 +25,6 @@ static bool rust_logs_initialized = false;
 class E1000EmulatedDevice : public VmuxDevice {
 private:
   E1000FFI *e1000;
-  std::shared_ptr<Driver> driver;
   std::shared_ptr<InterruptThrottlerNone> irqThrottle;
   static const int bars_nr = 2;
   epoll_callback tapCallback;
@@ -50,7 +49,7 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(std::shared_ptr<Driver> driver, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq, const uint8_t (*mac_addr)[6]) : driver(driver) {
+  E1000EmulatedDevice(std::shared_ptr<Driver> driver, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq, const uint8_t (*mac_addr)[6]) : VmuxDevice(driver) {
     this->irqThrottle = std::make_shared<InterruptThrottlerNone>(efd, IRQ_IDX, globalIrq);
     globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {

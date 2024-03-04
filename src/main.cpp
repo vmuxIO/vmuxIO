@@ -43,6 +43,9 @@ extern "C" {
 #include "libvfio-user.h"
 }
 
+#define DEBUG_ADMINQ 1
+#define DEBUG_LAN 1
+
 // set true by signals, should be respected by runtime loops
 std::atomic<bool> quit(false);
 
@@ -241,7 +244,7 @@ int _main(int argc, char **argv) {
       device = std::make_shared<StubDevice>();
     }
     if (modes[i] == "emulation") {
-      device = std::make_shared<E810EmulatedDevice>(&mac_addr);
+      device = std::make_shared<E810EmulatedDevice>(drivers[i], &mac_addr);
     }
     if (modes[i] == "e1000-emu") {
       device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true, globalIrq, &mac_addr);

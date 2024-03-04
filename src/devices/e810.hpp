@@ -8,10 +8,11 @@
 #include "vfio-consumer.hpp"
 #include "vfio-server.hpp"
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 
-class E810EmulatedDevice : public VmuxDevice {
+class E810EmulatedDevice : public VmuxDevice, public std::enable_shared_from_this<E810EmulatedDevice> {
   static const unsigned BAR_REGS = 0;
 private:
   /** we don't pass the entire device to the model, but only the callback
@@ -22,24 +23,28 @@ private:
 
   SimbricksProtoPcieDevIntro deviceIntro = SimbricksProtoPcieDevIntro();
 
+  const uint8_t mac_addr[6] = {};
 public:
   std::shared_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
 
-  E810EmulatedDevice(const uint8_t (*mac_addr)[6]) {
+  E810EmulatedDevice(std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6]) : VmuxDevice(driver) {
+    this->driver = driver;
+    memcpy((void*)this->mac_addr, mac_addr, 6);
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
     this->model = std::make_shared<i40e::i40e_bm>();
 
-    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>(mac_addr);
-    this->callbacks->model = this->model;
-
-    this->model->vmux = this->callbacks;
     this->init_pci_ids();
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
     this->vfuServer = vfu;
+
+    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>(shared_from_this(), &this->mac_addr);
+    this->callbacks->model = this->model;
     this->callbacks->vfu = vfu;
+    this->model->vmux = this->callbacks;
+
     // set up vfio-user register mediation
     this->init_bar_callbacks(*vfu);
 

@@ -452,7 +452,8 @@ void lan_queue_tx::do_writeback(uint32_t first_idx, uint32_t first_pos,
 #ifdef DEBUG_LAN
     std::cout << " hwb=" << *((uint32_t *)dma->data_) << logger::endl;
 #endif
-    dev.runner_->IssueDma(*dma);
+    // dev.runner_->IssueDma(*dma);
+    dev.vmux->IssueDma(*dma);
   }
 }
 
@@ -614,7 +615,8 @@ bool lan_queue_tx::trigger_tx_packet() {
       xsum_udp(pktbuf + udp_off, tso_len - udp_off);
     }
 
-    dev.runner_->EthSend(pktbuf, tso_len);
+    // dev.runner_->EthSend(pktbuf, tso_len);
+    dev.vmux->EthSend(pktbuf, tso_len);
   } else {
 #ifdef DEBUG_LAN
     std::cout << "    tso packet off=" << tso_off << " len=" << tso_len
@@ -631,7 +633,8 @@ bool lan_queue_tx::trigger_tx_packet() {
 
     xsum_tcpip_tso(pktbuf + maclen, iplen, l4len, tso_paylen);
 
-    dev.runner_->EthSend(pktbuf, tso_len);
+    // dev.runner_->EthSend(pktbuf, tso_len);
+    dev.vmux->EthSend(pktbuf, tso_len);
 
     tso_postupdate_header(pktbuf + maclen, iplen, l4len, tso_paylen);
 

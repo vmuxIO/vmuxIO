@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vfio-consumer.hpp"
+#include "drivers/driver.hpp"
 // #include "vfio-server.hpp"
 #include <cstdint>
 #include <memory>
@@ -65,13 +66,17 @@ public:
 
   std::shared_ptr<VfioUserServer> vfuServer;
 
+  std::shared_ptr<Driver> driver;
+
   virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) = 0;
+
+  VmuxDevice(std::shared_ptr<Driver> driver) : driver(driver) {};
 
   virtual ~VmuxDevice() = default;
 };
 
 class StubDevice : public VmuxDevice {
 public:
-  StubDevice() { this->vfioc = NULL; }
+  StubDevice() : VmuxDevice(NULL) { this->vfioc = NULL; }
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu){};
 };

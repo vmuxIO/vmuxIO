@@ -193,8 +193,9 @@ class CallbackAdaptor {
   public:
     std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
     std::shared_ptr<Device> model; 
+    std::shared_ptr<VmuxDevice> device;
 
-    CallbackAdaptor(const uint8_t (*mac_addr)[6]) : mac_addr(mac_addr) {}
+    CallbackAdaptor(std::shared_ptr<VmuxDevice> device, const uint8_t (*mac_addr)[6]) : mac_addr(mac_addr), device(device) {}
 
     /* these three are for `Runner::Device`. */
     void IssueDma(nicbm::DMAOp &op) {
@@ -228,7 +229,7 @@ class CallbackAdaptor {
     }
     void EthSend(const void *data, size_t len) {
       printf("CallbackAdaptor::EthSend(len=%zu)\n", len);
-      die("not implemented");
+      this->device->driver->send((char*)data, len);
     }
 
     void EventSchedule(nicbm::TimedEvent &evt) {
