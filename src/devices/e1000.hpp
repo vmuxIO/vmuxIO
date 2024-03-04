@@ -92,7 +92,9 @@ public:
           // 100us seem to yield good results.
           Util::rte_delay_us_block(100);
         }
+        this_->vfu_ctx_mutex.lock();
         this_->ethRx(this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]);
+        this_->vfu_ctx_mutex.unlock();
       }
       this_->driver->recv_consumed(vm_number);
       // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));

@@ -65,6 +65,7 @@ public:
   std::shared_ptr<VfioConsumer> vfioc;
 
   std::shared_ptr<VfioUserServer> vfuServer;
+  std::mutex vfu_ctx_mutex; // should be held by a thread accessing vfu_ctx or its private pointer
 
   std::shared_ptr<Driver> driver;
 
