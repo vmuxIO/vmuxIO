@@ -150,6 +150,13 @@ void lan::packet_received(const void *data, size_t len) {
   uint32_t hash = 0;
   uint16_t queue = 0;
   rss_steering(data, len, queue, hash);
+  if (!rxqs[queue]->is_enabled()) {
+    // if we receive on uninitialized queues, we throw errors
+    #ifdef DEBUG_LAN
+      std::cout << " dropped packet because queue " << queue << " is not ready."<< logger::endl;
+    #endif
+    return; // silently drop packet
+  }
   rxqs[queue]->packet_received(data, len, hash);
 }
 
