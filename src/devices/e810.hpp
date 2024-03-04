@@ -264,8 +264,10 @@ private:
       [[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char *const buf,
       [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
       [[maybe_unused]] const bool is_write) {
-    printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
+    if_log_level(LOG_DEBUG, 
+        printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
            offset, is_write);
+        );
     E810EmulatedDevice *device =
         (E810EmulatedDevice *)vfu_get_private(vfu_ctx);
     if (is_write) {

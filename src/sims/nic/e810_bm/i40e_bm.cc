@@ -369,7 +369,7 @@ uint32_t i40e_bm::reg_mem_read32(uint64_t addr) {
     val = regs.GLV_UPTCL[idx];
   }
   else {
-    std::cout << "read others" << addr << logger::endl;
+    std::cout << "read others " << addr << logger::endl;
     switch (addr) {
       case GLINT_CTL:
         val = ((ICE_ITR_GRAN_US << GLINT_CTL_ITR_GRAN_200_S) &
