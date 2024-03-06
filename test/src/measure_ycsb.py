@@ -156,9 +156,8 @@ class Ycsb():
         pass
         
 
-def main() -> None:
+def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
-    measurement = Measurement()
     host, loadgen = measurement.hosts()
     from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
     global OUT_DIR
@@ -197,6 +196,9 @@ def main() -> None:
         )
     info(f"Execution plan:")
     YcsbTest.estimate_time(test_matrix, ["interface", "num_vms"])
+
+    if plan_only:
+        return
 
     for num_vms in vm_nums:
         
@@ -252,4 +254,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    measurement = Measurement()
+    main(measurement)

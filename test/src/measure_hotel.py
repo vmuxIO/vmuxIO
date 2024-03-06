@@ -218,9 +218,8 @@ class DeathStarBench:
         end_foreach(guests, foreach_parallel)
 
 
-def main() -> None:
+def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
-    measurement = Measurement()
     host, loadgen = measurement.hosts()
     from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
     global OUT_DIR
@@ -257,6 +256,9 @@ def main() -> None:
             )
         info(f"Execution plan {app}:")
         DeathStarBenchTest.estimate_time(test_matrix, ["app", "interface", "num_vms"])
+
+    if plan_only:
+        return
 
     for app in apps:
         
@@ -312,4 +314,5 @@ def main() -> None:
     DeathStarBench.find_errors(OUT_DIR)
 
 if __name__ == "__main__":
-    main()
+    measurement = Measurement()
+    main(measurement)

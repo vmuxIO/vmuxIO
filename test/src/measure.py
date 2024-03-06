@@ -339,3 +339,13 @@ class AbstractBenchTest(ABC):
 
         return needed_s
 
+
+def main():
+    measurement = Measurement()
+    import measure_ycsb
+    measure_ycsb.main(measurement, plan_only=True)
+    pass
+
+
+if __name__ == "__main__":
+    main()
