@@ -12,13 +12,15 @@ def safe_cast(typ: type[T], o: Any) -> T:
     return cast(typ, o)
 
 def product_dict(input_dict: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
-    ret = _product_dict(input_dict)
+    current = dict()
+    ret = _product_dict(input_dict, current)
     assert ret is not None
     return ret
 
-def _product_dict(input_dict: Dict[str, List[Any]], result=None, keys: List[str] | None = None, index=0, current={}) -> List[Dict[str, Any]] | None:
+def _product_dict(input_dict: Dict[str, List[Any]], current: Dict[str, Any], result=None, keys: List[str] | None = None, index=0) -> List[Dict[str, Any]] | None:
     """
     Generates all combinations of lists contained in a dictionary, where each combination is represented as a dictionary with the same keys.
+    Note, that current must not be initialized in the function definition  with a default value. Otherwise the pointer to the same dict will be reused across function invocations.
     """
     # Initialize result list and keys on the first call
     if result is None:

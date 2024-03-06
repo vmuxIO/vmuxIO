@@ -339,13 +339,27 @@ class AbstractBenchTest(ABC):
 
         return needed_s
 
+import measure_vnf
+import measure_hotel
+import measure_ycsb
 
 def main():
     measurement = Measurement()
-    import measure_ycsb
-    measure_ycsb.main(measurement, plan_only=True)
-    pass
 
+    # estimate runtimes
+    info("")
+    measure_vnf.main(measurement, plan_only=True)
+    info("")
+    measure_hotel.main(measurement, plan_only=True)
+    info("")
+    measure_ycsb.main(measurement, plan_only=True)
+    info("")
+
+    info("Running benchmarks ...")
+    info("")
+    measure_vnf.main(measurement)
+    measure_hotel.main(measurement)
+    measure_ycsb.main(measurement)
 
 if __name__ == "__main__":
     main()

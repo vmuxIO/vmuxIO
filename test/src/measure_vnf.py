@@ -18,7 +18,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
     host, loadgen = measurement.hosts()
 
-    info("Execution plan:")
+    info("VNF execution plan:")
     info("Incremental tests not supported. Running tests for maybe 5 min.")
 
     if plan_only:

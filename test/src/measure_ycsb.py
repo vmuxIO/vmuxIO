@@ -194,7 +194,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         interface=[ interface.value for interface in interfaces],
         num_vms=vm_nums
         )
-    info(f"Execution plan:")
+    info(f"YCSB execution plan:")
     YcsbTest.estimate_time(test_matrix, ["interface", "num_vms"])
 
     if plan_only:

@@ -254,7 +254,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             repetitions=[ repetitions ],
             num_vms=[ len(bench.docker_compose) ]
             )
-        info(f"Execution plan {app}:")
+        info(f"DeathStarBench execution plan {app}:")
         DeathStarBenchTest.estimate_time(test_matrix, ["app", "interface", "num_vms"])
 
     if plan_only:
