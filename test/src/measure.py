@@ -149,13 +149,13 @@ class Measurement:
         setup_host_interface(self.host, interface)
 
         if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
-            self.host.start_vmux(interface.value)
+            self.host.start_vmux(interface)
 
         # start VM
 
         info(f"Starting VM ({interface.value})")
         self.host.run_guest(
-                net_type=interface.net_type(),
+                net_type=interface,
                 machine_type='pc',
                 qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin"
                 )
@@ -199,7 +199,7 @@ class Measurement:
             setup_host_interface(self.host, interface, vm_range=range(1, num+1))
 
         if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
-            self.host.start_vmux(interface.value, num_vms=num)
+            self.host.start_vmux(interface, num_vms=num)
 
         # start VMs in batches of batch
         range_ = MultiHost.range(num)
@@ -221,7 +221,7 @@ class Measurement:
 
                 # self.host.run_guest(net_type=interface.net_type(), machine_type='pc', qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin", vm_number=81)
                 self.host.run_guest(
-                        net_type=interface.net_type(),
+                        net_type=interface,
                         machine_type='pc',
                         qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin",
                         vm_number=i

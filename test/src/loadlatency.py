@@ -4,6 +4,7 @@ from logging import error, info, debug
 from time import sleep
 from os.path import isfile, join as path_join
 from copy import deepcopy
+from typing import List
 
 from server import Server, Host, Guest, LoadGen
 
@@ -63,6 +64,23 @@ class Interface(Enum):
         types[Interface.VMUX_EMU] = "vmux-emu"
         types[Interface.VMUX_DPDK] = "vmux-dpdk"
         return types[self]
+
+    def needs_br_tap(self) -> bool:
+        return self in [ Interface.BRIDGE, Interface.BRIDGE_E1000, Interface.VMUX_EMU ]
+
+    def needs_macvtap(self) -> bool:
+        return self in [ Interface.MACVTAP ]
+
+    def needs_vfio(self) -> bool:
+        return self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_DPDK ]
+
+    def needs_vmux(self) -> bool:
+        return self in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]
+
+    @staticmethod
+    def choices():
+        # return a list of the values of all Enum options 
+        return [ enum.value for enum in Interface.__members__.values() ]
 
 
 class Reflector(Enum):
@@ -336,20 +354,8 @@ class LoadLatencyTestGenerator(object):
     def run_guest(self, host: Host, machine: Machine,
                   interface: Interface, qemu: str, vhost: bool,
                   ioregionfd: bool):
-        net_type = None
-        if interface == Interface.BRIDGE:
-            net_type = 'brtap'
-        if interface == Interface.BRIDGE_E1000:
-            net_type = 'brtap-e1000'
-        elif interface == Interface.MACVTAP:
-            net_type = 'macvtap'
-        elif interface == Interface.VFIO:
-            net_type = 'vfio'
-        else:
-            # elif interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, ... ]:
-            net_type = interface.value
         host.run_guest(
-            net_type=net_type,
+            net_type=interface,
             machine_type='pc' if machine == Machine.PCVM else 'microvm',
             root_disk=None,
             debug_qemu=False,
@@ -562,7 +568,7 @@ class LoadLatencyTestGenerator(object):
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
                                 if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
-                                    host.start_vmux(interface.value)
+                                    host.start_vmux(interface)
                                 self.run_guest(host, machine, interface,
                                                qemu_path, vhost, ioregionfd)
                                 # TODO maybe check if tmux session running
