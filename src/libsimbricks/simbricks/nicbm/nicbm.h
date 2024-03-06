@@ -199,7 +199,9 @@ class CallbackAdaptor {
 
     /* these three are for `Runner::Device`. */
     void IssueDma(nicbm::DMAOp &op) {
-      printf("CallbackAdaptor::IssueDma: read %d, addr %lx, len %zu\n", !op.write_, op.dma_addr_, op.len_);
+      if_log_level(LOG_DEBUG, 
+        printf("CallbackAdaptor::IssueDma: read %d, addr %lx, len %zu\n", !op.write_, op.dma_addr_, op.len_)
+      );
       // __builtin_dump_struct(&op, &printf); // dump_struct doesnt work on classes
       void *local_addr = this->vfu->dma_local_addr(op.dma_addr_, op.len_);
       if (!local_addr) {
@@ -217,18 +219,19 @@ class CallbackAdaptor {
       die("not implemented");
     }
     void MsiXIssue(uint8_t vec) {
-      printf("CallbackAdaptor::MsiXIssue(%d)\n", vec);
       int ret = vfu_irq_trigger(this->vfu->vfu_ctx, vec);
       if (ret != 0)
         die("E810: could not send interrupt");
-      if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
+      if_log_level(LOG_DEBUG, printf("CallbackAdaptor::MsiXIssue: Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
     }
     void IntXIssue(bool level) {
       printf("CallbackAdaptor::IntXIssue(%d)\n", level);
       die("not implemented");
     }
     void EthSend(const void *data, size_t len) {
-      printf("CallbackAdaptor::EthSend(len=%zu)\n", len);
+      if_log_level(LOG_DEBUG, 
+        printf("CallbackAdaptor::EthSend(len=%zu)\n", len)
+      );
       this->device->driver->send((char*)data, len);
     }
 

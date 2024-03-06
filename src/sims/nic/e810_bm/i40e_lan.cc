@@ -112,7 +112,9 @@ bool lan::rss_steering(const void *data, size_t len, uint16_t &queue,
     hash = rss_kc.hash_ipv4(ntohl(tcp->ip.src), ntohl(tcp->ip.dest),
                             ntohs(tcp->tcp.src), ntohs(tcp->tcp.dest));
     
+    #ifdef DEBUG_LAN
     std::cout << "TCP IP Ethernet" << logger::endl;
+    #endif
   } else if (udp->eth.type == htons(ETH_TYPE_IP) &&
              udp->ip.proto == IP_PROTO_UDP) {
     hash = rss_kc.hash_ipv4(ntohl(udp->ip.src), ntohl(udp->ip.dest),
