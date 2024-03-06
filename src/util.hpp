@@ -35,7 +35,7 @@ struct epoll_callback {
   callback_fn callback;
 };
 
-static int LOG_LEVEL = LOG_DEBUG;
+extern int LOG_LEVEL; // = LOG_DEBUG;
 
 // __builtin_expect(!! ... to replace [[unlikely]] which is unsupported on clang
 #define if_log_level(level, expr) \
