@@ -45,37 +45,42 @@ class Interface(Enum):
     # VMux-passthrough to physical NIC for the VM
     VMUX_PT = "vmux-pt"
 
-    # vMux-emulation to tap backend
+    # vMux e1000 emulation to tap backend
     VMUX_EMU = "vmux-emu"
 
-    # vMux-dpdk
+    # vMux e810 emulation to tap backend
+    VMUX_EMU_E810 = "vmux-dpdk-e810"
+
+    # vMux e1000 emulation to dpdk backend
     VMUX_DPDK = "vmux-dpdk"
 
-    def net_type(self) -> str:
-        """
-        translates enum Interface into net_type strings used here
-        """
-        types = {}
-        types[Interface.BRIDGE] = "brtap"
-        types[Interface.BRIDGE_E1000] = "brtap-e1000"
-        types[Interface.MACVTAP] = "macvtap"
-        types[Interface.VFIO] = "vfio"
-        types[Interface.VMUX_PT] = "vmux-pt"
-        types[Interface.VMUX_EMU] = "vmux-emu"
-        types[Interface.VMUX_DPDK] = "vmux-dpdk"
-        return types[self]
+    # vMux e810 emulation to dpdk backend
+    VMUX_DPDK_E810 = "vmux-dpdk-e810"
+
 
     def needs_br_tap(self) -> bool:
-        return self in [ Interface.BRIDGE, Interface.BRIDGE_E1000, Interface.VMUX_EMU ]
+        return self in [ Interface.BRIDGE, Interface.BRIDGE_E1000, Interface.VMUX_EMU, Interface.VMUX_EMU_E810 ]
 
     def needs_macvtap(self) -> bool:
         return self in [ Interface.MACVTAP ]
 
     def needs_vfio(self) -> bool:
-        return self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_DPDK ]
+        return self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810 ]
 
     def needs_vmux(self) -> bool:
-        return self in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]
+        return self in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.VMUX_EMU_E810, Interface.VMUX_DPDK_E810 ]
+
+    def is_passthrough(self) -> bool:
+        return self in [ Interface.VFIO, Interface.VMUX_PT ]
+
+    def guest_driver(self) -> str:
+        if self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_EMU_E810, Interface.VMUX_DPDK_E810 ]:
+            return "ice"
+        if self in [ Interface.BRIDGE_E1000, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
+            return "e1000"
+        if self in [ Interface.BRIDGE, Interface.MACVTAP ]:
+            return "virtio-net"
+        raise Exception(f"Dont know which guest driver is used with {self}")
 
     @staticmethod
     def choices():
@@ -310,19 +315,16 @@ class LoadLatencyTestGenerator(object):
             host.modprobe_test_iface_drivers()
         if interface == Interface.PNIC:
             host.delete_nic_ip_addresses(host.test_iface)
-        elif interface in [ Interface.BRIDGE, Interface.BRIDGE_E1000 ]:
+        if interface.needs_br_tap():
             if machine == Machine.HOST:
                 host.setup_test_bridge()
             else:
-                multi_queue = (interface != Interface.BRIDGE_E1000)
-                host.setup_test_br_tap(multi_queue=multi_queue, vm_range=vm_range)
-        elif interface == Interface.MACVTAP:
+                host.setup_test_br_tap(multi_queue=False, vm_range=vm_range)
+        if interface.needs_macvtap():
             host.setup_test_macvtap()
-        elif interface in [Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_DPDK]:
+        if interface.needs_vfio():
             host.delete_nic_ip_addresses(host.test_iface)
             host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
-        elif interface == Interface.VMUX_EMU:
-            host.setup_test_br_tap(multi_queue=False, vm_range=vm_range)
 
     def start_reflector(self, server: Server, reflector: Reflector,
                         iface: str = None):
@@ -338,16 +340,10 @@ class LoadLatencyTestGenerator(object):
                        interface: Interface, iface: str = None):
         if reflector == Reflector.MOONGEN:
             server.stop_moongen_reflector()
-            if interface in [Interface.VFIO, Interface.VMUX_PT]:
-                server.unbind_device(server.test_iface_addr)
-                # TODO: The hardcoded driver is a dirty workaround,
-                #       we need to fix this later on
-                server.bind_device(server.test_iface_addr, 'ice')
-            elif interface in [ Interface.BRIDGE_E1000, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
-                server.unbind_device(server.test_iface_addr)
-                server.bind_device(server.test_iface_addr, 'e1000')
-            else:
-                server.release_test_iface()
+            driver = interface.guest_driver()
+            server.unbind_device(server.test_iface_addr)
+            server.bind_device(server.test_iface_addr, driver)
+            # if unknown driver: server.release_test_iface()
         else:
             server.stop_xdp_reflector(iface)
 
@@ -432,24 +428,24 @@ class LoadLatencyTestGenerator(object):
             for i in self.interfaces - {Interface.PNIC}:
                 # skip microvm (i think it doesnt support passthrough)
                 if (m == Machine.MICROVM
-                        and i in [Interface.VFIO, Interface.VMUX_PT]):
+                        and i.is_passthrough()):
                     continue
                 tree[m][i] = {}
                 mac = host.test_iface_mac \
-                    if i in [Interface.VFIO, Interface.VMUX_PT] \
+                    if i.is_passthrough() \
                     else host.guest_test_iface_mac
                 for q in self.qemus:
                     qemu, _ = q.split(':')
                     tree[m][i][q] = {}
                     for v in self.vhosts:
                         # skip passthrough because vhost does not apply here
-                        if (v and i in [Interface.VFIO, Interface.VMUX_PT]):
+                        if (v and i.guest_driver() != "virtio-net"):
                             continue
                         tree[m][i][q][v] = {}
                         # for io in reversed(list(self.ioregionfds)):
                         for io in self.ioregionfds:
                             if io and (m != Machine.MICROVM or
-                                       i in [Interface.VFIO, Interface.VMUX_PT]):
+                                       i.is_passthrough()):
                                 continue
                             tree[m][i][q][v][io] = {}
                             for r in self.reflectors:
@@ -567,7 +563,7 @@ class LoadLatencyTestGenerator(object):
                                 debug(f"Running guest {machine.value} " +
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
-                                if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
+                                if interface.needs_vmux():
                                     host.start_vmux(interface)
                                 self.run_guest(host, machine, interface,
                                                qemu_path, vhost, ioregionfd)
@@ -609,7 +605,7 @@ class LoadLatencyTestGenerator(object):
                                       f"{interface.value} {qemu_name} " +
                                       f"{vhost} {ioregionfd}")
                                 host.kill_guest()
-                                if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
+                                if interface.needs_vmux():
                                     host.stop_vmux()
 
                 debug(f"Tearing down interface {interface.value}")
