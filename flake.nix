@@ -350,7 +350,7 @@
       nesting-guest-image = pkgs.nesting-guest-image;
       nesting-guest-image-noiommu = pkgs.nesting-guest-image-noiommu;
       nesting-host-extkern-image = pkgs.nesting-host-extkern-image;
-      nesting-host-image = pkgs.nesting-guest-image;
+      nesting-host-image = pkgs.nesting-host-image;
     } // (let 
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         flakepkgs = self.packages.x86_64-linux;
@@ -382,6 +382,7 @@
             inherit (pkgs) lib;
             inherit flakepkgs;
             extkern = false;
+            extraEnvPackages = self.devShells.x86_64-linux.default.buildInputs;
           })
           ./nix/nixos-generators-qcow.nix
         ];
@@ -393,6 +394,7 @@
           inherit (pkgs) lib;
           inherit flakepkgs;
           extkern = true;
+          extraEnvPackages = self.devShells.x86_64-linux.default.buildInputs;
         }) ];
       };
       guest = nixpkgs.lib.nixosSystem {
