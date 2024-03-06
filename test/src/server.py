@@ -1759,16 +1759,21 @@ class Host(Server):
         """
         args = ""
         dpdk_args = ""
-        if interface == Interface.VMUX_PT:
+        vmux_mode = ""
+        if interface.is_passthrough():
             args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
-        if interface == Interface.VMUX_DPDK:
+        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810 ]:
             dpdk_args += " -u -- -l 1 -n 1"
-        if interface in [ Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
+        if interface.guest_driver() == "ice":
+            vmux_mode = "emulation"
+        elif interface.guest_driver() == "e1000":
+            vmux_mode = "e1000-emu"
+        if not interface.is_passthrough():
             if num_vms == 0:
-                args = f' -s {self.vmux_socket_path} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m e1000-emu'
+                args = f' -s {self.vmux_socket_path} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'
             else:
                 for vm_number in MultiHost.range(num_vms):
-                    args += f' -s {MultiHost.vfu_path(self.vmux_socket_path, vm_number)} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m e1000-emu'
+                    args += f' -s {MultiHost.vfu_path(self.vmux_socket_path, vm_number)} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode}'
 
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         self.tmux_new(

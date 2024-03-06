@@ -192,9 +192,8 @@ class Measurement:
 
         self.host.detect_test_iface()
 
-        unbatched_interfaces = [ mapping for mapping in Interface.__members__.values() if 
+        unbatched_interfaces = [ interface for interface in Interface.__members__.values() if 
                                 interface.needs_vfio() or (interface.needs_br_tap() and interface.needs_vmux()) ]
-        breakpoint()
         if interface in unbatched_interfaces:
             # vmux taps need to be there all from the start (no batching)
             debug(f"Setting up interface {interface.value} for {num} VMs")
