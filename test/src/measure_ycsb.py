@@ -2,8 +2,8 @@ from measure import Measurement, end_foreach, AbstractBenchTest
 from dataclasses import dataclass, field, asdict
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
-from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from server import Host, Guest, LoadGen, MultiHost
+from enums import Machine, Interface, Reflector
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
 from pathlib import Path

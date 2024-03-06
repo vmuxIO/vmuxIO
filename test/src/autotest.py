@@ -21,7 +21,8 @@ from conf import default_config_parser
 
 # project imports
 from server import Server, Host, Guest, LoadGen
-from loadlatency import Machine, Interface, Reflector, LoadLatencyTestGenerator
+from loadlatency import LoadLatencyTestGenerator
+from enums import Machine, Interface, Reflector
 
 
 # constants

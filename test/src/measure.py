@@ -10,7 +10,7 @@ from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from typing import Tuple, Iterator, Any, Dict, Callable
 from contextlib import contextmanager
-from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
+from enums import Machine, Interface, Reflector
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from util import safe_cast

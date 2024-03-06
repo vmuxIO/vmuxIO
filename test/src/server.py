@@ -10,7 +10,7 @@ from os.path import join as path_join
 from os.path import dirname as path_dirname
 from os.path import dirname as path_getsize
 from typing import Optional
-from loadlatency import Interface
+from enums import Interface
 import netaddr
 from pathlib import Path
 import copy

@@ -6,7 +6,8 @@ from argcomplete import autocomplete
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
-from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
+from loadlatency import LoadLatencyTest
+from enums import Machine, Interface, Reflector
 from measure import Measurement
 from util import safe_cast
 from typing import Iterator, cast
