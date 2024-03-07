@@ -338,27 +338,6 @@ static void lcore_init_checks() {
 					"not be optimal.\n", port);
 }
 
-/*
- * The lcore main. This is the main thread that does the work, reading from
- * an input port and writing to an output port.
- */
-
- /* Basic forwarding application lcore. 8< */
-static __rte_noreturn void
-lcore_main(void)
-{
-	lcore_init_checks();
-
-	printf("\nCore %u forwarding packets. [Ctrl+C to quit]\n",
-			rte_lcore_id());
-
-	/* Main work of application loop. 8< */
-	for (;;) {
-		lcore_poll_once();
-	}
-}
-/* >8 End Basic forwarding application lcore. */
-
 
 class Dpdk : public Driver {
 private:
