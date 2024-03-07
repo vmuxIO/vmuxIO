@@ -1749,7 +1749,7 @@ class Host(Server):
 
     def start_vmux(self: 'Host', interface: Interface, num_vms: int = 0) -> None:
         """
-        Start vmux in a tmux session.
+        Start vmux in a tmux session. Blocks until vmux is started.
 
         Parameters
         ----------
@@ -1760,6 +1760,7 @@ class Host(Server):
         args = ""
         dpdk_args = ""
         vmux_mode = ""
+        vmux_socket = ""
         if interface.is_passthrough():
             args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
         if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810 ]:
@@ -1770,10 +1771,12 @@ class Host(Server):
             vmux_mode = "e1000-emu"
         if not interface.is_passthrough():
             if num_vms == 0:
-                args = f' -s {self.vmux_socket_path} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'
+                vmux_socket = f"{self.vmux_socket_path}"
+                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'
             else:
                 for vm_number in MultiHost.range(num_vms):
-                    args += f' -s {MultiHost.vfu_path(self.vmux_socket_path, vm_number)} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode}'
+                    vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, vm_number)}"
+                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode}'
 
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         self.tmux_new(
@@ -1784,8 +1787,10 @@ class Host(Server):
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
             f'; sleep 999'
         )
-        sleep(1); # give vmux some time to start up and create the socket
-        self.exec(f'sudo chmod 777 {self.vmux_socket_path} || true') # this should be applied to all MultiHost.vfu_paths, but usually we dont need it anyways
+        # give vmux some time to start up and create the socket
+        self.wait_for_success(f"[[ -S {vmux_socket} ]]")
+        self.exec(f'sudo chmod 777 {vmux_socket} || true')
+        sleep(10)
 
     def stop_vmux(self: 'Host') -> None:
         """

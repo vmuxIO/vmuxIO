@@ -40,7 +40,7 @@ class Interface(Enum):
     VMUX_EMU = "vmux-emu"
 
     # vMux e810 emulation to tap backend
-    VMUX_EMU_E810 = "vmux-dpdk-e810"
+    VMUX_EMU_E810 = "vmux-emu-e810"
 
     # vMux e1000 emulation to dpdk backend
     VMUX_DPDK = "vmux-dpdk"
