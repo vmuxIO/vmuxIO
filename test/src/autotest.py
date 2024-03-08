@@ -21,7 +21,8 @@ from conf import default_config_parser
 
 # project imports
 from server import Server, Host, Guest, LoadGen
-from loadlatency import Machine, Interface, Reflector, LoadLatencyTestGenerator
+from loadlatency import LoadLatencyTestGenerator
+from enums import Machine, Interface, Reflector
 
 
 # constants
@@ -198,9 +199,8 @@ def setup_parser() -> ArgumentParser:
     run_guest_parser.add_argument('-i',
                                   '--interface',
                                   type=str,
-                                  choices=['brtap', 'brtap-e1000', 'macvtap',
-                                           'vfio', 'vmux-pt', 'vmux-emu', 'vmux-dpdk'],
-                                  default='brtap',
+                                  choices=Interface.choices(),
+                                  default=Interface.BRIDGE.value,
                                   help='Test network interface type.',
                                   )
     run_guest_parser.add_argument('-m',
@@ -275,9 +275,8 @@ def setup_parser() -> ArgumentParser:
     setup_network_parser.add_argument('-i',
                                       '--interface',
                                       type=str,
-                                      choices=['brtap', 'brtap-e1000', 'macvtap',
-                                               'vfio', 'vmux-pt', 'vmux-emu', 'vmux-dpdk'],
-                                      default='brtap',
+                                      choices=Interface.choices(),
+                                      default=Interface.BRIDGE.value,
                                       help='Test network interface type.',
                                       )
     teardown_network_parser = subparsers.add_parser(
@@ -632,7 +631,7 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
     host: Host = create_servers(conf, guest=False, loadgen=False)['host']
 
     try:
-        _setup_network(host, args.interface)
+        _setup_network(host, Interface(args.interface))
 
         vcpus = args.cpus if args.cpus else None
         memory = args.memory if args.memory else None
@@ -643,7 +642,7 @@ def run_guest(args: Namespace, conf: ConfigParser) -> None:
                   if args.interface in ['vfio', 'vmux'] # pretty sure these never match because they have been renamed
                   else conf['host']['qemu_path'])
 
-        host.run_guest(args.interface, args.machine, vcpus, memory, disk,
+        host.run_guest(Interface(args.interface), args.machine, vcpus, memory, disk,
                        args.debug, args.ioregionfd, qemu_path, args.vhost,
                        args.rx_queue_size, args.tx_queue_size)
     except Exception:
@@ -681,29 +680,18 @@ def kill_guest(args: Namespace, conf: ConfigParser) -> None:
     host.cleanup_network()
 
 
-def _setup_network(host: Host, interface: str) -> None:
+def _setup_network(host: Host, interface: Interface) -> None:
     host.setup_admin_bridge()
     host.setup_admin_tap()
     host.modprobe_test_iface_drivers()
-    if interface in [ 'brtap']:
-        host.setup_test_br_tap()
-    if interface in [ 'brtap-e1000' ]:
+    if interface.needs_br_tap():
         host.setup_test_br_tap(multi_queue=False)
-    elif interface == 'macvtap':
+    if interface.needs_macvtap():
         host.setup_test_macvtap()
-    elif interface == 'vfio':
+    if interface.needs_vfio():
         host.delete_nic_ip_addresses(host.test_iface)
         host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
-    elif interface == 'vmux-pt':
-        host.delete_nic_ip_addresses(host.test_iface)
-        host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
-        host.start_vmux(interface)
-    elif interface == 'vmux-emu':
-        host.setup_test_br_tap(multi_queue=False)
-        host.start_vmux(interface)
-    elif interface == 'vmux-dpdk':
-        host.delete_nic_ip_addresses(host.test_iface)
-        host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
+    if interface.needs_vmux():
         host.start_vmux(interface)
 
 
@@ -734,7 +722,7 @@ def setup_network(args: Namespace, conf: ConfigParser) -> None:
     host: Host = create_servers(conf, guest=False, loadgen=False)['host']
 
     try:
-        _setup_network(host, args.interface)
+        _setup_network(host, Interface(args.interface))
     except Exception:
         error('Failed to setup network')
         host.cleanup_network()

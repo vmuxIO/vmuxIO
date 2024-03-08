@@ -6,7 +6,7 @@ from argcomplete import autocomplete
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen, MultiHost
-from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
+from enums import Machine, Interface, Reflector
 from measure import AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
@@ -218,9 +218,8 @@ class DeathStarBench:
         end_foreach(guests, foreach_parallel)
 
 
-def main() -> None:
+def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
-    measurement = Measurement()
     host, loadgen = measurement.hosts()
     from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
     global OUT_DIR
@@ -255,8 +254,11 @@ def main() -> None:
             repetitions=[ repetitions ],
             num_vms=[ len(bench.docker_compose) ]
             )
-        info(f"Execution plan {app}:")
+        info(f"DeathStarBench execution plan {app}:")
         DeathStarBenchTest.estimate_time(test_matrix, ["app", "interface", "num_vms"])
+
+    if plan_only:
+        return
 
     for app in apps:
         
@@ -312,4 +314,5 @@ def main() -> None:
     DeathStarBench.find_errors(OUT_DIR)
 
 if __name__ == "__main__":
-    main()
+    measurement = Measurement()
+    main(measurement)

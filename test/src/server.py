@@ -10,6 +10,7 @@ from os.path import join as path_join
 from os.path import dirname as path_dirname
 from os.path import dirname as path_getsize
 from typing import Optional
+from enums import Interface
 import netaddr
 from pathlib import Path
 import copy
@@ -1553,7 +1554,7 @@ class Host(Server):
         self.exec(f'sudo ip link delete {self.test_macvtap} || true')
 
     def run_guest(self: 'Host',
-                  net_type: str,
+                  net_type: Interface,
                   machine_type: str,
                   vcpus: int = None,
                   memory: int = None,
@@ -1634,7 +1635,7 @@ class Host(Server):
         # Build test network parameters
 
         test_net_config = ''
-        if net_type == 'brtap':
+        if net_type == Interface.BRIDGE:
             if BRIDGE_QUEUES == 0:
                 queues = ""
                 multi_queue = ""
@@ -1652,7 +1653,7 @@ class Host(Server):
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
             )
-        if net_type == 'brtap-e1000':
+        if net_type == Interface.BRIDGE_E1000:
             test_net_config = (
                 f" -netdev tap," +
                 f'id=test0,ifname={MultiHost.iface_name(self.test_tap, vm_number)},script=no,' +
@@ -1660,7 +1661,7 @@ class Host(Server):
                 f' -device e1000,' +
                 f'netdev=test0,mac={MultiHost.mac(self.guest_test_iface_mac, vm_number)}'
             )
-        elif net_type == 'macvtap':
+        elif net_type == Interface.MACVTAP:
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
                 'id=test0,fd=3 3<>/dev/tap$(cat ' +
@@ -1671,9 +1672,9 @@ class Host(Server):
                 (',use-ioregionfd=true' if ioregionfd else '') +
                 f',rx_queue_size={rx_queue_size},tx_queue_size={tx_queue_size}'
             )
-        elif net_type == 'vfio':
+        elif net_type == Interface.VFIO:
             test_net_config = f' -device vfio-pci,host={self.test_iface_addr}'
-        elif net_type in [ 'vmux-pt', 'vmux-emu', 'vmux-dpdk' ]:
+        elif net_type.needs_vmux():
             test_net_config = \
                 f' -device vfio-user-pci,socket={MultiHost.vfu_path(self.vmux_socket_path, vm_number)}'
 
@@ -1746,9 +1747,9 @@ class Host(Server):
         """
         self.tmux_kill('qemu')
 
-    def start_vmux(self: 'Host', interface: str, num_vms: int = 0) -> None:
+    def start_vmux(self: 'Host', interface: Interface, num_vms: int = 0) -> None:
         """
-        Start vmux in a tmux session.
+        Start vmux in a tmux session. Blocks until vmux is started.
 
         Parameters
         ----------
@@ -1758,16 +1759,24 @@ class Host(Server):
         """
         args = ""
         dpdk_args = ""
-        if interface == "vmux-pt":
+        vmux_mode = ""
+        vmux_socket = ""
+        if interface.is_passthrough():
             args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
-        if interface == "vmux-dpdk":
+        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810 ]:
             dpdk_args += " -u -- -l 1 -n 1"
-        if interface in [ "vmux-emu", "vmux-dpdk"]:
+        if interface.guest_driver() == "ice":
+            vmux_mode = "emulation"
+        elif interface.guest_driver() == "e1000":
+            vmux_mode = "e1000-emu"
+        if not interface.is_passthrough():
             if num_vms == 0:
-                args = f' -s {self.vmux_socket_path} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m e1000-emu'
+                vmux_socket = f"{self.vmux_socket_path}"
+                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'
             else:
                 for vm_number in MultiHost.range(num_vms):
-                    args += f' -s {MultiHost.vfu_path(self.vmux_socket_path, vm_number)} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m e1000-emu'
+                    vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, vm_number)}"
+                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode}'
 
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         self.tmux_new(
@@ -1778,8 +1787,10 @@ class Host(Server):
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
             f'; sleep 999'
         )
-        sleep(1); # give vmux some time to start up and create the socket
-        self.exec(f'sudo chmod 777 {self.vmux_socket_path} || true') # this should be applied to all MultiHost.vfu_paths, but usually we dont need it anyways
+        # give vmux some time to start up and create the socket
+        self.wait_for_success(f"[[ -S {vmux_socket} ]]")
+        self.exec(f'sudo chmod 777 {vmux_socket} || true')
+        sleep(10)
 
     def stop_vmux(self: 'Host') -> None:
         """

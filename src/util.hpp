@@ -5,16 +5,16 @@
 #include <cstring>
 #include <dirent.h>
 #include <err.h>
+#include <generic/rte_cycles.h>
+#include <generic/rte_pause.h>
+#include <limits>
 #include <netinet/if_ether.h>
 #include <netinet/in.h>
+#include <rte_cycles.h>
 #include <stdexcept>
 #include <sys/param.h>
-#include <vector>
-#include <limits>
 #include <time.h>
-#include <generic/rte_cycles.h>
-#include <rte_cycles.h>
-#include <generic/rte_pause.h>
+#include <vector>
 
 // as per PCI spec, there can be at most 2048 MSIx inerrupts per device
 #define PCI_MSIX_MAX 2048
@@ -27,20 +27,22 @@
     throw std::runtime_error("See error above");                               \
   }
 
+typedef void (*callback_fn)(int, void *);
+
 struct epoll_callback {
   int fd;    // passed as arg1 to callback
   void *ctx; // passed as arg2 to callback
-  void (*callback)(int, void *);
+  callback_fn callback;
 };
 
-static int LOG_LEVEL = LOG_DEBUG;
+extern int LOG_LEVEL; // = LOG_DEBUG;
 
 // __builtin_expect(!! ... to replace [[unlikely]] which is unsupported on clang
-#define if_log_level(level, expr) \
-  do { \
-    if (__builtin_expect(!!(LOG_LEVEL >= level), 0)) { \
-      expr; \
-    } \
+#define if_log_level(level, expr)                                              \
+  do {                                                                         \
+    if (__builtin_expect(!!(LOG_LEVEL >= level), 0)) {                         \
+      expr;                                                                    \
+    }                                                                          \
   } while (0)
 
 class Util {
@@ -133,7 +135,7 @@ public:
     printf("proto=%04X\n", ntohs(eth->h_proto));
   }
 
-  static bool ts_before(const struct timespec* a, const struct timespec* b) {
+  static bool ts_before(const struct timespec *a, const struct timespec *b) {
     if (a->tv_sec > b->tv_sec) {
       return false;
     } else {
@@ -142,9 +144,10 @@ public:
   }
 
   // approx. diff in nsec
-  static ulong ts_diff(const struct timespec *time1, const struct timespec *time0) {
+  static ulong ts_diff(const struct timespec *time1,
+                       const struct timespec *time0) {
     struct timespec diff = {.tv_sec = time1->tv_sec - time0->tv_sec, //
-        .tv_nsec = time1->tv_nsec - time0->tv_nsec};
+                            .tv_nsec = time1->tv_nsec - time0->tv_nsec};
     if (diff.tv_nsec < 0) {
       // diff.tv_nsec += 1000000000; // nsec/sec
       // diff.tv_sec--;
@@ -152,22 +155,20 @@ public:
     }
     return diff.tv_nsec;
   }
-  
+
   static ulong ulong_diff(const ulong x, const ulong y) {
     return x > y ? x - y : y - x;
   }
 
-  static ulong ulong_min(const ulong x, const ulong y) {
-    return x < y ? x : y;
-  }
+  static ulong ulong_min(const ulong x, const ulong y) { return x < y ? x : y; }
 
-  static ulong ulong_max(const ulong x, const ulong y) {
-    return x > y ? x : y;
-  }
+  static ulong ulong_max(const ulong x, const ulong y) { return x > y ? x : y; }
 
   // takes a mac_str and writes its binary representation to mac_out
-  static int str_to_mac(const char* mac_str, uint8_t (*mac)[6]) {
-    int matches = sscanf(mac_str, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &(*mac)[0], &(*mac)[1], &(*mac)[2], &(*mac)[3], &(*mac)[4], &(*mac)[5]);
+  static int str_to_mac(const char *mac_str, uint8_t (*mac)[6]) {
+    int matches =
+        sscanf(mac_str, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", &(*mac)[0], &(*mac)[1],
+               &(*mac)[2], &(*mac)[3], &(*mac)[4], &(*mac)[5]);
     if (matches == 6) {
       return 0;
     } else {
@@ -176,23 +177,25 @@ public:
   }
 
   // Function to increment the MAC address
-  static void intcrement_mac(uint8_t* macArray, uint increment) {
+  static void intcrement_mac(uint8_t *macArray, uint increment) {
     unsigned long incrementValue = increment;
     for (int i = 5; i >= 0; i--) {
-        incrementValue += macArray[i]; // Add the increment to the current byte value
-        macArray[i] = incrementValue & 0xFF; // Assign the new value to the current byte
-        incrementValue >>= 8; // Handle overflow to the next byte
-        if (incrementValue == 0) {
-            break; // No overflow, no need to continue
-        }
+      incrementValue +=
+          macArray[i]; // Add the increment to the current byte value
+      macArray[i] =
+          incrementValue & 0xFF; // Assign the new value to the current byte
+      incrementValue >>= 8;      // Handle overflow to the next byte
+      if (incrementValue == 0) {
+        break; // No overflow, no need to continue
+      }
     }
   }
 
   // approximates rte_get_timer_hz() as 3GHz
   static void rte_delay_us_block(uint us) {
     const uint64_t start = rte_get_timer_cycles();
-	  const uint64_t ticks = (uint64_t)us * 3000000000 / 1E6;
-	  while ((rte_get_timer_cycles() - start) < ticks)
-	  	rte_pause();
+    const uint64_t ticks = (uint64_t)us * 3000000000 / 1E6;
+    while ((rte_get_timer_cycles() - start) < ticks)
+      rte_pause();
   }
 };

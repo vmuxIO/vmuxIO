@@ -1,50 +1,105 @@
 #pragma once
 
 #include "libsimbricks/simbricks/nicbm/nicbm.h"
+#include "libvfio-user.h"
 #include "sims/nic/e810_bm/e810_bm.h"
 #include "src/devices/vmux-device.hpp"
 #include "util.hpp"
 #include "vfio-consumer.hpp"
 #include "vfio-server.hpp"
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <string>
 
-class E810EmulatedDevice : public VmuxDevice {
+#define NUM_MSIX_IRQs 2048
+
+class E810EmulatedDevice : public VmuxDevice, public std::enable_shared_from_this<E810EmulatedDevice> {
+  static const unsigned BAR_REGS = 0;
 private:
-  std::unique_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
-                                        //
   /** we don't pass the entire device to the model, but only the callback
    * adaptor. We choose this approach, because we don't want to purpose
    * build the device to fit the simbricks code, and don't want to change
    * the simbricks code too much to fit the vmux code. **/
-  std::shared_ptr<nicbm::CallbackAdaptor> callbacks;
+  std::shared_ptr<nicbm::Runner::CallbackAdaptor> callbacks;
 
   SimbricksProtoPcieDevIntro deviceIntro = SimbricksProtoPcieDevIntro();
 
+  const uint8_t mac_addr[6] = {};
+
+  epoll_callback tapCallback;
+  int efd = 0; // if non-null: eventfd registered for this->tap->fd
+
+  void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
+    if (driver->fd == 0)
+      return;
+      // die("E1000 only supports drivers that offer fds to wait on")
+
+    this->tapCallback.fd = driver->fd;
+    this->tapCallback.callback = E810EmulatedDevice::driver_cb;
+    this->tapCallback.ctx = this;
+    struct epoll_event e;
+    e.events = EPOLLIN;
+    e.data.ptr = &this->tapCallback;
+
+    if (0 != epoll_ctl(efd, EPOLL_CTL_ADD, driver->fd, &e))
+      die("could not register driver fd to epoll");
+
+    this->efd = efd;
+  }
+
 public:
-  E810EmulatedDevice() {
+  std::shared_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
+
+  E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6]) : VmuxDevice(driver) {
+    this->driver = driver;
+    memcpy((void*)this->mac_addr, mac_addr, 6);
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
-    this->model = std::make_unique<i40e::i40e_bm>();
+    this->model = std::make_shared<i40e::i40e_bm>();
 
-    this->callbacks = std::make_shared<nicbm::CallbackAdaptor>();
-
-    this->model->vmux = this->callbacks;
     this->init_pci_ids();
+    this->registerDriverEpoll(driver, efd);
+    this->rx_callback = E810EmulatedDevice::driver_cb;
   }
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
+    this->vfuServer = vfu;
+
+    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>(shared_from_this(), &this->mac_addr);
+    this->callbacks->model = this->model;
+    this->callbacks->vfu = vfu;
+    this->model->vmux = this->callbacks;
+
     // set up vfio-user register mediation
     this->init_bar_callbacks(*vfu);
 
     // set up irqs
-    // TODO
+    this->init_irqs(*vfu);
+
+    // init pci capas
+    // capa copied from physical E810
+    unsigned char msix_capa[] = { 0x11, 0xa0, 0xff, 0x07, 0x03, 0x00, 0x00, 0x00, 0x03, 0x80, 0x00, 0x00 };
+    int ret = vfu_pci_add_capability(vfu->vfu_ctx, 0, 0, msix_capa);
+    if (ret < 0)
+      die("add cap error");
 
     // set up libvfio-user callbacks
     // vfu.setup_passthrough_callbacks(this->vfioc);
     this->init_general_callbacks(*vfu);
   };
+
+  // forward rx event callback from tap to this E1000EmulatedDevice
+  static void driver_cb(int vm_number, void *this__) {
+    E810EmulatedDevice *this_ = (E810EmulatedDevice*) this__;
+    this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
+    for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
+      this_->vfu_ctx_mutex.lock();
+      this_->model->EthRx(0, this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
+      this_->vfu_ctx_mutex.unlock();
+    }
+    this_->driver->recv_consumed(vm_number);
+  }
 
   void init_pci_ids() {
     this->model->SetupIntro(this->deviceIntro);
@@ -64,7 +119,6 @@ public:
 
 private:
   void init_general_callbacks(VfioUserServer &vfu) {
-    // TODO all those callback functions need implementation
     int ret;
     // I think quiescing only applies when using vfu_add_to_sgl and
     // vfu_sgl_read (see libvfio-user/docs/memory-mapping.md
@@ -105,6 +159,16 @@ private:
             type);
     }
   }
+
+  void init_irqs(VfioUserServer &vfu) {
+    int ret = vfu_setup_device_nr_irqs(
+      vfu.vfu_ctx, VFU_DEV_MSIX_IRQ, NUM_MSIX_IRQs);
+    if (ret < 0) {
+      die("Cannot set up vfio-user irq (type %d, num %d)", VFU_DEV_MSIX_IRQ,
+          1);
+    }
+  }
+
   static int reset_device_cb(vfu_ctx_t *vfu_ctx,
                              [[maybe_unused]] vfu_reset_type_t type) {
     E810EmulatedDevice *device = (E810EmulatedDevice *)vfu_get_private(vfu_ctx);
@@ -112,14 +176,30 @@ private:
     // device->model->SignalInterrupt(1, 1); // just as an example: do stuff
     return 0;
   }
+
   static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                               [[maybe_unused]] vfu_dma_info_t *info) {
     printf("dma register cb\n");
+    std::shared_ptr<VfioUserServer> vfu_ =
+        ((E810EmulatedDevice *)vfu_get_private(vfu_ctx))->vfuServer;
+    VfioUserServer *vfu =
+        vfu_.get(); // lets hope vfu_ stays around until end of this function
+                    // and map_dma_here only borrows vfu
+    uint32_t flags = 0; // unused here
+
+    VfioUserServer::map_dma_here(vfu_ctx, vfu, info, &flags);
   }
   static void dma_unregister_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                                 [[maybe_unused]] vfu_dma_info_t *info) {
     printf("dma unregister cb\n");
+    std::shared_ptr<VfioUserServer> vfu_ =
+        ((E810EmulatedDevice *)vfu_get_private(vfu_ctx))->vfuServer;
+    VfioUserServer *vfu =
+        vfu_.get(); // lets hope vfu_ stays around until end of this function
+                    // and map_dma_here only borrows vfu
+    VfioUserServer::unmap_dma_here(vfu_ctx, vfu, info);
   }
+
   static void irq_state_unimplemented_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                                          [[maybe_unused]] uint32_t start,
                                          [[maybe_unused]] uint32_t count,
@@ -141,10 +221,17 @@ private:
 
       int flags = Util::convert_flags(region.flags);
       flags |= VFU_REGION_FLAG_RW;
-      ret = vfu_setup_region(vfu.vfu_ctx, idx, region.len,
-                             &(this->expected_access_callback), flags, NULL,
-                             0,      // nr. items in bar_mmap_areas
-                             -1, 0); // fd -1 and offset 0 because fd is unused
+      if (idx == E810EmulatedDevice::BAR_REGS) { // the bm only serves registers on bar 2
+        ret = vfu_setup_region(vfu.vfu_ctx, idx, region.len,
+                               &(this->expected_access_callback), flags, NULL,
+                               0,      // nr. items in bar_mmap_areas
+                               -1, 0); // fd -1 and offset 0 because fd is unused
+      } else {
+        ret = vfu_setup_region(vfu.vfu_ctx, idx, region.len,
+                               &(this->unexpected_access_callback), flags, NULL,
+                               0,      // nr. items in bar_mmap_areas
+                               -1, 0); // fd -1 and offset 0 because fd is unused
+      }
       if (ret < 0) {
         die("failed to setup BAR region %d", idx);
       }
@@ -166,13 +253,33 @@ private:
              idx, (uint)region.len);
     }
   }
+
+  static ssize_t unexpected_access_callback(
+      [[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char *const buf,
+      [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
+      [[maybe_unused]] const bool is_write) {
+    printf("WARN: unexpected vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
+           offset, is_write);
+    return 0;
+  }
+
   static ssize_t expected_access_callback(
       [[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char *const buf,
       [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
       [[maybe_unused]] const bool is_write) {
-    printf("a vfio register/DMA access callback was \
-                triggered (at 0x%lx, is write %d.\n",
+    if_log_level(LOG_DEBUG, 
+        printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
            offset, is_write);
+        );
+    E810EmulatedDevice *device =
+        (E810EmulatedDevice *)vfu_get_private(vfu_ctx);
+    if (is_write) {
+      device->model->RegWrite(E810EmulatedDevice::BAR_REGS, offset, buf, count);
+      return count;
+    } else {
+      device->model->RegRead(E810EmulatedDevice::BAR_REGS, offset, buf, count);
+      return count;
+    }
     return 0;
   }
 };

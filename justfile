@@ -28,7 +28,12 @@ vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci_full"' hosts/$(
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
 
 vmuxE810:
-  sudo {{proot}}/build/vmux -d none -t none -m emulation -s {{vmuxSock}}
+  sudo ip link delete {{vmuxTap}} || true
+  sudo ip tuntap add mode tap {{vmuxTap}}
+  sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
+  sudo ip link set dev {{vmuxTap}} up
+  sudo gdb --args {{proot}}/build/vmux -d none -t {{vmuxTap}} -m emulation -s {{vmuxSock}} -b 52:54:00:fa:00:60 -q
+  sudo ip link delete {{vmuxTap}}
 
 vmuxE1000:
   sudo ip link delete {{vmuxTap}} || true
@@ -59,8 +64,11 @@ vmuxE1000b BRIDGE="br-okelmann" IF="enp65s0np0":
   sudo ip link delete {{vmuxTap}} || true
   sudo ip link delete {{BRIDGE}} || true
 
-vmuxDpdk:
+vmuxDpdkE1000:
   sudo {{proot}}/build_release/vmux -u -q -d none -m e1000-emu -s {{vmuxSock}} -- -l 1 -n 1
+
+vmuxDpdkE810:
+  sudo {{proot}}/build_release/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
 
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true
@@ -107,7 +115,6 @@ vm-libvfio-user:
     sudo rm {{qemuMem}} || true
     sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
-        -smp 8 \
         -enable-kvm \
         -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
         -machine q35,accel=kvm,kernel-irqchip=split \

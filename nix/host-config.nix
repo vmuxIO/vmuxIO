@@ -2,6 +2,7 @@
 extkern ? false, # whether to use externally, manually built kernel
 nested ? false, # whether this is the config variant for the nested guest
 noiommu ? false, # whether to disable iommu via cmdline and kernel config
+extraEnvPackages ? [],
 ... }:
 lib.attrsets.recursiveUpdate ({
   #networking.useDHCP = false;
@@ -133,7 +134,7 @@ lib.attrsets.recursiveUpdate ({
     ethtool
     bpftrace
     flakepkgs.devShellGcRoot
-  ];
+  ] ++ extraEnvPackages;
 
   hardware.firmware = [ flakepkgs.linux-firmware-pinned ];
 

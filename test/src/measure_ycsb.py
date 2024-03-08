@@ -2,8 +2,8 @@ from measure import Measurement, end_foreach, AbstractBenchTest
 from dataclasses import dataclass, field, asdict
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
-from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
 from server import Host, Guest, LoadGen, MultiHost
+from enums import Machine, Interface, Reflector
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
 from pathlib import Path
@@ -156,9 +156,8 @@ class Ycsb():
         pass
         
 
-def main() -> None:
+def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
-    measurement = Measurement()
     host, loadgen = measurement.hosts()
     from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
     global OUT_DIR
@@ -195,8 +194,11 @@ def main() -> None:
         interface=[ interface.value for interface in interfaces],
         num_vms=vm_nums
         )
-    info(f"Execution plan:")
+    info(f"YCSB execution plan:")
     YcsbTest.estimate_time(test_matrix, ["interface", "num_vms"])
+
+    if plan_only:
+        return
 
     for num_vms in vm_nums:
         
@@ -252,4 +254,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    measurement = Measurement()
+    main(measurement)

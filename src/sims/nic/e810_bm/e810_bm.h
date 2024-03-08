@@ -35,8 +35,8 @@ extern "C" {
 #include <src/libsimbricks/simbricks/nicbm/nicbm.h>
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 
-#define DEBUG_DEV
-#define DEBUG_ADMINQ
+// #define DEBUG_DEV
+// #define DEBUG_ADMINQ
 // #define DEBUG_LAN
 // #define DEBUG_HMC
 // #define DEBUG_QUEUES

@@ -369,7 +369,9 @@ uint32_t i40e_bm::reg_mem_read32(uint64_t addr) {
     val = regs.GLV_UPTCL[idx];
   }
   else {
-    std::cout << "read others" << addr << logger::endl;
+    #ifdef DEBUG_DEV
+      std::cout << "read others " << addr << logger::endl;
+    #endif
     switch (addr) {
       case GLINT_CTL:
         val = ((ICE_ITR_GRAN_US << GLINT_CTL_ITR_GRAN_200_S) &
@@ -774,8 +776,10 @@ void i40e_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
     size_t idx = (addr - GLV_UPTCL(0))/8;
     regs.GLV_UPTCL[idx] = val;
     } else {
-      std::cout << "write others " << addr << logger::endl;
-      std::cout << "write others value " << val << logger::endl;
+      #ifdef DEBUG_DEV
+        std::cout << "write others " << addr << logger::endl;
+        std::cout << "write others value " << val << logger::endl;
+      #endif
     switch (addr) {
       case PFPE_CCQPSTATUS:
         regs.reg_PFPE_CCQPSTATUS = val;
@@ -959,6 +963,10 @@ void i40e_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
     std::cout << "signal_interrupt() invalid itr (" << itr << ")" << logger::endl;
     abort();
   }
+
+  // TODO implement delays
+  this->vmux->MsiXIssue(vec);
+  return;
 
   uint64_t curtime = runner_->TimePs();
   uint64_t newtime = curtime + mindelay;

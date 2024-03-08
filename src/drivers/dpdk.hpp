@@ -66,31 +66,6 @@ copy_buf_to_pkt(void *buf, unsigned len, struct rte_mbuf *pkt, unsigned offset)
 	copy_buf_to_pkt_segs(buf, len, pkt, offset);
 }
 
-#define CHECK_INTERVAL 1000  /* 100ms */
-#define MAX_REPEAT_TIMES 90  /* 9s (90 * 100ms) in total */
-
-static void
-assert_link_status(uint16_t port_id)
-{
-	struct rte_eth_link link;
-	uint8_t rep_cnt = MAX_REPEAT_TIMES;
-	int link_get_err = -EINVAL;
-
-	memset(&link, 0, sizeof(link));
-	do {
-		link_get_err = rte_eth_link_get(port_id, &link);
-		if (link_get_err == 0 && link.link_status == RTE_ETH_LINK_UP)
-			break;
-		rte_delay_ms(CHECK_INTERVAL);
-	} while (--rep_cnt);
-
-	if (link_get_err < 0)
-		rte_exit(EXIT_FAILURE, ":: error: link get is failing: %s\n",
-			 rte_strerror(-link_get_err));
-	if (link.link_status == RTE_ETH_LINK_DOWN)
-		rte_exit(EXIT_FAILURE, ":: error: link is still down\n");
-}
-
 /* Port initialization used in flow filtering. 8< */
 static void
 filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mbuf_pool)
@@ -177,8 +152,6 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 			ret, port_id);
 	}
 	/* >8 End of starting the port. */
-
-	assert_link_status(port_id);
 
 	printf(":: initializing port: %d done\n", port_id);
 }
@@ -337,27 +310,6 @@ static void lcore_init_checks() {
 					"polling thread.\n\tPerformance will "
 					"not be optimal.\n", port);
 }
-
-/*
- * The lcore main. This is the main thread that does the work, reading from
- * an input port and writing to an output port.
- */
-
- /* Basic forwarding application lcore. 8< */
-static __rte_noreturn void
-lcore_main(void)
-{
-	lcore_init_checks();
-
-	printf("\nCore %u forwarding packets. [Ctrl+C to quit]\n",
-			rte_lcore_id());
-
-	/* Main work of application loop. 8< */
-	for (;;) {
-		lcore_poll_once();
-	}
-}
-/* >8 End Basic forwarding application lcore. */
 
 
 class Dpdk : public Driver {

@@ -6,7 +6,8 @@ from argcomplete import autocomplete
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
-from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
+from loadlatency import LoadLatencyTest
+from enums import Machine, Interface, Reflector
 from measure import Measurement
 from util import safe_cast
 from typing import Iterator, cast
@@ -14,10 +15,15 @@ import time
 
 OUT_DIR = "/tmp/out1"
 
-def main() -> None:
+def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
-    measurement = Measurement()
     host, loadgen = measurement.hosts()
+
+    info("VNF execution plan:")
+    info("Incremental tests not supported. Running tests for maybe 5 min.")
+
+    if plan_only:
+        return
 
     # loadgen: set up interfaces and networking
 
@@ -98,4 +104,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    measurement = Measurement()
+    main(measurement)

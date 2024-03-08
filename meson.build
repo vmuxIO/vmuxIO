@@ -12,7 +12,8 @@ libvfio_user_cppflags = [
   '-Wno-c11-extensions',
   '-Wno-c99-extensions',
   '-Wno-nested-anon-types',
-  '-Wno-flexible-array-extensions'
+  '-Wno-flexible-array-extensions',
+  '-Wno-macro-redefined'
 ]
 
 sims_flags = [

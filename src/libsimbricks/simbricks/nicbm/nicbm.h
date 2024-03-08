@@ -29,6 +29,8 @@
 #include <cstring>
 #include <deque>
 #include <set>
+#include "vfio-server.hpp"
+#include "devices/vmux-device.hpp"
 #include "util.hpp"
 #include <memory>
 
@@ -59,47 +61,6 @@ class TimedEvent {
   int priority_;
 };
 
-/*
- * Adaptor to replace the simbricks class Runner
- */
-class CallbackAdaptor {
-  public:
-    /* these three are for `Runner::Device`. */
-    void IssueDma(nicbm::DMAOp &op) {
-      printf("CallbackAdaptor::IssueDma:\n");
-      __builtin_dump_struct(&op, &printf);
-    }
-    void MsiIssue(uint8_t vec) {
-      printf("CallbackAdaptor::MsiIssue(%d)\n", vec);
-    }
-    void MsiXIssue(uint8_t vec) {
-      printf("CallbackAdaptor::MsiXIssue(%d)\n", vec);
-    }
-    void IntXIssue(bool level) {
-      printf("CallbackAdaptor::IntXIssue(%d)\n", level);
-    }
-    void EthSend(const void *data, size_t len) {
-      printf("CallbackAdaptor::EthSend(len=%zu)\n", len);
-    }
-
-    void EventSchedule(nicbm::TimedEvent &evt) {
-      printf("CallbackAdaptor::EventSchedule\n");
-    }
-    void EventCancel(nicbm::TimedEvent &evt) {
-      printf("CallbackAdaptor::EventCancel\n");
-    }
-
-    uint64_t TimePs() const {
-     die("unimplemented");
-     return 0;
-    }
-    uint64_t GetMacAddr() const {
-     die("unimplemented");
-     return 0;
-    }
-};
-
-
 /**
  * The Runner drives the main simulation loop. It's initialized with a reference
  * to a device it should manage, and then once `runMain` is called, it will
@@ -110,6 +71,7 @@ class Runner {
  public:
 
   class Device;
+  class CallbackAdaptor;
 
   /**
    * Replaces the Runner class. Adapts behavioral models from simbricks or other libraries to an libvfio-user-ish interface. 
@@ -125,7 +87,6 @@ class Runner {
 
       // Functions to be called through libvfio-user by the VM
       // In rust speak they would belong to "trait MmioProvider"
-      // TODO: maybe replace by bar?_access functions
       void RegRead(uint8_t bar, uint64_t addr, void *dest,
                            size_t len) {
         device_->RegRead(bar, addr, dest, len);
@@ -159,18 +120,18 @@ class Runner {
       
       // true: phy. device and emu. device can dma
       void MapPhysicalDeviceDma(bool enable); 
-      // TODO returns where registers of a physical device have been mapped to. Vmux can now use them.
+      // returns where registers of a physical device have been mapped to. Vmux can now use them.
       void MapPhysicalDeviceRegistersToVmux(bool enable); 
       // true: RegRead callbacks stop and are redirected to physical device
       void MapPhysicalDeviceRegistersToVm(bool enable); 
 
       // Further methods called by the Device to do multiple emulated devices (backed by one physical one)
-      // TODO
+      // ...
   };
 
   class Device {
    public:
-    Runner *runner_; // vmux leaves this at null and replaces it with CallbackAdaptor
+    Runner *runner_; // vmux leaves this at null and replaces it with CallbackAdaptor // TODO replace all usages of runner by vmux
     std::shared_ptr<CallbackAdaptor> vmux;
 
    protected:
@@ -220,6 +181,80 @@ class Runner {
      */
     virtual void DevctrlUpdate(struct SimbricksProtoPcieH2DDevctrl &devctrl);
   };
+
+/*
+ * Adaptor to replace the simbricks class Runner
+ * Impl in e810.hpp.
+ */
+class CallbackAdaptor {
+  private:
+    const uint8_t (*mac_addr)[6];
+  public:
+    std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
+    std::shared_ptr<Device> model; 
+    std::shared_ptr<VmuxDevice> device;
+
+    CallbackAdaptor(std::shared_ptr<VmuxDevice> device, const uint8_t (*mac_addr)[6]) : mac_addr(mac_addr), device(device) {}
+
+    /* these three are for `Runner::Device`. */
+    void IssueDma(nicbm::DMAOp &op) {
+      if_log_level(LOG_DEBUG, 
+        printf("CallbackAdaptor::IssueDma: read %d, addr %lx, len %zu\n", !op.write_, op.dma_addr_, op.len_)
+      );
+      // __builtin_dump_struct(&op, &printf); // dump_struct doesnt work on classes
+      void *local_addr = this->vfu->dma_local_addr(op.dma_addr_, op.len_);
+      if (!local_addr) {
+        die("Could not translate DMA address");
+      }
+      if (op.write_) {
+        memcpy(local_addr, op.data_, op.len_);
+      } else {
+        memcpy(op.data_, local_addr, op.len_);
+      }
+      model->DmaComplete(op);
+    }
+    void MsiIssue(uint8_t vec) {
+      printf("CallbackAdaptor::MsiIssue(%d)\n", vec);
+      die("not implemented");
+    }
+    void MsiXIssue(uint8_t vec) {
+      int ret = vfu_irq_trigger(this->vfu->vfu_ctx, vec);
+      if (ret != 0)
+        die("E810: could not send interrupt");
+      if_log_level(LOG_DEBUG, printf("CallbackAdaptor::MsiXIssue: Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
+    }
+    void IntXIssue(bool level) {
+      printf("CallbackAdaptor::IntXIssue(%d)\n", level);
+      die("not implemented");
+    }
+    void EthSend(const void *data, size_t len) {
+      if_log_level(LOG_DEBUG, 
+        printf("CallbackAdaptor::EthSend(len=%zu)\n", len)
+      );
+      this->device->driver->send((char*)data, len);
+    }
+
+    void EventSchedule(nicbm::TimedEvent &evt) {
+      printf("CallbackAdaptor::EventSchedule\n");
+      die("not implemented");
+    }
+    void EventCancel(nicbm::TimedEvent &evt) {
+      printf("CallbackAdaptor::EventCancel\n");
+      die("not implemented");
+    }
+
+    uint64_t TimePs() const {
+     die("unimplemented");
+     return 0;
+    }
+    uint64_t GetMacAddr() const {
+     uint64_t mac = 0;
+     memcpy(&mac, this->mac_addr, sizeof(*this->mac_addr));
+     return mac;
+    }
+};
+
+
 
  protected:
   struct EventCmp {

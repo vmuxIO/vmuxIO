@@ -80,7 +80,9 @@ private:
       // printf("poll runner\n");
 
       if (pfd.revents & POLLIN) {
+        this->device->vfu_ctx_mutex.lock();
         ret = vfu_run_ctx(vfu->vfu_ctx);
+        this->device->vfu_ctx_mutex.unlock();
         if (ret < 0) {
           if (errno == EAGAIN) {
             continue;

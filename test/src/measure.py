@@ -10,7 +10,7 @@ from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from typing import Tuple, Iterator, Any, Dict, Callable
 from contextlib import contextmanager
-from loadlatency import Interface, Machine, LoadLatencyTest, Reflector
+from enums import Machine, Interface, Reflector
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from util import safe_cast
@@ -148,14 +148,14 @@ class Measurement:
         debug(f"Setting up interface {interface.value}")
         setup_host_interface(self.host, interface)
 
-        if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
-            self.host.start_vmux(interface.value)
+        if interface.needs_vmux():
+            self.host.start_vmux(interface)
 
         # start VM
 
         info(f"Starting VM ({interface.value})")
         self.host.run_guest(
-                net_type=interface.net_type(),
+                net_type=interface,
                 machine_type='pc',
                 qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin"
                 )
@@ -168,7 +168,7 @@ class Measurement:
         # teardown
 
         self.host.kill_guest()
-        if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
+        if interface.needs_vmux():
             self.host.stop_vmux()
         self.host.cleanup_network()
 
@@ -192,14 +192,15 @@ class Measurement:
 
         self.host.detect_test_iface()
 
-        unbatched_interfaces = [ Interface.VMUX_EMU, Interface.VMUX_DPDK ]
+        unbatched_interfaces = [ interface for interface in Interface.__members__.values() if 
+                                interface.needs_vfio() or (interface.needs_br_tap() and interface.needs_vmux()) ]
         if interface in unbatched_interfaces:
             # vmux taps need to be there all from the start (no batching)
             debug(f"Setting up interface {interface.value} for {num} VMs")
             setup_host_interface(self.host, interface, vm_range=range(1, num+1))
 
-        if interface in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
-            self.host.start_vmux(interface.value, num_vms=num)
+        if interface.needs_vmux():
+            self.host.start_vmux(interface, num_vms=num)
 
         # start VMs in batches of batch
         range_ = MultiHost.range(num)
@@ -221,7 +222,7 @@ class Measurement:
 
                 # self.host.run_guest(net_type=interface.net_type(), machine_type='pc', qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin", vm_number=81)
                 self.host.run_guest(
-                        net_type=interface.net_type(),
+                        net_type=interface,
                         machine_type='pc',
                         qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin",
                         vm_number=i
@@ -339,3 +340,27 @@ class AbstractBenchTest(ABC):
 
         return needed_s
 
+import measure_vnf
+import measure_hotel
+import measure_ycsb
+
+def main():
+    measurement = Measurement()
+
+    # estimate runtimes
+    info("")
+    measure_vnf.main(measurement, plan_only=True)
+    info("")
+    measure_hotel.main(measurement, plan_only=True)
+    info("")
+    measure_ycsb.main(measurement, plan_only=True)
+    info("")
+
+    info("Running benchmarks ...")
+    info("")
+    measure_vnf.main(measurement)
+    measure_hotel.main(measurement)
+    measure_ycsb.main(measurement)
+
+if __name__ == "__main__":
+    main()

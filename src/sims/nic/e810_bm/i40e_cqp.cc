@@ -37,7 +37,8 @@ void control_queue_pair::create_cqp() {
     cqp_ctx_fetch *dma = new cqp_ctx_fetch(*this, 64, cqp_ctx);
     dma->dma_addr_ = base;
     dma->len_ = 64;
-    dev.runner_->IssueDma(*dma);
+    // dev.runner_->IssueDma(*dma);
+    dev.vmux->IssueDma(*dma);
     enabled = true;
     dev.regs.reg_PFPE_CQPTAIL = 0;
     if (dev.regs.reg_PFPE_CCQPLOW == 0){
@@ -76,6 +77,7 @@ void control_queue_pair::cqe_fetch::done() {
   desc_ctx &ctx = *cqp_.desc_ctxs[0];
   
   memcpy(ctx.desc, data_, len_);
+  #ifdef DEBUG_ADMINQ
   std::cout << "cqe buffer: "<< logger::endl;
   for (int i = 0; i < 8; i++)
   {
@@ -85,6 +87,7 @@ void control_queue_pair::cqe_fetch::done() {
   {
     std::cout << std::hex << (uint64_t)((uint64_t*)buf_addr)[i];
   }
+  #endif
   ctx.process();
   
   delete this;
@@ -134,10 +137,13 @@ void control_queue_pair::trigger_fetch() {
   cqe_fetch *dma = new cqe_fetch(*this, 64, cqe);
   dma->write_ = false;
   dma->dma_addr_ = cqe_base + (tail)*64;
-  std::cout << "cqe addr: "<< dma->dma_addr_<<logger::endl;
+  #ifdef DEBUG_ADMINQ
+    std::cout << "cqe addr: "<< dma->dma_addr_<<logger::endl;
+  #endif
   dma->len_ = 64;
   dma->pos = 0;
-  dev.runner_->IssueDma(*dma);
+  // dev.runner_->IssueDma(*dma);
+  dev.vmux->IssueDma(*dma);
 
 }
 
@@ -170,7 +176,8 @@ void control_queue_pair::admin_desc_ctx::data_write(uint64_t addr, size_t data_l
   data_dma->write_ = true;
   data_dma->dma_addr_ = addr;
   memcpy(data_dma->data_, buf, data_len);
-  dev.runner_->IssueDma(*data_dma);
+  // dev.runner_->IssueDma(*data_dma);
+  dev.vmux->IssueDma(*data_dma);
 }
 
 void control_queue_pair::admin_desc_ctx::desc_compl_prepare(uint16_t retval,
@@ -201,8 +208,10 @@ void control_queue_pair::admin_desc_ctx::process() {
   u64 temp;
   get_64bit_val((__le64*)desc, 24, &temp);
   __le16 opcode = FIELD_GET(IRDMA_CQPSQ_OPCODE, temp);
+  #ifdef DEBUG_ADMINQ
   std::cout << "opcode is: " << opcode << logger::endl;
   std::cout << "before process tail is" << dev.regs.reg_PFPE_CQPTAIL << logger::endl;
+  #endif
   if (opcode == IRDMA_CQP_OP_QUERY_FPM_VAL){
     u64 query_buf_addr;
     __le64 return_buffer[22];
@@ -263,7 +272,9 @@ void control_queue_pair::admin_desc_ctx::process() {
     temp = temp | (u32) 1;
     set_64bit_val(return_buffer, 168, temp);
     get_64bit_val((__le64*)desc, 32, &query_buf_addr);
+    #ifdef DEBUG_ADMINQ
     std::cout << "query_buf_addr: "<< query_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0,return_buffer, 176, query_buf_addr);
   } else if (opcode == IRDMA_CQP_OP_SHMC_PAGES_ALLOCATED) {
 
@@ -274,7 +285,9 @@ void control_queue_pair::admin_desc_ctx::process() {
     temp = 0;
     get_64bit_val((__le64*)desc, 24, &temp);
     u32 cq_id = temp & 0x3ffff;
+    #ifdef DEBUG_ADMINQ
     std::cout << "cq id: " << cq_id << logger::endl;
+    #endif
 
     if (cq_id > 0){
       
@@ -299,13 +312,17 @@ void control_queue_pair::admin_desc_ctx::process() {
     u8 polarity = (u8)FIELD_GET(IRDMA_CQPSQ_WQEVALID, get_polarity);
     u32 ceq_id = FIELD_GET(IRDMA_CQPSQ_CEQ_CEQID, get_polarity);
     u32 tail = dev.regs.reg_PFPE_CQPTAIL;
+    #ifdef DEBUG_ADMINQ
     std::cout << "tail here: "<<tail<<logger::endl;
+    #endif
     temp = FIELD_PREP(IRDMA_CQ_WQEIDX, tail) | 
                   FIELD_PREP(IRDMA_CQ_VALID, polarity);
     set_64bit_val(return_buffer, 24, temp);
     u32 new_tail = FIELD_GET(IRDMA_CQ_WQEIDX, temp);
+    #ifdef DEBUG_ADMINQ
     std::cout << "new tail here: "<<new_tail<<logger::endl;
     std::cout << " create cq return buffer addr: "<<return_shadow_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0, return_buffer, 32, return_shadow_buf_addr);
     if (cq_id > 1) {
       dev.cem.qena_updated(ceq_id);
@@ -341,7 +358,9 @@ void control_queue_pair::admin_desc_ctx::process() {
             FIELD_PREP(IRDMA_CQ_VALID, polarity);
     
     set_64bit_val(cqe_return_buffer, 24, temp);
+    #ifdef DEBUG_ADMINQ
     std::cout << " query rdma return buffer addr: "<<return_shadow_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0, cqe_return_buffer, 32, return_shadow_buf_addr);
     cnt++;
     
@@ -374,7 +393,9 @@ void control_queue_pair::admin_desc_ctx::process() {
             FIELD_PREP(IRDMA_CQ_VALID, polarity);
     
     set_64bit_val(cqe_return_buffer, 24, temp);
+    #ifdef DEBUG_ADMINQ
     std::cout << " create ceq return buffer addr: "<<return_shadow_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0, cqe_return_buffer, 32, return_shadow_buf_addr);
     dev.cem.qena_updated(ceq_id);
     completion_event_queue &ceq = static_cast<completion_event_queue &>(*dev.cem.ceqs[ceq_id]);
@@ -401,7 +422,9 @@ void control_queue_pair::admin_desc_ctx::process() {
             FIELD_PREP(IRDMA_CQ_VALID, polarity);
     
     set_64bit_val(cqe_return_buffer, 24, temp);
+    #ifdef DEBUG_ADMINQ
     std::cout << " create ceq return buffer addr: "<<return_shadow_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0, cqe_return_buffer, 32, return_shadow_buf_addr);
 
     cnt++;
@@ -417,7 +440,9 @@ void control_queue_pair::admin_desc_ctx::process() {
             FIELD_PREP(IRDMA_CQ_VALID, polarity);
     
     set_64bit_val(cqe_return_buffer, 24, temp);
+    #ifdef DEBUG_ADMINQ
     std::cout << " create ceq return buffer addr: "<<return_shadow_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0, cqe_return_buffer, 32, return_shadow_buf_addr);
 
     cnt++;
@@ -436,7 +461,9 @@ void control_queue_pair::admin_desc_ctx::process() {
     get_64bit_val((__le64*)desc, 24, &get_polarity);
     u32 ceq_id = FIELD_GET(IRDMA_CQPSQ_CEQ_CEQID, get_polarity);
     set_64bit_val(cqe_return_buffer, 24, temp);
+    #ifdef DEBUG_ADMINQ
     std::cout << " create ceq return buffer addr: "<<return_shadow_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0, cqe_return_buffer, 32, return_shadow_buf_addr);
     dev.cem.qena_updated(ceq_id);
     cnt++;
@@ -455,7 +482,9 @@ void control_queue_pair::admin_desc_ctx::process() {
     get_64bit_val((__le64*)desc, 24, &get_polarity);
     u32 ceq_id = FIELD_GET(IRDMA_CQPSQ_CEQ_CEQID, get_polarity);
     set_64bit_val(cqe_return_buffer, 24, temp);
+    #ifdef DEBUG_ADMINQ
     std::cout << " create ceq return buffer addr: "<<return_shadow_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0, cqe_return_buffer, 32, return_shadow_buf_addr);
     dev.cem.qena_updated(ceq_id);
     cnt++;
@@ -474,7 +503,9 @@ void control_queue_pair::admin_desc_ctx::process() {
     get_64bit_val((__le64*)desc, 24, &get_polarity);
     u32 ceq_id = FIELD_GET(IRDMA_CQPSQ_CEQ_CEQID, get_polarity);
     set_64bit_val(cqe_return_buffer, 24, temp);
+    #ifdef DEBUG_ADMINQ
     std::cout << " create ceq return buffer addr: "<<return_shadow_buf_addr << logger::endl;
+    #endif
     desc_complete_indir(0, cqe_return_buffer, 32, return_shadow_buf_addr);
     dev.cem.qena_updated(ceq_id);
     cnt++;
@@ -483,7 +514,9 @@ void control_queue_pair::admin_desc_ctx::process() {
     std::cout << "unhandled opcode is: " << opcode << logger::endl;
   }
   dev.regs.reg_PFPE_CQPTAIL = dev.regs.reg_PFPE_CQPTAIL + 1;
-  std::cout << "after process tail is" << dev.regs.reg_PFPE_CQPTAIL << logger::endl;
+  #ifdef DEBUG_ADMINQ
+    std::cout << "after process tail is" << dev.regs.reg_PFPE_CQPTAIL << logger::endl;
+  #endif
 }
 
 control_queue_pair::dma_data_wb::dma_data_wb(desc_ctx &ctx_, size_t len) : ctx(ctx_){

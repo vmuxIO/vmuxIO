@@ -112,7 +112,9 @@ bool lan::rss_steering(const void *data, size_t len, uint16_t &queue,
     hash = rss_kc.hash_ipv4(ntohl(tcp->ip.src), ntohl(tcp->ip.dest),
                             ntohs(tcp->tcp.src), ntohs(tcp->tcp.dest));
     
+    #ifdef DEBUG_LAN
     std::cout << "TCP IP Ethernet" << logger::endl;
+    #endif
   } else if (udp->eth.type == htons(ETH_TYPE_IP) &&
              udp->ip.proto == IP_PROTO_UDP) {
     hash = rss_kc.hash_ipv4(ntohl(udp->ip.src), ntohl(udp->ip.dest),
@@ -150,6 +152,13 @@ void lan::packet_received(const void *data, size_t len) {
   uint32_t hash = 0;
   uint16_t queue = 0;
   rss_steering(data, len, queue, hash);
+  if (!rxqs[queue]->is_enabled()) {
+    // if we receive on uninitialized queues, we throw errors
+    #ifdef DEBUG_LAN
+      std::cout << " dropped packet because queue " << queue << " is not ready."<< logger::endl;
+    #endif
+    return; // silently drop packet
+  }
   rxqs[queue]->packet_received(data, len, hash);
 }
 
@@ -452,7 +461,8 @@ void lan_queue_tx::do_writeback(uint32_t first_idx, uint32_t first_pos,
 #ifdef DEBUG_LAN
     std::cout << " hwb=" << *((uint32_t *)dma->data_) << logger::endl;
 #endif
-    dev.runner_->IssueDma(*dma);
+    // dev.runner_->IssueDma(*dma);
+    dev.vmux->IssueDma(*dma);
   }
 }
 
@@ -614,7 +624,8 @@ bool lan_queue_tx::trigger_tx_packet() {
       xsum_udp(pktbuf + udp_off, tso_len - udp_off);
     }
 
-    dev.runner_->EthSend(pktbuf, tso_len);
+    // dev.runner_->EthSend(pktbuf, tso_len);
+    dev.vmux->EthSend(pktbuf, tso_len);
   } else {
 #ifdef DEBUG_LAN
     std::cout << "    tso packet off=" << tso_off << " len=" << tso_len
@@ -631,7 +642,8 @@ bool lan_queue_tx::trigger_tx_packet() {
 
     xsum_tcpip_tso(pktbuf + maclen, iplen, l4len, tso_paylen);
 
-    dev.runner_->EthSend(pktbuf, tso_len);
+    // dev.runner_->EthSend(pktbuf, tso_len);
+    dev.vmux->EthSend(pktbuf, tso_len);
 
     tso_postupdate_header(pktbuf + maclen, iplen, l4len, tso_paylen);
 

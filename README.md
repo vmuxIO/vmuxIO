@@ -198,12 +198,10 @@ nix develop
 sln ./test/conf/autotest_rose_wilfred.cfg autotest.cfg 
 ```
 
-Run scripted use-cases/benchmarks:
+Run all scripted use-cases/benchmarks (or use `measure_*.py` to only run selected use-cases):
 
 ```bash
-python3 ./test/src/measure_vnf.py -c ./test/conf/autotest_rose_wilfred_small.cfg -vvv
-python3 ./test/src/measure_ycsb.py -c ./test/conf/autotest_rose_wilfred_small.cfg -vvv
-python3 ./test/src/measure_hotel.py -c ./test/conf/autotest_rose_wilfred_small.cfg -vvv
+python3 ./test/src/measure.py -c ./test/conf/autotest_rose_wilfred_small.cfg -vvv
 ls /tmp/out1 # artefacts
 ```
 

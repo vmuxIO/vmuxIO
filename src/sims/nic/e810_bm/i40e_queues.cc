@@ -102,7 +102,8 @@ void queue_base::trigger_fetch() {
 #ifdef DEBUG_QUEUES
   std::cout << "    dma addr = " << dma->dma_addr_ << logger::endl;
 #endif
-  dev.runner_->IssueDma(*dma);
+  // dev.runner_->IssueDma(*dma);
+  dev.vmux->IssueDma(*dma);
 }
 
 void queue_base::trigger_process() {
@@ -230,7 +231,8 @@ void queue_base::do_writeback(uint32_t first_idx, uint32_t first_pos,
     memcpy(buf + i * desc_len, ctx.desc, desc_len);
   }
 
-  dev.runner_->IssueDma(*dma);
+  // dev.runner_->IssueDma(*dma);
+  dev.vmux->IssueDma(*dma);
 }
 
 void queue_base::writeback_done(uint32_t first_pos, uint32_t cnt) {
@@ -335,7 +337,8 @@ void queue_base::desc_ctx::data_fetch(uint64_t addr, size_t data_len) {
             << " len=" << data_len << logger::endl;
   std::cout << "  dma = " << dma << " data=" << data << logger::endl;
 #endif
-  queue.dev.runner_->IssueDma(*dma);
+  // queue.dev.runner_->IssueDma(*dma);
+  queue.dev.vmux->IssueDma(*dma);
 }
 
 void queue_base::desc_ctx::data_fetched(uint64_t addr, size_t len) {
@@ -348,7 +351,8 @@ void queue_base::desc_ctx::data_write(uint64_t addr, size_t data_len,
   data_dma->write_ = true;
   data_dma->dma_addr_ = addr;
   memcpy(data_dma->data_, buf, data_len);
-  queue.dev.runner_->IssueDma(*data_dma);
+  // queue.dev.runner_->IssueDma(*data_dma);
+  queue.dev.vmux->IssueDma(*data_dma);
 }
 
 void queue_base::desc_ctx::data_written(uint64_t addr, size_t len) {
@@ -407,7 +411,8 @@ void queue_base::dma_data_fetch::done() {
     std::cout << "  dma_fetch: next part of multi part dma" << logger::endl;
 #endif
     len_ = std::min(total_len - part_offset, MAX_DMA_SIZE);
-    ctx.queue.dev.runner_->IssueDma(*this);
+    // ctx.queue.dev.runner_->IssueDma(*this);
+    ctx.queue.dev.vmux->IssueDma(*this);
     return;
   }
   ctx.data_fetched(dma_addr_ - part_offset, total_len);
