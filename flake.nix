@@ -98,11 +98,13 @@
       };
       moongen21 = pkgs.callPackage ./nix/moongen21.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
+        pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)
         inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
       moongen-lachnit = pkgs.callPackage ./nix/moongen-lachnit.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
+        pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)
         inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };

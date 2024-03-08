@@ -1,23 +1,7 @@
 { self
-,stdenv
-, fetchFromGitHub
-, fetchurl
-, writeScriptBin
-, linux
-, openssl
-, tbb
-, libbsd
-, numactl
-, luajit
-, hello
-, cmake
-, ninja
-, meson
-, bash
-, gcc8Stdenv
-, libpcap
-, python3Packages
 , linux-firmware-pinned
+, pkgs
+, linux
 }:
 let 
   srcpack = {
@@ -26,7 +10,7 @@ let
     dpdk = self.inputs.dpdk-lachnit-src;
   };
 in
-stdenv.mkDerivation {
+pkgs.stdenv.mkDerivation {
   pname = "moongen-lachnit";
   version = "2021.07.17-21";
 
@@ -42,7 +26,7 @@ stdenv.mkDerivation {
     chmod -R u+w $sourceRoot/libmoon/deps/dpdk
   '';
 
-  nativeBuildInputs = [
+  nativeBuildInputs = with pkgs; [
     cmake
     ninja
     meson
@@ -52,7 +36,7 @@ stdenv.mkDerivation {
         echo ignoring git command
     '')
   ];
-  buildInputs = [
+  buildInputs = with pkgs; [
     openssl
     libbsd
     numactl
@@ -77,7 +61,10 @@ stdenv.mkDerivation {
       '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"'
   '';
 
-  buildPhase = "NIX_DEBUG=1 ./build.sh";
+
+  buildPhase = ''
+    ./build.sh
+  '';
 
   installPhase = ''
     mkdir -p $out/bin

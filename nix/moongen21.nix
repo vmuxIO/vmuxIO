@@ -1,23 +1,7 @@
 { self
-,stdenv
-, fetchFromGitHub
-, fetchurl
-, writeScriptBin
 , linux
-, openssl
-, tbb
-, libbsd
-, numactl
-, luajit
-, hello
-, cmake
-, ninja
-, meson
-, bash
-, gcc8Stdenv
-, libpcap
-, python3Packages
 , linux-firmware-pinned
+, pkgs
 }:
 let 
   srcpack = {
@@ -26,7 +10,7 @@ let
     dpdk = self.inputs.dpdk-src;
   };
 in
-stdenv.mkDerivation {
+pkgs.stdenv.mkDerivation {
   pname = "moongen";
   version = "2021.07.17-21";
 
@@ -42,7 +26,7 @@ stdenv.mkDerivation {
     chmod -R u+w $sourceRoot/libmoon/deps/dpdk
   '';
 
-  nativeBuildInputs = [
+  nativeBuildInputs = with pkgs; [
     cmake
     ninja
     meson
@@ -52,7 +36,7 @@ stdenv.mkDerivation {
         echo ignoring git command
     '')
   ];
-  buildInputs = [
+  buildInputs = with pkgs; [
     openssl
     libbsd
     numactl
