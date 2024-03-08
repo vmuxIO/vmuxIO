@@ -32,20 +32,20 @@ function master(args)
 	local dev = device.config({port = args.dev, rxQueues = args.threads + 1, txQueues = args.threads + 1})
 	device.waitForLinks()
 	for i = 0, args.threads - 1 do
-	    dev:getTxQueue(i):setRate(args.rate * (args.size + 4) * 8 / 1000)
-	    mg.startTask("loadSlave", dev:getTxQueue(i), dev:getMac(true), args.mac, args.size)
+	    -- dev:getTxQueue(i):setRate(args.rate * (args.size + 4) * 8 / 1000)
+	    mg.startTask("loadSlave", dev, dev:getTxQueue(i), dev:getMac(true), args.mac, args.size, args.rate)
     end
-	stats.startStatsTask{dev}
+	-- stats.startStatsTask{dev}
 	mg.startSharedTask("timerSlave", dev:getTxQueue(args.threads), dev:getRxQueue(args.threads), args.mac, args.file)
-	if args.time >= 0 then
-		runtime = timer:new(args.time)
-		runtime:wait()
-		mg:stop()
-	end
+	-- if args.time >= 0 then
+	-- 	runtime = timer:new(args.time)
+	-- 	runtime:wait()
+	-- 	mg:stop()
+	-- end
 	mg.waitForTasks()
 end
 
-function loadSlave(queue, srcMac, dstMac, pktSize)
+function loadSlave(dev, queue, srcMac, dstMac, pktSize, rate)
 	local mem = memory.createMemPool(function(buf)
 		buf:getEthernetPacket():fill{
 			ethSrc = srcMac,
@@ -54,10 +54,22 @@ function loadSlave(queue, srcMac, dstMac, pktSize)
 		}
 	end)
 	local bufs = mem:bufArray()
+	local rxStats = stats:newDevRxCounter(dev, "plain")
+	local txStats = stats:newManualTxCounter(dev, "plain")
 	while mg.running() do
 		bufs:alloc(pktSize)
-		queue:send(bufs)
+		for _, buf in ipairs(bufs) do
+			-- this script uses Mpps instead of Mbit (like the other scripts)
+			-- 1000 is a randomly chosen value that seems to have the desired effect
+			buf:setDelay(poissonDelay(1000 * 10^10 / 8 / (rate * 10^6) - pktSize - 24))
+			--buf:setRate(rate)
+		end
+		txStats:updateWithSize(queue:sendWithDelay(bufs), pktSize)
+		rxStats:update()
+		--txStats:update()
 	end
+	rxStats:finalize()
+	txStats:finalize()
 end
 
 function timerSlave(txQueue, rxQueue, dstMac, histfile)
