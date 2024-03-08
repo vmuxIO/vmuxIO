@@ -36,8 +36,8 @@
 #include "devices/e810.hpp"
 #include "devices/passthrough.hpp"
 #include "src/devices/vmux-device.hpp"
-#include "src/drivers/tap.hpp"
 #include "src/drivers/dpdk.hpp"
+#include "src/drivers/tap.hpp"
 
 extern "C" {
 #include "libvfio-user.h"
@@ -89,7 +89,8 @@ int _main(int argc, char **argv) {
   std::vector<std::unique_ptr<VmuxRunner>> runner;
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices; // all devices
-  std::vector<std::shared_ptr<VmuxDevice>> pollingDevices; // devices backed by poll based drivers
+  std::vector<std::shared_ptr<VmuxDevice>>
+      pollingDevices; // devices backed by poll based drivers
   std::vector<std::shared_ptr<VfioUserServer>> vfuServers;
   std::vector<std::shared_ptr<Driver>> drivers; // network backend for emulation
   std::string group_arg;
@@ -126,11 +127,14 @@ int _main(int argc, char **argv) {
       break;
     case '?':
     case 'h':
-      std::cout << argv[0] << " [VMUX-OPTIONS] [-- DPDK-OPTIONS]\n"
+      std::cout
+          << argv[0] << " [VMUX-OPTIONS] [-- DPDK-OPTIONS]\n"
           << "-q                                     Quiet: reduce log level\n"
-          << "-b " << base_mac_str << "                   Start assigning MAC "
+          << "-b " << base_mac_str
+          << "                   Start assigning MAC "
              "address to emulated devices starting from this base\n"
-          << "-u                                     Use dpdk backend instead of linux taps\n"
+          << "-u                                     Use dpdk backend instead "
+             "of linux taps\n"
           << "-d 0000:18:00.0                        PCI-Device (or "
              "\"none\" if not applicable)\n"
           << "-t tap-username0                       Tap device to use "
@@ -171,8 +175,7 @@ int _main(int argc, char **argv) {
     errno = EINVAL;
     die("Could not parse base MAC address (%d)", ret);
   }
-      
-  
+
   // start setting up vmux
 
   int efd = epoll_create1(0);
@@ -191,7 +194,7 @@ int _main(int argc, char **argv) {
   } else {
     // init dpdk
     // move to after vfu sock creation
-    char** dpdk_argv = &(argv[optind-1]); // first arg is at index 0: "--"
+    char **dpdk_argv = &(argv[optind - 1]); // first arg is at index 0: "--"
     size_t dpdk_argc;
     if (optind < argc) {
       // -- arg used
@@ -201,7 +204,8 @@ int _main(int argc, char **argv) {
       dpdk_argc = 0;
     }
 
-    auto dpdk = std::make_shared<Dpdk>(sockets.size(), &base_mac, dpdk_argc, dpdk_argv);
+    auto dpdk =
+        std::make_shared<Dpdk>(sockets.size(), &base_mac, dpdk_argc, dpdk_argv);
     for (size_t i = 0; i < sockets.size(); i++) {
       drivers.push_back(dpdk); // everyone shares a single dpdk backend
     }
@@ -248,7 +252,8 @@ int _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>(drivers[i], efd, &mac_addr);
     }
     if (modes[i] == "e1000-emu") {
-      device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true, globalIrq, &mac_addr);
+      device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true,
+                                                     globalIrq, &mac_addr);
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());

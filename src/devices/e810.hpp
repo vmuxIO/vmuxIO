@@ -12,6 +12,8 @@
 #include <memory>
 #include <string>
 
+#define NUM_MSIX_IRQs 2048
+
 class E810EmulatedDevice : public VmuxDevice, public std::enable_shared_from_this<E810EmulatedDevice> {
   static const unsigned BAR_REGS = 0;
 private:
@@ -117,7 +119,6 @@ public:
 
 private:
   void init_general_callbacks(VfioUserServer &vfu) {
-    // TODO all those callback functions need implementation
     int ret;
     // I think quiescing only applies when using vfu_add_to_sgl and
     // vfu_sgl_read (see libvfio-user/docs/memory-mapping.md
@@ -161,7 +162,7 @@ private:
 
   void init_irqs(VfioUserServer &vfu) {
     int ret = vfu_setup_device_nr_irqs(
-      vfu.vfu_ctx, VFU_DEV_MSIX_IRQ, 2048); // TODO constant
+      vfu.vfu_ctx, VFU_DEV_MSIX_IRQ, NUM_MSIX_IRQs);
     if (ret < 0) {
       die("Cannot set up vfio-user irq (type %d, num %d)", VFU_DEV_MSIX_IRQ,
           1);
@@ -176,7 +177,6 @@ private:
     return 0;
   }
 
-  // TODO join with E1000 dma_register_cb
   static void dma_register_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                               [[maybe_unused]] vfu_dma_info_t *info) {
     printf("dma register cb\n");

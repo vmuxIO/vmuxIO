@@ -87,7 +87,6 @@ class Runner {
 
       // Functions to be called through libvfio-user by the VM
       // In rust speak they would belong to "trait MmioProvider"
-      // TODO: maybe replace by bar?_access functions
       void RegRead(uint8_t bar, uint64_t addr, void *dest,
                            size_t len) {
         device_->RegRead(bar, addr, dest, len);
@@ -121,13 +120,13 @@ class Runner {
       
       // true: phy. device and emu. device can dma
       void MapPhysicalDeviceDma(bool enable); 
-      // TODO returns where registers of a physical device have been mapped to. Vmux can now use them.
+      // returns where registers of a physical device have been mapped to. Vmux can now use them.
       void MapPhysicalDeviceRegistersToVmux(bool enable); 
       // true: RegRead callbacks stop and are redirected to physical device
       void MapPhysicalDeviceRegistersToVm(bool enable); 
 
       // Further methods called by the Device to do multiple emulated devices (backed by one physical one)
-      // TODO
+      // ...
   };
 
   class Device {
