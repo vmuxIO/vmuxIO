@@ -23,7 +23,7 @@
 
     nix-fast-build = {
       url = "github:Mic92/nix-fast-build";
-      inputs.nixpgks.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # on flake submodules https://github.com/NixOS/nix/pull/5434

@@ -19,7 +19,7 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = with pkgs; [
     openssl
     python3Packages.pyelftools
-    pkgconfig
+    pkg-config
     coreutils
     (writeScriptBin "git" ''
         echo ignoring git command
