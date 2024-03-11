@@ -390,6 +390,7 @@ build:
   nix build -o {{proot}}/qemu-ioregionfd .#qemu-ioregionfd
   nix build -o {{proot}}/ycsb .#ycsb
   nix build -o {{proot}}/vmux-nixbuild .#vmux
+  [[ -z $(git submodule status | grep "^-") ]] || echo WARN: git submodules status: not in sync
 
 update:
   # update nix flake inputs
