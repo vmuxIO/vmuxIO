@@ -10,9 +10,9 @@
   ];
 
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
-    nixpkgs-2211.url = github:NixOS/nixpkgs/nixos-22.11;
-    nixpkgs-2111.url = github:NixOS/nixpkgs/nixos-21.11;
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-2211.url = "github:NixOS/nixpkgs/nixos-22.11";
+    nixpkgs-2111.url = "github:NixOS/nixpkgs/nixos-21.11";
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -23,7 +23,7 @@
 
     nix-fast-build = {
       url = "github:Mic92/nix-fast-build";
-      inputs.nixpgks.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     # on flake submodules https://github.com/NixOS/nix/pull/5434
@@ -98,11 +98,13 @@
       };
       moongen21 = pkgs.callPackage ./nix/moongen21.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
+        pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)
         inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
       moongen-lachnit = pkgs.callPackage ./nix/moongen-lachnit.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
+        pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)
         inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
@@ -320,9 +322,9 @@
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
       # nix develop .#qemu-dev
-      qemu-dev = pkgs2211.qemu.overrideAttrs (old: {
-        buildInputs = [ pkgs.libndctl pkgs.libtasn1 ] ++ old.buildInputs;
-        nativeBuildInputs = [ pkgs.meson pkgs.ninja ] ++ old.nativeBuildInputs;
+      qemu-dev = with pkgs2211; qemu.overrideAttrs (old: {
+        buildInputs = [ libndctl libtasn1 ] ++ old.buildInputs;
+        nativeBuildInputs = [ meson ninja ] ++ old.nativeBuildInputs;
         hardeningDisable = [ "all" ]; # [ "stackprotector" ];
         shellHook = ''
           unset CPP # intereferes with dependency calculation
