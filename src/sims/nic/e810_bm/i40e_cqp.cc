@@ -10,7 +10,7 @@ using namespace std;
 #include <bits/stdc++.h>
 namespace i40e {
 
-control_queue_pair::control_queue_pair(i40e_bm &dev_, uint32_t &reg_high_,
+control_queue_pair::control_queue_pair(e810_bm &dev_, uint32_t &reg_high_,
                                uint32_t &reg_low_, uint32_t &reg_head_,
                                uint32_t &reg_tail_)
     : queue_base("cqp", reg_head_, reg_tail_, dev_),
@@ -161,7 +161,7 @@ void control_queue_pair::trigger_process() {
 }
 
 control_queue_pair::admin_desc_ctx::admin_desc_ctx(control_queue_pair &queue_,
-                                               i40e_bm &dev_)
+                                               e810_bm &dev_)
     : i40e::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
   d = reinterpret_cast<__le64 *>(desc);
 }

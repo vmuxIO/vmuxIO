@@ -35,7 +35,7 @@
 
 namespace i40e {
 
-i40e_bm::i40e_bm()
+e810_bm::e810_bm()
     : log("i40e", runner_),
       pf_atq(*this, regs.pf_atqba, regs.pf_atqlen, regs.pf_atqh, regs.pf_atqt),
       pf_mbx_atq(*this, regs.pf_mbx_atqba, regs.pf_mbx_atqlen, regs.pf_mbx_atqh, regs.pf_mbx_atqt),
@@ -47,10 +47,10 @@ i40e_bm::i40e_bm()
   reset(false);
 }
 
-i40e_bm::~i40e_bm() {
+e810_bm::~e810_bm() {
 }
 
-void i40e_bm::SetupIntro(struct SimbricksProtoPcieDevIntro &di) {
+void e810_bm::SetupIntro(struct SimbricksProtoPcieDevIntro &di) {
   di.bars[BAR_REGS].len = 64 * 1024 * 1024;
   di.bars[BAR_REGS].flags = SIMBRICKS_PROTO_PCIE_BAR_64;
   di.bars[BAR_IO].len = 32;
@@ -74,7 +74,7 @@ void i40e_bm::SetupIntro(struct SimbricksProtoPcieDevIntro &di) {
   di.psi_msix_cap_offset = 0x70;
 }
 
-void i40e_bm::DmaComplete(nicbm::DMAOp &op) {
+void e810_bm::DmaComplete(nicbm::DMAOp &op) {
   dma_base &dma = dynamic_cast<dma_base &>(op);
 #ifdef DEBUG_DEV
   std::cout << "dma_complete(" << &op << ")" << logger::endl;
@@ -82,14 +82,14 @@ void i40e_bm::DmaComplete(nicbm::DMAOp &op) {
   dma.done();
 }
 
-void i40e_bm::EthRx(uint8_t port, const void *data, size_t len) {
+void e810_bm::EthRx(uint8_t port, const void *data, size_t len) {
 #ifdef DEBUG_DEV
   std::cout << "i40e: received packet len=" << len << logger::endl;
 #endif
   lanmgr.packet_received(data, len);
 }
 
-void i40e_bm::RegRead(uint8_t bar, uint64_t addr, void *dest, size_t len) {
+void e810_bm::RegRead(uint8_t bar, uint64_t addr, void *dest, size_t len) {
   uint32_t *dest_p = reinterpret_cast<uint32_t *>(dest);
 
   if (len == 4) {
@@ -104,7 +104,7 @@ void i40e_bm::RegRead(uint8_t bar, uint64_t addr, void *dest, size_t len) {
   }
 }
 
-uint32_t i40e_bm::RegRead32(uint8_t bar, uint64_t addr) {
+uint32_t e810_bm::RegRead32(uint8_t bar, uint64_t addr) {
   if (bar == BAR_REGS) {
     return reg_mem_read32(addr);
   } else if (bar == BAR_IO) {
@@ -115,7 +115,7 @@ uint32_t i40e_bm::RegRead32(uint8_t bar, uint64_t addr) {
   }
 }
 
-void i40e_bm::RegWrite(uint8_t bar, uint64_t addr, const void *src,
+void e810_bm::RegWrite(uint8_t bar, uint64_t addr, const void *src,
                        size_t len) {
   const uint32_t *src_p = reinterpret_cast<const uint32_t *>(src);
 
@@ -131,7 +131,7 @@ void i40e_bm::RegWrite(uint8_t bar, uint64_t addr, const void *src,
   }
 }
 
-void i40e_bm::RegWrite32(uint8_t bar, uint64_t addr, uint32_t val) {
+void e810_bm::RegWrite32(uint8_t bar, uint64_t addr, uint32_t val) {
   if (bar == BAR_REGS) {
     reg_mem_write32(addr, val);
   } else if (bar == BAR_IO) {
@@ -142,17 +142,17 @@ void i40e_bm::RegWrite32(uint8_t bar, uint64_t addr, uint32_t val) {
   }
 }
 
-uint32_t i40e_bm::reg_io_read(uint64_t addr) {
+uint32_t e810_bm::reg_io_read(uint64_t addr) {
   std::cout << "unhandled io read addr=" << addr << logger::endl;
   return 0;
 }
 
-void i40e_bm::reg_io_write(uint64_t addr, uint32_t val) {
+void e810_bm::reg_io_write(uint64_t addr, uint32_t val) {
   std::cout << "unhandled io write addr=" << addr << " val=" << val << logger::endl;
 }
 
 
-uint32_t i40e_bm::reg_mem_read32(uint64_t addr) {
+uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
   uint32_t val = 0;
 
   if (addr >= GLINT_DYN_CTL(0) &&
@@ -568,7 +568,7 @@ uint32_t i40e_bm::reg_mem_read32(uint64_t addr) {
   return val;
 }
 
-void i40e_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
+void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
   if (addr >= GLINT_DYN_CTL(0) &&
       addr <= GLINT_DYN_CTL(NUM_PFINTS - 1)) {
     regs.pfint_dyn_ctln[(addr - GLINT_DYN_CTL(0)) / 4] = val;
@@ -925,7 +925,7 @@ void i40e_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
   }
 }
 
-void i40e_bm::Timed(nicbm::TimedEvent &ev) {
+void e810_bm::Timed(nicbm::TimedEvent &ev) {
   int_ev &iev = *((int_ev *)&ev);
 #ifdef DEBUG_DEV
   std::cout << "timed_event: triggering interrupt (" << iev.vec << ")"
@@ -943,7 +943,7 @@ void i40e_bm::Timed(nicbm::TimedEvent &ev) {
   }
 }
 
-void i40e_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
+void e810_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
   int_ev &iev = intevs[vec];
 
   uint64_t mindelay;
@@ -993,7 +993,7 @@ void i40e_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
   runner_->EventSchedule(iev);
 }
 
-void i40e_bm::reset(bool indicate_done) {
+void e810_bm::reset(bool indicate_done) {
 #ifdef DEBUG_DEV
   std::cout << "reset triggered" << logger::endl;
 #endif
@@ -1035,7 +1035,7 @@ void i40e_bm::reset(bool indicate_done) {
   regs.glrpb_plw = 0x0846;
 }
 
-shadow_ram::shadow_ram(i40e_bm &dev_) : dev(dev_), log("sram", dev_.runner_) {
+shadow_ram::shadow_ram(e810_bm &dev_) : dev(dev_), log("sram", dev_.runner_) {
 }
 
 void shadow_ram::reg_updated() {
@@ -1109,7 +1109,7 @@ int_ev::int_ev() {
 class i40e_factory : public nicbm::MultiNicRunner::DeviceFactory {
   public:
     virtual nicbm::Runner::Device &create() override {
-      return *new i40e::i40e_bm;
+      return *new i40e::e810_bm;
     }
 };
 
