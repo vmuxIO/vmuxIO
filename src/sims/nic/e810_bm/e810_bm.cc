@@ -965,7 +965,7 @@ void e810_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
   }
 
   // TODO implement delays
-  this->vmux->MsiXIssue(vec);
+  this->vmux->MsiXIssue(vec, mindelay);
   return;
 
   uint64_t curtime = runner_->TimePs();
