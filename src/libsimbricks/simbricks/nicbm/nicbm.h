@@ -29,6 +29,7 @@
 #include <cstring>
 #include <deque>
 #include <set>
+#include "interrupts/none.hpp"
 #include "vfio-server.hpp"
 #include "devices/vmux-device.hpp"
 #include "util.hpp"
@@ -193,8 +194,9 @@ class CallbackAdaptor {
     std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
     std::shared_ptr<Device> model; 
     std::shared_ptr<VmuxDevice> device;
+    std::vector<std::shared_ptr<InterruptThrottlerNone>> irqThrottle;
 
-    CallbackAdaptor(std::shared_ptr<VmuxDevice> device, const uint8_t (*mac_addr)[6]) : mac_addr(mac_addr), device(device) {}
+    CallbackAdaptor(std::shared_ptr<VmuxDevice> device, const uint8_t (*mac_addr)[6], std::vector<std::shared_ptr<InterruptThrottlerNone>> irqThrottle) : mac_addr(mac_addr), device(device), irqThrottle(irqThrottle) {}
 
     /* these three are for `Runner::Device`. */
     void IssueDma(nicbm::DMAOp &op) {
@@ -218,9 +220,16 @@ class CallbackAdaptor {
       die("not implemented");
     }
     void MsiXIssue(uint8_t vec) {
-      int ret = vfu_irq_trigger(this->vfu->vfu_ctx, vec);
-      if (ret != 0)
-        die("E810: could not send interrupt");
+      // E1000EmulatedDevice *this_ = (E1000EmulatedDevice *)private_ptr;
+      // spacing_s = 1 / ( 10^9 / (reg * 256) )
+      // spcaing_s = (reg * 256) / 10^9
+      // ulong spacing_us = (e1000_interrupt_throtteling_reg(this_->e1000, -1) * 256);
+      this->irqThrottle[vec]->try_interrupt(0, false);
+
+      int ret = 0;
+      // ret = vfu_irq_trigger(this->vfu->vfu_ctx, vec);
+      // if (ret != 0)
+      //   die("E810: could not send interrupt");
       if_log_level(LOG_DEBUG, printf("CallbackAdaptor::MsiXIssue: Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
     }
     void IntXIssue(bool level) {

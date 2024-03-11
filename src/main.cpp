@@ -249,7 +249,7 @@ int _main(int argc, char **argv) {
       device = std::make_shared<StubDevice>();
     }
     if (modes[i] == "emulation") {
-      device = std::make_shared<E810EmulatedDevice>(drivers[i], efd, &mac_addr);
+      device = std::make_shared<E810EmulatedDevice>(drivers[i], efd, &mac_addr, globalIrq);
     }
     if (modes[i] == "e1000-emu") {
       device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true,

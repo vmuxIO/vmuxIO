@@ -1,5 +1,6 @@
 #pragma once
 
+#include "interrupts/none.hpp"
 #include "libsimbricks/simbricks/nicbm/nicbm.h"
 #include "libvfio-user.h"
 #include "sims/nic/e810_bm/e810_bm.h"
@@ -29,6 +30,8 @@ private:
 
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
+               //
+  std::vector<std::shared_ptr<InterruptThrottlerNone>> irqThrottle;
 
   void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
     if (driver->fd == 0)
@@ -49,11 +52,18 @@ private:
   }
 
 public:
-  std::shared_ptr<i40e::e810_bm> model; // TODO rename i40e_bm class to e810
+  std::shared_ptr<i40e::e810_bm> model;
 
-  E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6]) : VmuxDevice(driver) {
+  E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(driver) {
     this->driver = driver;
     memcpy((void*)this->mac_addr, mac_addr, 6);
+
+    for (int idx = 0; idx < NUM_MSIX_IRQs; idx++) {
+      auto throttler = std::make_shared<InterruptThrottlerNone>(efd, idx, irq_glob);
+      irq_glob->add(throttler);
+      this->irqThrottle.push_back(throttler);
+    }
+
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
     this->model = std::make_shared<i40e::e810_bm>();
@@ -66,7 +76,13 @@ public:
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
     this->vfuServer = vfu;
 
-    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>(shared_from_this(), &this->mac_addr);
+    std::vector<std::shared_ptr<InterruptThrottlerNone>> throttlers;
+    for (int idx = 0; idx < NUM_MSIX_IRQs; idx++) {
+      auto throttler = this->irqThrottle[idx];
+      throttlers.push_back(throttler);
+      this->irqThrottle[idx]->vfuServer = vfu;
+    }
+    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>(shared_from_this(), &this->mac_addr, this->irqThrottle);
     this->callbacks->model = this->model;
     this->callbacks->vfu = vfu;
     this->model->vmux = this->callbacks;

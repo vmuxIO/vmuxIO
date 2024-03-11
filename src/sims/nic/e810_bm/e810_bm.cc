@@ -978,6 +978,7 @@ void e810_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
 #endif
     return;
   } else if (iev.armed) {
+    // already armed and is scheduled for a later point in time.
     // need to reschedule
     runner_->EventCancel(iev);
   }
