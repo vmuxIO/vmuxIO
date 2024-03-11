@@ -1,6 +1,7 @@
 #pragma once
 
 #include "interrupts/none.hpp"
+#include "interrupts/simbricks.hpp"
 #include "libsimbricks/simbricks/nicbm/nicbm.h"
 #include "libvfio-user.h"
 #include "sims/nic/e810_bm/e810_bm.h"
@@ -31,7 +32,7 @@ private:
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
                //
-  std::vector<std::shared_ptr<InterruptThrottlerNone>> irqThrottle;
+  std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle;
 
   void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
     if (driver->fd == 0)
@@ -59,7 +60,7 @@ public:
     memcpy((void*)this->mac_addr, mac_addr, 6);
 
     for (int idx = 0; idx < NUM_MSIX_IRQs; idx++) {
-      auto throttler = std::make_shared<InterruptThrottlerNone>(efd, idx, irq_glob);
+      auto throttler = std::make_shared<InterruptThrottlerSimbricks>(efd, idx, irq_glob);
       irq_glob->add(throttler);
       this->irqThrottle.push_back(throttler);
     }
@@ -76,7 +77,7 @@ public:
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
     this->vfuServer = vfu;
 
-    std::vector<std::shared_ptr<InterruptThrottlerNone>> throttlers;
+    std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> throttlers;
     for (int idx = 0; idx < NUM_MSIX_IRQs; idx++) {
       auto throttler = this->irqThrottle[idx];
       throttlers.push_back(throttler);

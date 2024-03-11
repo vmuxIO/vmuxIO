@@ -30,6 +30,7 @@
 #include <deque>
 #include <set>
 #include "interrupts/none.hpp"
+#include "interrupts/simbricks.hpp"
 #include "vfio-server.hpp"
 #include "devices/vmux-device.hpp"
 #include "util.hpp"
@@ -194,9 +195,9 @@ class CallbackAdaptor {
     std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
     std::shared_ptr<Device> model; 
     std::shared_ptr<VmuxDevice> device;
-    std::vector<std::shared_ptr<InterruptThrottlerNone>> irqThrottle;
+    std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle;
 
-    CallbackAdaptor(std::shared_ptr<VmuxDevice> device, const uint8_t (*mac_addr)[6], std::vector<std::shared_ptr<InterruptThrottlerNone>> irqThrottle) : mac_addr(mac_addr), device(device), irqThrottle(irqThrottle) {}
+    CallbackAdaptor(std::shared_ptr<VmuxDevice> device, const uint8_t (*mac_addr)[6], std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle) : mac_addr(mac_addr), device(device), irqThrottle(irqThrottle) {}
 
     /* these three are for `Runner::Device`. */
     void IssueDma(nicbm::DMAOp &op) {
