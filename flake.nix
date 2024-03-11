@@ -10,9 +10,9 @@
   ];
 
   inputs = {
-    nixpkgs.url = github:NixOS/nixpkgs/nixos-unstable;
-    nixpkgs-2211.url = github:NixOS/nixpkgs/nixos-22.11;
-    nixpkgs-2111.url = github:NixOS/nixpkgs/nixos-21.11;
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs-2211.url = "github:NixOS/nixpkgs/nixos-22.11";
+    nixpkgs-2111.url = "github:NixOS/nixpkgs/nixos-21.11";
 
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -322,9 +322,9 @@
         CXXFLAGS = "-std=gnu++14"; # libmoon->highwayhash->tbb needs <c++17
       };
       # nix develop .#qemu-dev
-      qemu-dev = pkgs2211.qemu.overrideAttrs (old: {
-        buildInputs = [ pkgs.libndctl pkgs.libtasn1 ] ++ old.buildInputs;
-        nativeBuildInputs = [ pkgs.meson pkgs.ninja ] ++ old.nativeBuildInputs;
+      qemu-dev = with pkgs2211; qemu.overrideAttrs (old: {
+        buildInputs = [ libndctl libtasn1 ] ++ old.buildInputs;
+        nativeBuildInputs = [ meson ninja ] ++ old.nativeBuildInputs;
         hardeningDisable = [ "all" ]; # [ "stackprotector" ];
         shellHook = ''
           unset CPP # intereferes with dependency calculation
