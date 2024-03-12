@@ -184,11 +184,11 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
              addr <= QRX_TAIL(2048 - 1)) {
     val = regs.qrx_tail[(addr - QRX_TAIL(0)) / 4];
   } else if (addr >= GLINT_ITR(0, 0) && addr <= GLINT_ITR(0, 2047)) {
-    val = regs.GLINT_ITR0[(addr - GLINT_ITR(0,0))];
+    val = regs.GLINT_ITR0[(addr - GLINT_ITR(0,0)) / 4]; 
   } else if (addr >= GLINT_ITR(1, 0) && addr <= GLINT_ITR(1, 2047)) {
-    val = regs.GLINT_ITR1[(addr - GLINT_ITR(1,0))];
+    val = regs.GLINT_ITR1[(addr - GLINT_ITR(1,0)) / 4];
   } else if (addr >= GLINT_ITR(2, 0) && addr <= GLINT_ITR(2, 2047)) {
-    val = regs.GLINT_ITR2[(addr - GLINT_ITR(2,0))];
+    val = regs.GLINT_ITR2[(addr - GLINT_ITR(2,0)) / 4];
   } else if (addr >= QRX_CONTEXT(0, 0) && addr <= QRX_CONTEXT(0, 0)) {
     std::cout << "reading qrx context..." << logger::endl;
     std::cout<< "reading QRX_CONTEXT(0,0)" << logger::endl;
@@ -611,11 +611,11 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
     regs.glint_ceqctl[idx] = val;
     cem.qena_updated(idx);
   } else if (addr >= GLINT_ITR(0, 0) && addr <= GLINT_ITR(0, 2047)) {
-    regs.GLINT_ITR0[(addr - GLINT_ITR(0,0))] = val;
+    regs.GLINT_ITR0[(addr - GLINT_ITR(0,0)) / 4] = val;
   } else if (addr >= GLINT_ITR(1, 0) && addr <= GLINT_ITR(1, 2047)) {
-    regs.GLINT_ITR1[(addr - GLINT_ITR(1,0))] = val;
+    regs.GLINT_ITR1[(addr - GLINT_ITR(1,0)) / 4] = val;
   } else if (addr >= GLINT_ITR(2, 0) && addr <= GLINT_ITR(2, 2047)) {
-    regs.GLINT_ITR2[(addr - GLINT_ITR(2,0))] = val;
+    regs.GLINT_ITR2[(addr - GLINT_ITR(2,0)) / 4] = val;
   } else if (addr >= QRX_CONTEXT(0, 0) && addr <= QRX_CONTEXT(7, 2047)) {
     regs.QRX_CONTEXT[(addr - QRX_CONTEXT(0,0))] = val;
   } else if (addr >= QRXFLXP_CNTXT(0) && addr <= QRXFLXP_CNTXT(2047)) {
@@ -950,12 +950,13 @@ void e810_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
   if (itr <= 2) {
     // itr 0-2
     if (vec == 0)
-      mindelay = regs.GLINT_ITR0[itr];
+      mindelay = regs.GLINT_ITR0[itr]; // delay in n * 2us
     else if (vec == 1)
       mindelay = regs.GLINT_ITR1[itr];
     else
       mindelay = regs.GLINT_ITR2[itr];
-    mindelay *= 2000000ULL;
+    // mindelay *= 2000000ULL; // delay in ps
+    mindelay *= 2000ULL; // delay in ns
   } else if (itr == 3) {
     // noitr
     mindelay = 0;
