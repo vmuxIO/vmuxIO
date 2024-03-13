@@ -20,7 +20,8 @@ sims_flags = [
   '-Wno-extra-semi',
   '-Wno-unused-parameter',
   '-Wno-unused-variable',
-  '-Wno-pointer-arith'
+  '-Wno-pointer-arith',
+  '-fPIC'
 ]
 
 dpdk_flags = [

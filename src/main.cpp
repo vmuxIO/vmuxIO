@@ -178,6 +178,8 @@ int _main(int argc, char **argv) {
 
   // start setting up vmux
 
+  Util::check_clock_accuracy();
+
   int efd = epoll_create1(0);
 
   if (!useDpdk) {

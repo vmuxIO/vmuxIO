@@ -27,6 +27,7 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
   epoll_callback timer_callback;
   std::shared_ptr<VfioUserServer> vfuServer;
   ulong factor = 1;
+  struct timespec poll_timer = {};
 
   InterruptThrottlerSimbricks(int efd, int irq_idx, std::shared_ptr<GlobalInterrupts> irq_glob): irq_idx(irq_idx) {
     this->timer_fd = timerfd_create(CLOCK_MONOTONIC, 0); // foo error
@@ -46,6 +47,26 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
       die("could not register timer fd to epoll");
 
     this->efd = efd;
+  }
+
+  ulong processPollTimer() {
+    ulong ret = 0;
+    if (this->poll_timer.tv_sec == 0 && this->poll_timer.tv_nsec == 0) {
+      return ret; // timer is deactivated
+    }
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    if (Util::ts_before(&this->poll_timer, &now)) {
+      ulong ret = Util::ts_diff(&now, &this->poll_timer);
+      this->poll_timer_cb();
+    }
+    return ret;
+  }
+
+  void poll_timer_cb() {
+    this->send_interrupt();
+    this->poll_timer = {}; // disable timer
+    this->armed.store(false);
   }
 
   static void timer_cb(int fd, void* this__) {
@@ -69,6 +90,10 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
     struct itimerspec its = {};
     its.it_value = *ts;
     timerfd_settime(this->timer_fd, TFD_TIMER_ABSTIME, &its, NULL);
+  }
+
+  void defer_interrupt_abs_polling(struct timespec* ts) {
+    this->poll_timer = *ts;
   }
 
   /* mindelay in ns
@@ -103,7 +128,7 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
 
     this->armed.store(true);
     this->time_ = newtime;
-    this->defer_interrupt_abs(&newtime); // newtime
+    this->defer_interrupt_abs_polling(&newtime); // newtime // TODO incompatible with non-polling tap backend
 
     return 0;
 

@@ -109,6 +109,9 @@ public:
   // forward rx event callback from tap to this E1000EmulatedDevice
   static void driver_cb(int vm_number, void *this__) {
     E810EmulatedDevice *this_ = (E810EmulatedDevice*) this__;
+    for (size_t i = 0; i < this_->irqThrottle.size(); i++) {
+      this_->irqThrottle[i]->processPollTimer();
+    }
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
     for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
       this_->vfu_ctx_mutex.lock();
