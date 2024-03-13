@@ -182,6 +182,9 @@ lib.attrsets.recursiveUpdate ({
     }
   ];
 
+  boot.kernelPackages = pkgs.linuxKernel.packages.linux_6_1; # 6.1 is LTS
+  # our e810 emulation is suspected to be broken with the following (and newer) kernels: 6.6.19
+
   #boot.kernelPackages = let
   #  linux_ioregfd_pkg = { fetchurl, buildLinux, ... } @ args:
 

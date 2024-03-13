@@ -34,7 +34,7 @@ using namespace std;
 #include <bits/stdc++.h>
 namespace i40e {
 
-queue_admin_tx::queue_admin_tx(i40e_bm &dev_, uint64_t &reg_base_,
+queue_admin_tx::queue_admin_tx(e810_bm &dev_, uint64_t &reg_base_,
                                uint32_t &reg_len_, uint32_t &reg_head_,
                                uint32_t &reg_tail_)
     : queue_base("atx", reg_head_, reg_tail_, dev_),
@@ -68,7 +68,7 @@ void queue_admin_tx::reg_updated() {
 }
 
 queue_admin_tx::admin_desc_ctx::admin_desc_ctx(queue_admin_tx &queue_,
-                                               i40e_bm &dev_)
+                                               e810_bm &dev_)
     : i40e::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
   d = reinterpret_cast<struct i40e_aq_desc *>(desc);
 }

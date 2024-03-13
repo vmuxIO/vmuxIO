@@ -11,7 +11,7 @@ using namespace std;
 
 namespace i40e {
 
-completion_event_manager::completion_event_manager(i40e_bm &dev_, size_t num_qs_)
+completion_event_manager::completion_event_manager(e810_bm &dev_, size_t num_qs_)
     : dev(dev_), log("cem", dev_.runner_),num_qs(num_qs_){
   ceqs = new completion_event_queue *[num_qs];
   for (size_t i = 0; i < num_qs; i++) {
@@ -73,7 +73,7 @@ void completion_event_manager::reset() {
   }
 }
 
-completion_event_queue::completion_event_queue(i40e_bm &dev_, uint64_t ceq_base, uint32_t &reg_head_,
+completion_event_queue::completion_event_queue(e810_bm &dev_, uint64_t ceq_base, uint32_t &reg_head_,
                                uint32_t &reg_tail_)
     : queue_base("ceq", reg_head_, reg_tail_, dev_){
   desc_len = 64;

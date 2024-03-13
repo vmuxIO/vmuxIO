@@ -49,14 +49,14 @@ private:
   }
 
 public:
-  std::shared_ptr<i40e::i40e_bm> model; // TODO rename i40e_bm class to e810
+  std::shared_ptr<i40e::e810_bm> model; // TODO rename i40e_bm class to e810
 
   E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6]) : VmuxDevice(driver) {
     this->driver = driver;
     memcpy((void*)this->mac_addr, mac_addr, 6);
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
-    this->model = std::make_shared<i40e::i40e_bm>();
+    this->model = std::make_shared<i40e::e810_bm>();
 
     this->init_pci_ids();
     this->registerDriverEpoll(driver, efd);

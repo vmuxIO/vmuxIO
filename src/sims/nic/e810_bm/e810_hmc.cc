@@ -33,7 +33,7 @@
 
 namespace i40e {
 
-host_mem_cache::host_mem_cache(i40e_bm &dev_) : dev(dev_) {
+host_mem_cache::host_mem_cache(e810_bm &dev_) : dev(dev_) {
   reset();
 }
 

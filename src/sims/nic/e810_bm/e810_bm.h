@@ -47,7 +47,7 @@ struct i40e_tx_desc;
 
 namespace i40e {
 
-class i40e_bm;
+class e810_bm;
 class lan;
 class cem;
 
@@ -207,7 +207,7 @@ class queue_base {
   logger log;
 
  protected:
-  i40e_bm &dev;
+  e810_bm &dev;
   desc_ctx *desc_ctxs[MAX_ACTIVE_DESCS];
   uint32_t active_first_pos;
   uint32_t active_first_idx;
@@ -252,7 +252,7 @@ class queue_base {
  public:
   uint64_t host_cq_pa;
   queue_base(const std::string &qname_, uint32_t &reg_head_,
-             uint32_t &reg_tail_, i40e_bm &dev_);
+             uint32_t &reg_tail_, e810_bm &dev_);
   virtual void reset();
   void reg_updated();
   bool is_enabled();
@@ -263,7 +263,7 @@ class queue_admin_tx : public queue_base {
   class admin_desc_ctx : public desc_ctx {
    protected:
     queue_admin_tx &aq;
-    i40e_bm &dev;
+    e810_bm &dev;
     struct i40e_aq_desc *d;
     // struct ice_aq_desc *ice_d;
     
@@ -280,7 +280,7 @@ class queue_admin_tx : public queue_base {
                              bool ignore_datalen = false);
 
    public:
-    admin_desc_ctx(queue_admin_tx &queue_, i40e_bm &dev);
+    admin_desc_ctx(queue_admin_tx &queue_, e810_bm &dev);
   
     virtual void prepare();
     virtual void process();
@@ -292,7 +292,7 @@ class queue_admin_tx : public queue_base {
   virtual desc_ctx &desc_ctx_create();
 
  public:
-  queue_admin_tx(i40e_bm &dev_, uint64_t &reg_base_, uint32_t &reg_len_,
+  queue_admin_tx(e810_bm &dev_, uint64_t &reg_base_, uint32_t &reg_len_,
                  uint32_t &reg_head_, uint32_t &reg_tail_);
   void reg_updated();
 };
@@ -302,7 +302,7 @@ class completion_queue : public queue_base {
   class admin_desc_ctx : public desc_ctx {
    protected:
     completion_queue &aq;
-    i40e_bm &dev;
+    e810_bm &dev;
     __le64 *d;
     uint64_t cq_base; // cq write_back buffer addr
     uint32_t wcursor; // cursor indicating which cqe is going to be written back
@@ -321,7 +321,7 @@ class completion_queue : public queue_base {
                              bool ignore_datalen = false);
 
    public:
-    admin_desc_ctx(completion_queue &queue_, i40e_bm &dev);
+    admin_desc_ctx(completion_queue &queue_, e810_bm &dev);
 
     virtual void prepare();
     virtual void process();
@@ -375,7 +375,7 @@ class completion_queue : public queue_base {
   virtual desc_ctx &desc_ctx_create();
 
  public:
-  completion_queue(i40e_bm &dev_, uint32_t &reg_high_, uint32_t &reg_low_,
+  completion_queue(e810_bm &dev_, uint32_t &reg_high_, uint32_t &reg_low_,
                  uint32_t &reg_head_, uint32_t &reg_tail_);
   void ctx_fetched();
   virtual void trigger_fetch();
@@ -392,7 +392,7 @@ class control_queue_pair : public queue_base {
   class admin_desc_ctx : public desc_ctx {
    protected:
     control_queue_pair &aq;
-    i40e_bm &dev;
+    e810_bm &dev;
     __le64 *d;
     uint64_t cqp_base;
     uint32_t cnt;
@@ -414,7 +414,7 @@ class control_queue_pair : public queue_base {
                              bool ignore_datalen = false);
 
    public:
-    admin_desc_ctx(control_queue_pair &queue_, i40e_bm &dev);
+    admin_desc_ctx(control_queue_pair &queue_, e810_bm &dev);
 
     virtual void prepare();
     virtual void process();
@@ -468,7 +468,7 @@ class control_queue_pair : public queue_base {
   virtual desc_ctx &desc_ctx_create();
 
  public:
-  control_queue_pair(i40e_bm &dev_, uint32_t &reg_high_, uint32_t &reg_low_,
+  control_queue_pair(e810_bm &dev_, uint32_t &reg_high_, uint32_t &reg_low_,
                  uint32_t &reg_head_, uint32_t &reg_tail_);
   void ctx_fetched();
   virtual void trigger_fetch();
@@ -510,7 +510,7 @@ class completion_event_queue : public queue_base {
   size_t total_len;
   size_t part_offset;
   virtual desc_ctx &desc_ctx_create() override;
-  completion_event_queue(i40e_bm &dev_, uint64_t ceq_base, uint32_t &reg_head_,
+  completion_event_queue(e810_bm &dev_, uint64_t ceq_base, uint32_t &reg_head_,
                                uint32_t &reg_tail_);
   virtual void trigger_fetch();
   virtual void trigger_process();
@@ -545,7 +545,7 @@ class host_mem_cache {
     bool direct;
   };
 
-  i40e_bm &dev;
+  e810_bm &dev;
   segment segs[MAX_SEGMENTS];
 
  public:
@@ -554,7 +554,7 @@ class host_mem_cache {
     bool failed;
   };
 
-  explicit host_mem_cache(i40e_bm &dev);
+  explicit host_mem_cache(e810_bm &dev);
   void reset();
   void reg_updated(uint64_t addr);
 
@@ -712,7 +712,7 @@ class lan {
   friend class lan_queue_tx;
   friend class lan_queue_rx;
 
-  i40e_bm &dev;
+  e810_bm &dev;
   logger log;
   rss_key_cache rss_kc;
   const size_t num_qs;
@@ -723,7 +723,7 @@ class lan {
                     uint32_t &hash);
 
  public:
-  lan(i40e_bm &dev, size_t num_qs);
+  lan(e810_bm &dev, size_t num_qs);
   void reset();
   void qena_updated(uint16_t idx, bool rx);
   void tail_updated(uint16_t idx, bool rx);
@@ -736,7 +736,7 @@ class completion_event_manager {
  protected:
   friend class completion_event_queue;
 
-  i40e_bm &dev;
+  e810_bm &dev;
   logger log;
   const size_t num_qs;
   
@@ -744,7 +744,7 @@ class completion_event_manager {
  public:
   completion_event_queue **ceqs;
 
-  completion_event_manager(i40e_bm &dev, size_t num_qs);
+  completion_event_manager(e810_bm &dev, size_t num_qs);
   void reset();
   void qena_updated(uint16_t idx);
   void tail_updated(uint16_t idx);
@@ -752,18 +752,18 @@ class completion_event_manager {
 
 class shadow_ram {
  protected:
-  i40e_bm &dev;
+  e810_bm &dev;
   logger log;
 
  public:
-  explicit shadow_ram(i40e_bm &dev);
+  explicit shadow_ram(e810_bm &dev);
   void reg_updated();
   uint16_t read(uint16_t addr);
   void write(uint16_t addr, uint16_t val);
 };
 
 
-class i40e_bm : public nicbm::Runner::Device {
+class e810_bm : public nicbm::Runner::Device {
  protected:
   friend class queue_admin_tx;
   friend class host_mem_cache;
@@ -946,8 +946,8 @@ class i40e_bm : public nicbm::Runner::Device {
   };
 
  public:
-  i40e_bm();
-  virtual ~i40e_bm();
+  e810_bm();
+  virtual ~e810_bm();
 
   void SetupIntro(struct SimbricksProtoPcieDevIntro &di) override;
   void RegRead(uint8_t bar, uint64_t addr, void *dest, size_t len) override;
