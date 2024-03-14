@@ -58,12 +58,12 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
     clock_gettime(CLOCK_MONOTONIC, &now);
     if (Util::ts_before(&this->poll_timer, &now)) {
       ulong ret = Util::ts_diff(&now, &this->poll_timer);
-      this->poll_timer_cb();
+      this->poll_timer_cb(ret);
     }
     return ret;
   }
 
-  void poll_timer_cb() {
+  void poll_timer_cb(ulong _inaccuracy) {
     this->send_interrupt();
     this->poll_timer = {}; // disable timer
     this->armed.store(false);

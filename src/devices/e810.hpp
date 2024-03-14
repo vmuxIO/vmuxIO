@@ -106,17 +106,21 @@ public:
     this->init_general_callbacks(*vfu);
   };
 
+  void processAllPollTimers() {
+    for (size_t i = 0; i < 4; i++) { // TODO this_->irqThrottle.size()
+      this->irqThrottle[i]->processPollTimer();
+    }
+  }
+
   // forward rx event callback from tap to this E1000EmulatedDevice
   static void driver_cb(int vm_number, void *this__) {
     E810EmulatedDevice *this_ = (E810EmulatedDevice*) this__;
-    for (size_t i = 0; i < this_->irqThrottle.size(); i++) {
-      this_->irqThrottle[i]->processPollTimer();
-    }
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
     for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
       this_->vfu_ctx_mutex.lock();
       this_->model->EthRx(0, this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
       this_->vfu_ctx_mutex.unlock();
+      this_->processAllPollTimers();
     }
     this_->driver->recv_consumed(vm_number);
   }
