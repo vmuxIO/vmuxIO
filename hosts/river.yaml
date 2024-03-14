@@ -1,4 +1,5 @@
 iommu_on: true
+hugepages1G: 8
 devices:
   - name: ethDut
     pci: "51:00.0"
@@ -10,5 +11,5 @@ devices:
     firmware-versions: 
       - "2.15 0x800049c3 1.2789.0"
       - "2.30 0x80005d1e 1.2877.0"
-    dpdk-driver: igb_uio
+    dpdk-driver: vfio-pci
     kernel-driver: ice
