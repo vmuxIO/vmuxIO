@@ -107,7 +107,7 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
 
   __attribute__((noinline)) ulong try_interrupt(ulong mindelay, bool int_pending) {
     this->spacing = mindelay;
-    this->globalIrq->update();
+    // this->globalIrq->update(); // TODO high overhead
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
