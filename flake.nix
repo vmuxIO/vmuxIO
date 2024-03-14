@@ -114,6 +114,11 @@
         kernel = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
       };
+      dpdk22 = pkgs.callPackage ./nix/dpdk23.nix {
+        kernel = pkgs.linuxPackages_5_10.kernel;
+        inherit (flakepkgs) linux-firmware-pinned;
+        dpdkVersion = "22.11";
+      };
       dpdk = pkgs.callPackage ./nix/dpdk.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
