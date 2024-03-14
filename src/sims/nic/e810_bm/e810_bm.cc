@@ -943,20 +943,20 @@ void e810_bm::Timed(nicbm::TimedEvent &ev) {
   }
 }
 
+/*
+ * e810_bm reads itr from GLINT_CEQCTL ITR index field. This index refers to GLINT_ITR{0..2}.
+ */
 void e810_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
   int_ev &iev = intevs[vec];
 
   uint64_t mindelay;
-  if (itr <= 2) {
-    // itr 0-2
-    if (vec == 0)
-      mindelay = regs.GLINT_ITR0[itr]; // delay in n * 2us
-    else if (vec == 1)
-      mindelay = regs.GLINT_ITR1[itr];
-    else
-      mindelay = regs.GLINT_ITR2[itr];
-    // mindelay *= 2000000ULL; // delay in ps
-    mindelay *= 2000ULL; // delay in ns
+  // itr 0-2
+  if (itr == 0) {
+    mindelay = regs.GLINT_ITR0[vec]; // delay in n * 2us
+  } else if (itr == 1) {
+    mindelay = regs.GLINT_ITR1[vec];
+  } else if (itr == 2){
+    mindelay = regs.GLINT_ITR2[vec];
   } else if (itr == 3) {
     // noitr
     mindelay = 0;
@@ -964,6 +964,8 @@ void e810_bm::SignalInterrupt(uint16_t vec, uint8_t itr) {
     std::cout << "signal_interrupt() invalid itr (" << itr << ")" << logger::endl;
     abort();
   }
+  // mindelay *= 2000000ULL; // delay in ps
+  mindelay *= 2000ULL; // delay in ns
 
   // TODO implement delays
   this->vmux->MsiXIssue(vec, mindelay);
