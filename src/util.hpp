@@ -198,4 +198,12 @@ public:
     while ((rte_get_timer_cycles() - start) < ticks)
       rte_pause();
   }
+
+  static void check_clock_accuracy() {
+    struct timespec ts;
+    clock_getres(CLOCK_MONOTONIC, &ts);
+    if (ts.tv_nsec > 100) {
+      printf("WARN: your system clock is less precise (%ldns) than expected (%dns)\n", ts.tv_nsec, 100);
+    }
+  }
 };

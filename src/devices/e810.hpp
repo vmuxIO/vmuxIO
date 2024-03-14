@@ -1,5 +1,7 @@
 #pragma once
 
+#include "interrupts/none.hpp"
+#include "interrupts/simbricks.hpp"
 #include "libsimbricks/simbricks/nicbm/nicbm.h"
 #include "libvfio-user.h"
 #include "sims/nic/e810_bm/e810_bm.h"
@@ -12,7 +14,7 @@
 #include <memory>
 #include <string>
 
-#define NUM_MSIX_IRQs 2048
+#define NUM_MSIX_IRQs 16 // choose small to avoid unneccessary polling in processAllPollTimers
 
 class E810EmulatedDevice : public VmuxDevice, public std::enable_shared_from_this<E810EmulatedDevice> {
   static const unsigned BAR_REGS = 0;
@@ -29,6 +31,8 @@ private:
 
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
+               //
+  std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle;
 
   void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
     if (driver->fd == 0)
@@ -49,11 +53,18 @@ private:
   }
 
 public:
-  std::shared_ptr<i40e::e810_bm> model; // TODO rename i40e_bm class to e810
+  std::shared_ptr<i40e::e810_bm> model;
 
-  E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6]) : VmuxDevice(driver) {
+  E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(driver) {
     this->driver = driver;
     memcpy((void*)this->mac_addr, mac_addr, 6);
+
+    for (int idx = 0; idx < NUM_MSIX_IRQs; idx++) {
+      auto throttler = std::make_shared<InterruptThrottlerSimbricks>(efd, idx, irq_glob);
+      irq_glob->add(throttler);
+      this->irqThrottle.push_back(throttler);
+    }
+
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
     // i40e::i40e_bm* model = new i40e::i40e_bm();
     this->model = std::make_shared<i40e::e810_bm>();
@@ -66,7 +77,13 @@ public:
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
     this->vfuServer = vfu;
 
-    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>(shared_from_this(), &this->mac_addr);
+    std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> throttlers;
+    for (int idx = 0; idx < NUM_MSIX_IRQs; idx++) {
+      auto throttler = this->irqThrottle[idx];
+      throttlers.push_back(throttler);
+      this->irqThrottle[idx]->vfuServer = vfu;
+    }
+    this->callbacks = std::make_shared<nicbm::Runner::CallbackAdaptor>(shared_from_this(), &this->mac_addr, this->irqThrottle);
     this->callbacks->model = this->model;
     this->callbacks->vfu = vfu;
     this->model->vmux = this->callbacks;
@@ -89,14 +106,22 @@ public:
     this->init_general_callbacks(*vfu);
   };
 
+  void processAllPollTimers() {
+    for (size_t i = 0; i < NUM_MSIX_IRQs; i++) {
+      this->irqThrottle[i]->processPollTimer();
+    }
+  }
+
   // forward rx event callback from tap to this E1000EmulatedDevice
   static void driver_cb(int vm_number, void *this__) {
     E810EmulatedDevice *this_ = (E810EmulatedDevice*) this__;
+    this_->processAllPollTimers();
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
     for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
       this_->vfu_ctx_mutex.lock();
       this_->model->EthRx(0, this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
       this_->vfu_ctx_mutex.unlock();
+      this_->processAllPollTimers();
     }
     this_->driver->recv_consumed(vm_number);
   }

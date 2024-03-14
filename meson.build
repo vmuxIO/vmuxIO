@@ -20,7 +20,12 @@ sims_flags = [
   '-Wno-extra-semi',
   '-Wno-unused-parameter',
   '-Wno-unused-variable',
-  '-Wno-pointer-arith'
+  '-Wno-pointer-arith',
+]
+
+vmux_flags = [
+  '-fPIC',
+  '-Wno-format-pedantic'
 ]
 
 dpdk_flags = [
@@ -69,7 +74,7 @@ boost_dep = dependency('boost')
 exe = executable('vmux', 'src/main.cpp',
   sources,
   include_directories : incdir,
-  cpp_args : libvfio_user_cppflags + sims_flags + dpdk_flags,
+  cpp_args : libvfio_user_cppflags + sims_flags + dpdk_flags + vmux_flags,
   c_args : sims_flags,
   # dependencies : [libvfio_user_dep, cxx.find_library('boost_fiber')],
   # link_args : '-lboost',
