@@ -14,7 +14,7 @@
 #include <memory>
 #include <string>
 
-#define NUM_MSIX_IRQs 2048
+#define NUM_MSIX_IRQs 16 // choose small to avoid unneccessary polling in processAllPollTimers
 
 class E810EmulatedDevice : public VmuxDevice, public std::enable_shared_from_this<E810EmulatedDevice> {
   static const unsigned BAR_REGS = 0;
@@ -107,7 +107,7 @@ public:
   };
 
   void processAllPollTimers() {
-    for (size_t i = 0; i < 4; i++) { // TODO this_->irqThrottle.size()
+    for (size_t i = 0; i < NUM_MSIX_IRQs; i++) {
       this->irqThrottle[i]->processPollTimer();
     }
   }

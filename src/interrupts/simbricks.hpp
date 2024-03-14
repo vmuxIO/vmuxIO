@@ -107,7 +107,7 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
 
   __attribute__((noinline)) ulong try_interrupt(ulong mindelay, bool int_pending) {
     this->spacing = mindelay;
-    // this->globalIrq->update(); // TODO high overhead
+    // this->globalIrq->update(); // disable for now due to high overhead
     // struct itimerspec its = {};
     // timerfd_gettime(this->timer_fd, &its); // foo error
     // struct timespec* now = &its.it_value;
@@ -128,7 +128,9 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
 
     this->armed.store(true);
     this->time_ = newtime;
-    this->defer_interrupt_abs_polling(&newtime); // newtime // TODO incompatible with non-polling tap backend
+    this->defer_interrupt_abs_polling(&newtime);
+    // if mindelay == 0: we could do immediate interrupt instead of deferring (but kernel driver shouldnt configure mindelay 0 anyways)
+
 
     return 0;
 
