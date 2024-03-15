@@ -16,7 +16,7 @@ define(
 	$numa       false,
 	$mode       flow,    // Rx mode required by the DPDK Flow Rule Manager
 	$verbose    99,
-	$rules      /home/okelmann/fastclick/conf/flow-parser/test_dpdk_nic_rules        // Better provide absolute path
+	$rules      ./test/fastclick/test_dpdk_nic_rules        // Better provide absolute path
 );
 
 // NIC in Flow Rule Manager's mode
