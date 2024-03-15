@@ -7,7 +7,7 @@
 let
   dpdk = selfpkgs.dpdk22; # needed for ice package thingy
   # dpdk = self.inputs.nixpkgs.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
-  debug = true;
+  debug = false;
 in
 pkgs.stdenv.mkDerivation {
   pname = "fastclick";
@@ -56,6 +56,7 @@ pkgs.stdenv.mkDerivation {
 
     mkdir /build/rte_sdk
     cp -r ${dpdk}/* /build/rte_sdk
+
   '';
 
   RTE_SDK = "/build/rte_sdk";
@@ -106,8 +107,8 @@ pkgs.stdenv.mkDerivation {
 
   ];
 
-  CFLAGS = "-O3 -msse4.1 -mavx" + lib.optionalString debug " -g";
-  CXXFLAGS = "-std=c++11 -O3 -msse4.1 -mavx" + lib.optionalString debug " -g";
+  CFLAGS = "-msse4.1 -mavx" + lib.optionalString (!debug) " -O3" + lib.optionalString debug " -g";
+  CXXFLAGS = "-std=c++11 -msse4.1 -mavx" + lib.optionalString (!debug) " -O3" + lib.optionalString debug " -g";
   NIX_LDFLAGS = "-lrte_eal -lrte_ring -lrte_mempool -lrte_ethdev -lrte_mbuf -lrte_net -lrte_latencystats -lrte_cmdline -lrte_net_bond -lrte_metrics -lrte_gso -lrte_gro -lrte_net_ixgbe -lrte_net_i40e -lrte_net_bnxt -lrte_net_dpaa -lrte_bpf -lrte_bitratestats -ljansson -lbsd";
   RTE_VER_YEAR = "21"; # does this bubble through to the makefile variable? i dont think so. Then we can remove it.
   enableParallelBuilding = true;
@@ -119,4 +120,5 @@ pkgs.stdenv.mkDerivation {
   '';
 
   dontFixup = debug;
+  dontStrip = debug;
 }
