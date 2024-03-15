@@ -22,38 +22,53 @@ define(
 // NIC in Flow Rule Manager's mode
 fd0 :: FromDPDKDevice(
 	PORT $ifacePCI0, MODE $mode,
-	N_QUEUES $queues, NUMA $numa,
-	THREADOFFSET 0, MAXTHREADS $threads,
+	QUEUE 0, NUMA $numa,
+	MAXTHREADS 1,
 	FLOW_RULES_FILE $rules,
 	VERBOSE $verbose
 	// , PAUSE full // according to click docs this is needed for rte_flow but i claim it is entirely unrelated
 );
 
+fd1 :: FromDPDKDevice(
+		PORT $ifacePCI0, 
+		QUEUE 1,
+		MAXTHREADS 1,
+	FLOW_RULES_FILE $rules,
+	VERBOSE $verbose
+		)
+
 fd0
-	-> classifier :: Classifier(12/0800, -)
-	-> Strip(14)
-	-> check :: CheckIPHeader(VERBOSE true)
-	-> IPPrint(ETHER true, LENGTH true)
-	-> Unstrip(14)
-	-> legit :: AverageCounterMP()
+ // -> classifier :: Classifier(12/0800, -)
+ // -> Strip(14)
+ // -> check :: CheckIPHeader(VERBOSE true)
+ // -> IPPrint(ETHER true, LENGTH true)
+ // -> Unstrip(14)
+  -> fd0c :: AverageCounterMP()
 	-> Discard;
 
-dropped :: AverageCounterMP();
+fd1
+  -> fd1c :: AverageCounterMP()
+  -> Discard;
 
-classifier[1] -> dropped;
-check[1] -> dropped;
-dropped	-> Discard;
+// dropped :: AverageCounterMP();
+
+// classifier[1] -> dropped;
+// check[1] -> dropped;
+// dropped	-> Discard;
 
 DriverManager(
 	pause,
-	print "",
+	print "$(fd0.xstats)",
 	print "[Rule 1 - Queue 0]: "$(fd0.xstats rx_q0packets)" packets - "$(fd0.xstats rx_q0bytes)" bytes",
 	print "[Rule 2 - Queue 1]: "$(fd0.xstats rx_q1packets)" packets - "$(fd0.xstats rx_q1bytes)" bytes",
 	print "[Rule 3 - Queue 2]: "$(fd0.xstats rx_q2packets)" packets - "$(fd0.xstats rx_q2bytes)" bytes",
 	print "[   RSS - Queue 3]: "$(fd0.xstats rx_q3packets)" packets - "$(fd0.xstats rx_q3bytes)" bytes",
 	print "[   RSS - Queue 4]: "$(fd0.xstats rx_q4packets)" packets - "$(fd0.xstats rx_q4bytes)" bytes",
 	print "",
-	print "   IPv4: "$(legit.count),
+	print "   IPv4: "$(fd0c.count),
 	print "Dropped: "$(dropped.count),
+	print "",
+	print "   fd0c: "$(fd0c.count),
+	print "   fd1c: "$(fd1c.count),
 	stop
 );
