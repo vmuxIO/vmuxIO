@@ -54,6 +54,10 @@ inline auto Err(std::string error_msg) {
   return outcome::failure(error_msg);
 }
 
+inline auto Ok() {
+  return outcome::success();
+}
+
 inline auto Ok(auto value) {
   return outcome::success(value);
 }

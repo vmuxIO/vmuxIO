@@ -87,9 +87,8 @@ Result<int> foo() {
   return Err("foo failed");
 }
 
-
 Result<void> _main(int argc, char **argv) {
-  auto i = expect(foo(), "aborted vmux1");
+  // auto i = expect(foo(), "aborted vmux1");
 
   int ch;
   std::string base_mac_str = "52:54:00:fa:00:60";
@@ -339,13 +338,18 @@ Result<void> _main(int argc, char **argv) {
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     runner[i]->stop();
   }
+
+  Result<void> res = Ok();
   for (size_t i = 0; i < pciAddresses.size(); i++) {
-    runner[i]->join();
+    if (Result<void> e = runner[i]->join()) {} else {
+      printf("Thread %zu failed: %s\n", i, e.error().c_str());
+      res = Err("Terminating because a thread failed.");
+    }
   }
 
   // destruction is done by ~VfioUserServer
   close(efd);
-  return outcome::success();
+  return res;
 }
 
 void signal_handler(int) { quit.store(true); }
