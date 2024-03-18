@@ -5,7 +5,7 @@
 , ...
 }:
 let
-  dpdk = selfpkgs.dpdk22; # needed for ice package thingy
+  dpdk = selfpkgs.dpdk23; # needed for ice package thingy
   # dpdk = self.inputs.nixpkgs.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
   debug = false;
 in
@@ -56,9 +56,6 @@ pkgs.stdenv.mkDerivation {
     substituteInPlace ./userlevel/Makefile.in \
       --replace "@RTE_VER_MONTH@" "11"
 
-    # substituteInPlace ./lib/flowrulemanager.cc \
-    #   --replace "(const uint32_t *) int_rule_ids" "(const uint64_t *) int_rule_ids, true"
-
     mkdir /build/rte_sdk
     cp -r ${dpdk}/* /build/rte_sdk
 
@@ -66,6 +63,10 @@ pkgs.stdenv.mkDerivation {
     # We attempt to patch fastclick for dpdk 22. 
     substituteInPlace ./include/click/flowruleparser.hh \
       --replace "main_ctx" "builtin_ctx"
+    # patch needed for dpdk 23.
+    substituteInPlace ./lib/flowrulemanager.cc \
+      --replace "(const uint32_t *) int_rule_ids" "(const uint64_t *) int_rule_ids, true"
+
   '';
 
   RTE_SDK = "/build/rte_sdk";
