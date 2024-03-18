@@ -15,6 +15,7 @@
 #include <sys/param.h>
 #include <time.h>
 #include <vector>
+#include <boost/outcome.hpp>
 
 // as per PCI spec, there can be at most 2048 MSIx inerrupts per device
 #define PCI_MSIX_MAX 2048
@@ -28,6 +29,34 @@
     warn(__VA_ARGS__);                                                         \
     abort();                                                   \
   }
+
+namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
+
+// typedef outcome::result<T, std::string> foobar<T>;
+template<class T> using Result = outcome::result<T, std::string>;
+
+// Unwrap returns the value of call to be assigned or returns the function while
+// appending error_msg to the error string. 
+// call: of type myresult<T> 
+// error_msg: implements .to_string() 
+// returns: T
+#define expect(call, error_msg)                                                    \
+  ({                                                                               \
+    auto result = call;                                                            \
+    if (!result.has_value()) {                                                     \
+      return outcome::failure(std::string() + error_msg + ": " + result.error());  \
+    }                                                                              \
+    result.value();                                                                \
+                                                                                   \
+  })
+
+inline auto Err(std::string error_msg) {
+  return outcome::failure(error_msg);
+}
+
+inline auto Ok(auto value) {
+  return outcome::success(value);
+}
 
 typedef void (*callback_fn)(int, void *);
 
