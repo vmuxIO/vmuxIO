@@ -57,6 +57,10 @@ pkgs.stdenv.mkDerivation {
     mkdir /build/rte_sdk
     cp -r ${dpdk}/* /build/rte_sdk
 
+    # fastlick FromDPDKDevice(FLOW_RULES_FILE) requires dpdk 21.11 or older.
+    # We attempt to patch fastclick for dpdk 22. 
+    substituteInPlace ./include/click/flowruleparser.hh \
+      --replace "main_ctx" "builtin_ctx"
   '';
 
   RTE_SDK = "/build/rte_sdk";
