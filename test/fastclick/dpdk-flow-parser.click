@@ -30,33 +30,12 @@ fd0 :: FromDPDKDevice(
 );
 
 fd0
-	-> classifier :: Classifier(12/0800, -)
-	-> Strip(14)
-	-> check :: CheckIPHeader(VERBOSE true)
-	-> IPPrint(ETHER true, LENGTH true)
-	-> Unstrip(14)
-	-> legit :: AverageCounterIMP()
-	-> Discard;
-
-dropped :: AverageCounterIMP();
-
-classifier[1] -> dropped;
-check[1] -> dropped;
-dropped	-> Discard;
+  -> dropped :: AverageCounterIMP()
+  -> Discard;
 
 DriverManager(
 	pause,
 	print "",
-	print ""$(fd0.queue_packets 0)"",
-	print ""$(fd0.queue_packets 1)"",
-	print ""$(fd0.queue_packets 2)"",
-	print "[Rule 1 - Queue 0]: "$(fd0.xstats rx_q0packets)" packets - "$(fd0.xstats rx_q0bytes)" bytes",
-	print "[Rule 2 - Queue 1]: "$(fd0.xstats rx_q1packets)" packets - "$(fd0.xstats rx_q1bytes)" bytes",
-	print "[Rule 3 - Queue 2]: "$(fd0.xstats rx_q2packets)" packets - "$(fd0.xstats rx_q2bytes)" bytes",
-	print "[   RSS - Queue 3]: "$(fd0.xstats rx_q3packets)" packets - "$(fd0.xstats rx_q3bytes)" bytes",
-	print "[   RSS - Queue 4]: "$(fd0.xstats rx_q4packets)" packets - "$(fd0.xstats rx_q4bytes)" bytes",
-	print "",
-	print "   IPv4: "$(legit.count),
 	print "Dropped: "$(dropped.count),
 	stop
 );
