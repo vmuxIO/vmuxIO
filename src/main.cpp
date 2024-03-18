@@ -83,8 +83,42 @@ typedef struct {
   return count;
 }
 
-outcome::result<void, std::string> _main(int argc, char **argv) {
+outcome::result<int, std::string> foo() {
+  return outcome::failure("foo failed");
+}
+
+// typedef outcome::result<T, std::string> foobar<T>;
+template<class T> using Result = outcome::result<T, std::string>;
+
+// Unwrap returns the value of call to be assigned or returns the function while
+// appending error_msg to the error string. 
+// call: of type myresult<T> 
+// error_msg: implements .to_string() 
+// returns: T
+#define unwrap(call, error_msg)                                                    \
+  ({                                                                               \
+    auto result = call;                                                            \
+    if (!result.has_value()) {                                                     \
+      return outcome::failure(std::string() + error_msg + ": " + result.error());  \
+    }                                                                              \
+    result.value();                                                                \
+                                                                                   \
+  })
+
+
+Result<void> _main(int argc, char **argv) {
+  auto i = unwrap(foo(), "aborted vmux1");
+
+  if (auto res = foo()) {
+    die("unreachable");
+  } else {
+    return outcome::failure("aborted vmux: " + res.error());
+  }
   return outcome::failure("foo");
+
+  BOOST_OUTCOME_TRY(auto res, foo());
+  printf("%d\n", res);
+
   int ch;
   std::string base_mac_str = "52:54:00:fa:00:60";
   std::string device = "0000:18:00.0";
