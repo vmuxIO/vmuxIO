@@ -35,6 +35,11 @@ pkgs.stdenv.mkDerivation {
     jansson
   ];
 
+  patches = [
+    ./fastclick.per-thread-counter.patch
+    ./fastclick.dpdk23.patch # patch needed for FromDPDKDevice(FLOW_RULES_FILE) with dpdk 23
+  ];
+
   postPatch = ''
     # sln /bin/echo ${pkgs.coreutils}/bin/echo
     find . -type f -exec sed -i 's/\/bin\/echo/echo/g' {} \;
