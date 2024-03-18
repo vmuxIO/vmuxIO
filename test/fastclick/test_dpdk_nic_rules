@@ -1,3 +1,4 @@
-flow create 0 ingress pattern eth src spec 00:00:00:00:00:00 src mask 00:00:00:00:00:ff / end actions queue index 0 / end
-flow create 0 ingress pattern eth src spec 00:00:00:00:00:01 src mask 00:00:00:00:00:ff / end actions queue index 1 / end
-flow create 0 ingress pattern eth src spec 00:00:00:00:00:02 src mask 00:00:00:00:00:ff / end actions queue index 2 / end
+ingress pattern eth dst spec 00:00:00:00:00:00 dst mask 00:00:00:00:00:ff / end actions queue index 0 / end
+ingress pattern eth dst spec 00:00:00:00:00:01 dst mask 00:00:00:00:00:ff / end actions queue index 1 / end
+ingress pattern eth dst spec 00:00:00:00:00:02 dst mask 00:00:00:00:00:ff / end actions queue index 2 / end
+
