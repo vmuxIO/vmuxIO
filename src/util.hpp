@@ -19,12 +19,14 @@
 // as per PCI spec, there can be at most 2048 MSIx inerrupts per device
 #define PCI_MSIX_MAX 2048
 
+#define BOOST_NO_EXCEPTIONS
+
 // exit() and err() breaks invariants for RAII (destructors). Therefore we use
 // warn() instead to printf an error and throw afterwards to exit.
 #define die(...)                                                               \
   {                                                                            \
     warn(__VA_ARGS__);                                                         \
-    throw std::runtime_error("See error above");                               \
+    abort();                                                   \
   }
 
 typedef void (*callback_fn)(int, void *);
