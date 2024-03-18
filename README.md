@@ -17,13 +17,13 @@ We can:
 
 - emluate registers
 - do passthrough (e1000, E810)
-- emulate an e1000
+- emulate an e1000 and E810
 
 We cannot yet: 
 
-- multiplex
-- do interrupts
-- emulate an E810/iavf
+- Emulate multiple queues for E810
+- Mediate rte_flow onto hardware
+- Minimize data plane overheads with mediated queue passthrough
 
 ## Usage
 
