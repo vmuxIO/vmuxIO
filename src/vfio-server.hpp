@@ -390,14 +390,15 @@ public:
       printf("%p\n", p);
     }
     printf("}\n");
+    __builtin_dump_struct(info, &printf);
 
     // info->mapping indicates if mapped
     if (!info->mapping.iov_base) {
-      printf("Region not mapped, nothing to do\n");
-      return false;
+      printf("Region not mapped, nothing to do\n"); // 2
+      return true; // fake success (actually what is success value expected?)
     }
 
-    if (!vfu->mapped.count(info->iova.iov_base)) {
+    if (!vfu->mapped.count(info->iova.iov_base)) { // 1, 3, ...
       printf("Region seems not to be mapped\n");
       // return;
     }
@@ -408,6 +409,9 @@ public:
       printf("Why?\n");
       // return;
     }
+    vfu->mappings.erase(info->iova.iov_base);
+    vfu->mapped.erase(info->vaddr);
+    vfu->sgs.erase(info->vaddr);
 
     // TODO should probably return with vfu_sgl_put()
 
