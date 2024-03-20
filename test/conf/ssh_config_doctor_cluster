@@ -49,6 +49,15 @@ UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 LogLevel=ERROR
 
+Host localhost
+Hostname christina.dse.in.tum.de
+IdentityFile /root/.ssh/lawful_access
+StrictHostKeyChecking=no
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
+LogLevel=ERROR
+
+
 # generate vm*.* hosts with:
 # just gen-ssh-config
 
