@@ -43,6 +43,7 @@ typedef uint64_t __le64;
 #include "sims/nic/e810_bm/base/ice_hw_autogen.h"
 #include "sims/nic/e810_bm/base/ice_adminq_cmd.h"
 #include "sims/nic/e810_bm/base/ice_lan_tx_rx.h"
+#include "sims/nic/e810_bm/base/ice_status.h"
 #include "sims/nic/e810_bm/base/icrdma_hw.h"
 #include "sims/nic/e810_bm/base/defs.h"
 #include "sims/nic/e810_bm/base/hmc.h"
