@@ -572,71 +572,53 @@ void queue_admin_tx::admin_desc_ctx::process() {
     desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_nvm_read){ // fails
     struct ice_aqc_nvm *nvm_read_cmd = reinterpret_cast<ice_aqc_nvm *> (d->params.raw);
-    printf("ice_aqc_opc_nvm_read\n");
-    __builtin_dump_struct(nvm_read_cmd, &printf);
-
 
     uint32_t offset = 0;
     offset |= nvm_read_cmd->offset_low;
     offset |= (nvm_read_cmd->offset_high) << 16;
 
-    if (offset == 0x0) {
+    // copy reposes observed on real hardware.
+    if (offset == 0x0) { // some control register defining nvm layout
       uint16_t return_data = 0x78;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
-    } else if (offset == 0x84) {
+    } else if (offset == 0x84) { // more registers used to calculate header length offset
       uint16_t return_data = 0x8020;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
     } else if (offset == 0x86) {
       uint16_t return_data = 0x41a;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
     } else if (offset == 0x88) {
       uint16_t return_data = 0x8854;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
     } else if (offset == 0x8a) {
       uint16_t return_data = 0x7d;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
     } else if (offset == 0x8c) {
       uint16_t return_data = 0x894e;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
     } else if (offset == 0x8a) {
       uint16_t return_data = 0x7;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
+
+    // two registers that are queried to get a header length:
+    // ice_get_nvm_css_hdr_len+58 ICE_NVM_CSS_HDR_LEN_L and *_LEN_H
     } else if (offset == 0x43a004) {
       uint16_t return_data = 0xa1;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
     } else if (offset == 0x43a006) {
       uint16_t return_data = 0x0;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
-    }
-    else if (offset == 0x84) { // ice_get_nvm_css_hdr_len+58 ICE_NVM_CSS_HDR_LEN_L
-      uint16_t return_data = 0x14a & 0xFF; // 0x14a seems to be the offset reported by our hardware
-      desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
-    } else if (offset == 0x86) { // ice_get_nvm_css_hdr_len+96 ICE_NVM_CSS_HDR_LEN_H
-      uint16_t return_data = 0x14a & 0xFF00; // 0x14a seems to be the offset reported by our hardware
-      desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
+
+    // default value to return for other accesses. This value seems to work.
     } else if (offset < 0xc00000 ) { 
       char return_data = 1 << ICE_SR_CTRL_WORD_1_S ;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-      printf("retval 0x%x\n", return_data);
+    
+    // Simulate out of bounds access: Our physical card reports this size at most. Dpdk probes this size.
     } else {
-      // Our physical card reports this size at most. Dpdk probes this size so we simulate the corresponding out of bounds error.
       char return_data = 1 << ICE_SR_CTRL_WORD_1_S ;
       desc_complete_indir(ICE_AQ_RC_EINVAL, &return_data, sizeof(return_data)); // -100 = ICE_ERR_AQ_ERROR
-      printf("retval 0x%x\n", return_data);
     }
-
-    // hdr len 0x14a
 
     // desc_complete(0);
   }
