@@ -2146,7 +2146,10 @@ class LoadGen(Server):
         Starts iperf client
         """
 
-        options = "-J"
+        options = ""
+        
+        if ipt.output_json:
+            options += "-J"
 
         if ipt.direction  == "reverse":
             options += " -R"
@@ -2158,7 +2161,7 @@ class LoadGen(Server):
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
 
         info("Starting iperf client on " + ipt.guest_hostname + ":" + str(ipt.port))
-        self.tmux_new("iperf3-client", f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | tee /tmp/measure_iperf.txt")
+        self.tmux_new("iperf3-client", f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | tee {ipt.output_path}")
 
 
     def stop_iperf_client(self):

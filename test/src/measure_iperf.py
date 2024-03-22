@@ -23,7 +23,10 @@ import subprocess
 @dataclass
 class IPerfTest:
 
-    direction = "reverse" # can be: forward | reverse | bidirectional
+    direction = "forward" # can be: forward | reverse | bidirectional
+    output_json = True # sets / unsets -J flag on iperf client 
+    output_path = "/tmp/measure_iperf.json"
+
 
     # network options - currently set up to work with the "measure_christina_river.cfg" config
     guest_test_iface: str
