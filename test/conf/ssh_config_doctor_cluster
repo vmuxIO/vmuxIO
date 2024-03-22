@@ -49,7 +49,7 @@ UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 LogLevel=ERROR
 
-Host localhost
+Host christina.christina
 Hostname christina.dse.in.tum.de
 IdentityFile /root/.ssh/lawful_access
 StrictHostKeyChecking=no
