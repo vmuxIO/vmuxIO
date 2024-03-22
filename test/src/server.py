@@ -2158,4 +2158,8 @@ class LoadGen(Server):
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
 
         info("Starting iperf client on " + ipt.guest_hostname + ":" + str(ipt.port))
-        self.exec(f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | tee /tmp/measure_iperf.txt")
+        self.tmux_new("iperf3-client", f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | tee /tmp/measure_iperf.txt")
+
+
+    def stop_iperf_client(self):
+        self.tmux_kill("iperf3-client")

@@ -23,15 +23,17 @@ import subprocess
 @dataclass
 class IPerfTest:
 
-    direction = "forward" # can be: forward | reverse | bidirectional
+    direction = "reverse" # can be: forward | reverse | bidirectional
 
     # network options - currently set up to work with the "measure_christina_river.cfg" config
-    guest_test_iface = "eth1"
-    guest_hostname = "10.2.0.1"
-    loadgen_hostname = "10.2.0.2"
-    subnet_size = 24
+    guest_test_iface: str
+    guest_hostname: str
+    loadgen_hostname: str
     port = 5001
 
+
+def strip_subnet_mask(ip_addr: str):
+    return ip_addr[ : ip_addr.index("/")]
 
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
@@ -53,25 +55,25 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         except Exception:
             pass
 
-        loadgen.setup_test_iface_ip_net()
-        guest.setup_test_iface_ip_net()
 
-        ipt = IPerfTest()
+        guest.setup_test_iface_ip_net()
+        loadgen.setup_test_iface_ip_net()
+
+        ipt = IPerfTest(
+            guest_hostname=strip_subnet_mask(guest.test_iface_ip_net), 
+            loadgen_hostname=strip_subnet_mask(guest.test_iface_ip_net),
+            guest_test_iface=guest.test_iface)
 
         try:
             
             info("Starting iperf")
-            guest.exec(f"sudo ip addr add {ipt.guest_hostname}/{ipt.subnet_size} dev {ipt.guest_test_iface}")
-            loadgen.exec(f"sudo ip addr add {ipt.loadgen_hostname}/{ipt.subnet_size} dev {loadgen.test_iface}")
-
             guest.start_iperf_server(ipt)
             loadgen.run_iperf_client(ipt)
 
         finally:
             # teardown
             guest.stop_iperf_server()
-            guest.exec(f"ip addr delete {ipt.guest_hostname}/{ipt.subnet_size} dev {ipt.guest_test_iface}")
-            loadgen.exec(f"ip addr delete {ipt.loadgen_hostname}/{ipt.subnet_size} dev {loadgen.test_iface}")
+            loadgen.stop_iperf_client()
 
 
 
