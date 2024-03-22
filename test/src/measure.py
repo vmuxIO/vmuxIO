@@ -19,6 +19,7 @@ import copy
 import time
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
+from root import QEMU_BUILD_DIR
 
 
 OUT_DIR: str = "/tmp/out1"
@@ -27,6 +28,10 @@ NUM_WORKERS: int = 8 # with 16, it already starts failing on rose
 
 
 def setup_parser() -> ArgumentParser:
+    """
+    Creates ArgumentParser instance for parsing program options
+    """
+
     # create the argument parser
     parser = ArgumentParser(
         description='''
@@ -132,6 +137,10 @@ class Measurement:
 
     @contextmanager
     def virtual_machine(self, interface: Interface) -> Iterator[Guest]:
+        """
+        Creates a guest virtual machine
+        """
+
         # host: inital cleanup
 
         debug('Initial cleanup')
@@ -139,38 +148,41 @@ class Measurement:
             self.host.kill_guest()
         except Exception:
             pass
-        self.host.cleanup_network()
 
-        # host: set up interfaces and networking
+        try:
+            self.host.cleanup_network()
 
-        self.host.detect_test_iface()
+            # host: set up interfaces and networking
 
-        debug(f"Setting up interface {interface.value}")
-        setup_host_interface(self.host, interface)
+            self.host.detect_test_iface()
 
-        if interface.needs_vmux():
-            self.host.start_vmux(interface)
+            debug(f"Setting up interface {interface.value}")
+            setup_host_interface(self.host, interface)
 
-        # start VM
+            if interface.needs_vmux():
+                self.host.start_vmux(interface)
 
-        info(f"Starting VM ({interface.value})")
-        self.host.run_guest(
-                net_type=interface,
-                machine_type='pc',
-                qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin"
-                )
+            # start VM
 
-        debug("Waiting for guest connectivity")
-        self.guest.wait_for_connection(timeout=120)
+            info(f"Starting VM ({interface.value})")
+            self.host.run_guest(
+                    net_type=interface,
+                    machine_type='pc',
+                    qemu_build_dir=QEMU_BUILD_DIR
+                    )
 
-        yield self.guest
+            debug("Waiting for guest connectivity")
+            self.guest.wait_for_connection(timeout=120)
 
-        # teardown
+            yield self.guest
 
-        self.host.kill_guest()
-        if interface.needs_vmux():
-            self.host.stop_vmux()
-        self.host.cleanup_network()
+        finally:
+            # teardown
+
+            self.host.kill_guest()
+            if interface.needs_vmux():
+                self.host.stop_vmux()
+            self.host.cleanup_network()
 
 
     @contextmanager
@@ -180,10 +192,15 @@ class Measurement:
         # host: inital cleanup
 
         debug('Initial cleanup')
+
         try:
             self.host.kill_guest()
-        except Exception:
+
+        except Exception as e:
+            error("Could not kill guest VMs")
+            error(e.with_traceback())
             pass
+
         self.host.modprobe_test_iface_drivers() # cleanup network needs device drivers
         self.host.cleanup_network()
 
@@ -192,8 +209,10 @@ class Measurement:
 
         self.host.detect_test_iface()
 
-        unbatched_interfaces = [ interface for interface in Interface.__members__.values() if 
+        unbatched_interfaces = [ 
+            interface for interface in Interface.__members__.values() if 
                                 interface.needs_vfio() or (interface.needs_br_tap() and interface.needs_vmux()) ]
+        
         if interface in unbatched_interfaces:
             # vmux taps need to be there all from the start (no batching)
             debug(f"Setting up interface {interface.value} for {num} VMs")
@@ -204,6 +223,7 @@ class Measurement:
 
         # start VMs in batches of batch
         range_ = MultiHost.range(num)
+
         while range_:
             # pop first batch
             vm_range = range_[:batch]
@@ -220,11 +240,11 @@ class Measurement:
             for i in vm_range:
                 info(f"Starting VM {i} ({interface.value})")
 
-                # self.host.run_guest(net_type=interface.net_type(), machine_type='pc', qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin", vm_number=81)
+                # self.host.run_guest(net_type=interface.net_type(), machine_type='pc', qemu_build_dir=QEMU_BUILD_DIR, vm_number=81)
                 self.host.run_guest(
                         net_type=interface,
                         machine_type='pc',
-                        qemu_build_dir="/scratch/okelmann/vmuxIO/qemu/bin",
+                        qemu_build_dir=QEMU_BUILD_DIR,
                         vm_number=i
                         )
 
