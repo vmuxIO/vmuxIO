@@ -1,6 +1,6 @@
 result
 .ccls-cache/
-VMs/
+VMs/*
 __pycache__/
 outputs*/
 out_*/
@@ -8,3 +8,5 @@ out_*/
 linux-*/
 .local/
 test/kni-latency/kni-latency
+.bash_history
+.vscode
