@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from subprocess import check_output, CalledProcessError, STDOUT
 from socket import getfqdn
-from logging import debug, warning, error
+from logging import debug, info, warning, error
 from time import sleep
 from datetime import datetime
 from abc import ABC
@@ -328,6 +328,7 @@ class Server(ABC):
         .bashrc
         """
         if echo: debug(f'Executing command on {self.log_name()}: {command}')
+
         if self.localhost:
             return self.__exec_local(command)
         else:
@@ -1807,17 +1808,12 @@ class Host(Server):
     def cleanup_network(self: 'Host', number_vms: int = MAX_VMS) -> None:
         """
         Cleanup the network setup.
-
-        Parameters
-        ----------
-
-        Returns
-        -------
         """
         try:
             self.stop_vmux()
         except:
             pass
+
         self.modprobe_test_iface_drivers()
         self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
@@ -1953,6 +1949,21 @@ class Guest(Server):
         """
         # sometimes the VM needs a bit of extra time until it can assign an IP
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
+
+
+    def start_iperf_server(self, ipt: "IPerfTest"):
+        """
+        Starts an iperf server listening on port "port". Returns the ip address the server is bound to.
+        """
+
+        self.tmux_new("iperf3-server", f"iperf3 -s --bind {ipt.guest_hostname} -p {ipt.port}")
+    
+
+    def stop_iperf_server(self):
+        """
+        Kills the iperf server process
+        """
+        self.tmux_kill("iperf3-server")
 
 
 class LoadGen(Server):
@@ -2128,3 +2139,13 @@ class LoadGen(Server):
         """
         self.exec(f'sudo ip link set {self.test_iface} up')
         self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
+
+
+    def run_iperf_client(self, ipt: "IPerfTest"):
+        """
+        Starts iperf client
+        """
+
+        options = "-J"
+        info("Starting iperf client on " + ipt.guest_hostname + ":" + str(ipt.port))
+        self.exec(f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | tee /tmp/measure_iperf.txt")
