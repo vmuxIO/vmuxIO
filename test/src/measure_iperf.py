@@ -25,7 +25,7 @@ class IPerfTest:
 
     direction = "forward" # can be: forward | reverse | bidirectional
 
-    # network options - currently set up to work with the "iperf_test.cfg" config
+    # network options - currently set up to work with the "measure_christina_river.cfg" config
     guest_test_iface = "eth1"
     guest_hostname = "10.2.0.1"
     loadgen_hostname = "10.2.0.2"
