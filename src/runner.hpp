@@ -23,6 +23,7 @@ public:
   std::atomic_int state;
   std::atomic_bool running;
   std::string socket;
+  std::string termination_error; // non-null if Runner terminated with error
 
   // void (*VmuxRunner::interrupt_handler)(void);
 
@@ -44,7 +45,13 @@ public:
 
   void stop() { running.store(0); }
 
-  void join() { runner.join(); }
+  Result<void> join() { 
+    runner.join();
+    if (!this->termination_error.empty()) {
+      return Err(this->termination_error);
+    }
+    return Ok();
+  }
 
   bool is_initialized() { return state == INITILIZED; }
   bool is_connected() { return state == CONNECTED; }
@@ -54,6 +61,12 @@ private:
                    [[maybe_unused]] int level, char const *msg) {
     fprintf(stderr, "server[%d]: %s\n", getpid(), msg);
   }
+
+  void set_failed(std::string error) {
+    this->termination_error = error;
+    raise(SIGINT); // signal abortion to main thread
+  }
+
   void run() {
     this->initilize();
     state.store(INITILIZED);
@@ -88,7 +101,8 @@ private:
             continue;
           }
           if (errno == ENOTCONN) {
-            die("vfu_run_ctx() does not want to run anymore");
+            this->set_failed("vfu_run_ctx() does not want to run anymore (did the VM disconnect?)");
+            return;
           }
           // perhaps is there also an ESHUTDOWN case?
           die("vfu_run_ctx() failed (to realize device emulation)");

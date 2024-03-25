@@ -6,6 +6,7 @@
 using namespace std;
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
+#include "util.hpp"
 
 #include <bits/stdc++.h>
 
@@ -126,7 +127,7 @@ void completion_event_queue::interrupt() {
 }
 
 queue_base::desc_ctx &completion_event_queue::desc_ctx_create() {
-  throw "no function return implemented";
+  die("no function return implemented");
 }
 
 void completion_event_queue::writeback_done(uint32_t first_pos, uint32_t cnt) {

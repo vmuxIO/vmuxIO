@@ -1,8 +1,8 @@
 #include <atomic>
+#include <cstdlib>
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
-#include <exception>
 #include <fcntl.h>
 #include <iostream>
 #include <map>
@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
+#include <boost/outcome.hpp>
 
 #include "src/caps.hpp"
 #include "src/util.hpp"
@@ -42,6 +43,8 @@
 extern "C" {
 #include "libvfio-user.h"
 }
+
+namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
 
 // E810 debug logging flags
 // #define DEBUG_ADMINQ 1
@@ -80,7 +83,13 @@ typedef struct {
   return count;
 }
 
-int _main(int argc, char **argv) {
+Result<int> foo() {
+  return Err("foo failed");
+}
+
+Result<void> _main(int argc, char **argv) {
+  // auto i = expect(foo(), "aborted vmux1");
+
   int ch;
   std::string base_mac_str = "52:54:00:fa:00:60";
   std::string device = "0000:18:00.0";
@@ -142,7 +151,7 @@ int _main(int argc, char **argv) {
           << "-s /tmp/vmux.sock                      Path of the socket\n"
           << "-m passthrough                         vMux mode: "
              "passthrough, emulation, e1000-emu\n";
-      return 0;
+      return outcome::success();
     default:
       break;
     }
@@ -329,13 +338,18 @@ int _main(int argc, char **argv) {
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     runner[i]->stop();
   }
+
+  Result<void> res = Ok();
   for (size_t i = 0; i < pciAddresses.size(); i++) {
-    runner[i]->join();
+    if (Result<void> e = runner[i]->join()) {} else {
+      printf("Thread %zu failed: %s\n", i, e.error().c_str());
+      res = Err("Terminating because a thread failed.");
+    }
   }
 
   // destruction is done by ~VfioUserServer
   close(efd);
-  return 0;
+  return res;
 }
 
 void signal_handler(int) { quit.store(true); }
@@ -348,12 +362,11 @@ int main(int argc, char **argv) {
   sigfillset(&sa.sa_mask);
   sigaction(SIGINT, &sa, NULL);
 
-  try {
-    return _main(argc, argv);
-  } catch (...) {
-    // we seem to need this catch everyting so that our destructors work
+  if (outcome::result<void, std::string> res = _main(argc, argv)) {
+    return EXIT_SUCCESS;
+  } else {
+    auto e = res.error();
+    printf("%s\n", e.c_str());
     return EXIT_FAILURE;
   }
-
-  return quit;
 }

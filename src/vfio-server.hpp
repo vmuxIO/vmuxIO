@@ -3,7 +3,6 @@
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
-#include <exception>
 #include <fcntl.h>
 #include <iostream>
 #include <map>

@@ -36,10 +36,13 @@ public:
       if (ret < 0)
         die("failed to add irqs");
 
-      vfu->add_legacy_irq_pollfds(
-          this->vfioc->irqfd_intx, this->vfioc->irqfd_msi,
-          this->vfioc->irqfd_err, this->vfioc->irqfd_req);
-      vfu->add_msix_pollfds(this->vfioc->irqfds);
+      if (this->vfioc->use_msix) {
+        vfu->add_msix_pollfds(this->vfioc->irqfds);
+      } else {
+        vfu->add_legacy_irq_pollfds(
+            this->vfioc->irqfd_intx, this->vfioc->irqfd_msi,
+            this->vfioc->irqfd_err, this->vfioc->irqfd_req);
+      }
     }
 
     // set up callbacks

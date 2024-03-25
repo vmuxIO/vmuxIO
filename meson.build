@@ -25,7 +25,8 @@ sims_flags = [
 
 vmux_flags = [
   '-fPIC',
-  '-Wno-format-pedantic'
+  '-Wno-format-pedantic',
+  '-fno-exceptions'
 ]
 
 dpdk_flags = [
