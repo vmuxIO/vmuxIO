@@ -21,7 +21,7 @@ import subprocess
 
 
 @dataclass
-class IPerfTest:
+class IPerfTest(AbstractBenchTest):
 
     direction = "forward" # can be: forward | reverse | bidirectional
     output_json = True # sets / unsets -J flag on iperf client 
@@ -34,6 +34,16 @@ class IPerfTest:
     loadgen_hostname: str
     port = 5001
 
+    interface: str # network interface used
+
+    def test_infix(self):
+        return f"iperf3_{self.interface}_{self.num_vms}vms_{self.direction}"
+
+    def estimated_runtime(self) -> float:
+        """
+        estimate time needed to run this benchmark excluding boottime in seconds
+        """
+        return -1
 
 def strip_subnet_mask(ip_addr: str):
     return ip_addr[ : ip_addr.index("/")]
@@ -45,8 +55,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     info("Booting VM")
 
+    interface = Interface.VFIO
+
     # boot VMs
-    with measurement.virtual_machine(Interface.VFIO) as guest:
+    with measurement.virtual_machine(interface) as guest:
         # loadgen: set up interfaces and networking
 
         info('Binding loadgen interface')
@@ -65,13 +77,21 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         ipt = IPerfTest(
             guest_hostname=strip_subnet_mask(guest.test_iface_ip_net), 
             loadgen_hostname=strip_subnet_mask(guest.test_iface_ip_net),
-            guest_test_iface=guest.test_iface)
+            guest_test_iface=guest.test_iface,
+            interface=interface.value,
+            repetitions=1,
+            num_vms=1
+            )
 
         try:
             
             info("Starting iperf")
             guest.start_iperf_server(ipt)
             loadgen.run_iperf_client(ipt)
+            
+            remote_output_file = ipt.output_path
+            local_output_file = ipt.output_filepath(0)
+            loadgen.copy_from(remote_output_file, local_output_file)
 
         finally:
             # teardown
