@@ -92,7 +92,11 @@ int main(int argc, char* argv[]) {
   socket_address.sll_addr[4] = dst[4];
   socket_address.sll_addr[5] = dst[5];
 
-  for(int i = 0; i < runtime_s * 1000; i++) {
+  printf("Starting to send frames to %hhx:%hhx:%hhx:%hhx:%hhx:%hhx", dst[0], dst[1], dst[2], dst[3], dst[4], dst[5]);
+  
+  const uint32_t frameCount = runtime_s * 1000;
+
+  for(int i = 0; i < frameCount; i++) {
     /* Send packet */
     if (sendto(fd, sendbuf, tx_len, 0, (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll)) < 0) {
       printf("Send failed\n");
