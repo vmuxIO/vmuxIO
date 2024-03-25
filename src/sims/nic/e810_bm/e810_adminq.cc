@@ -383,6 +383,21 @@ void queue_admin_tx::admin_desc_ctx::process() {
 //                 d->params.raw);
 //     */
 //     desc_complete(0);
+  } else if (d->opcode == ice_aqc_opc_alloc_res) {
+    struct ice_aqc_alloc_free_res_cmd *request =
+        reinterpret_cast<struct ice_aqc_alloc_free_res_cmd *>(
+                d->params.raw);
+    // TODO find corect struct type
+    struct ice_aqc_res_elem* resource_descriptors = (struct ice_aqc_res_elem*)(
+        request->addr_low | (((uint64_t)request->addr_high) << 32)); // TODO this is a DMA addr no?
+    struct ice_aqc_alloc_free_res_elem foo; // TODO malloc this
+
+    printf("ice_aqc_opc_alloc_res buffer address 0x%x\n", resource_descriptors);
+    for (int i = 0; i < request->num_entries; i++) {
+      __builtin_dump_struct(&resource_descriptors[i], printf);
+    }
+
+    desc_complete_indir(0, request, sizeof(*request));
   } else if (d->opcode == ice_aqc_opc_add_vsi) {
 #ifdef DEBUG_ADMINQ
     cout <<  "  get vsi parameters" << logger::endl;
