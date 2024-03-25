@@ -149,40 +149,38 @@ class Measurement:
         except Exception:
             pass
 
-        try:
-            self.host.cleanup_network()
+        self.host.cleanup_network()
 
-            # host: set up interfaces and networking
+        # host: set up interfaces and networking
 
-            self.host.detect_test_iface()
+        self.host.detect_test_iface()
 
-            debug(f"Setting up interface {interface.value}")
-            setup_host_interface(self.host, interface)
+        debug(f"Setting up interface {interface.value}")
+        setup_host_interface(self.host, interface)
 
-            if interface.needs_vmux():
-                self.host.start_vmux(interface)
+        if interface.needs_vmux():
+            self.host.start_vmux(interface)
 
-            # start VM
+        # start VM
 
-            info(f"Starting VM ({interface.value})")
-            self.host.run_guest(
-                    net_type=interface,
-                    machine_type='pc',
-                    qemu_build_dir=QEMU_BUILD_DIR
-                    )
+        info(f"Starting VM ({interface.value})")
+        self.host.run_guest(
+                net_type=interface,
+                machine_type='pc',
+                qemu_build_dir=QEMU_BUILD_DIR
+                )
 
-            debug("Waiting for guest connectivity")
-            self.guest.wait_for_connection(timeout=120)
+        debug("Waiting for guest connectivity")
+        self.guest.wait_for_connection(timeout=120)
 
-            yield self.guest
+        yield self.guest
 
-        finally:
-            # teardown
+        # teardown
 
-            self.host.kill_guest()
-            if interface.needs_vmux():
-                self.host.stop_vmux()
-            self.host.cleanup_network()
+        self.host.kill_guest()
+        if interface.needs_vmux():
+            self.host.stop_vmux()
+        self.host.cleanup_network()
 
 
     @contextmanager
