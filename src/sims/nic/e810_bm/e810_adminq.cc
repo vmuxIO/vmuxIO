@@ -384,20 +384,47 @@ void queue_admin_tx::admin_desc_ctx::process() {
 //     */
 //     desc_complete(0);
   } else if (d->opcode == ice_aqc_opc_alloc_res) {
+    // command to request resources. References a data buffer that contains the actual requests.
     struct ice_aqc_alloc_free_res_cmd *request =
         reinterpret_cast<struct ice_aqc_alloc_free_res_cmd *>(
                 d->params.raw);
-    // TODO find corect struct type
-    struct ice_aqc_res_elem* resource_descriptors = (struct ice_aqc_res_elem*)(
-        request->addr_low | (((uint64_t)request->addr_high) << 32)); // TODO this is a DMA addr no?
-    struct ice_aqc_alloc_free_res_elem foo; // TODO malloc this
 
-    printf("ice_aqc_opc_alloc_res buffer address 0x%x\n", resource_descriptors);
+    // data buffer
+    struct ice_aqc_alloc_free_res_elem* resource_request = reinterpret_cast<struct ice_aqc_alloc_free_res_elem*> (data);
+    // list of requested things (resource descriptors)
+    struct ice_aqc_res_elem* resource_descriptors = (struct ice_aqc_res_elem*) &resource_request->elem;
+
+    // assert resource_request->num_elems == request->num_entries
+
+    printf("ice_aqc_opc_alloc_res type 0x%x buffer address 0x%p\n", resource_request->res_type, resource_descriptors);
     for (int i = 0; i < request->num_entries; i++) {
       __builtin_dump_struct(&resource_descriptors[i], printf);
+      uint16_t type = resource_request->res_type & 0x7F; // type is only bits 0:6
+      if (type == ICE_AQC_RES_TYPE_VSI_LIST_PRUNE) {
+        printf("pruning VSI list %d\n", i);
+        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+      } else if (type == ICE_AQC_RES_TYPE_FDIR_COUNTER_BLOCK) {
+        printf("allocating FDIR COUNTER BLOCK %d\n", i);
+        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+      } else if (type == ICE_AQC_RES_TYPE_FD_PROF_BLDR_PROFID) {
+        printf("allocating ICE_AQC_RES_TYPE_FD_PROF_BLDR_PROFID\n");
+        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+      } else if (type == ICE_AQC_RES_TYPE_FD_PROF_BLDR_TCAM) {
+        printf("allocating ICE_AQC_RES_TYPE_FD_PROF_BLDR_TCAM\n");
+        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+      } else if (type == ICE_AQC_RES_TYPE_HASH_PROF_BLDR_PROFID) {
+        printf("allocating ICE_AQC_RES_TYPE_HASH_PROF_BLDR_PROFID\n");
+        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+      } else if (type == ICE_AQC_RES_TYPE_HASH_PROF_BLDR_TCAM) {
+        printf("allocating ICE_AQC_RES_TYPE_HASH_PROF_BLDR_TCAM\n");
+        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+      } else {
+        printf("unknown resource type. Skipping its allocation.\n");
+      }
     }
 
-    desc_complete_indir(0, request, sizeof(*request));
+    // dma data to indirect buffer
+    desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_add_vsi) {
 #ifdef DEBUG_ADMINQ
     cout <<  "  get vsi parameters" << logger::endl;
