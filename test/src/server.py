@@ -1033,8 +1033,17 @@ class Server(ABC):
         >>> server.get_nic_ip_addresses('enp176s0')
         ['192.168.0.1/24']
         """
-        return self.exec(f'ip addr show dev {iface}' +
-                         ' | grep inet | awk "{print \\$2}"').splitlines()
+
+        result = self.exec(f'ip addr show dev {iface}' +
+                         ' | grep inet | awk "{print \\$2}"')
+        
+        if "does not exist" in result: 
+            debug("Interface {iface} does not exist!")
+            return []
+        
+        else:
+            return result.splitlines()
+        
 
     def delete_nic_ip_addresses(self: 'Server', iface: str) -> None:
         """
