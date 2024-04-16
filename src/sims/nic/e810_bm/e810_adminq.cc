@@ -406,6 +406,12 @@ void queue_admin_tx::admin_desc_ctx::process() {
       } else if (type == ICE_AQC_RES_TYPE_FDIR_COUNTER_BLOCK) {
         printf("allocating FDIR COUNTER BLOCK %d\n", i);
         resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+      } else if (type == ICE_AQC_RES_TYPE_FDIR_GUARANTEED_ENTRIES) {
+        printf("allocating FDIR guar. entry %d\n", i);
+        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+      } else if (type == ICE_AQC_RES_TYPE_FDIR_SHARED_ENTRIES) {
+        printf("allocating FDIR shared entry %d\n", i);
+        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
       } else if (type == ICE_AQC_RES_TYPE_FD_PROF_BLDR_PROFID) {
         printf("allocating ICE_AQC_RES_TYPE_FD_PROF_BLDR_PROFID\n");
         resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
