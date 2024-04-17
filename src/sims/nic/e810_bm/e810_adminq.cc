@@ -494,6 +494,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
 
     desc_complete_indir(0, &dev.topo_elem, sizeof(dev.topo_elem));
   } else if (d->opcode == ice_aqc_opc_get_sched_elems) {
+    // actually, this should return what was set via ice_aqc_opc_add_sched_elems, but we just hardcode it
     struct ice_aqc_sched_elem_cmd *get_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
     get_elem_cmd->num_elem_resp = 1;
     struct ice_aqc_txsched_elem_data *get_elem = reinterpret_cast<struct ice_aqc_txsched_elem_data*> (data);
@@ -505,33 +506,43 @@ void queue_admin_tx::admin_desc_ctx::process() {
       break;
     case 1:
       get_elem->parent_teid = 0;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_ENTRY_POINT;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
       break;
     case 2:
-      get_elem->parent_teid = 0;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+      get_elem->parent_teid = 1;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_ENTRY_POINT;
       break;
     case 3:
-      get_elem->parent_teid = 1;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
+      get_elem->parent_teid = 2;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
     case 4:
-      get_elem->parent_teid = 1;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
+      get_elem->parent_teid = 3;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
     case 5:
-      get_elem->parent_teid = 2;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
+      get_elem->parent_teid = 4;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
-    case E810_STATIC_NODES - 1: // last of the statically allocated nodes
-      get_elem->parent_teid = 2;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
+    case 6:
+      get_elem->parent_teid = 5;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+      break;
+    case 22:
+      get_elem->parent_teid = 5;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+      break;
+    case 38:
+      get_elem->parent_teid = 5;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case E810_STATIC_NODES: // id 54 // last of the statically allocated nodes
+      get_elem->parent_teid = 5;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
     default:
-      cout << "unexpectedly get elems: "<< get_elem->node_teid << logger::endl;
+      cout << "unexpectedly get elems: "<< get_elem->node_teid << logger::endl; // this is where the driver tries to get more elements and we get confused
       break;
     }
-    
     
     desc_complete_indir(0, get_elem, sizeof(*get_elem));
   } else if (d->opcode == ice_aqc_opc_add_sched_elems) {
