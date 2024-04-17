@@ -523,7 +523,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
       get_elem->parent_teid = 2;
       get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
       break;
-    case 6:
+    case E810_STATIC_NODES - 1: // last of the statically allocated nodes
       get_elem->parent_teid = 2;
       get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
       break;
@@ -536,10 +536,17 @@ void queue_admin_tx::admin_desc_ctx::process() {
     desc_complete_indir(0, get_elem, sizeof(*get_elem));
   } else if (d->opcode == ice_aqc_opc_add_sched_elems) {
     struct ice_aqc_sched_elem_cmd *get_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
-    get_elem_cmd->num_elem_resp = 1;
     struct ice_aqc_add_elem *add_elem = reinterpret_cast<struct ice_aqc_add_elem*> (data);
-    add_elem->generic[0].node_teid = dev.last_returned_node;
-    dev.last_returned_node = dev.last_returned_node + 1;
+
+    get_elem_cmd->num_elem_resp = add_elem->hdr.num_elems;
+
+    __builtin_dump_struct(add_elem, &printf);
+    for (int i = 0; i < add_elem->hdr.num_elems; i++) {
+      add_elem->generic[i].node_teid = dev.last_returned_node;
+      dev.last_returned_node = dev.last_returned_node + 1;
+      __builtin_dump_struct(&(add_elem->generic[i]), &printf);
+    }
+
     desc_complete_indir(0, add_elem, d->datalen);
   } else if (d->opcode == ice_aqc_opc_delete_sched_elems) {
     struct ice_aqc_sched_elem_cmd *delete_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
