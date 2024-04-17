@@ -45,14 +45,14 @@ class IPerfTest(AbstractBenchTest):
     def test_infix(self):
         return f"iperf_{self.num_vms}vms_{self.interface}"
 
-    def output_path_per_vm(self, repetition: int, vm_number: int) -> str:
-        return str(Path(OUT_DIR) / "measure_iperf" / f"VMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
+    def output_path_per_vm(self, direction: str, repetition: int, vm_number: int) -> str:
+        return str(Path(OUT_DIR) / "measure_iperf" / f"{direction}_VMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
     def estimated_runtime(self) -> float:
         """
         estimate time needed to run this benchmark excluding boot time in seconds
         """
-        return 5 # TODO
+        return 20 # TODO
 
 
 
@@ -75,11 +75,11 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     else:
         # set up test plan
-        interfaces = [ Interface.VMUX_PT, Interface.VMUX_EMU_E810, Interface.VMUX_DPDK_E810 ]
-        directions = [ "forward", "reverse", "bidirectional" ]
-        vm_nums = [ 1, 2, 4 ]
+        interfaces = [ Interface.VFIO ]
+        directions = [ "reverse", "bidirectional" ]
+        vm_nums = [ 1, 2 ]
 
-        repetitions = 3
+        repetitions = 1
 
         test_matrix = dict(
             repetitions=[ repetitions ],
@@ -101,12 +101,12 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 for vm_num in vm_nums:
                     info(f"Testing configuration iface: {iface} direction: {direction} vm_num: {vm_num}")
                     
-                    # build test object^
-
+                    # build test object
                     test_config = IPerfTest(repetitions, direction, iface, vm_num)
+
                     # temporarily raise log level to avoid normal info logs to console for repeated tests
                     prevLevel = logger.level
-                    logger.setLevel(WARN)
+                    logger.setLevel(INFO)
 
                     single_test(test_config, 0)
 
@@ -121,8 +121,6 @@ def single_test(ipt=IPerfTest(), repetition=0):
     host, loadgen = measurement.hosts()
 
     info("Booting VM")
-
-    interface = Interface.VFIO
 
     # boot VMs
     with measurement.virtual_machine(ipt.interface) as guest:

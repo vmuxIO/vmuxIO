@@ -2176,5 +2176,5 @@ class LoadGen(Server):
         info("Starting iperf client on " + ipt.guest_hostname + ":" + str(ipt.port))
 
         # create output folder since it might not exist
-        self.exec(f"mkdir -p {path_dirname(ipt.output_filepath(repetition))}")
-        self.exec(f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | sudo tee {ipt.output_filepath(repetition)}")
+        self.exec(f"mkdir -p {path_dirname(ipt.output_path_per_vm(ipt.direction, repetition, ipt.num_vms))}")
+        self.exec(f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | sudo tee {ipt.output_path_per_vm(ipt.direction, repetition, ipt.num_vms)}")
