@@ -569,7 +569,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_sched_elem_cmd *get_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
     struct ice_aqc_add_elem *add_elem = reinterpret_cast<struct ice_aqc_add_elem*> (data);
 
-    get_elem_cmd->num_elem_resp = add_elem->hdr.num_elems;
+    get_elem_cmd->num_elem_resp = 1; // get_elem_cmd->num_elem_req; (ignore all but first) // nr. of element groups in data
 
     __builtin_dump_struct(add_elem, &printf);
     for (int i = 0; i < add_elem->hdr.num_elems; i++) {
@@ -596,7 +596,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     
     query_res.layer_props[1].max_sibl_grp_sz = 2;
 
-    query_res.layer_props[2].max_sibl_grp_sz = 4;
+    query_res.layer_props[2].max_sibl_grp_sz = 32;
     query_res.layer_props[3].max_sibl_grp_sz = 8;
     
     desc_complete_indir(0, &query_res, sizeof(query_res));
