@@ -976,6 +976,7 @@ class e810_bm : public nicbm::Runner::Device {
   int last_used_parent_node = 3;
 #define E810_STATIC_NODES 59
   int last_returned_node = E810_STATIC_NODES + 1; // actually, i believe this is the next returned node
+  std::map<int, struct ice_aqc_txsched_elem_data*> sched_nodes; // allocated nodes
 
 
 
