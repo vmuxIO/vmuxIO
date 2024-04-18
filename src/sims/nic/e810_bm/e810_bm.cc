@@ -515,6 +515,15 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
         val = regs.pf_arqt;
         break;
       // e810
+      
+      // e810 PF LAN
+      case PFLAN_RX_QALLOC:
+        val = 0 |
+          ((1 << PFLAN_RX_QALLOC_FIRSTQ_S) & PFLAN_RX_QALLOC_FIRSTQ_M) |
+          ((1 << PFLAN_RX_QALLOC_LASTQ_S) & PFLAN_RX_QALLOC_LASTQ_M) |
+          ((1 << PFLAN_RX_QALLOC_VALID_S) & PFLAN_RX_QALLOC_VALID_M);
+        break;
+      // e810 PF LAN end
 
       // e810 mailbox
       case PF_MBX_ATQBAL:

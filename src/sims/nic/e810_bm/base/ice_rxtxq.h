@@ -1,0 +1,19 @@
+// #include "ice_osdep.h"
+#define MAKEMASK(m, s) ((m) << (s))
+
+// from dpdks ice_hw_autogen.h
+#define PFLAN_RX_QALLOC				0x001D2500 /* Reset Source: CORER */
+#define PFLAN_RX_QALLOC_FIRSTQ_S		0
+#define PFLAN_RX_QALLOC_FIRSTQ_M		MAKEMASK(0x7FF, 0)
+#define PFLAN_RX_QALLOC_LASTQ_S			16
+#define PFLAN_RX_QALLOC_LASTQ_M			MAKEMASK(0x7FF, 16)
+#define PFLAN_RX_QALLOC_VALID_S			31
+#define PFLAN_RX_QALLOC_VALID_M			BIT(31)
+#define PFLAN_TX_QALLOC				0x001D2580 /* Reset Source: CORER */
+#define PFLAN_TX_QALLOC_FIRSTQ_S		0
+#define PFLAN_TX_QALLOC_FIRSTQ_M		MAKEMASK(0x3FFF, 0)
+#define PFLAN_TX_QALLOC_LASTQ_S			16
+#define PFLAN_TX_QALLOC_LASTQ_M			MAKEMASK(0x3FFF, 16)
+#define PFLAN_TX_QALLOC_VALID_S			31
+#define PFLAN_TX_QALLOC_VALID_M			BIT(31)
+
