@@ -195,6 +195,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
         {ICE_AQC_CAPS_VSI, 1, 0, dev.NUM_VSIS, 0, 0, {}, {}},
         {ICE_AQC_CAPS_DCB, 1, 0, 1, 4, 1, {}, {}},
         {ICE_AQC_CAPS_RDMA, 1, 0, 1, 1, 1, {}, {}},
+        {ICE_AQC_CAPS_FD, 1, 0, dev.NUM_FD_GUAR, dev.NUM_FD_BEST_EFFORT, 0, {}, {}},
     };
     size_t num_caps = sizeof(caps) / sizeof(caps[0]);
 
