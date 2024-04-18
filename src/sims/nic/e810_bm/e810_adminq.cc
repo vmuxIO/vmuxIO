@@ -555,7 +555,12 @@ void queue_admin_tx::admin_desc_ctx::process() {
       get_elem->parent_teid = 55;
       get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
     default:
-      cout << "unexpectedly get elems: "<< get_elem->node_teid << logger::endl; // this is where the driver tries to get more elements and we get confused
+      struct ice_aqc_txsched_elem_data* allocated_elem = dev.sched_nodes[get_elem->node_teid];
+      if (allocated_elem != NULL) {
+        *get_elem = *allocated_elem;
+      } else {
+        cout << "unexpectedly get elems: "<< get_elem->node_teid << logger::endl; // this is where the driver tries to get more elements and we get confused
+      }
       break;
     }
     
@@ -569,8 +574,9 @@ void queue_admin_tx::admin_desc_ctx::process() {
     __builtin_dump_struct(add_elem, &printf);
     for (int i = 0; i < add_elem->hdr.num_elems; i++) {
       add_elem->generic[i].node_teid = dev.last_returned_node;
-      dev.last_returned_node = dev.last_returned_node + 1;
+      dev.sched_nodes[dev.last_returned_node] = &(add_elem->generic[i]);
       __builtin_dump_struct(&(add_elem->generic[i]), &printf);
+      dev.last_returned_node = dev.last_returned_node + 1;
     }
 
     desc_complete_indir(0, add_elem, d->datalen);
