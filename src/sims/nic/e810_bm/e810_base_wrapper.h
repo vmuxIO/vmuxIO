@@ -37,7 +37,7 @@ typedef uint64_t __le64;
 // #include "sims/nic/e810_bm/base/i40e_adminq_cmd.h"
 // #include "sims/nic/e810_bm/base/i40e_devids.h"
 // #include "sims/nic/e810_bm/base/i40e_register.h"
-// #include "sims/nic/e810_bm/base/i40e_rxtxq.h"
+#include "sims/nic/e810_bm/base/ice_rxtxq.h"
 #include "sims/nic/e810_bm/base/ice_devids.h"
 #include "sims/nic/e810_bm/base/ice_type.h"
 #include "sims/nic/e810_bm/base/ice_hw_autogen.h"
