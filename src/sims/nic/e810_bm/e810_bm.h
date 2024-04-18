@@ -786,6 +786,8 @@ class e810_bm : public nicbm::Runner::Device {
   static const uint16_t MAX_MTU = 2048;
   static const uint8_t NUM_ITR = 3;
   static const uint32_t NUM_RXDID = 64;
+  static const uint16_t NUM_FD_GUAR = 8192;
+  static const uint16_t NUM_FD_BEST_EFFORT = 8192;
   uint32_t QRX_CONTEXT[8192*4];
   uint32_t ctx[8];
 

@@ -394,6 +394,12 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       // case I40E_GLPCI_CAPSUP:
       //   val = 0;
       //   break;
+      
+      case GLQF_FD_SIZE:
+        val = 0 |
+          ((this->NUM_FD_GUAR << GLQF_FD_SIZE_FD_GSIZE_S) & GLQF_FD_SIZE_FD_GSIZE_M) |
+          ((this->NUM_FD_BEST_EFFORT << GLQF_FD_SIZE_FD_BSIZE_S) & GLQF_FD_SIZE_FD_BSIZE_M);
+        break;
       case PFPE_CQPDB:
         val = regs.reg_PFPE_CQPDB;
         break;
