@@ -535,10 +535,25 @@ void queue_admin_tx::admin_desc_ctx::process() {
     case 38:
       get_elem->parent_teid = 5;
       get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
-    case E810_STATIC_NODES: // id 54 // last of the statically allocated nodes
+    case 54: // id 54 
       get_elem->parent_teid = 5;
       get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
+    case 55:
+      get_elem->parent_teid = 1;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case 56:
+      get_elem->parent_teid = 55;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case 57:
+      get_elem->parent_teid = 55;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case 58:
+      get_elem->parent_teid = 55;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case E810_STATIC_NODES: // id 59 // last of the statically allocated nodes
+      get_elem->parent_teid = 55;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
     default:
       cout << "unexpectedly get elems: "<< get_elem->node_teid << logger::endl; // this is where the driver tries to get more elements and we get confused
       break;

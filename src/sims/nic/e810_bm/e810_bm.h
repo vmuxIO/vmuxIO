@@ -974,7 +974,8 @@ class e810_bm : public nicbm::Runner::Device {
 
   u8 ctx_addr[4][22];
   int last_used_parent_node = 3;
-  int last_returned_node = 7;
+#define E810_STATIC_NODES 59
+  int last_returned_node = E810_STATIC_NODES + 1; // actually, i believe this is the next returned node
 
 
 
