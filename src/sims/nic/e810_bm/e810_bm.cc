@@ -229,6 +229,9 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
              addr <= GLFLXP_RXDID_FLX_WRD_3(63)){
     size_t idx = (addr - GLFLXP_RXDID_FLX_WRD_3(0)) / 4;
     val = regs.flex_rxdid_3[idx];
+  } else if (addr >= GLFLXP_RXDID_FLAGS(0, 0) &&
+             addr <= GLFLXP_RXDID_FLAGS(63, 4)){
+    val = 0x16; // supported queue descriptor layout (used by dpdk ice_get_supported_rxdid())
   } else if (addr >= GLPRT_BPRCL(0) && addr <= GLPRT_BPRCL(7)){
     size_t idx = (addr - GLPRT_BPRCL(0))/8;
     val = regs.GLPRT_BPRCL[idx];
