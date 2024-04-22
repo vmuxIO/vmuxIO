@@ -8,7 +8,6 @@ from abc import ABC
 from os import listdir, remove
 from os.path import join as path_join
 from os.path import dirname as path_dirname
-from os.path import dirname as path_getsize
 from typing import Optional
 from enums import Interface
 import netaddr
@@ -1033,8 +1032,17 @@ class Server(ABC):
         >>> server.get_nic_ip_addresses('enp176s0')
         ['192.168.0.1/24']
         """
-        return self.exec(f'ip addr show dev {iface}' +
-                         ' | grep inet | awk "{print \\$2}"').splitlines()
+
+        result = self.exec(f'ip addr show dev {iface}' +
+                         ' | grep inet | awk "{print \\$2}"')
+        
+        if "does not exist" in result: 
+            debug("Interface {iface} does not exist!")
+            return []
+        
+        else:
+            return result.splitlines()
+        
 
     def delete_nic_ip_addresses(self: 'Server', iface: str) -> None:
         """
@@ -1613,15 +1621,18 @@ class Host(Server):
         # Build misc parameters
 
         dev_type = 'pci' if machine_type == 'pc' else 'device'
+
         # TODO we need a different qemu build dir for vmux
         qemu_bin_path = 'qemu-system-x86_64'
         if qemu_build_dir:
             qemu_bin_path = path_join(qemu_build_dir, qemu_bin_path)
+
         cpus = vcpus if vcpus else self.guest_vcpus
         mem = memory if memory else self.guest_memory
         disk_path = self.guest_root_disk_path
         if root_disk:
             disk_path = root_disk
+
         disk_path = MultiHost.disk_path(disk_path, vm_number)
         fsdev_config = ''
         if self.fsdevs:
@@ -1685,9 +1696,10 @@ class Host(Server):
             memory_path = f'/dev/hugepages/qemu-memory{vm_number}'
         else:
             memory_path = f'/dev/shm/qemu-{vm_number}'
-        # if path_getsize(memory_path) != mem * 1024 * 1024:
-        if self.test("[[ -f {memory_path} && $(stat --printf='%s' {memory_path}) -eq {mem*1024*1024} ]]"):
+        # if path_dirname(memory_path) != mem * 1024 * 1024:
+        if self.test(f"[[ -f {memory_path} && $(stat --printf='%s' {memory_path}) -eq {int(mem)*1024*1024} ]]"):
             self.exec(f"sudo rm {memory_path}")
+
         memory_backend = f' -object memory-backend-file,mem-path={memory_path},prealloc=yes,id=bm,size={mem}M,share=on'
 
         # Actually start qemu in tmux
@@ -2141,7 +2153,7 @@ class LoadGen(Server):
         self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
 
 
-    def run_iperf_client(self, ipt: "IPerfTest"):
+    def run_iperf_client(self, ipt: "IPerfTest", repetition: int):
         """
         Starts iperf client
         """
@@ -2160,9 +2172,9 @@ class LoadGen(Server):
         elif ipt.direction != "forward":
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
 
+    
         info("Starting iperf client on " + ipt.guest_hostname + ":" + str(ipt.port))
-        self.tmux_new("iperf3-client", f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | tee {ipt.output_path}")
 
-
-    def stop_iperf_client(self):
-        self.tmux_kill("iperf3-client")
+        # create output folder since it might not exist
+        self.exec(f"mkdir -p {path_dirname(ipt.output_path_per_vm(ipt.direction, repetition, ipt.num_vms))}")
+        self.exec(f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | sudo tee {ipt.output_path_per_vm(ipt.direction, repetition, ipt.num_vms)}")
