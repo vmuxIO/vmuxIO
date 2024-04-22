@@ -150,7 +150,7 @@ void lan::packet_received(const void *data, size_t len) {
 #endif
 
   uint32_t hash = 0;
-  uint16_t queue = 0;
+  uint16_t queue = 1; // queue 0 is not allocated by dpdk!? Also, rss_steering never changes queue for now
   rss_steering(data, len, queue, hash);
   if (!rxqs[queue]->is_enabled()) {
     // if we receive on uninitialized queues, we throw errors
