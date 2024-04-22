@@ -225,7 +225,7 @@ class CallbackAdaptor {
       // spacing_s = 1 / ( 10^9 / (reg * 256) )
       // spcaing_s = (reg * 256) / 10^9
       // ulong spacing_us = (e1000_interrupt_throtteling_reg(this_->e1000, -1) * 256);
-      this->irqThrottle[vec]->try_interrupt(mindelay, false);
+      this->irqThrottle[vec-1]->try_interrupt(mindelay, false);
 
       int ret = 0;
       // ret = vfu_irq_trigger(this->vfu->vfu_ctx, vec);
