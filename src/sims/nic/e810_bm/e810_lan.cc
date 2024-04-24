@@ -432,10 +432,12 @@ void lan_queue_tx::initialize() {
   if (idx == 0) {
     base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
     hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 16);
+    base = ((*base_p) & ((1ULL << 57) - 1))*128 + idx * sizeof(ice_tx_desc);
     len = ((*hwb_qlen_p) >> 7) & ((1 << 13) - 1);
   } else {
     base_p = reinterpret_cast<uint64_t *>(ctx_p + 22);
     hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 16);
+    base = ((*base_p) & ((1ULL << 57) - 1))*128;
     len = ((*hwb_qlen_p) >> 3) & ((1 << 13) - 1);
   }
   // uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
@@ -443,7 +445,6 @@ void lan_queue_tx::initialize() {
   // uint16_t *hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 17);
   uint64_t *hwb_p = reinterpret_cast<uint64_t *>(ctx_p + 12);
 
-  base = ((*base_p) & ((1ULL << 57) - 1))*128 + idx * sizeof(ice_tx_desc);
 
 #ifdef DEBUG_LAN
   std::cout << " lan_queue_tx " << this->qname << " initialize() -> iova 0x" << std::hex << base << logger::endl;
