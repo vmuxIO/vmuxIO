@@ -13,7 +13,6 @@ from util import safe_cast
 from typing import Iterator, cast
 import time
 
-OUT_DIR = "/tmp/out1"
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
@@ -66,7 +65,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             repetitions=1,
             warmup=False,
             cooldown=False,
-            outputdir=OUT_DIR,
+            outputdir=measurement.output_dir(),
         )
         guest_: LoadGen = cast(LoadGen, guest) # trust me bro, this works
         test.run(guest_)
@@ -98,7 +97,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 f"| tee {remote_output_file}"
                 )
         guest.copy_from(remote_output_file,
-                    f"{OUT_DIR}/measure_vnf_rep0.log")
+                    f"{measurement.output_dir()}/measure_vnf_rep0.log")
 
         loadgen.stop_moongen_reflector()
 

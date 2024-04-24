@@ -22,12 +22,10 @@ import subprocess
 from root import QEMU_BUILD_DIR
 
 
-OUT_DIR: str = "/tmp/out1"
-BRIEF: bool = False
 NUM_WORKERS: int = 8 # with 16, it already starts failing on rose
 
 
-def setup_parser() -> ArgumentParser:
+def setup_parser(out_dir: str = "/tmp/out1") -> ArgumentParser:
     """
     Creates ArgumentParser instance for parsing program options
     """
@@ -48,7 +46,7 @@ def setup_parser() -> ArgumentParser:
                         )
     parser.add_argument('-o',
                         '--outdir',
-                        default=OUT_DIR,
+                        default=out_dir,
                         help='Directory to expect old results in and write new ones to',
                         )
     parser.add_argument('-b',
@@ -113,14 +111,17 @@ class Measurement:
 
         self.guests = dict()
 
-        global BRIEF
-        global OUT_DIR
-        BRIEF = self.args.brief
-        OUT_DIR = self.args.outdir
+        if self.is_brief():
+            subprocess.run(["sudo", "rm", "-r", self.output_dir()])
 
-        if BRIEF:
-            subprocess.run(["sudo", "rm", "-r", OUT_DIR])
 
+    def is_brief(self):
+        return self.args.brief
+    
+
+    def output_dir(self):
+        return self.args.outdir
+    
 
     def hosts(self) -> Tuple[Host, LoadGen]:
         return (self.host, self.loadgen)
@@ -270,6 +271,7 @@ class Measurement:
 class AbstractBenchTest(ABC):
     repetitions: int
     num_vms: int
+    out_dir: str
 
     @abstractmethod
     def test_infix(self) -> str:
@@ -284,7 +286,7 @@ class AbstractBenchTest(ABC):
         raise Exception("unimplemented")
 
     def output_filepath(self, repetition: int):
-        return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.log")
+        return path_join(self.out_dir, f"{self.test_infix()}_rep{repetition}.log")
 
     def test_done(self, repetition: int):
         output_file = self.output_filepath(repetition)

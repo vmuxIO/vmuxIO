@@ -10,8 +10,6 @@ from pathlib import Path
 import pandas as pd
 from pandas import DataFrame
 
-OUT_DIR: str
-BRIEF: bool
 DURATION_S: int
 
 @dataclass
@@ -23,7 +21,7 @@ class YcsbTest(AbstractBenchTest):
         return f"ycsb_{self.num_vms}vms_{self.interface}_{self.rps}rps"
 
     def output_path_per_vm(self, repetition: int, vm_number: int) -> str:
-        return str(Path(OUT_DIR) / f"ycsbVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
+        return str(Path(measurement.output_dir()) / f"ycsbVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
     def estimated_runtime(self) -> float:
         """
@@ -159,19 +157,15 @@ class Ycsb():
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
     host, loadgen = measurement.hosts()
-    from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
-    global OUT_DIR
-    global BRIEF
+
     global DURATION_S
-    OUT_DIR = M_OUT_DIR
-    BRIEF = M_BRIEF
 
     interfaces = [ Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.BRIDGE_E1000, Interface.BRIDGE ]
     rpsList = [ 10, 100, 500, 1000, 5000, 10000, 50000, 1000000 ]
     vm_nums = [ 1, 2, 4 ]
     repetitions = 3
-    DURATION_S = 61 if not BRIEF else 11
-    if BRIEF:
+    DURATION_S = 61 if not measurement.is_brief() else 11
+    if measurement.is_brief():
         # interfaces = [ Interface.BRIDGE_E1000 ]
         interfaces = [ Interface.VMUX_DPDK ]
         rpsList = [ 10 ]
@@ -241,7 +235,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                             repetitions=repetitions,
                             rps=rps,
                             interface=interface.value,
-                            num_vms=num_vms
+                            num_vms=num_vms,
+                            out_dir=measurement.output_dir()
                             )
                     if test.needed():
                         info(f"running {test}")
@@ -250,7 +245,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         info(f"skipping {test}")
 
 
-    YcsbTest.find_errors(OUT_DIR, ["READ-ERROR", "WRITE-ERROR"])
+    YcsbTest.find_errors(measurement.output_dir(), ["READ-ERROR", "WRITE-ERROR"])
 
 
 if __name__ == "__main__":

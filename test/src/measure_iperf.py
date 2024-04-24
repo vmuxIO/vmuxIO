@@ -7,7 +7,7 @@ from logging import (info, debug, error, warning, getLogger,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen, MultiHost
 from enums import Machine, Interface, Reflector
-from measure import AbstractBenchTest, Measurement, end_foreach, BRIEF, OUT_DIR
+from measure import AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
@@ -35,18 +35,19 @@ class IPerfTest(AbstractBenchTest):
     loadgen_hostname: str
     port = 5001
 
-    def __init__(self, repetitions=1, direction="forward", interface=Interface.VFIO, num_vms=1):
+    def __init__(self, repetitions=1, direction="forward", interface=Interface.BRIDGE_E1000, num_vms=1, out_dir="/tmp/out1"):
         self.repetitions = repetitions
         self.direction = direction
         self.interface = interface
         self.num_vms = num_vms
+        self.out_dir = out_dir
 
 
     def test_infix(self):
         return f"iperf_{self.num_vms}vms_{self.interface}"
 
     def output_path_per_vm(self, direction: str, repetition: int, vm_number: int) -> str:
-        return str(Path(OUT_DIR) / "measure_iperf" / f"{direction}_VMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
+        return str(Path(measurement.output_dir()) / "measure_iperf" / f"{direction}_VMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
     def estimated_runtime(self) -> float:
         """
@@ -62,20 +63,16 @@ def strip_subnet_mask(ip_addr: str):
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
-    from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
-    global OUT_DIR
-    global BRIEF
-    global DURATION_S
-    OUT_DIR = M_OUT_DIR
-    BRIEF = M_BRIEF
 
-    if BRIEF:
+    global DURATION_S
+
+    if measurement.is_brief():
         info("Running single test with one VM")
-        single_test()
+        single_test(IPerfTest(out_dir=measurement.output_dir()))
 
     else:
         # set up test plan
-        interfaces = [ Interface.VFIO ]
+        interfaces = [ Interface.VMUX_DPDK_E810 ]
         directions = [ "reverse", "bidirectional" ]
         vm_nums = [ 1, 2 ]
 
@@ -102,7 +99,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     info(f"Testing configuration iface: {iface} direction: {direction} vm_num: {vm_num}")
                     
                     # build test object
-                    test_config = IPerfTest(repetitions, direction, iface, vm_num)
+                    test_config = IPerfTest(repetitions, direction, iface, vm_num, measurement.output_dir())
 
                     # temporarily raise log level to avoid normal info logs to console for repeated tests
                     prevLevel = logger.level
@@ -113,7 +110,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     logger.setLevel(prevLevel)
 
 
-def single_test(ipt=IPerfTest(), repetition=0):
+def single_test(ipt, repetition=0):
     """
     Runs a single iperf test based on the supplied IPerfTest object. If no Object is supplied, use default config.
     """
@@ -144,8 +141,10 @@ def single_test(ipt=IPerfTest(), repetition=0):
             ipt.guest_test_iface = guest.test_iface
 
             info("Starting iperf")
+            breakpoint()
             guest.start_iperf_server(ipt)
             loadgen.run_iperf_client(ipt, repetition)
+            breakpoint()
 
         finally:
             # teardown
