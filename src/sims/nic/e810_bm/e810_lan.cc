@@ -425,30 +425,30 @@ void lan_queue_tx::reset() {
 }
 
 void lan_queue_tx::initialize() {
-  uint8_t *ctx_p = reinterpret_cast<uint8_t *>(dev.ctx_addr);
+  uint8_t *ctx_p = reinterpret_cast<uint8_t *>(dev.ctx_addr[idx]);
 
   uint64_t *base_p;
-  uint16_t *hwb_qlen_p;
-  if (idx == 0) {
+  uint32_t *hwb_qlen_p;
+  // if (idx == 0) {
     base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
-    hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 16);
-    base = ((*base_p) & ((1ULL << 57) - 1))*128 + idx * sizeof(ice_tx_desc);
-    len = ((*hwb_qlen_p) >> 7) & ((1 << 13) - 1);
-  } else {
-    base_p = reinterpret_cast<uint64_t *>(ctx_p + 22);
-    hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 16);
-    base = ((*base_p) & ((1ULL << 57) - 1))*128;
-    len = ((*hwb_qlen_p) >> 3) & ((1 << 13) - 1);
-  }
+    hwb_qlen_p = reinterpret_cast<uint32_t *>(ctx_p + 16);
+    base = ((*base_p) & ((1ULL << 57) - 1))*128; // + idx * sizeof(ice_tx_desc); // bit 0 - 56
+    len = ((*hwb_qlen_p) >> 7) & ((1 << 14) - 1); // bit 135 (12 bits long)
+  // } else { 
+  //   base_p = reinterpret_cast<uint64_t *>(ctx_p + 22);
+  //   hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 16);
+  //   base = ((*base_p) & ((1ULL << 57) - 1))*128; // bit 176 - 232
+  //   len = ((*hwb_qlen_p) >> 3) & ((1 << 13) - 1); // bit 131
+  // }
   // uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
   // uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 22);
   // uint16_t *hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 17);
   uint64_t *hwb_p = reinterpret_cast<uint64_t *>(ctx_p + 12);
 
 
-#ifdef DEBUG_LAN
+// #ifdef DEBUG_LAN
   std::cout << " lan_queue_tx " << this->qname << " initialize() -> iova 0x" << std::hex << base << logger::endl;
-#endif
+// #endif
   hwb = !!((*hwb_p) >> 5 & (1 << 0));
 #ifdef DEBUG_LAN
   // std::cout << "  head=" << reg_dummy_head << " base=" << base << " len=" << len
