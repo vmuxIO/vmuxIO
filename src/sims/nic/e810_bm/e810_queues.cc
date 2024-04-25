@@ -126,7 +126,7 @@ void queue_base::trigger_process() {
 
     ctx.state = desc_ctx::DESC_PROCESSING;
 #ifdef DEBUG_QUEUES
-    std::cout << "processing desc " << ctx.index << logger::endl;
+    std::cout << "q_" << this->qname << " processing desc " << ctx.index << logger::endl;
 #endif
     ctx.process();
   }
@@ -381,8 +381,8 @@ void queue_base::dma_fetch::done() {
     union ice_32byte_rx_desc *rxd =
       reinterpret_cast<union ice_32byte_rx_desc *>(ctx.desc);
 #ifdef DEBUG_QUEUES
-    std::cout << "preparing desc " << ctx.index << logger::endl;
-    std::cout << "rx desc read pkt_addr" << rxd->read.pkt_addr << logger::endl;
+    std::cout << "q_" << queue.qname << ": preparing desc " << ctx.index << logger::endl;
+    std::cout << " desc read pkt_addr" << rxd->read.pkt_addr << logger::endl;
 #endif
     ctx.state = desc_ctx::DESC_PREPARING;
     ctx.prepare();

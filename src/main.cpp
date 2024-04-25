@@ -46,10 +46,6 @@ extern "C" {
 
 namespace outcome = BOOST_OUTCOME_V2_NAMESPACE;
 
-// E810 debug logging flags
-// #define DEBUG_ADMINQ 1
-// #define DEBUG_LAN 1
-
 // set true by signals, should be respected by runtime loops
 std::atomic<bool> quit(false);
 
