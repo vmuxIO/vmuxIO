@@ -427,6 +427,7 @@ void lan_queue_tx::reset() {
 void lan_queue_tx::initialize() {
   uint8_t *ctx_p = reinterpret_cast<uint8_t *>(dev.ctx_addr[idx]);
 
+  // Table 10-29. LAN Tx-Queue Context in the QTXCOMM_CNTX Array
   uint64_t *base_p;
   uint32_t *hwb_qlen_p;
   // if (idx == 0) {

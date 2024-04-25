@@ -605,6 +605,7 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
     regs.QRX_CTRL[idx] = val+4;
     regs.qrx_ena[idx] = val;
     lanmgr.qena_updated(idx, true);
+    printf("QRX_CTRL[%zu] write %d\n", idx, val);
   } else if (addr >= PF0INT_ITR_0(0) &&
              addr <= PF0INT_ITR_0(2047)) {
     regs.pfint_itrn[0][(addr - PF0INT_ITR_0(0)) / 4096] = val;

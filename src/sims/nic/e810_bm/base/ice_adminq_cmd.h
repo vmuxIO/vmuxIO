@@ -755,6 +755,7 @@ struct ice_aqc_txsched_elem {
 	__le16 reserved2;
 };
 
+// datasheet 2.4 table 8-30
 struct ice_aqc_txsched_elem_data {
 	__le32 parent_teid;
 	__le32 node_teid;

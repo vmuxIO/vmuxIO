@@ -606,6 +606,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_add_txqs *add_txqs_cmd = reinterpret_cast<ice_aqc_add_txqs *> (d->params.raw);
     // add_txqs_cmd->num_qgrps = 1;
     struct ice_aqc_add_tx_qgrp *add_txqs = reinterpret_cast<ice_aqc_add_tx_qgrp *> (data);
+    __builtin_dump_struct(&(add_txqs->txqs[0]), &printf);
     add_txqs->parent_teid = dev.last_used_parent_node;
     add_txqs->num_txqs = 1;
     add_txqs->txqs[0].q_teid = dev.last_returned_node;

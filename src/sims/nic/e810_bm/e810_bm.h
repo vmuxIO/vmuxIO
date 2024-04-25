@@ -37,6 +37,7 @@ extern "C" {
 
 // #define DEBUG_DEV
 // #define DEBUG_ADMINQ
+// #define DEBUG_QUEUES
 // #define DEBUG_LAN
 // #define DEBUG_HMC
 // #define DEBUG_QUEUES
