@@ -591,7 +591,7 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
       addr <= GLINT_DYN_CTL(NUM_PFINTS - 1)) {
     regs.pfint_dyn_ctln[(addr - GLINT_DYN_CTL(0)) / 4] = val;
   } else if (addr >= QTX_COMM_DBELL(0) && addr <= QTX_COMM_DBELL(2047)){
-      size_t idx = 1; // TODO (addr - QTX_COMM_DBELL(0))/4;
+      size_t idx = (addr - QTX_COMM_DBELL(0))/4;
       regs.QTX_COMM_DBELL[idx] = val;
       regs.qtx_tail[idx] = val;
       lanmgr.tail_updated(idx, false);
