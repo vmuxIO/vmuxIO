@@ -275,18 +275,13 @@ void lan_queue_rx::reset() {
 }
 
 void lan_queue_rx::initialize() {
-#ifdef DEBUG_LAN
-  std::cout << " lan_queue_rx " << this->qname << " initialize()" << logger::endl;
-  // dev.qrx_enabled = true;
-
-#endif
-  
+  uint32_t packed_ctx[8]; // Each QRX_CONTEXT queue has 8 registers
   for (int i = 0; i < 8; i++)
   { 
-    int index = QRX_CONTEXT(i, idx)-QRX_CONTEXT(0,0);
-    dev.ctx[i] = dev.regs.QRX_CONTEXT[index];
+    int index = (QRX_CONTEXT(i, idx)-QRX_CONTEXT(0,0)) / 4; // byte offset / 4 = uint32_t* offset
+    packed_ctx[i] = dev.regs.QRX_CONTEXT[index];
   }
-  uint8_t *ctx_p = reinterpret_cast<uint8_t *>(dev.ctx);
+  uint8_t *ctx_p = reinterpret_cast<uint8_t *>(&(packed_ctx[0]));
   
   uint16_t *head_p = reinterpret_cast<uint16_t *>(ctx_p + 0);
   uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 4);
@@ -307,7 +302,13 @@ void lan_queue_rx::initialize() {
   desc_len = (longdesc ? 32 : 16);
   crc_strip = !!(((*hbsz_p) >> 13) & 0x1);
   rxmax = (((*rxmax_p) >> 6) & ((1 << 14) - 1)) * 128;
-  std::cout<<" base: " << base << logger::endl;
+
+// #ifdef DEBUG_LAN
+  std::cout << " lan_queue_rx " << this->qname << " initialize() -> iova 0x" << std::hex << base << logger::endl;
+  // dev.qrx_enabled = true;
+
+// #endif
+  
   
   if (!longdesc) {
     std::cout << "lan_queue_rx::initialize: currently only 32B descs "

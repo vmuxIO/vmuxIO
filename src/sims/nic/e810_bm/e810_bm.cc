@@ -190,27 +190,33 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
   } else if (addr >= GLINT_ITR(2, 0) && addr <= GLINT_ITR(2, 2047)) {
     val = regs.GLINT_ITR2[(addr - GLINT_ITR(2,0)) / 4];
   } else if (addr >= QRX_CONTEXT(0, 0) && addr <= QRX_CONTEXT(0, 0)) {
-    std::cout << "reading qrx context..." << logger::endl;
-    std::cout<< "reading QRX_CONTEXT(0,0)" << logger::endl;
-    val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(0,0))/8192];
-  } else if (addr >= QRX_CONTEXT(1, 0) && addr <= QRX_CONTEXT(1, 0)) {
-    std::cout<< "reading QRX_CONTEXT(1,0)" << logger::endl;
-    val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(1,0))/8192];
-    } else if (addr >= QRX_CONTEXT(2, 0) && addr <= QRX_CONTEXT(2, 0)) {
-    std::cout<< "reading QRX_CONTEXT(2,0)" << logger::endl;
-    val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(2,0))/8192];
-    } else if (addr >= QRX_CONTEXT(3, 0) && addr <= QRX_CONTEXT(3, 0)) {
-    std::cout<< "reading QRX_CONTEXT(3,0)" << logger::endl;
-    val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(3,0))/8192];
-    } else if (addr >= QRX_CONTEXT(4, 0) && addr <= QRX_CONTEXT(4, 0)) {
-    val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(4,0))/8192];
-    } else if (addr >= QRX_CONTEXT(5, 0) && addr <= QRX_CONTEXT(5, 0)) {
-    val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(5,0))/8192];
-    } else if (addr >= QRX_CONTEXT(6, 0) && addr <= QRX_CONTEXT(6, 0)) {
-    val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(6,0))/8192];
-    } else if (addr >= QRX_CONTEXT(7, 0) && addr <= QRX_CONTEXT(7, 0)) {
-    // QRX_CONTEXT[(addr - QRX_CONTEXT(7,0))/8192] = val;
-    val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(7,0))/8192];
+    int index = (addr - QRX_CONTEXT(0,0)) / 4; // byte offset / 4 = uint32_t* offset
+    val = regs.QRX_CONTEXT[index];
+
+  // Original QRX_CONTEXT implementation:
+  //
+  // } else if (addr >= QRX_CONTEXT(0, 0) && addr <= QRX_CONTEXT(0, 0)) {
+  //   std::cout << "reading qrx context..." << logger::endl;
+  //   std::cout<< "reading QRX_CONTEXT(0,0)" << logger::endl;
+  //   val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(0,0))/8192];
+  // } else if (addr >= QRX_CONTEXT(1, 0) && addr <= QRX_CONTEXT(1, 0)) {
+  //   std::cout<< "reading QRX_CONTEXT(1,0)" << logger::endl;
+  //   val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(1,0))/8192];
+  //   } else if (addr >= QRX_CONTEXT(2, 0) && addr <= QRX_CONTEXT(2, 0)) {
+  //   std::cout<< "reading QRX_CONTEXT(2,0)" << logger::endl;
+  //   val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(2,0))/8192];
+  //   } else if (addr >= QRX_CONTEXT(3, 0) && addr <= QRX_CONTEXT(3, 0)) {
+  //   std::cout<< "reading QRX_CONTEXT(3,0)" << logger::endl;
+  //   val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(3,0))/8192];
+  //   } else if (addr >= QRX_CONTEXT(4, 0) && addr <= QRX_CONTEXT(4, 0)) {
+  //   val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(4,0))/8192];
+  //   } else if (addr >= QRX_CONTEXT(5, 0) && addr <= QRX_CONTEXT(5, 0)) {
+  //   val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(5,0))/8192];
+  //   } else if (addr >= QRX_CONTEXT(6, 0) && addr <= QRX_CONTEXT(6, 0)) {
+  //   val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(6,0))/8192];
+  //   } else if (addr >= QRX_CONTEXT(7, 0) && addr <= QRX_CONTEXT(7, 0)) {
+  //   // QRX_CONTEXT[(addr - QRX_CONTEXT(7,0))/8192] = val;
+  //   val = regs.QRX_CONTEXT[(addr - QRX_CONTEXT(7,0))/8192];
   } else if (addr >= QRXFLXP_CNTXT(0) && addr <= QRXFLXP_CNTXT(2047)) {
     val = regs.QRXFLXP_CNTXT[(addr - QRXFLXP_CNTXT(0)) / 4];
   } else if (addr >= GLFLXP_RXDID_FLX_WRD_0(0) &&
@@ -528,7 +534,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       // e810 PF LAN
       case PFLAN_RX_QALLOC:
         val = 0 |
-          ((1 << PFLAN_RX_QALLOC_FIRSTQ_S) & PFLAN_RX_QALLOC_FIRSTQ_M) |
+          ((0 << PFLAN_RX_QALLOC_FIRSTQ_S) & PFLAN_RX_QALLOC_FIRSTQ_M) |
           ((1 << PFLAN_RX_QALLOC_LASTQ_S) & PFLAN_RX_QALLOC_LASTQ_M) |
           ((1 << PFLAN_RX_QALLOC_VALID_S) & PFLAN_RX_QALLOC_VALID_M);
         break;
@@ -635,8 +641,16 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
     regs.GLINT_ITR1[(addr - GLINT_ITR(1,0)) / 4] = val;
   } else if (addr >= GLINT_ITR(2, 0) && addr <= GLINT_ITR(2, 2047)) {
     regs.GLINT_ITR2[(addr - GLINT_ITR(2,0)) / 4] = val;
-  } else if (addr >= QRX_CONTEXT(0, 0) && addr <= QRX_CONTEXT(7, 2047)) {
-    regs.QRX_CONTEXT[(addr - QRX_CONTEXT(0,0))] = val;
+  } else if (addr >= QRX_CONTEXT(0, 0) && addr < QRX_CONTEXT(8, 2048)) {
+    int index = (addr - QRX_CONTEXT(0,0));
+    regs.QRX_CONTEXT[index / 4] = val; // byte offset / 4 = uint32_t* offset
+    // #ifdef DEBUG_DEV
+      // int q_idx = ((index * 4) % 8192) / 4;
+      // int ctx_reg = (q_idx == 0) ? (index) : (index % (q_idx * 8192));
+      int q_idx = (index % 8192) / 4;
+      int ctx_reg = index / 8192;
+      printf("write QRX_CONTEXT(%d, %d) val %x\n", ctx_reg, q_idx, val);
+    // #endif
   } else if (addr >= QRXFLXP_CNTXT(0) && addr <= QRXFLXP_CNTXT(2047)) {
     regs.QRXFLXP_CNTXT[(addr - QRXFLXP_CNTXT(0)) / 4] = val;
   } else if (addr >= GLFLXP_RXDID_FLX_WRD_0(0) &&

@@ -789,9 +789,6 @@ class e810_bm : public nicbm::Runner::Device {
   static const uint32_t NUM_RXDID = 64;
   static const uint16_t NUM_FD_GUAR = 8192;
   static const uint16_t NUM_FD_BEST_EFFORT = 8192;
-  uint32_t QRX_CONTEXT[8192*4];
-  uint32_t ctx[8];
-
   
 
   struct i40e_regs {
@@ -882,7 +879,7 @@ class e810_bm : public nicbm::Runner::Device {
     uint32_t QRXFLXP_CNTXT[2048];
     uint32_t qtx_comm_head[NUM_QUEUES];
 
-    uint32_t QRX_CONTEXT[QRX_CONTEXT(7, 2047)];
+    uint32_t QRX_CONTEXT[8*2048]; // 8 registers per queue
 
     uint32_t GLINT_ITR0[2048];
     uint32_t GLINT_ITR1[2048];
