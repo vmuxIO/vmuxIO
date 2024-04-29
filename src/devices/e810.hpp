@@ -161,13 +161,13 @@ private:
 
     ret = vfu_setup_irq_state_callback(
         vfu.vfu_ctx, VFU_DEV_INTX_IRQ,
-        E810EmulatedDevice::irq_state_unimplemented_cb);
+        E810EmulatedDevice::irq_state_cb);
     if (ret)
       die("setting up intx state callback for libvfio-user failed");
 
     ret = vfu_setup_irq_state_callback(
         vfu.vfu_ctx, VFU_DEV_MSIX_IRQ,
-        E810EmulatedDevice::irq_state_unimplemented_cb);
+        E810EmulatedDevice::irq_state_cb);
     if (ret)
       die("setting up msix state callback for libvfio-user failed");
 
@@ -177,7 +177,7 @@ private:
         continue;
       ret = vfu_setup_irq_state_callback(
           vfu.vfu_ctx, (enum vfu_dev_irq_type)type,
-          E810EmulatedDevice::irq_state_unimplemented_cb);
+          E810EmulatedDevice::irq_state_cb);
       if (ret)
         die("setting up irq type %d callback for libvfio-user \
                       failed",
@@ -225,11 +225,16 @@ private:
     VfioUserServer::unmap_dma_here(vfu_ctx, vfu, info);
   }
 
-  static void irq_state_unimplemented_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
+  static void irq_state_cb([[maybe_unused]] vfu_ctx_t *vfu_ctx,
                                          [[maybe_unused]] uint32_t start,
                                          [[maybe_unused]] uint32_t count,
                                          [[maybe_unused]] bool mask) {
-    printf("irq_state_unimplemented_cb unimplemented\n");
+    E810EmulatedDevice *this_= (E810EmulatedDevice *)vfu_get_private(vfu_ctx);
+    for (uint32_t i = start; i < start + count; i++) {
+      this_->irqThrottle[i]->guest_irq_routing_enabled = !mask;
+    }
+    if_log_level(LOG_DEBUG,
+      printf("irq_state_callback: [%d, %d) masked %d\n", start, start + count, mask));
   }
 
   void init_bar_callbacks(VfioUserServer &vfu) {

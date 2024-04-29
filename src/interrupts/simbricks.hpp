@@ -18,6 +18,11 @@
  */
 class InterruptThrottlerSimbricks: public InterruptThrottler {
   public:
+
+  // dont trigger irqs if the guest kernel didnt set up irq routing for it. 
+  // Libvfio-user doenst get a eventfd to trigger the irq and will fail.
+  bool guest_irq_routing_enabled = false; 
+
   struct timespec time_ = {};
   // ulong interrupt_spacing = 250 * 1000; // nsec
   std::atomic<bool> armed = false;
@@ -106,6 +111,10 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
    */
 
   __attribute__((noinline)) ulong try_interrupt(ulong mindelay, bool int_pending) {
+    if (!this->guest_irq_routing_enabled) {
+      return 0;
+    }
+
     this->spacing = mindelay;
     // this->globalIrq->update(); // disable for now due to high overhead
     // struct itimerspec its = {};
@@ -166,9 +175,9 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
 
   __attribute__((noinline)) void send_interrupt() {
     int ret = vfu_irq_trigger(this->vfuServer->vfu_ctx, this->irq_idx);
-    if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
+    if_log_level(LOG_DEBUG, printf("Triggered interrupt %d. ret = %d, errno: %d\n", this->irq_idx, ret, errno));
     if (ret < 0) {
-      die("Cannot trigger MSIX interrupt %d", this->irq_idx);
+      die("Cannot trigger MSIX interrupt %d (Is the devices vfu_setup_irq_state_callback implemented?)", this->irq_idx);
     }
   }
 };
