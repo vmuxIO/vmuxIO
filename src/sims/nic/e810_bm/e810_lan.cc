@@ -150,7 +150,7 @@ void lan::packet_received(const void *data, size_t len) {
 #endif
 
   uint32_t hash = 0;
-  uint16_t queue = 1; // queue 0 is not allocated by dpdk!? Also, rss_steering never changes queue for now
+  uint16_t queue = dev.vsi0_first_queue + 0; // queue 0 is not allocated by dpdk!? Also, rss_steering never changes queue for now // TODO
   rss_steering(data, len, queue, hash);
   if (!rxqs[queue]->is_enabled()) {
     // if we receive on uninitialized queues, we throw errors
@@ -215,7 +215,7 @@ void lan_queue_base::disable() {
 }
 
 void lan_queue_base::interrupt() {
-  uint32_t qctl = reg_intqctl;
+  uint32_t qctl = reg_intqctl; // regs.qint_rqctl
   int index = reg_intqctl & QINT_TQCTL_MSIX_INDX_M;
   uint32_t gctl = lanmgr.dev.regs.pfint_dyn_ctln[index];
 #ifdef DEBUG_LAN

@@ -608,7 +608,7 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
       lanmgr.tail_updated(idx, true);
   } else if (addr >= QRX_CTRL(0) && addr <= QRX_CTRL(2047)){
     size_t idx = (addr - QRX_CTRL(0)) / 4;
-    regs.QRX_CTRL[idx] = val+4;
+    regs.QRX_CTRL[idx] = val+4; // set queue enable status bit (given it was 0 before)
     regs.qrx_ena[idx] = val;
     lanmgr.qena_updated(idx, true);
     printf("QRX_CTRL[%zu] write %d\n", idx, val);
