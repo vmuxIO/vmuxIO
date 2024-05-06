@@ -400,36 +400,35 @@ void queue_admin_tx::admin_desc_ctx::process() {
     // list of requested things (resource descriptors)
     struct ice_aqc_res_elem* resource_descriptors = (struct ice_aqc_res_elem*) &resource_request->elem;
 
-    // assert resource_request->num_elems == request->num_entries
-
+    // Through trial and error we assembled this static tree. Not off of it may be necessary
     printf("ice_aqc_opc_alloc_res type 0x%x buffer address 0x%p\n", resource_request->res_type, resource_descriptors);
     for (int i = 0; i < request->num_entries; i++) {
       __builtin_dump_struct(&resource_descriptors[i], printf);
       uint16_t type = resource_request->res_type & 0x7F; // type is only bits 0:6
       if (type == ICE_AQC_RES_TYPE_VSI_LIST_PRUNE) {
         printf("pruning VSI list %d\n", i);
-        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+        resource_descriptors[i].e.sw_resp = i; // these are stubbed resource ids
       } else if (type == ICE_AQC_RES_TYPE_FDIR_COUNTER_BLOCK) {
         printf("allocating FDIR COUNTER BLOCK %d\n", i);
-        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+        resource_descriptors[i].e.sw_resp = i;
       } else if (type == ICE_AQC_RES_TYPE_FDIR_GUARANTEED_ENTRIES) {
         printf("allocating FDIR guar. entry %d\n", i);
-        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+        resource_descriptors[i].e.sw_resp = i;
       } else if (type == ICE_AQC_RES_TYPE_FDIR_SHARED_ENTRIES) {
         printf("allocating FDIR shared entry %d\n", i);
-        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+        resource_descriptors[i].e.sw_resp = i;
       } else if (type == ICE_AQC_RES_TYPE_FD_PROF_BLDR_PROFID) {
         printf("allocating ICE_AQC_RES_TYPE_FD_PROF_BLDR_PROFID\n");
-        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+        resource_descriptors[i].e.sw_resp = i;
       } else if (type == ICE_AQC_RES_TYPE_FD_PROF_BLDR_TCAM) {
         printf("allocating ICE_AQC_RES_TYPE_FD_PROF_BLDR_TCAM\n");
-        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+        resource_descriptors[i].e.sw_resp = i;
       } else if (type == ICE_AQC_RES_TYPE_HASH_PROF_BLDR_PROFID) {
         printf("allocating ICE_AQC_RES_TYPE_HASH_PROF_BLDR_PROFID\n");
-        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+        resource_descriptors[i].e.sw_resp = i;
       } else if (type == ICE_AQC_RES_TYPE_HASH_PROF_BLDR_TCAM) {
         printf("allocating ICE_AQC_RES_TYPE_HASH_PROF_BLDR_TCAM\n");
-        resource_descriptors[i].e.sw_resp = i; // TODO this is a stubbed resource id
+        resource_descriptors[i].e.sw_resp = i;
       } else {
         printf("unknown resource type. Skipping its allocation.\n");
       }
@@ -665,14 +664,14 @@ void queue_admin_tx::admin_desc_ctx::process() {
     add_sw_rules->pdata.lkup_tx_rx.src = 1;
     add_sw_rules->pdata.lkup_tx_rx.index = 0;
     desc_complete_indir(0, data, d->datalen);
-  } else if (d->opcode == ice_aqc_opc_nvm_read){ // fails
+  } else if (d->opcode == ice_aqc_opc_nvm_read){
     struct ice_aqc_nvm *nvm_read_cmd = reinterpret_cast<ice_aqc_nvm *> (d->params.raw);
 
     uint32_t offset = 0;
     offset |= nvm_read_cmd->offset_low;
     offset |= (nvm_read_cmd->offset_high) << 16;
 
-    // copy reposes observed on real hardware.
+    // copy responses observed on real hardware.
     if (offset == 0x0) { // some control register defining nvm layout
       uint16_t return_data = 0x78;
       desc_complete_indir(0, &return_data, sizeof(return_data));
