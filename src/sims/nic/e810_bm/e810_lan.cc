@@ -150,7 +150,9 @@ void lan::packet_received(const void *data, size_t len) {
 #endif
 
   uint32_t hash = 0;
-  uint16_t queue = dev.vsi0_first_queue + 0; // queue 0 is not allocated by dpdk!? Also, rss_steering never changes queue for now // TODO
+  // if the driver uses VSIs, it reserves queue 0 as VSI control queue. 
+  // Rss may have to account for that.
+  uint16_t queue = dev.vsi0_first_queue + 0; 
   rss_steering(data, len, queue, hash);
   if (!rxqs[queue]->is_enabled()) {
     // if we receive on uninitialized queues, we throw errors
@@ -431,20 +433,10 @@ void lan_queue_tx::initialize() {
   // Table 10-29. LAN Tx-Queue Context in the QTXCOMM_CNTX Array
   uint64_t *base_p;
   uint32_t *hwb_qlen_p;
-  // if (idx == 0) {
-    base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
-    hwb_qlen_p = reinterpret_cast<uint32_t *>(ctx_p + 16);
-    base = ((*base_p) & ((1ULL << 57) - 1))*128; // + idx * sizeof(ice_tx_desc); // bit 0 - 56
-    len = ((*hwb_qlen_p) >> 7) & ((1 << 14) - 1); // bit 135 (12 bits long)
-  // } else { 
-  //   base_p = reinterpret_cast<uint64_t *>(ctx_p + 22);
-  //   hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 16);
-  //   base = ((*base_p) & ((1ULL << 57) - 1))*128; // bit 176 - 232
-  //   len = ((*hwb_qlen_p) >> 3) & ((1 << 13) - 1); // bit 131
-  // }
-  // uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
-  // uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 22);
-  // uint16_t *hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 17);
+  base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
+  hwb_qlen_p = reinterpret_cast<uint32_t *>(ctx_p + 16);
+  base = ((*base_p) & ((1ULL << 57) - 1))*128; // + idx * sizeof(ice_tx_desc); // bit 0 - 56
+  len = ((*hwb_qlen_p) >> 7) & ((1 << 14) - 1); // bit 135 (12 bits long)
   uint64_t *hwb_p = reinterpret_cast<uint64_t *>(ctx_p + 12);
 
 
