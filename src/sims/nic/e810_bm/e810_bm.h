@@ -977,6 +977,7 @@ class e810_bm : public nicbm::Runner::Device {
 #define E810_STATIC_NODES 59
   int last_returned_node = E810_STATIC_NODES + 1; // actually, i believe this is the next returned node
   std::map<int, struct ice_aqc_txsched_elem_data*> sched_nodes; // allocated nodes
+  size_t vsi0_first_queue = 0; // index to use for first VSI queue (or 0 if VSI disabled)
 
 
 

@@ -371,6 +371,11 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_get_set_rss_lut *v =
         reinterpret_cast<struct ice_aqc_get_set_rss_lut *>(
                 d->params.raw);
+    __builtin_dump_struct(v, &printf);
+    if (((v->flags & ICE_AQC_GSET_RSS_LUT_TABLE_SIZE_M) >> ICE_AQC_GSET_RSS_LUT_TABLE_SIZE_S) == ICE_AQC_GSET_RSS_LUT_TABLE_SIZE_512_FLAG) {
+      // We use this RSS setting to detect DPDK based Fastclick to fix its unexplainable reg_idx queue offset.
+      dev.vsi0_first_queue = 1;
+    }
     desc_complete_indir(0, data, d->datalen);
   // }
 //   else if (d->opcode == i40e_aqc_opc_set_switch_config) {
@@ -439,6 +444,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_add_update_free_vsi_resp *v =
         reinterpret_cast<struct ice_aqc_add_update_free_vsi_resp *>(
                 d->params.raw);
+    __builtin_dump_struct(v, &printf);
     v->vsi_num = 1;
     struct ice_aqc_vsi_props pd;
     // memset(&pd, 0, sizeof(pd));
