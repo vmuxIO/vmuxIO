@@ -231,7 +231,7 @@ private:
                                          [[maybe_unused]] bool mask) {
     E810EmulatedDevice *this_= (E810EmulatedDevice *)vfu_get_private(vfu_ctx);
     for (uint32_t i = start; i < start + count; i++) {
-      this_->irqThrottle[i]->guest_irq_routing_enabled = !mask;
+      this_->irqThrottle[i]->guest_unmasked_irq = !mask;
     }
     if_log_level(LOG_DEBUG,
       printf("irq_state_callback: [%d, %d) masked %d\n", start, start + count, mask));
