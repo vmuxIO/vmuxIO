@@ -38,7 +38,7 @@ extern "C" {
 // #define DEBUG_DEV
 // #define DEBUG_ADMINQ
 // #define DEBUG_QUEUES
-// #define DEBUG_LAN
+#define DEBUG_LAN
 // #define DEBUG_HMC
 // #define DEBUG_QUEUES
 // #define DEBUG_NICBM
@@ -719,6 +719,7 @@ class lan {
   const size_t num_qs;
   lan_queue_rx **rxqs;
   lan_queue_tx **txqs;
+  size_t rss_last_queue = -1; // may be used to serve queues in round robin fashion. Consumers shall wrap to MIN_QUEUE value if this exceeds MAX_QUEUE value.
 
   bool rss_steering(const void *data, size_t len, uint16_t &queue,
                     uint32_t &hash);
