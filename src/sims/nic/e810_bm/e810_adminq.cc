@@ -618,7 +618,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     add_txqs->txqs[0].info.elem_type = ICE_AQC_ELEM_TYPE_LEAF;
     add_txqs->txqs[0].info.cir_bw.bw_alloc = 100;
     add_txqs->txqs[0].info.eir_bw.bw_alloc = 100;
-    if (add_txqs->txqs[0].txq_id >=4){
+    if (add_txqs->txqs[0].txq_id >=4){ // TODO
       cout<< "ice_aqc_opc_add_txqs error. txd id = "<< add_txqs->txqs[0].txq_id << logger::endl;
       // TODO this gets thrown leading to ctx_addr being incorrect, leading to lan_queue_tx::initialize() setting len to 0, leading to devision by 0
       // Problem was that the VM had 8 cores and thus allocated 8 tx queues which is more than the 4 expected here. Likely this number is just arbitrary and can be raised?
