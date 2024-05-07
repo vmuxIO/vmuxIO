@@ -161,6 +161,25 @@ void lan::packet_received(const void *data, size_t len) {
     #endif
     return; // silently drop packet
   }
+
+  // Obacht! Ineffizient :*)
+  while (true) {
+    // wrap if initialized to -1
+    this->rss_last_queue = this->rss_last_queue % this->num_qs;
+    // try next queue
+    this->rss_last_queue = (this->rss_last_queue + 1) % this->num_qs;
+    // if we wrapped, skip vsi0 first queues
+    this->rss_last_queue = std::max(this->rss_last_queue, dev.vsi0_first_queue);
+
+    if (rxqs[this->rss_last_queue]->is_enabled()) {
+      queue = this->rss_last_queue;
+      break;
+    }
+  }
+
+  #ifdef DEBUG_LAN
+    std::cout << "rx packet queue " << queue << "."<< logger::endl;
+  #endif
   rxqs[queue]->packet_received(data, len, hash);
 }
 
@@ -296,6 +315,7 @@ void lan_queue_rx::initialize() {
 
   base = ((*base_p) & ((1ULL << 57) - 1)) * 128;
   len = (*qlen_p >> 1) & ((1 << 13) - 1);
+  printf("rx_init this 0x%p len %d (0x%p)\n", this, len, &len);
 
   dbuff_size = (((*dbsz_p) >> 6) & ((1 << 7) - 1)) * 128;
   hbuff_size = (((*hbsz_p) >> 5) & ((1 << 5) - 1)) * 64;
