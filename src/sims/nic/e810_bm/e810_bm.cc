@@ -535,8 +535,8 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case PFLAN_RX_QALLOC:
         val = 0 |
           ((0 << PFLAN_RX_QALLOC_FIRSTQ_S) & PFLAN_RX_QALLOC_FIRSTQ_M) |
-          ((1 << PFLAN_RX_QALLOC_LASTQ_S) & PFLAN_RX_QALLOC_LASTQ_M) |
-          ((1 << PFLAN_RX_QALLOC_VALID_S) & PFLAN_RX_QALLOC_VALID_M);
+          ((this->NUM_QUEUES << PFLAN_RX_QALLOC_LASTQ_S) & PFLAN_RX_QALLOC_LASTQ_M) |
+          ((this->NUM_QUEUES << PFLAN_RX_QALLOC_VALID_S) & PFLAN_RX_QALLOC_VALID_M);
         break;
       // e810 PF LAN end
 
