@@ -611,6 +611,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_add_txqs *add_txqs_cmd = reinterpret_cast<ice_aqc_add_txqs *> (d->params.raw);
     // add_txqs_cmd->num_qgrps = 1;
     struct ice_aqc_add_tx_qgrp *add_txqs = reinterpret_cast<ice_aqc_add_tx_qgrp *> (data);
+    uint32_t idx = add_txqs->txqs[0].txq_id;
+    __builtin_dump_struct(add_txqs, &printf);
     __builtin_dump_struct(&(add_txqs->txqs[0]), &printf);
     add_txqs->parent_teid = dev.last_used_parent_node;
     add_txqs->num_txqs = 1;
@@ -618,6 +620,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     add_txqs->txqs[0].info.elem_type = ICE_AQC_ELEM_TYPE_LEAF;
     add_txqs->txqs[0].info.cir_bw.bw_alloc = 100;
     add_txqs->txqs[0].info.eir_bw.bw_alloc = 100;
+    cout<< "ice_aqc_opc_add_txqs. txd id = "<< add_txqs->txqs[0].txq_id << logger::endl;
     if (add_txqs->txqs[0].txq_id >=4){ // TODO
       cout<< "ice_aqc_opc_add_txqs error. txd id = "<< add_txqs->txqs[0].txq_id << logger::endl;
       // TODO this gets thrown leading to ctx_addr being incorrect, leading to lan_queue_tx::initialize() setting len to 0, leading to devision by 0
@@ -632,6 +635,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
 
     // dev.last_used_parent_node = dev.last_returned_node+1;
     // dev.lanmgr.qena_updated(add_txqs->txqs[0].txq_id, false);
+    dev.regs.qtx_ena[idx] = QRX_CTRL_QENA_REQ_M;
+    dev.lanmgr.qena_updated(idx, false);
     desc_complete_indir(0, data, d->datalen);
   // } else if (d->opcode == ice_aqc_opc_add_rdma_qset) {
   //   struct ice_aqc_add_rdma_qset *add_txqs_cmd = reinterpret_cast<ice_aqc_add_rdma_qset *> (d->params.raw);
