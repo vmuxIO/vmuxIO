@@ -813,7 +813,7 @@ class e810_bm : public nicbm::Runner::Device {
     uint32_t glnvm_srdata;
 
     uint32_t qint_tqctl[NUM_QUEUES];
-    uint32_t qtx_ena[2048];
+    uint32_t qtx_ena[2048]; // does not exist in reality (replaced by admin command), but we just use the same format as for qrx_ena.
     uint32_t qtx_tail[NUM_QUEUES];
     uint32_t qtx_ctl[NUM_QUEUES];
     uint32_t qint_rqctl[NUM_QUEUES];

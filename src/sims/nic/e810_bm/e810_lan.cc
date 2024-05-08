@@ -178,7 +178,7 @@ void lan::packet_received(const void *data, size_t len) {
   }
 
   #ifdef DEBUG_LAN
-    std::cout << "rx packet queue " << queue << "."<< logger::endl;
+    std::cout << "rx packet queue " << std::dec << queue << "."<< logger::endl;
   #endif
   rxqs[queue]->packet_received(data, len, hash);
 }

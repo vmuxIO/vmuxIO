@@ -625,7 +625,6 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
              addr <= QINT_TQCTL(16383)) {
     size_t idx = (addr - QINT_TQCTL(0)) / 4;
     regs.qint_tqctl[idx] = val;
-    regs.qtx_ena[idx] = val;
     lanmgr.qena_updated(idx, false);
   } else if (addr >= QINT_RQCTL(0) &&
              addr <= QINT_RQCTL(2048 - 1)) {
