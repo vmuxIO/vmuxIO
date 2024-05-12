@@ -672,8 +672,7 @@ class lan_queue_rx : public lan_queue_base {
    public:
     explicit rx_desc_ctx(lan_queue_rx &queue_);
     virtual void process();
-    void packet_received(const void *data, size_t len, bool last);
-    bool ptp_should_sample_rx(const void *data, size_t len);
+    void packet_received(const void *data, size_t len, gltsyn_ts_t timestamp, bool last);
 
  };
 
@@ -690,8 +689,10 @@ class lan_queue_rx : public lan_queue_base {
  public:
   lan_queue_rx(lan &lanmgr_, uint32_t &reg_tail, size_t idx, uint32_t &reg_ena,
                uint32_t &fpm_basereg, uint32_t &reg_intqctl);
+  
   virtual void reset();
   void packet_received(const void *data, size_t len, uint32_t hash);
+  bool ptp_should_sample_rx(const void *data, size_t len);
 };
 
 class rss_key_cache {
@@ -985,6 +986,10 @@ class e810_bm : public nicbm::Runner::Device {
     uint32_t REG_GLHH_ART_TIME[2];
     uint32_t REG_GLHH_ART_DATA;
     uint32_t REG_PFHH_SEM;
+
+    uint32_t REG_PF_SB_ATQBAL;
+    uint32_t REG_PF_SB_ATQBAH;
+    uint32_t REG_PF_SB_ATQLEN;
 
    //Transmit Comm Scheduler Queue Doorbell
     uint32_t QTX_COMM_DBELL[NUM_QUEUES];

@@ -32,8 +32,10 @@
 #include <iostream>
 
 #include "sims/nic/e810_bm/base/ice_hw_autogen.h"
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/libsimbricks/simbricks/nicbm/multinic.h"
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
+#include "sims/nic/e810_bm/util.h"
 
 namespace i40e {
 
@@ -599,7 +601,8 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
 
       CASE_2(GLTSYN_STAT, val = regs.REG_GLTSYN_STAT[INDEX])
 
-      CASE_6(GLTSYN_TIME, 0, val = regs.REG_GLTSYN_TIME[INDEX])
+      // This can't be read probably
+      CASE_6(GLTSYN_TIME, 0, DEBUG_LOG_PTP("Tried to read GLTSYN_TIME"))
       CASE_6(GLTSYN_SHTIME, 0, val = regs.REG_GLTSYN_SHTIME[INDEX])
 
       CASE_4(GLTSYN_HHTIME, 0, val = regs.REG_GLTSYN_HHTIME[INDEX])
@@ -1076,10 +1079,7 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
 
       default:
-#ifdef DEBUG_DEV
-        std::cout << "unhandled mem write addr=" << addr << " val=" << val
-            << logger::endl;
-#endif
+        DEBUG_LOG_DEV("unhandled mem write addr=" << addr << " val=" << val)
         break;
     }
   }

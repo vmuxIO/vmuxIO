@@ -29,6 +29,7 @@ public:
   void *msix();
   void *exp();
   void *vpd();
+  void *ptm();
 
 private:
   // copy of config space of underlying device

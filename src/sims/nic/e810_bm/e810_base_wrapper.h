@@ -7,6 +7,7 @@
 
 #include <linux/types.h>
 #include <stdint.h>
+#include <byteswap.h>
 
 #define PF_DRIVER
 #define I40E_MASK(mask, shift) (mask << shift)
@@ -156,5 +157,9 @@ typedef uint64_t __le64;
 #define GLHH_ART_TIME(_i) (0x000A41D8 + ((_i) * 0x4))
 #define GLHH_ART_DATA (0x000A41E0)
 #define PFHH_SEM (0x000A4200)
+
+#define PF_SB_ATQBAL (0x0022FC00)
+#define PF_SB_ATQBAH (0x0022FC80)
+#define PF_SB_ATQLEN (0x0022FD00)
 
 #endif  // I40E_BASE_WRAPPER_H_

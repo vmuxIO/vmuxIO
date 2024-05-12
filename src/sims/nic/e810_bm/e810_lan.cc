@@ -367,7 +367,6 @@ queue_base::desc_ctx &lan_queue_rx::desc_ctx_create() {
   return *new rx_desc_ctx(*this);
 }
 
-
 /* determine if we should sample a ptp rx timestamp for this packet */
 bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
   // if no global timer is active, do not sample
@@ -430,12 +429,15 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
     return;
   }
 
-  gltsyn_ts_t timestamp = {{0, 0}};
+  gltsyn_ts_t timestamp = { .value=0 };
 
   if (ptp_should_sample_rx(data, pktlen)) {
     if (!PTP_GLTSYN_SEM_BUSY(dev.regs.REG_PFTSYN_SEM)) {
-        timestamp = dev.ptp.phc_read();
+        // TODO: Write PF ID (owner) to semaphore register
         dev.regs.REG_PFTSYN_SEM = PTP_GLTSYN_SEM_SET_BUSY(dev.regs.REG_PFTSYN_SEM, true);
+        timestamp = dev.ptp.phc_read();
+
+        dev.regs.REG_PFTSYN_SEM = PTP_GLTSYN_SEM_SET_BUSY(dev.regs.REG_PFTSYN_SEM, false);
     }
   }
 

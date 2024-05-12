@@ -13,7 +13,7 @@
 namespace i40e {
 
 ptpmgr::ptpmgr(e810_bm &dev_)
-  : dev(dev_), last_updated(0), last_val(0), offset(0), inc_val(0),
+  : dev(dev_), last_updated(0), last_val({ .value=0 }), offset({ .value=0 }), inc_val(0),
     adj_neg(false), adj_val(0) {
 }
 
@@ -29,7 +29,7 @@ gltsyn_ts_t ptpmgr::update_clock() {
   uint64_t cycles_passed = cycle_now - last_updated;
 
   // increment clock
-  last_val += (__uint128_t) inc_val * cycles_passed;
+  last_val.value += (__uint128_t) inc_val * cycles_passed;
 
   // factor in adjustments
   if (adj_val != 0) {
@@ -44,14 +44,14 @@ gltsyn_ts_t ptpmgr::update_clock() {
 
     adj = adj << 32;
     if (adj_neg)
-      last_val -= adj;
+      last_val.value -= (__int128)adj;
     else
-      last_val += adj;
+      last_val.value += (__int128)adj;
   }
 
   last_updated = cycle_now;
 
-  gltsyn_ts_t next_val = {{ (last_val.value >> (__int128) 32) + offset.value }};
+  gltsyn_ts_t next_val = { .value = (last_val.value >> (__int128) 32) + offset.value };
   return next_val;
 }
 
