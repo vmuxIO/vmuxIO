@@ -76,7 +76,7 @@ class Runner {
   class CallbackAdaptor;
 
   /**
-   * Replaces the Runner class. Adapts behavioral models from simbricks or other libraries to an libvfio-user-ish interface. 
+   * Replaces the Runner class. Adapts behavioral models from simbricks or other libraries to an libvfio-user-ish interface.
    * From the point of view of emulators interfacing directly with libvfio-user, this class is similar to "device context".
    **/
   class DeviceEmulator {
@@ -119,13 +119,13 @@ class Runner {
       void EthSend(const void *data, size_t len);
 
       // Further methods called by the Device to set up passthrough or mediation (can be ignored for now)
-      
+
       // true: phy. device and emu. device can dma
-      void MapPhysicalDeviceDma(bool enable); 
+      void MapPhysicalDeviceDma(bool enable);
       // returns where registers of a physical device have been mapped to. Vmux can now use them.
-      void MapPhysicalDeviceRegistersToVmux(bool enable); 
+      void MapPhysicalDeviceRegistersToVmux(bool enable);
       // true: RegRead callbacks stop and are redirected to physical device
-      void MapPhysicalDeviceRegistersToVm(bool enable); 
+      void MapPhysicalDeviceRegistersToVm(bool enable);
 
       // Further methods called by the Device to do multiple emulated devices (backed by one physical one)
       // ...
@@ -193,7 +193,7 @@ class CallbackAdaptor {
     const uint8_t (*mac_addr)[6];
   public:
     std::shared_ptr<VfioUserServer> vfu; // must be lazily set during VmuxDevice.setup_vfu()
-    std::shared_ptr<Device> model; 
+    std::shared_ptr<Device> model;
     std::shared_ptr<VmuxDevice> device;
     std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle;
 
@@ -201,7 +201,7 @@ class CallbackAdaptor {
 
     /* these three are for `Runner::Device`. */
     void IssueDma(nicbm::DMAOp &op) {
-      if_log_level(LOG_DEBUG, 
+      if_log_level(LOG_DEBUG,
         printf("CallbackAdaptor::IssueDma: read %d, addr %lx, len %zu\n", !op.write_, op.dma_addr_, op.len_)
       );
       // __builtin_dump_struct(&op, &printf); // dump_struct doesnt work on classes
@@ -238,7 +238,7 @@ class CallbackAdaptor {
       die("not implemented");
     }
     void EthSend(const void *data, size_t len) {
-      if_log_level(LOG_DEBUG, 
+      if_log_level(LOG_DEBUG,
         printf("CallbackAdaptor::EthSend(len=%zu)\n", len)
       );
       this->device->driver->send((char*)data, len);
@@ -253,10 +253,11 @@ class CallbackAdaptor {
       die("not implemented");
     }
 
-    uint64_t TimePs() const {
-     die("unimplemented");
-     return 0;
+    gltsyn_ts_t TimePs() const {
+      // TODO: Get hardware time
+     return time;
     }
+
     uint64_t GetMacAddr() const {
      uint64_t mac = 0;
      memcpy(&mac, this->mac_addr, sizeof(*this->mac_addr));

@@ -32,9 +32,11 @@
 extern "C" {
 #include <src/libsimbricks/simbricks/pcie/proto.h>
 }
+
 #include <src/libsimbricks/simbricks/nicbm/nicbm.h>
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
+#include "sims/nic/e810_bm/e810_ptp.h"
 
 // #define DEBUG_DEV
 // #define DEBUG_ADMINQ
@@ -216,12 +218,12 @@ class queue_base {
   uint32_t active_cnt;
 
   uint64_t base;
-  
+
   uint32_t len;
   uint32_t &reg_head;
   uint32_t &reg_tail;
 
-  
+
 
   bool enabled;
   size_t desc_len;
@@ -268,8 +270,8 @@ class queue_admin_tx : public queue_base {
     e810_bm &dev;
     struct ice_aq_desc *d;
     // struct ice_aq_desc *ice_d;
-    
-    
+
+
     virtual void data_written(uint64_t addr, size_t len);
 
     // prepare completion descriptor (fills flags, and return value)
@@ -283,11 +285,11 @@ class queue_admin_tx : public queue_base {
 
    public:
     admin_desc_ctx(queue_admin_tx &queue_, e810_bm &dev);
-  
+
     virtual void prepare();
     virtual void process();
   };
-  
+
   uint64_t &reg_base;
   uint32_t &reg_len;
 
@@ -308,7 +310,7 @@ class completion_queue : public queue_base {
     __le64 *d;
     uint64_t cq_base; // cq write_back buffer addr
     uint32_t wcursor; // cursor indicating which cqe is going to be written back
-    
+
     virtual void data_written(uint64_t addr, size_t len);
     virtual void data_write(uint64_t addr, size_t data_len,
                                       const void *buf);
@@ -362,13 +364,13 @@ class completion_queue : public queue_base {
    public:
     size_t total_len;
     size_t part_offset;
-    
+
 
     explicit cq_ctx_fetch(completion_queue &cq, size_t len, void *buffer);
     virtual ~cq_ctx_fetch();
     virtual void done();
   };
-  
+
   uint32_t &reg_high;
   uint32_t &reg_low;
   __le64 cqp_ctx[8];
@@ -399,9 +401,9 @@ class control_queue_pair : public queue_base {
     uint64_t cqp_base;
     uint32_t cnt;
     // struct ice_aq_desc *ice_d;
-    
-    
-    
+
+
+
     virtual void data_written(uint64_t addr, size_t len);
     virtual void data_write(uint64_t addr, size_t data_len,
                                       const void *buf);
@@ -455,13 +457,13 @@ class control_queue_pair : public queue_base {
    public:
     size_t total_len;
     size_t part_offset;
-    
+
 
     explicit cqp_ctx_fetch(control_queue_pair &cqp, size_t len, void *buffer);
     virtual ~cqp_ctx_fetch();
     virtual void done();
   };
-  
+
   uint32_t &reg_high;
   uint32_t &reg_low;
   __le64 cqp_ctx[8];
@@ -484,7 +486,7 @@ class control_queue_pair : public queue_base {
 
 class completion_event_queue : public queue_base {
  protected:
-  
+
   class dma_data_wb : public dma_base {
    protected:
     completion_event_queue &ceq;
@@ -495,12 +497,12 @@ class completion_event_queue : public queue_base {
     virtual ~dma_data_wb();
     virtual void done();
   };
-  
+
   __le64 cqp_ctx[8];
-  
+
   __le64 cqe[8];
 
-  
+
   uint64_t ceq_size;
 
 
@@ -594,7 +596,7 @@ class lan_queue_base : public queue_base {
   uint32_t &reg_intqctl;
   size_t ctx_size;
   void *ctx;
-  
+
 
   uint32_t reg_dummy_head;
 
@@ -671,7 +673,9 @@ class lan_queue_rx : public lan_queue_base {
     explicit rx_desc_ctx(lan_queue_rx &queue_);
     virtual void process();
     void packet_received(const void *data, size_t len, bool last);
-  };
+    bool ptp_should_sample_rx(const void *data, size_t len);
+
+ };
 
   uint16_t dbuff_size;
   uint16_t hbuff_size;
@@ -734,7 +738,6 @@ class lan {
   void packet_received(const void *data, size_t len, std::optional<uint16_t> queue_hint);
 };
 
-
 class completion_event_manager {
  protected:
   friend class completion_event_queue;
@@ -742,7 +745,7 @@ class completion_event_manager {
   e810_bm &dev;
   logger log;
   const size_t num_qs;
-  
+
 
  public:
   completion_event_queue **ceqs;
@@ -959,6 +962,31 @@ class e810_bm : public nicbm::Runner::Device {
     uint32_t reg_PFPE_CQPDB;
     uint32_t reg_PFPE_CCQPSTATUS;
 
+  // TimeSync registers
+    uint32_t REG_GLTSYN_ENA[2];
+    uint32_t REG_GLTSYN_CMD;
+    uint32_t REG_GLTSYN_CMD_SYNC;
+    uint32_t REG_GLTSYN_SYNC_DLAY;
+    uint32_t REG_GLTSYN_HH_DLAY;
+    uint32_t REG_PFTSYN_SEM;
+    uint32_t REG_GLTSYN_STAT[2];
+    uint32_t REG_GLTSYN_TIME[6];
+    uint32_t REG_GLTSYN_SHTIME[6];
+    uint32_t REG_GLTSYN_HHTIME[4];
+    uint32_t REG_GLTSYN_SHADJ[4];
+
+    uint32_t REG_GLTSYN_INCVAL[4];
+    uint32_t REG_GLTSYN_TGT[16];
+    uint32_t REG_GLTSYN_EVNT[12];
+    uint32_t REG_GLTSYN_AUX_OUT[8];
+    uint32_t REG_GLTSYN_CLKO[8];
+    uint32_t REG_GLTSYN_AUX_IN[6];
+    uint32_t REG_GLHH_ART_CTL;
+    uint32_t REG_GLHH_ART_TIME[2];
+    uint32_t REG_GLHH_ART_DATA;
+    uint32_t REG_PFHH_SEM;
+
+   //Transmit Comm Scheduler Queue Doorbell
     uint32_t QTX_COMM_DBELL[NUM_QUEUES];
   };
 
@@ -988,6 +1016,7 @@ class e810_bm : public nicbm::Runner::Device {
   shadow_ram shram;
   lan lanmgr;
   completion_event_manager cem;
+  ptpmgr ptp;
   e810_switch bcam; // binary content addressable memory aka switch
 
   u8 ctx_addr[2048][22]; // 22 byte descriptors for each tx queue

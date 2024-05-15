@@ -24,12 +24,14 @@
 
 #include "src/sims/nic/e810_bm/e810_bm.h"
 
+#include <cstdint>
 #include <stdlib.h>
 #include <string.h>
 
 #include <cassert>
 #include <iostream>
 
+#include "sims/nic/e810_bm/base/ice_hw_autogen.h"
 #include "src/libsimbricks/simbricks/nicbm/multinic.h"
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 
@@ -45,6 +47,7 @@ e810_bm::e810_bm()
       lanmgr(*this, NUM_QUEUES),
       cem(*this, NUM_QUEUES),
       bcam(*this) {
+      ptp(*this) {
   reset(false);
 }
 
@@ -159,7 +162,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
   if (addr >= GLINT_DYN_CTL(0) &&
       addr < GLINT_DYN_CTL(NUM_PFINTS - 1)) {
     val = regs.pfint_dyn_ctln[(addr - GLINT_DYN_CTL(0)) / 4];
-  }else if (addr >= QTX_COMM_HEAD(0) &&
+  } else if (addr >= QTX_COMM_HEAD(0) &&
              addr <= QTX_COMM_HEAD(16383)) {
     val = regs.qtx_comm_head[(addr - QTX_COMM_HEAD(0)) / 4];
   } else if (addr >= PF0INT_ITR_0(0) &&
@@ -185,7 +188,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
              addr <= QRX_TAIL(2048 - 1)) {
     val = regs.qrx_tail[(addr - QRX_TAIL(0)) / 4];
   } else if (addr >= GLINT_ITR(0, 0) && addr <= GLINT_ITR(0, 2047)) {
-    val = regs.GLINT_ITR0[(addr - GLINT_ITR(0,0)) / 4]; 
+    val = regs.GLINT_ITR0[(addr - GLINT_ITR(0,0)) / 4];
   } else if (addr >= GLINT_ITR(1, 0) && addr <= GLINT_ITR(1, 2047)) {
     val = regs.GLINT_ITR1[(addr - GLINT_ITR(1,0)) / 4];
   } else if (addr >= GLINT_ITR(2, 0) && addr <= GLINT_ITR(2, 2047)) {
@@ -417,11 +420,11 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case GLPE_CPUSTATUS0:
         val = 0x80;
         break;
-      
+
       case GLPE_CPUSTATUS1:
         val = 0x80;
         break;
-      
+
       case GLPE_CPUSTATUS2:
         val = 0x80;
         break;
@@ -461,7 +464,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case GLGEN_RSTCTL:
         val = regs.glgen_rstctl;
         break;
-        
+
       case GLGEN_STAT:
         val = regs.glgen_stat;
         break;
@@ -573,7 +576,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case PF_MBX_ARQT:
         val = regs.pf_mbx_arqt;
         break;
-      
+
       case PF_FUNC_RID:
         val = 0;
         break;
@@ -583,7 +586,59 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
         break;
       // e810
 
-      default:
+
+      // timesync (PTP)
+
+      // preprocessor abuse to reduce the number of duplicate lines for this switch case from ~250 to about 30
+      CASE_2(GLTSYN_ENA, val = regs.REG_GLTSYN_ENA[INDEX])
+      CASE(GLTSYN_CMD, val = regs.REG_GLTSYN_CMD)
+      CASE(GLTSYN_CMD_SYNC, val = regs.REG_GLTSYN_CMD_SYNC)
+      CASE(GLTSYN_SYNC_DLAY, val = regs.REG_GLTSYN_SYNC_DLAY)
+      CASE(GLTSYN_HH_DLAY, val = regs.REG_GLTSYN_HH_DLAY)
+      CASE(PFTSYN_SEM, val = regs.REG_PFTSYN_SEM)
+
+      CASE_2(GLTSYN_STAT, val = regs.REG_GLTSYN_STAT[INDEX])
+
+      CASE_6(GLTSYN_TIME, 0, val = regs.REG_GLTSYN_TIME[INDEX])
+      CASE_6(GLTSYN_SHTIME, 0, val = regs.REG_GLTSYN_SHTIME[INDEX])
+
+      CASE_4(GLTSYN_HHTIME, 0, val = regs.REG_GLTSYN_HHTIME[INDEX])
+
+      CASE_4(GLTSYN_SHADJ, 0, {
+        if (INDEX < 2) {
+          // lower register
+          val = (uint32_t) (ptp.adj_get() & 0xffffffff);
+        } else {
+          val = (uint32_t) (ptp.adj_get() >> 32);
+        }
+      })
+
+      CASE_4(GLTSYN_INCVAL, 0, val = regs.REG_GLTSYN_INCVAL[INDEX])
+
+      CASE_4(GLTSYN_TGT, 0, val = regs.REG_GLTSYN_TGT[INDEX])
+      CASE_4(GLTSYN_TGT, 4, val = regs.REG_GLTSYN_TGT[INDEX])
+      CASE_4(GLTSYN_TGT, 8, val = regs.REG_GLTSYN_TGT[INDEX])
+      CASE_4(GLTSYN_TGT, 12, val = regs.REG_GLTSYN_TGT[INDEX])
+
+
+      CASE_6(GLTSYN_EVNT, 0, val = regs.REG_GLTSYN_EVNT[INDEX])
+      CASE_6(GLTSYN_EVNT, 6, val = regs.REG_GLTSYN_EVNT[INDEX])
+
+      CASE_4(GLTSYN_AUX_OUT, 0, val = regs.REG_GLTSYN_TGT[INDEX])
+      CASE_4(GLTSYN_AUX_OUT, 4, val = regs.REG_GLTSYN_TGT[INDEX])
+
+      CASE_4(GLTSYN_CLKO, 0, val = regs.REG_GLTSYN_CLKO[INDEX])
+      CASE_4(GLTSYN_CLKO, 4, val = regs.REG_GLTSYN_CLKO[INDEX])
+
+      CASE_6(GLTSYN_AUX_IN, 0, val = regs.REG_GLTSYN_AUX_IN[INDEX])
+
+
+      CASE(GLHH_ART_CTL, val = regs.REG_GLHH_ART_CTL)
+      CASE_2(GLHH_ART_TIME, val = regs.REG_GLHH_ART_TIME[INDEX])
+      CASE(GLHH_ART_DATA, val = regs.REG_GLHH_ART_DATA)
+      CASE(PFHH_SEM, val = regs.REG_PFHH_SEM)
+
+  default:
 #ifdef DEBUG_DEV
         std::cout << "unhandled mem read addr=" << addr << logger::endl;
 #endif
@@ -619,17 +674,17 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
   } else if (addr >= PF0INT_ITR_1(0) &&
              addr <= PF0INT_ITR_1(2047)) {
     regs.pfint_itrn[1][(addr - PF0INT_ITR_1(0)) / 4096] = val;
-  }else if (addr >= PF0INT_ITR_2(0) &&
+  } else if (addr >= PF0INT_ITR_2(0) &&
              addr <= PF0INT_ITR_2(2047)) {
     regs.pfint_itrn[2][(addr - PF0INT_ITR_2(0)) / 4096] = val;
-  }else if (addr >= QINT_TQCTL(0) &&
+  } else if (addr >= QINT_TQCTL(0) &&
              addr <= QINT_TQCTL(16383)) {
     size_t idx = (addr - QINT_TQCTL(0)) / 4;
     regs.qint_tqctl[idx] = val;
     lanmgr.qena_updated(idx, false);
   } else if (addr >= QINT_RQCTL(0) &&
              addr <= QINT_RQCTL(2048 - 1)) {
-    size_t idx = (addr - QINT_RQCTL(0)) / 4;          
+    size_t idx = (addr - QINT_RQCTL(0)) / 4;
     regs.qint_rqctl[idx] = val;
   } else if (addr >= GLINT_CEQCTL(0) && addr <= GLINT_CEQCTL(2018-1)) {
     uint16_t idx = (addr - GLINT_CEQCTL(0)) / 4;
@@ -826,16 +881,16 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         if ((0x3ff & val) > regs.reg_PFPE_CQPTAIL){
           cqp.reg_updated();
         }
-        
+
         break;
 
       case PFPE_CCQPHIGH:
         regs.reg_PFPE_CCQPHIGH = val;
         break;
-      
+
       case PFPE_CCQPLOW:
         regs.reg_PFPE_CCQPLOW = val;
-        
+
         cqp.create_cqp();
         break;
 

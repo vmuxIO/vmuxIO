@@ -267,6 +267,7 @@
         # not available in 22.05 yet
         # python310.pkgs.types-pyyaml
         ethtool
+        linuxptp
 
         # deps for tests
         (pkgs.python3.withPackages (ps: [

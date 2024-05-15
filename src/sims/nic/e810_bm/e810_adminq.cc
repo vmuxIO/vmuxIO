@@ -145,7 +145,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
         reinterpret_cast<struct ice_aqc_get_ver *>(d->params.raw);
     gv->rom_ver = 0;
     gv->fw_build = 0;
-    gv->fw_major = 0;
+    gv->fw_major = 6;
     gv->fw_minor = 0;
     gv->api_major = EXP_FW_API_VER_MAJOR;
     gv->api_minor = EXP_FW_API_VER_MINOR;

@@ -29,6 +29,7 @@
 #include <cassert>
 #include <iostream>
 #include <string>
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include "sims/nic/e810_bm/headers.h"
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
@@ -77,7 +78,7 @@ void lan::qena_updated(uint16_t idx, bool rx) {
     else {
       q.enable(rx);
     }
-    
+
   } else if (!(reg & QRX_CTRL_QENA_REQ_M) && q.is_enabled()) {
     q.disable();
   }
@@ -111,7 +112,7 @@ bool lan::rss_steering(const void *data, size_t len, uint16_t &queue,
   if (tcp->eth.type == htons(ETH_TYPE_IP) && tcp->ip.proto == IP_PROTO_TCP) {
     hash = rss_kc.hash_ipv4(ntohl(tcp->ip.src), ntohl(tcp->ip.dest),
                             ntohs(tcp->tcp.src), ntohs(tcp->tcp.dest));
-    
+
     #ifdef DEBUG_LAN
     std::cout << "TCP IP Ethernet" << logger::endl;
     #endif
@@ -310,6 +311,7 @@ void lan_queue_rx::initialize() {
   }
   uint8_t *ctx_p = reinterpret_cast<uint8_t *>(&(packed_ctx[0]));
   
+
   uint16_t *head_p = reinterpret_cast<uint16_t *>(ctx_p + 0);
   uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 4);
   uint16_t *qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 11);
@@ -337,14 +339,14 @@ void lan_queue_rx::initialize() {
 
 // #endif
   
-  
+
   if (!longdesc) {
     std::cout << "lan_queue_rx::initialize: currently only 32B descs "
            " supported"
         << logger::endl;
     abort();
   }
-  
+
   if (dtype != 0) {
     std::cout << "lan_queue_rx::initialize: no header split supported"
         << logger::endl;
@@ -365,6 +367,50 @@ queue_base::desc_ctx &lan_queue_rx::desc_ctx_create() {
   return *new rx_desc_ctx(*this);
 }
 
+
+/* determine if we should sample a ptp rx timestamp for this packet */
+bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
+  // if no global timer is active, do not sample
+  if (!PTP_GLTSYN_ENA(dev.regs.REG_GLTSYN_ENA[0]) || !PTP_GLTSYN_ENA(dev.regs.REG_GLTSYN_ENA[1])) {
+    return false;
+  }
+
+  const headers::pkt_udp *udp =
+      reinterpret_cast<const headers::pkt_udp *>(data);
+  const void *ptp_start;
+  bool is_udp = false;
+
+  if (udp->eth.type == htons(ETH_TYPE_IP) && udp->ip.proto == IP_PROTO_UDP) {
+
+    uint16_t port = ntohs(udp->udp.dest);
+    if (port != PTP_UDP_1 && port != PTP_UDP_2)
+      return false;
+
+    is_udp = true;
+    ptp_start = udp + 1;
+
+  } else if (udp->eth.type == htons(ETH_TYPE_PTP)) {
+    ptp_start = &udp->ip;
+
+  } else {
+    return false;
+  }
+
+  const headers::ptp_v1_hdr *v1 =
+      reinterpret_cast<const headers::ptp_v1_hdr *>(ptp_start);
+  const headers::ptp_v2_hdr *v2 =
+      reinterpret_cast<const headers::ptp_v2_hdr *>(ptp_start);
+
+  if (v1->version_ptp == 1) {
+    return true;
+
+  } else if (v2->version_ptp == 2) {
+    return true;
+  }
+
+  return false;
+}
+
 void lan_queue_rx::packet_received(const void *data, size_t pktlen,
                                    uint32_t h) {
   size_t num_descs = (pktlen + dbuff_size - 1) / dbuff_size;
@@ -374,7 +420,7 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
   }
   if (!enabled)
     return;
-  
+
 
   if (dcache.size() < num_descs) {
 #ifdef DEBUG_LAN
@@ -382,6 +428,15 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
         << logger::endl;
 #endif
     return;
+  }
+
+  gltsyn_ts_t timestamp = {{0, 0}};
+
+  if (ptp_should_sample_rx(data, pktlen)) {
+    if (!PTP_GLTSYN_SEM_BUSY(dev.regs.REG_PFTSYN_SEM)) {
+        timestamp = dev.ptp.phc_read();
+        dev.regs.REG_PFTSYN_SEM = PTP_GLTSYN_SEM_SET_BUSY(dev.regs.REG_PFTSYN_SEM, true);
+    }
   }
 
   for (size_t i = 0; i < num_descs; i++) {
@@ -394,13 +449,13 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
     dcache.pop_front();
 
     const uint8_t *buf = (const uint8_t *)data + (dbuff_size * i);
-  
+
     if (i == num_descs - 1) {
       // last packet
-      ctx.packet_received(buf, pktlen - dbuff_size * i, true);
+      ctx.packet_received(buf, pktlen - dbuff_size * i, timestamp, true);
     } else {
-      
-      ctx.packet_received(buf, dbuff_size, false);
+
+      ctx.packet_received(buf, dbuff_size, timestamp, false);
     }
   }
 }
@@ -418,7 +473,7 @@ void lan_queue_rx::rx_desc_ctx::process() {
 }
 
 void lan_queue_rx::rx_desc_ctx::packet_received(const void *data, size_t pktlen,
-                                                bool last) {
+                                                gltsyn_ts_t timestamp, bool last) {
   union ice_32byte_rx_desc *rxd =
       reinterpret_cast<union ice_32byte_rx_desc *>(desc);
   union ice_32b_rx_flex_desc *flex_rxd =
@@ -427,6 +482,11 @@ void lan_queue_rx::rx_desc_ctx::packet_received(const void *data, size_t pktlen,
   flex_rxd->wb.pkt_len = pktlen;
   rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_DD_S);
   rxd->wb.qword1.status_error_len |= (pktlen << 38);
+
+  // write to TS registers of flex context
+  flex_rxd->wb.flex_ts.ts_high_0 = timestamp.ts_h_0;
+  flex_rxd->wb.flex_ts.ts_high_1 = timestamp.ts_h_1;
+  flex_rxd->wb.ts_low = timestamp.ts_l;
 
   if (last) {
     rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_EOF_S);
