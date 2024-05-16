@@ -32,6 +32,8 @@ using namespace std;
 #include "sims/nic/e810_bm/e810_bm.h"
 // #include "sims/nic/e810_bm/base/ice_adminq_cmd.h"
 #include <bits/stdc++.h>
+#include <algorithm>
+
 namespace i40e {
 
 queue_admin_tx::queue_admin_tx(e810_bm &dev_, uint64_t &reg_base_,
@@ -279,9 +281,9 @@ void queue_admin_tx::admin_desc_ctx::process() {
 
     desc_complete_indir(0, &link_status_data, sizeof(link_status_data));
   } else if (d->opcode == ice_aqc_opc_get_sw_cfg) {
-#ifdef DEBUG_ADMINQ
+// #ifdef DEBUG_ADMINQ
     cout <<  "  get switch config" << logger::endl;
-#endif
+// #endif
     struct ice_aqc_get_sw_cfg *sw =
         reinterpret_cast<struct ice_aqc_get_sw_cfg *>(d->params.raw);
     struct ice_aqc_get_sw_cfg_resp_elem hr;
@@ -463,6 +465,25 @@ void queue_admin_tx::admin_desc_ctx::process() {
 // #endif
 //     /* TODO */
 //     desc_complete(0);
+  } else if (d->opcode == ice_aqc_opc_remove_sw_rules) {
+    struct ice_aqc_sw_rules_elem *rules_elem = reinterpret_cast<struct ice_aqc_sw_rules_elem*>(data);
+    struct ice_aqc_sw_rules *add_sw_rules_cmd = reinterpret_cast<ice_aqc_sw_rules *> (d->params.raw);
+
+    // assume add_sw_rules_cmd->num_rules_fltr_entry_index == 1
+    
+    cout <<  "AQ remove sw rule" << logger::endl;
+
+    
+    if (rules_elem->type == ICE_AQC_SW_RULES_T_LKUP_RX || rules_elem->type == ICE_AQC_SW_RULES_T_LKUP_TX) {
+      rules_elem->pdata.lkup_tx_rx.index = 0; // null, since now deleted
+    } else {
+      // we should also zero the index for other types
+    }
+
+    // TODO peter: actually delete the rule
+
+    int retval = 0; // or ENOSPC on error
+    desc_complete_indir(retval, rules_elem, std::min(sizeof(*rules_elem), (size_t)d->datalen));
   } else if (d->opcode == ice_aqc_opc_get_dflt_topo) {
 #ifdef DEBUG_ADMINQ
     cout <<  "  configure vsi bw limit" << logger::endl;
@@ -665,6 +686,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
   } else if (d->opcode == ice_aqc_opc_add_sw_rules) {
     struct ice_aqc_sw_rules *add_sw_rules_cmd = reinterpret_cast<ice_aqc_sw_rules *> (d->params.raw);
     struct ice_aqc_sw_rules_elem *add_sw_rules = reinterpret_cast<ice_aqc_sw_rules_elem*>(data);
+    cout <<  "  set switch config" << logger::endl;
     add_sw_rules->type = ICE_AQC_SW_RULES_T_LKUP_TX;
     add_sw_rules->pdata.lkup_tx_rx.src = 1;
     add_sw_rules->pdata.lkup_tx_rx.index = 0;
