@@ -680,9 +680,11 @@ void queue_admin_tx::admin_desc_ctx::process() {
     desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_download_pkg) {
     struct ice_aqc_download_pkg *download_pkg = reinterpret_cast<ice_aqc_download_pkg *> (d->params.raw);
-    struct ice_aqc_download_pkg_resp download_pkg_resp;
-    // download_pkg_resp.error_info = ICE_AQ_RC_OK;
-    desc_complete_indir(0, &download_pkg_resp, sizeof(download_pkg_resp));
+    // struct ice_aqc_download_pkg_resp download_pkg_resp = *((struct ice_aqc_download_pkg_resp*)download_pkg);
+    struct ice_aqc_download_pkg_resp *download_pkg_resp = (struct ice_aqc_download_pkg_resp*)download_pkg;
+    download_pkg_resp->error_info = ICE_AQ_RC_OK;
+    download_pkg_resp->error_offset = 0;
+    desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_add_sw_rules) {
     struct ice_aqc_sw_rules *add_sw_rules_cmd = reinterpret_cast<ice_aqc_sw_rules *> (d->params.raw);
     struct ice_aqc_sw_rules_elem *add_sw_rules = reinterpret_cast<ice_aqc_sw_rules_elem*>(data);
