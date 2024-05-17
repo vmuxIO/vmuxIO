@@ -10,7 +10,7 @@ using namespace std;
 namespace i40e {
 
 class e810_switch {
-
+  public:
   static void print_sw_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
     if (add_sw_rules->type == ICE_AQC_SW_RULES_T_LKUP_RX || add_sw_rules->type == ICE_AQC_SW_RULES_T_LKUP_TX) {
       bool is_rx = add_sw_rules->type == ICE_AQC_SW_RULES_T_LKUP_RX;
