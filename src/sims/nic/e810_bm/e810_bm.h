@@ -34,6 +34,7 @@ extern "C" {
 }
 #include <src/libsimbricks/simbricks/nicbm/nicbm.h>
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
+#include "sims/nic/e810_bm/e810_bm.h"
 
 // #define DEBUG_DEV
 // #define DEBUG_ADMINQ
@@ -764,6 +765,15 @@ class shadow_ram {
   void write(uint16_t addr, uint16_t val);
 };
 
+class e810_switch {
+  std::map<uint64_t, uint16_t> mac_rules; // dst mac address (odd alignment/byte order...) -> dst queue idx
+
+  public:
+
+  bool add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
+
+  static void print_sw_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
+};
 
 class e810_bm : public nicbm::Runner::Device {
  protected:
@@ -972,6 +982,7 @@ class e810_bm : public nicbm::Runner::Device {
   shadow_ram shram;
   lan lanmgr;
   completion_event_manager cem;
+  e810_switch bcam; // binary content addressable memory aka switch
 
   u8 ctx_addr[2048][22]; // 22 byte descriptors for each tx queue
   int last_used_parent_node = 3;

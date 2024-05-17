@@ -30,7 +30,6 @@
 using namespace std;
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
-#include "sims/nic/e810_bm/e810_switch.cc"
 // #include "sims/nic/e810_bm/base/ice_adminq_cmd.h"
 #include <bits/stdc++.h>
 #include <algorithm>
@@ -700,6 +699,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
     
     e810_switch::print_sw_rule(add_sw_rules);
     __builtin_dump_struct(add_sw_rules, &printf);
+
+    bool success = dev.bcam.add_rule(add_sw_rules);
 
     add_sw_rules->type = ICE_AQC_SW_RULES_T_LKUP_TX;
     add_sw_rules->pdata.lkup_tx_rx.src = 1;
