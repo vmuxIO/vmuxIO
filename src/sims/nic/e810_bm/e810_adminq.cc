@@ -402,7 +402,6 @@ void queue_admin_tx::admin_desc_ctx::process() {
     // list of requested things (resource descriptors)
     struct ice_aqc_res_elem* resource_descriptors = (struct ice_aqc_res_elem*) &resource_request->elem;
 
-    // Through trial and error we assembled this static tree. Not off of it may be necessary
     printf("ice_aqc_opc_alloc_res type 0x%x buffer address 0x%p\n", resource_request->res_type, resource_descriptors);
     for (int i = 0; i < request->num_entries; i++) {
       __builtin_dump_struct(&resource_descriptors[i], printf);
@@ -525,6 +524,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_sched_elem_cmd *get_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
     get_elem_cmd->num_elem_resp = 1;
     struct ice_aqc_txsched_elem_data *get_elem = reinterpret_cast<struct ice_aqc_txsched_elem_data*> (data);
+
+    // Through trial and error we assembled this static tree. Not off of it may be necessary
     switch (get_elem->node_teid)
     {
     case 0:
@@ -710,7 +711,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
           logger::endl;
       } else if (action_type == ICE_SINGLE_ACT_TO_Q) {
         cout << "   action Queue idx=" << queue_id << 
-          " region=?" << logger::endl;
+          " region=? hdr:" << logger::endl;
+        Util::hexdump(add_sw_rules->pdata.lkup_tx_rx.hdr, add_sw_rules->pdata.lkup_tx_rx.hdr_len);
       } else if (action_type == ICE_SINGLE_ACT_PRUNE && !large_action) {
         cout << "   action Prune vsi/list=?" << logger::endl;
       } else if (action_type == ICE_SINGLE_ACT_PTR && large_action) {
