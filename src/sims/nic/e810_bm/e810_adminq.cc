@@ -464,6 +464,12 @@ void queue_admin_tx::admin_desc_ctx::process() {
 // #endif
 //     /* TODO */
 //     desc_complete(0);
+  } else if (d->opcode == ice_aqc_opc_get_recipe) {
+    struct ice_aqc_add_get_recipe *get_recipe_cmd = reinterpret_cast<struct ice_aqc_add_get_recipe*>(d->params.raw);
+    struct ice_aqc_recipe_data_elem *get_recipe = reinterpret_cast<struct ice_aqc_recipe_data_elem*>(data);
+    cout << "get recipe: reject/ignore" << logger::endl;
+    __builtin_dump_struct(get_recipe, &printf);
+    desc_complete(0); // TODO this prints, but rejects the command
   } else if (d->opcode == ice_aqc_opc_remove_sw_rules) {
     struct ice_aqc_sw_rules_elem *rules_elem = reinterpret_cast<struct ice_aqc_sw_rules_elem*>(data);
     struct ice_aqc_sw_rules *add_sw_rules_cmd = reinterpret_cast<ice_aqc_sw_rules *> (d->params.raw);
