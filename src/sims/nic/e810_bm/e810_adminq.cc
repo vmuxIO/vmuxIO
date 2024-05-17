@@ -72,7 +72,7 @@ void queue_admin_tx::reg_updated() {
 queue_admin_tx::admin_desc_ctx::admin_desc_ctx(queue_admin_tx &queue_,
                                                e810_bm &dev_)
     : i40e::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
-  d = reinterpret_cast<struct i40e_aq_desc *>(desc);
+  d = reinterpret_cast<struct ice_aq_desc *>(desc);
 }
 
 void queue_admin_tx::admin_desc_ctx::data_written(uint64_t addr, size_t len) {
@@ -196,7 +196,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
         {ICE_AQC_CAPS_MSIX, 1, 0, dev.NUM_PFINTS, 0, 0, {}, {}},
         {ICE_AQC_CAPS_VSI, 1, 0, dev.NUM_VSIS, 0, 0, {}, {}},
         {ICE_AQC_CAPS_DCB, 1, 0, 1, 4, 1, {}, {}},
-        {ICE_AQC_CAPS_RDMA, 1, 0, 1, 1, 1, {}, {}},
+        {ICE_AQC_CAPS_IWARP, 1, 0, 1, 1, 1, {}, {}},
         {ICE_AQC_CAPS_FD, 1, 0, dev.NUM_FD_GUAR, dev.NUM_FD_BEST_EFFORT, 0, {}, {}},
     };
     size_t num_caps = sizeof(caps) / sizeof(caps[0]);
