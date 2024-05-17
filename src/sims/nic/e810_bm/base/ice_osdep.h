@@ -63,15 +63,15 @@ typedef uint64_t        s64;
 
 /* Avoid macro redefinition warning on Windows */
 #ifdef RTE_EXEC_ENV_WINDOWS
-#ifdef min
-#undef min
+#ifdef ice_min
+#undef ice_min
 #endif
-#ifdef max
-#undef max
+#ifdef ice_max
+#undef ice_max
 #endif
 #endif
-#define min(a, b) RTE_MIN(a, b)
-#define max(a, b) RTE_MAX(a, b)
+#define ice_min(a, b) RTE_MIN(a, b)
+#define ice_max(a, b) RTE_MAX(a, b)
 
 #define FIELD_SIZEOF(t, f) RTE_SIZEOF_FIELD(t, f)
 #define ARRAY_SIZE(arr) RTE_DIM(arr)

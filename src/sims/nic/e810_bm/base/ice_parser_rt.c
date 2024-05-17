@@ -104,7 +104,7 @@ void ice_parser_rt_reset(struct ice_parser_rt *rt)
 void ice_parser_rt_pktbuf_set(struct ice_parser_rt *rt, const u8 *pkt_buf,
 			      int pkt_len)
 {
-	int len = min(ICE_PARSER_MAX_PKT_LEN, pkt_len);
+	int len = ice_min(ICE_PARSER_MAX_PKT_LEN, pkt_len);
 	u16 ho = rt->gpr[GPR_HO_IDX];
 
 	ice_memcpy(rt->pkt_buf, pkt_buf, len, ICE_NONDMA_TO_NONDMA);

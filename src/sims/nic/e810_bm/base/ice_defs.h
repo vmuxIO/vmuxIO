@@ -30,7 +30,7 @@
  */
 #define ROUND_UP(a, b)	((b) * DIVIDE_AND_ROUND_UP((a), (b)))
 
-#define MIN_T(_t, _a, _b)	min((_t)(_a), (_t)(_b))
+#define MIN_T(_t, _a, _b)	ice_min((_t)(_a), (_t)(_b))
 
 #define IS_ASCII(_ch)	((_ch) < 0x80)
 

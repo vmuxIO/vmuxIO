@@ -325,7 +325,7 @@ ice_find_next_bit(const ice_bitmap_t *bitmap, u16 size, u16 offset)
 
 		for (j = offset % BITS_PER_CHUNK; j < BITS_PER_CHUNK; j++) {
 			if (ice_is_bit_set(bitmap, off + j))
-				return min(size, (u16)(off + j));
+				return ice_min(size, (u16)(off + j));
 		}
 	}
 
@@ -336,7 +336,7 @@ ice_find_next_bit(const ice_bitmap_t *bitmap, u16 size, u16 offset)
 
 			for (j = 0; j < BITS_PER_CHUNK; j++) {
 				if (ice_is_bit_set(bitmap, off + j))
-					return min(size, (u16)(off + j));
+					return ice_min(size, (u16)(off + j));
 			}
 		}
 	}
