@@ -25,7 +25,7 @@
 
 #include "ice_alloc.h"
 
-#include "../ice_logs.h"
+// #include "../ice_logs.h"
 
 #ifndef __INTEL_NET_BASE_OSDEP__
 #define __INTEL_NET_BASE_OSDEP__
@@ -164,7 +164,7 @@ do {									\
 		int i;							\
 		for (i = 0; i < len_l; i += 8)				\
 			ice_debug(hw_l, type,				\
-				  "0x%04X  0x%016"PRIx64"\n",		\
+				  "0x%04X  0x%016" PRIx64 "\n",		\
 				  i, *((u64 *)((buf_l) + i)));		\
 } while (0)
 #define ice_snprintf snprintf
@@ -231,46 +231,46 @@ ice_memdup(__rte_unused struct ice_hw *hw, const void *src, size_t size,
 	return p;
 }
 
-static inline void *
-ice_alloc_dma_mem(__rte_unused struct ice_hw *hw,
-		  struct ice_dma_mem *mem, u64 size)
-{
-	static uint64_t ice_dma_memzone_id;
-	const struct rte_memzone *mz = NULL;
-	char z_name[RTE_MEMZONE_NAMESIZE];
-
-	if (!mem)
-		return NULL;
-
-	snprintf(z_name, sizeof(z_name), "ice_dma_%" PRIu64,
-		__atomic_fetch_add(&ice_dma_memzone_id, 1, __ATOMIC_RELAXED));
-	mz = rte_memzone_reserve_bounded(z_name, size, SOCKET_ID_ANY, 0,
-					 0, RTE_PGSIZE_2M);
-	if (!mz)
-		return NULL;
-
-	mem->size = size;
-	mem->va = mz->addr;
-	mem->pa = mz->iova;
-	mem->zone = (const void *)mz;
-	PMD_DRV_LOG(DEBUG, "memzone %s allocated with physical address: "
-		    "%"PRIu64, mz->name, mem->pa);
-
-	return mem->va;
-}
-
-static inline void
-ice_free_dma_mem(__rte_unused struct ice_hw *hw,
-		 struct ice_dma_mem *mem)
-{
-	PMD_DRV_LOG(DEBUG, "memzone %s to be freed with physical address: "
-		    "%"PRIu64, ((const struct rte_memzone *)mem->zone)->name,
-		    mem->pa);
-	rte_memzone_free((const struct rte_memzone *)mem->zone);
-	mem->zone = NULL;
-	mem->va = NULL;
-	mem->pa = (u64)0;
-}
+// static inline void *
+// ice_alloc_dma_mem(__rte_unused struct ice_hw *hw,
+// 		  struct ice_dma_mem *mem, u64 size)
+// {
+// 	static uint64_t ice_dma_memzone_id;
+// 	const struct rte_memzone *mz = NULL;
+// 	char z_name[RTE_MEMZONE_NAMESIZE];
+// 
+// 	if (!mem)
+// 		return NULL;
+// 
+// 	snprintf(z_name, sizeof(z_name), "ice_dma_%" PRIu64,
+// 		__atomic_fetch_add(&ice_dma_memzone_id, 1, __ATOMIC_RELAXED));
+// 	mz = rte_memzone_reserve_bounded(z_name, size, SOCKET_ID_ANY, 0,
+// 					 0, RTE_PGSIZE_2M);
+// 	if (!mz)
+// 		return NULL;
+// 
+// 	mem->size = size;
+// 	mem->va = mz->addr;
+// 	mem->pa = mz->iova;
+// 	mem->zone = (const void *)mz;
+// 	PMD_DRV_LOG(DEBUG, "memzone %s allocated with physical address: "
+// 		    "%"PRIu64, mz->name, mem->pa);
+// 
+// 	return mem->va;
+// }
+// 
+// static inline void
+// ice_free_dma_mem(__rte_unused struct ice_hw *hw,
+// 		 struct ice_dma_mem *mem)
+// {
+// 	PMD_DRV_LOG(DEBUG, "memzone %s to be freed with physical address: "
+// 		    "%"PRIu64, ((const struct rte_memzone *)mem->zone)->name,
+// 		    mem->pa);
+// 	rte_memzone_free((const struct rte_memzone *)mem->zone);
+// 	mem->zone = NULL;
+// 	mem->va = NULL;
+// 	mem->pa = (u64)0;
+// }
 
 static inline u8
 ice_hweight8(u32 num)
