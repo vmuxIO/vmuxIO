@@ -265,7 +265,7 @@ class queue_admin_tx : public queue_base {
    protected:
     queue_admin_tx &aq;
     e810_bm &dev;
-    struct i40e_aq_desc *d;
+    struct ice_aq_desc *d;
     // struct ice_aq_desc *ice_d;
     
     

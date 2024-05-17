@@ -113,15 +113,15 @@ void queue_admin_tx::admin_desc_ctx::desc_complete_indir(uint16_t retval,
 
   desc_compl_prepare(retval, extra_flags);
 
-  uint64_t addr = d->params.external.addr_low |
-                  (((uint64_t)d->params.external.addr_high) << 32);
+  uint64_t addr = d->params.generic.addr_low |
+                  (((uint64_t)d->params.generic.addr_high) << 32);
   data_write(addr, len, data);
 }
 
 void queue_admin_tx::admin_desc_ctx::prepare() {
   if ((d->flags & ICE_AQ_FLAG_RD)) {
-    uint64_t addr = d->params.external.addr_low |
-                    (((uint64_t)d->params.external.addr_high) << 32);
+    uint64_t addr = d->params.generic.addr_low |
+                    (((uint64_t)d->params.generic.addr_high) << 32);
 #ifdef DEBUG_ADMINQ
     cout <<  " desc with buffer opc=" << d->opcode << " addr=" << addr
               << logger::endl;
@@ -251,8 +251,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
     par.caps = ICE_AQC_PHY_EN_LINK | ICE_AQC_PHY_AN_MODE;
     par.eee_cap = ICE_AQC_PHY_EEE_EN_40GBASE_KR4;
 
-    d->params.external.param0 = 0;
-    d->params.external.param1 = 0;
+    d->params.generic.param0 = 0;
+    d->params.generic.param1 = 0;
 
     desc_complete_indir(0, &par, sizeof(par));
   } else if (d->opcode == ice_aqc_opc_get_link_status) {
