@@ -7,6 +7,7 @@
 using namespace std;
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
+#include "sims/nic/e810_bm/headers.h"
 
 namespace i40e {
 
@@ -23,11 +24,27 @@ bool e810_switch::add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
   }
 
   struct ethhdr *hdr = (struct ethhdr*)(add_sw_rules->pdata.lkup_tx_rx.hdr);
-  uint64_t dst_mac = *(uint64_t*)(hdr->h_dest);
+  uint64_t dst_mac = 0xFFFFFFFFFFFF & *(uint64_t*)(hdr->h_dest);
   this->mac_rules[dst_mac] = queue_id;
   printf("added rule dst_mac 0x%lx -> queue %d\n", dst_mac, queue_id);
 
   return true;
+}
+
+/**
+ * set queue if a switching rule applies
+ */
+void e810_switch::select_queue(const void* data, size_t len, uint16_t* queue) {
+  // assume firmware recipe 0
+  // match ethertype, src_mac, dst_ac, vlan, logical port, ...
+  if (len < sizeof(struct ethhdr)) {
+    return;
+  }
+  struct ethhdr* packet_hdr = (struct ethhdr*) data;
+  uint64_t dst_mac = 0xFFFFFFFFFFFF & *(uint64_t*)(packet_hdr->h_dest);
+  if (auto search = this->mac_rules.find(dst_mac); search != this->mac_rules.end())
+    *queue = search->second; // return map entry, if it exists
+  return;
 }
 
 void e810_switch::print_sw_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {

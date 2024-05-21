@@ -772,6 +772,8 @@ class e810_switch {
 
   bool add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
 
+  void select_queue(const void* data, size_t len, uint16_t* queue);
+
   static void print_sw_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
 };
 

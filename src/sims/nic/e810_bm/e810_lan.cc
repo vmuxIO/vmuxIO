@@ -152,7 +152,8 @@ void lan::packet_received(const void *data, size_t len) {
   uint32_t hash = 0;
   // if the driver uses VSIs, it reserves queue 0 as VSI control queue. 
   // Rss may have to account for that.
-  uint16_t queue = dev.vsi0_first_queue + 0; 
+  uint16_t queue = dev.vsi0_first_queue + 0;
+  this->dev.bcam.select_queue(data, len, &queue);
   rss_steering(data, len, queue, hash);
   if (!rxqs[queue]->is_enabled()) {
     // if we receive on uninitialized queues, we throw errors
