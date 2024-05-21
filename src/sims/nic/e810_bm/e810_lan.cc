@@ -164,7 +164,7 @@ void lan::packet_received(const void *data, size_t len) {
   }
 
   // Obacht! Ineffizient :*)
-  while (true) {
+  while (false) { // while true: deliver packets in round robin fashion to queues
     // wrap if initialized to -1
     this->rss_last_queue = this->rss_last_queue % this->num_qs;
     // try next queue
