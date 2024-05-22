@@ -77,6 +77,9 @@ vmuxDpdkE810:
 vmuxMed:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1
 
+vmuxDpdkE810Gdb:
+  sudo gdb --args {{proot}}/build_release/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
+
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true
   sudo ip tuntap add mode tap {{vmuxTap}}
@@ -454,7 +457,7 @@ build:
   if [[ -d build ]]; then meson build --wipe; else meson build; fi
   pushd subprojects/nic-emu; cargo build --no-default-features --features generate-bindings; cargo build --no-default-features --features generate-bindings --release; popd
   meson compile -C build
-  meson setup build_release --wipe -Dbuildtype=release
+  meson setup build_release --wipe -Dbuildtype=debug
   meson compile -C build_release
   clang++ {{proot}}/test/kni-latency/kni-latency.cpp -o {{proot}}/test/kni-latency/kni-latency -O3
   nix build -o {{proot}}/mg .#moongen

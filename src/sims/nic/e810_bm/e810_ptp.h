@@ -29,6 +29,28 @@ namespace i40e {
 #define PTP_ATQBAH_SET_TS(ts) ((ts) & 0xffffffff)
 
 
+// PTP capabilities
+//#define CAP_TIME_SYNC_ENA 0b1
+//#define CAP_TIMER_OWNED 0b10
+//#define CAP_TIMER_ENA 0b100
+//#define CAP_SDP_TIME_SYNC 0b111100000000
+
+#define CAP_GPIO_TIME_SYNC (1 << 13)
+
+#define CAP_PF_TIMER_0_OWNED (0b1 << 3)
+#define CAP_PF_TIMER_1_OWNED (0b1 << 7)
+
+
+
+#define CAP_PF_TIMESYNC_ENA (1 << 24)
+#define CAP_PF_TIMER_0_ENA (1 << 25)
+#define CAP_PF_TIMER_1_ENA (1 << 26)
+#define CAP_PF_LL_TX_SUPPORTED (1 << 28)
+
+#define CAP_1588_FLAGS ((uint32_t) CAP_PF_TIMER_0_OWNED | CAP_PF_TIMER_0_ENA | CAP_PF_TIMESYNC_ENA | CAP_PF_LL_TX_SUPPORTED | \
+                        CAP_GPIO_TIME_SYNC )
+
+
 typedef union {
  struct {
   uint8_t resv[4];

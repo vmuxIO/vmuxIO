@@ -32,7 +32,7 @@
 
 let
   mod = kernel != null;
-  debug = false;
+  debug = true;
 in
 stdenv.mkDerivation {
   pname = "dpdk";
@@ -90,9 +90,9 @@ stdenv.mkDerivation {
   mesonFlags = [
     "-Dtests=false"
     "-Denable_docs=true"
+    "--buildtype=debug"
     "-Denable_kmods=${lib.boolToString mod}"
   ]
-  ++ lib.optional debug "--buildtype=debug"
   # kni kernel driver is currently not compatble with 5.11
   ++ lib.optional (mod && kernel.kernelOlder "5.11") "-Ddisable_drivers=kni"
   ++ [ (if shared then "-Ddefault_library=shared" else "-Ddefault_library=static") ]
@@ -112,8 +112,11 @@ stdenv.mkDerivation {
     find examples -type f -executable -exec install {} $examples/bin \;
   '' + lib.optionalString (withSomeSources) ''
     cp -r ../app $out/
+
     cp -r ../drivers $out/
+    cp -r ../lib $out/ 
   '';
+
 
   dontFixup = debug;
   dontStrip = debug;

@@ -22,9 +22,11 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "sims/nic/e810_bm/base/ice_adminq_cmd.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include <cassert>
 #include <iostream>
 using namespace std;
@@ -198,6 +200,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
         {ICE_AQC_CAPS_DCB, 1, 0, 1, 4, 1, {}, {}},
         {ICE_AQC_CAPS_IWARP, 1, 0, 1, 1, 1, {}, {}},
         {ICE_AQC_CAPS_FD, 1, 0, dev.NUM_FD_GUAR, dev.NUM_FD_BEST_EFFORT, 0, {}, {}},
+        {ICE_AQC_CAPS_1588, 1, 1, CAP_1588_FLAGS, 1, 1, {}, {} }
     };
     size_t num_caps = sizeof(caps) / sizeof(caps[0]);
 
@@ -268,7 +271,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_get_link_status_data link_status_data;
     // link_status_data.topo_media_conflict = BIT(3);
     link_status_data.phy_type_low = ICE_PHY_TYPE_LOW_40GBASE_CR4;
-    // link_status_data.phy_type_high = 
+    // link_status_data.phy_type_high =
     link_status_data.link_speed = ICE_AQ_LINK_SPEED_40GB;
     link_status_data.link_info = ICE_AQ_LINK_UP | ICE_AQ_LINK_UP_PORT |
                      ICE_AQ_MEDIA_AVAILABLE | ICE_AQ_SIGNAL_DETECT;
@@ -367,7 +370,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_get_set_rss_key *v =
         reinterpret_cast<struct ice_aqc_get_set_rss_key *>(
                 d->params.raw);
-    
+
     desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_set_rss_lut) {
     struct ice_aqc_get_set_rss_lut *v =
