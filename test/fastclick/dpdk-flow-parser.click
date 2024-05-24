@@ -10,8 +10,9 @@
  */
 
 define(
-	$ifacePCI0  0000:41:00.0,
-	$queues     5,
+	// $ifacePCI0  0000:41:00.0,
+	$ifacePCI0  0000:00:06.0,
+	$queues     3,
 	$threads    $queues,
 	$numa       false,
 	$mode       flow,    // Rx mode required by the DPDK Flow Rule Manager
