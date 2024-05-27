@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright (c) 2018, Intel Corporation. */
+/* SPDX-License-Identifier: BSD-3-Clause
+ * Copyright(c) 2001-2023 Intel Corporation
+ */
 
 #ifndef _ICE_STATUS_H_
 #define _ICE_STATUS_H_
@@ -29,10 +30,13 @@ enum ice_status {
 	ICE_ERR_HW_TABLE			= -19,
 	ICE_ERR_FW_DDP_MISMATCH			= -20,
 
+	/* NVM specific error codes: Range -50..-59 */
 	ICE_ERR_NVM				= -50,
 	ICE_ERR_NVM_CHECKSUM			= -51,
 	ICE_ERR_BUF_TOO_SHORT			= -52,
 	ICE_ERR_NVM_BLANK_MODE			= -53,
+
+	/* ARQ/ASQ specific error codes. Range -100..-109 */
 	ICE_ERR_AQ_ERROR			= -100,
 	ICE_ERR_AQ_TIMEOUT			= -101,
 	ICE_ERR_AQ_FULL				= -102,

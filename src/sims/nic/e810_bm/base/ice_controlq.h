@@ -1,5 +1,6 @@
-/* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright (c) 2018, Intel Corporation. */
+/* SPDX-License-Identifier: BSD-3-Clause
+ * Copyright(c) 2001-2023 Intel Corporation
+ */
 
 #ifndef _ICE_CONTROLQ_H_
 #define _ICE_CONTROLQ_H_
@@ -93,8 +94,8 @@ struct ice_ctl_q_info {
 	u16 rq_buf_size;		/* receive queue buffer size */
 	u16 sq_buf_size;		/* send queue buffer size */
 	enum ice_aq_err sq_last_status;	/* last status on send queue */
-	struct mutex sq_lock;		/* Send queue lock */
-	struct mutex rq_lock;		/* Receive queue lock */
+	struct ice_lock sq_lock;		/* Send queue lock */
+	struct ice_lock rq_lock;		/* Receive queue lock */
 };
 
 #endif /* _ICE_CONTROLQ_H_ */

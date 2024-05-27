@@ -1,4 +1,4 @@
-ingress pattern eth dst spec 00:00:00:00:00:00 dst mask 00:00:00:00:00:ff / end actions queue index 0 / end
-ingress pattern eth dst spec 00:00:00:00:00:01 dst mask 00:00:00:00:00:ff / end actions queue index 1 / end
-ingress pattern eth dst spec 00:00:00:00:00:02 dst mask 00:00:00:00:00:ff / end actions queue index 2 / end
+ingress pattern eth dst spec 00:00:00:00:00:00 dst mask ff:ff:ff:ff:ff:ff / end actions queue index 0 / end
+ingress pattern eth dst spec 00:00:00:00:00:01 dst mask ff:ff:ff:ff:ff:ff / end actions queue index 1 / end
+ingress pattern eth dst spec 00:00:00:00:00:02 dst mask ff:ff:ff:ff:ff:ff / end actions queue index 2 / end
 

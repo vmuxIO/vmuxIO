@@ -32,6 +32,8 @@ using namespace std;
 #include "sims/nic/e810_bm/e810_bm.h"
 // #include "sims/nic/e810_bm/base/ice_adminq_cmd.h"
 #include <bits/stdc++.h>
+#include <algorithm>
+
 namespace i40e {
 
 queue_admin_tx::queue_admin_tx(e810_bm &dev_, uint64_t &reg_base_,
@@ -70,7 +72,7 @@ void queue_admin_tx::reg_updated() {
 queue_admin_tx::admin_desc_ctx::admin_desc_ctx(queue_admin_tx &queue_,
                                                e810_bm &dev_)
     : i40e::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
-  d = reinterpret_cast<struct i40e_aq_desc *>(desc);
+  d = reinterpret_cast<struct ice_aq_desc *>(desc);
 }
 
 void queue_admin_tx::admin_desc_ctx::data_written(uint64_t addr, size_t len) {
@@ -111,15 +113,15 @@ void queue_admin_tx::admin_desc_ctx::desc_complete_indir(uint16_t retval,
 
   desc_compl_prepare(retval, extra_flags);
 
-  uint64_t addr = d->params.external.addr_low |
-                  (((uint64_t)d->params.external.addr_high) << 32);
+  uint64_t addr = d->params.generic.addr_low |
+                  (((uint64_t)d->params.generic.addr_high) << 32);
   data_write(addr, len, data);
 }
 
 void queue_admin_tx::admin_desc_ctx::prepare() {
   if ((d->flags & ICE_AQ_FLAG_RD)) {
-    uint64_t addr = d->params.external.addr_low |
-                    (((uint64_t)d->params.external.addr_high) << 32);
+    uint64_t addr = d->params.generic.addr_low |
+                    (((uint64_t)d->params.generic.addr_high) << 32);
 #ifdef DEBUG_ADMINQ
     cout <<  " desc with buffer opc=" << d->opcode << " addr=" << addr
               << logger::endl;
@@ -194,7 +196,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
         {ICE_AQC_CAPS_MSIX, 1, 0, dev.NUM_PFINTS, 0, 0, {}, {}},
         {ICE_AQC_CAPS_VSI, 1, 0, dev.NUM_VSIS, 0, 0, {}, {}},
         {ICE_AQC_CAPS_DCB, 1, 0, 1, 4, 1, {}, {}},
-        {ICE_AQC_CAPS_RDMA, 1, 0, 1, 1, 1, {}, {}},
+        {ICE_AQC_CAPS_IWARP, 1, 0, 1, 1, 1, {}, {}},
+        {ICE_AQC_CAPS_FD, 1, 0, dev.NUM_FD_GUAR, dev.NUM_FD_BEST_EFFORT, 0, {}, {}},
     };
     size_t num_caps = sizeof(caps) / sizeof(caps[0]);
 
@@ -248,8 +251,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
     par.caps = ICE_AQC_PHY_EN_LINK | ICE_AQC_PHY_AN_MODE;
     par.eee_cap = ICE_AQC_PHY_EEE_EN_40GBASE_KR4;
 
-    d->params.external.param0 = 0;
-    d->params.external.param1 = 0;
+    d->params.generic.param0 = 0;
+    d->params.generic.param1 = 0;
 
     desc_complete_indir(0, &par, sizeof(par));
   } else if (d->opcode == ice_aqc_opc_get_link_status) {
@@ -278,9 +281,9 @@ void queue_admin_tx::admin_desc_ctx::process() {
 
     desc_complete_indir(0, &link_status_data, sizeof(link_status_data));
   } else if (d->opcode == ice_aqc_opc_get_sw_cfg) {
-#ifdef DEBUG_ADMINQ
+// #ifdef DEBUG_ADMINQ
     cout <<  "  get switch config" << logger::endl;
-#endif
+// #endif
     struct ice_aqc_get_sw_cfg *sw =
         reinterpret_cast<struct ice_aqc_get_sw_cfg *>(d->params.raw);
     struct ice_aqc_get_sw_cfg_resp_elem hr;
@@ -370,6 +373,11 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_get_set_rss_lut *v =
         reinterpret_cast<struct ice_aqc_get_set_rss_lut *>(
                 d->params.raw);
+    __builtin_dump_struct(v, &printf);
+    if (((v->flags & ICE_AQC_GSET_RSS_LUT_TABLE_SIZE_M) >> ICE_AQC_GSET_RSS_LUT_TABLE_SIZE_S) == ICE_AQC_GSET_RSS_LUT_TABLE_SIZE_512_FLAG) {
+      // We use this RSS setting to detect DPDK based Fastclick to fix its unexplainable reg_idx queue offset.
+      dev.vsi0_first_queue = 1;
+    }
     desc_complete_indir(0, data, d->datalen);
   // }
 //   else if (d->opcode == i40e_aqc_opc_set_switch_config) {
@@ -383,6 +391,52 @@ void queue_admin_tx::admin_desc_ctx::process() {
 //                 d->params.raw);
 //     */
 //     desc_complete(0);
+  } else if (d->opcode == ice_aqc_opc_alloc_res) {
+    // command to request resources. References a data buffer that contains the actual requests.
+    struct ice_aqc_alloc_free_res_cmd *request =
+        reinterpret_cast<struct ice_aqc_alloc_free_res_cmd *>(
+                d->params.raw);
+
+    // data buffer
+    struct ice_aqc_alloc_free_res_elem* resource_request = reinterpret_cast<struct ice_aqc_alloc_free_res_elem*> (data);
+    // list of requested things (resource descriptors)
+    struct ice_aqc_res_elem* resource_descriptors = (struct ice_aqc_res_elem*) &resource_request->elem;
+
+    printf("ice_aqc_opc_alloc_res type 0x%x buffer address 0x%p\n", resource_request->res_type, resource_descriptors);
+    for (int i = 0; i < request->num_entries; i++) {
+      __builtin_dump_struct(&resource_descriptors[i], printf);
+      uint16_t type = resource_request->res_type & 0x7F; // type is only bits 0:6
+      if (type == ICE_AQC_RES_TYPE_VSI_LIST_PRUNE) {
+        printf("pruning VSI list %d\n", i);
+        resource_descriptors[i].e.sw_resp = i; // these are stubbed resource ids
+      } else if (type == ICE_AQC_RES_TYPE_FDIR_COUNTER_BLOCK) {
+        printf("allocating FDIR COUNTER BLOCK %d\n", i);
+        resource_descriptors[i].e.sw_resp = i;
+      } else if (type == ICE_AQC_RES_TYPE_FDIR_GUARANTEED_ENTRIES) {
+        printf("allocating FDIR guar. entry %d\n", i);
+        resource_descriptors[i].e.sw_resp = i;
+      } else if (type == ICE_AQC_RES_TYPE_FDIR_SHARED_ENTRIES) {
+        printf("allocating FDIR shared entry %d\n", i);
+        resource_descriptors[i].e.sw_resp = i;
+      } else if (type == ICE_AQC_RES_TYPE_FD_PROF_BLDR_PROFID) {
+        printf("allocating ICE_AQC_RES_TYPE_FD_PROF_BLDR_PROFID\n");
+        resource_descriptors[i].e.sw_resp = i;
+      } else if (type == ICE_AQC_RES_TYPE_FD_PROF_BLDR_TCAM) {
+        printf("allocating ICE_AQC_RES_TYPE_FD_PROF_BLDR_TCAM\n");
+        resource_descriptors[i].e.sw_resp = i;
+      } else if (type == ICE_AQC_RES_TYPE_HASH_PROF_BLDR_PROFID) {
+        printf("allocating ICE_AQC_RES_TYPE_HASH_PROF_BLDR_PROFID\n");
+        resource_descriptors[i].e.sw_resp = i;
+      } else if (type == ICE_AQC_RES_TYPE_HASH_PROF_BLDR_TCAM) {
+        printf("allocating ICE_AQC_RES_TYPE_HASH_PROF_BLDR_TCAM\n");
+        resource_descriptors[i].e.sw_resp = i;
+      } else {
+        printf("unknown resource type. Skipping its allocation.\n");
+      }
+    }
+
+    // dma data to indirect buffer
+    desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_add_vsi) {
 #ifdef DEBUG_ADMINQ
     cout <<  "  get vsi parameters" << logger::endl;
@@ -390,6 +444,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_add_update_free_vsi_resp *v =
         reinterpret_cast<struct ice_aqc_add_update_free_vsi_resp *>(
                 d->params.raw);
+    __builtin_dump_struct(v, &printf);
     v->vsi_num = 1;
     struct ice_aqc_vsi_props pd;
     // memset(&pd, 0, sizeof(pd));
@@ -409,6 +464,31 @@ void queue_admin_tx::admin_desc_ctx::process() {
 // #endif
 //     /* TODO */
 //     desc_complete(0);
+  } else if (d->opcode == ice_aqc_opc_get_recipe) {
+    struct ice_aqc_add_get_recipe *get_recipe_cmd = reinterpret_cast<struct ice_aqc_add_get_recipe*>(d->params.raw);
+    struct ice_aqc_recipe_data_elem *get_recipe = reinterpret_cast<struct ice_aqc_recipe_data_elem*>(data);
+    cout << "get recipe: reject/ignore" << logger::endl;
+    __builtin_dump_struct(get_recipe, &printf);
+    desc_complete(0); // TODO this prints, but rejects the command
+  } else if (d->opcode == ice_aqc_opc_remove_sw_rules) {
+    struct ice_aqc_sw_rules_elem *rules_elem = reinterpret_cast<struct ice_aqc_sw_rules_elem*>(data);
+    struct ice_aqc_sw_rules *add_sw_rules_cmd = reinterpret_cast<ice_aqc_sw_rules *> (d->params.raw);
+
+    // assume add_sw_rules_cmd->num_rules_fltr_entry_index == 1
+    
+    cout <<  "AQ remove sw rule" << logger::endl;
+
+    
+    if (rules_elem->type == ICE_AQC_SW_RULES_T_LKUP_RX || rules_elem->type == ICE_AQC_SW_RULES_T_LKUP_TX) {
+      rules_elem->pdata.lkup_tx_rx.index = 0; // null, since now deleted
+    } else {
+      // we should also zero the index for other types
+    }
+
+    // TODO peter: actually delete the rule
+
+    int retval = 0; // or ENOSPC on error
+    desc_complete_indir(retval, rules_elem, std::min(sizeof(*rules_elem), (size_t)d->datalen));
   } else if (d->opcode == ice_aqc_opc_get_dflt_topo) {
 #ifdef DEBUG_ADMINQ
     cout <<  "  configure vsi bw limit" << logger::endl;
@@ -449,6 +529,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_sched_elem_cmd *get_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
     get_elem_cmd->num_elem_resp = 1;
     struct ice_aqc_txsched_elem_data *get_elem = reinterpret_cast<struct ice_aqc_txsched_elem_data*> (data);
+
+    // Through trial and error we assembled this static tree. Not off of it may be necessary
     switch (get_elem->node_teid)
     {
     case 0:
@@ -457,41 +539,79 @@ void queue_admin_tx::admin_desc_ctx::process() {
       break;
     case 1:
       get_elem->parent_teid = 0;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_ENTRY_POINT;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
       break;
     case 2:
-      get_elem->parent_teid = 0;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+      get_elem->parent_teid = 1;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_ENTRY_POINT;
       break;
     case 3:
-      get_elem->parent_teid = 1;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
+      get_elem->parent_teid = 2;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
     case 4:
-      get_elem->parent_teid = 1;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
+      get_elem->parent_teid = 3;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
     case 5:
-      get_elem->parent_teid = 2;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
+      get_elem->parent_teid = 4;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
     case 6:
-      get_elem->parent_teid = 2;
-      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_TC;
+      get_elem->parent_teid = 5;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
+    case 22:
+      get_elem->parent_teid = 5;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+      break;
+    case 38:
+      get_elem->parent_teid = 5;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case 54: // id 54 
+      get_elem->parent_teid = 5;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+      break;
+    case 55:
+      get_elem->parent_teid = 1;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case 56:
+      get_elem->parent_teid = 55;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case 57:
+      get_elem->parent_teid = 55;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case 58:
+      get_elem->parent_teid = 55;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
+    case E810_STATIC_NODES: // id 59 // last of the statically allocated nodes
+      get_elem->parent_teid = 55;
+      get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
     default:
-      cout << "unexpectedly get elems: "<< get_elem->node_teid << logger::endl;
+      struct ice_aqc_txsched_elem_data* allocated_elem = dev.sched_nodes[get_elem->node_teid];
+      if (allocated_elem != NULL) {
+        *get_elem = *allocated_elem;
+      } else {
+        cout << "unexpectedly get elems: "<< get_elem->node_teid << logger::endl; // this is where the driver tries to get more elements and we get confused
+      }
       break;
     }
-    
     
     desc_complete_indir(0, get_elem, sizeof(*get_elem));
   } else if (d->opcode == ice_aqc_opc_add_sched_elems) {
     struct ice_aqc_sched_elem_cmd *get_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
-    get_elem_cmd->num_elem_resp = 1;
     struct ice_aqc_add_elem *add_elem = reinterpret_cast<struct ice_aqc_add_elem*> (data);
-    add_elem->generic[0].node_teid = dev.last_returned_node;
-    dev.last_returned_node = dev.last_returned_node + 1;
+
+    get_elem_cmd->num_elem_resp = 1; // get_elem_cmd->num_elem_req; (ignore all but first) // nr. of element groups in data
+
+    __builtin_dump_struct(add_elem, &printf);
+    for (int i = 0; i < add_elem->hdr.num_elems; i++) {
+      add_elem->generic[i].node_teid = dev.last_returned_node;
+      dev.sched_nodes[dev.last_returned_node] = &(add_elem->generic[i]);
+      __builtin_dump_struct(&(add_elem->generic[i]), &printf);
+      dev.last_returned_node = dev.last_returned_node + 1;
+    }
+
     desc_complete_indir(0, add_elem, d->datalen);
   } else if (d->opcode == ice_aqc_opc_delete_sched_elems) {
     struct ice_aqc_sched_elem_cmd *delete_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
@@ -509,7 +629,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     
     query_res.layer_props[1].max_sibl_grp_sz = 2;
 
-    query_res.layer_props[2].max_sibl_grp_sz = 4;
+    query_res.layer_props[2].max_sibl_grp_sz = 32;
     query_res.layer_props[3].max_sibl_grp_sz = 8;
     
     desc_complete_indir(0, &query_res, sizeof(query_res));
@@ -518,15 +638,19 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_add_txqs *add_txqs_cmd = reinterpret_cast<ice_aqc_add_txqs *> (d->params.raw);
     // add_txqs_cmd->num_qgrps = 1;
     struct ice_aqc_add_tx_qgrp *add_txqs = reinterpret_cast<ice_aqc_add_tx_qgrp *> (data);
+    uint32_t idx = add_txqs->txqs[0].txq_id;
+    __builtin_dump_struct(add_txqs, &printf);
+    __builtin_dump_struct(&(add_txqs->txqs[0]), &printf);
     add_txqs->parent_teid = dev.last_used_parent_node;
     add_txqs->num_txqs = 1;
     add_txqs->txqs[0].q_teid = dev.last_returned_node;
     add_txqs->txqs[0].info.elem_type = ICE_AQC_ELEM_TYPE_LEAF;
     add_txqs->txqs[0].info.cir_bw.bw_alloc = 100;
     add_txqs->txqs[0].info.eir_bw.bw_alloc = 100;
+    cout<< "ice_aqc_opc_add_txqs. txd id = "<< add_txqs->txqs[0].txq_id << logger::endl;
     if (add_txqs->txqs[0].txq_id >=4){
       cout<< "ice_aqc_opc_add_txqs error. txd id = "<< add_txqs->txqs[0].txq_id << logger::endl;
-      // TODO this gets thrown leading to ctx_addr being incorrect, leading to lan_queue_tx::initialize() setting len to 0, leading to devision by 0
+      // TODO peter: this gets thrown leading to ctx_addr being incorrect, leading to lan_queue_tx::initialize() setting len to 0, leading to devision by 0
       // Problem was that the VM had 8 cores and thus allocated 8 tx queues which is more than the 4 expected here. Likely this number is just arbitrary and can be raised?
     }
     memcpy(dev.ctx_addr[add_txqs->txqs[0].txq_id], add_txqs->txqs[0].txq_ctx, sizeof(u8)*22);
@@ -538,6 +662,8 @@ void queue_admin_tx::admin_desc_ctx::process() {
 
     // dev.last_used_parent_node = dev.last_returned_node+1;
     // dev.lanmgr.qena_updated(add_txqs->txqs[0].txq_id, false);
+    dev.regs.qtx_ena[idx] = QRX_CTRL_QENA_REQ_M;
+    dev.lanmgr.qena_updated(idx, false);
     desc_complete_indir(0, data, d->datalen);
   // } else if (d->opcode == ice_aqc_opc_add_rdma_qset) {
   //   struct ice_aqc_add_rdma_qset *add_txqs_cmd = reinterpret_cast<ice_aqc_add_rdma_qset *> (d->params.raw);
@@ -560,27 +686,83 @@ void queue_admin_tx::admin_desc_ctx::process() {
     desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_download_pkg) {
     struct ice_aqc_download_pkg *download_pkg = reinterpret_cast<ice_aqc_download_pkg *> (d->params.raw);
-    struct ice_aqc_download_pkg_resp download_pkg_resp;
-    // download_pkg_resp.error_info = ICE_AQ_RC_OK;
-    desc_complete_indir(0, &download_pkg_resp, sizeof(download_pkg_resp));
+    // struct ice_aqc_download_pkg_resp download_pkg_resp = *((struct ice_aqc_download_pkg_resp*)download_pkg);
+    struct ice_aqc_download_pkg_resp *download_pkg_resp = (struct ice_aqc_download_pkg_resp*)download_pkg;
+    download_pkg_resp->error_info = ICE_AQ_RC_OK;
+    download_pkg_resp->error_offset = 0;
+    desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_add_sw_rules) {
     struct ice_aqc_sw_rules *add_sw_rules_cmd = reinterpret_cast<ice_aqc_sw_rules *> (d->params.raw);
     struct ice_aqc_sw_rules_elem *add_sw_rules = reinterpret_cast<ice_aqc_sw_rules_elem*>(data);
+    cout <<  "  set switch config" << logger::endl;
+    
+    e810_switch::print_sw_rule(add_sw_rules);
+    __builtin_dump_struct(add_sw_rules, &printf);
+
+    bool success = dev.bcam.add_rule(add_sw_rules);
+
     add_sw_rules->type = ICE_AQC_SW_RULES_T_LKUP_TX;
     add_sw_rules->pdata.lkup_tx_rx.src = 1;
     add_sw_rules->pdata.lkup_tx_rx.index = 0;
     desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_nvm_read){
     struct ice_aqc_nvm *nvm_read_cmd = reinterpret_cast<ice_aqc_nvm *> (d->params.raw);
-    char return_data = 1 << ICE_SR_CTRL_WORD_1_S ;
-    desc_complete_indir(0, &return_data, sizeof(return_data));
+
+    uint32_t offset = 0;
+    offset |= nvm_read_cmd->offset_low;
+    offset |= (nvm_read_cmd->offset_high) << 16;
+    printf("nvm read at 0x%x\n", offset);
+
+    // copy responses observed on real hardware.
+    if (offset == 0x0) { // some control register defining nvm layout
+      uint16_t return_data = 0x78;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+    } else if (offset == 0x84) { // more registers used to calculate header length offset
+      uint16_t return_data = 0x8020;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+    } else if (offset == 0x86) {
+      uint16_t return_data = 0x41a;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+    } else if (offset == 0x88) {
+      uint16_t return_data = 0x8854;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+    } else if (offset == 0x8a) {
+      uint16_t return_data = 0x7d;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+    } else if (offset == 0x8c) {
+      uint16_t return_data = 0x894e;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+    } else if (offset == 0x8a) {
+      uint16_t return_data = 0x7;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+
+    // two registers that are queried to get a header length:
+    // ice_get_nvm_css_hdr_len+58 ICE_NVM_CSS_HDR_LEN_L and *_LEN_H
+    } else if (offset == 0x43a004) {
+      uint16_t return_data = 0xa1;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+    } else if (offset == 0x43a006) {
+      uint16_t return_data = 0x0;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+
+    // default value to return for other accesses. This value seems to work.
+    } else if (offset < 0xc00000 ) { 
+      char return_data = 1 << ICE_SR_CTRL_WORD_1_S ;
+      desc_complete_indir(0, &return_data, sizeof(return_data));
+    
+    // Simulate out of bounds access: Our physical card reports this size at most. Dpdk probes this size.
+    } else {
+      char return_data = 1 << ICE_SR_CTRL_WORD_1_S ;
+      desc_complete_indir(ICE_AQ_RC_EINVAL, &return_data, sizeof(return_data)); // -100 = ICE_ERR_AQ_ERROR
+    }
+
     // desc_complete(0);
   }
   else {
-    cout <<  "  uknown opcode=" << d->opcode << logger::endl;
+    cout <<  "  unknown opcode=0x" << std::hex << d->opcode << logger::endl;
     
 #ifdef DEBUG_ADMINQ
-    cout <<  "  uknown opcode=" << d->opcode << logger::endl;
+    cout <<  "  unknown opcode=" << d->opcode << logger::endl;
 #endif
     // desc_complete(I40E_AQ_RC_ESRCH);
     desc_complete(0);

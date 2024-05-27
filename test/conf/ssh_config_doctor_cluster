@@ -6,6 +6,7 @@ IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 StrictHostKeyChecking=no
+LogLevel=ERROR
 
 Host rose.christina
 Hostname rose.dse.in.tum.de
@@ -14,6 +15,7 @@ StrictHostKeyChecking=no
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 StrictHostKeyChecking=no
+LogLevel=ERROR
 
 Host wilfred.christina
 Hostname wilfred.dse.in.tum.de
@@ -22,6 +24,7 @@ StrictHostKeyChecking=no
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 StrictHostKeyChecking=no
+LogLevel=ERROR
 
 Host river.christina
 Hostname river.dse.in.tum.de

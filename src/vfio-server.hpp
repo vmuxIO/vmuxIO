@@ -390,11 +390,12 @@ public:
       printf("%p\n", p);
     }
     printf("}\n");
+    __builtin_dump_struct(info, &printf);
 
     // info->mapping indicates if mapped
     if (!info->mapping.iov_base) {
       printf("Region not mapped, nothing to do\n");
-      return false;
+      return false; // fake success (actually what is success value expected?)
     }
 
     if (!vfu->mapped.count(info->iova.iov_base)) {
@@ -408,10 +409,13 @@ public:
       printf("Why?\n");
       // return;
     }
+    vfu->mappings.erase(info->iova.iov_base);
+    vfu->mapped.erase(info->vaddr);
+    vfu->sgs.erase(info->vaddr);
 
     // TODO should probably return with vfu_sgl_put()
 
-    return true;
+    return false; // false means success...
   }
 
   /* Convert dma addr (iova) to addr where it is locally mapped

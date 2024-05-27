@@ -18,6 +18,10 @@
  */
 class InterruptThrottlerSimbricks: public InterruptThrottler {
   public:
+
+  // dont trigger irqs if the guest kernels pci driver masked the interrupt
+  bool guest_unmasked_irq = true; 
+
   struct timespec time_ = {};
   // ulong interrupt_spacing = 250 * 1000; // nsec
   std::atomic<bool> armed = false;
@@ -106,6 +110,10 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
    */
 
   __attribute__((noinline)) ulong try_interrupt(ulong mindelay, bool int_pending) {
+    if (!this->guest_unmasked_irq) {
+      return 0;
+    }
+
     this->spacing = mindelay;
     // this->globalIrq->update(); // disable for now due to high overhead
     // struct itimerspec its = {};
@@ -166,9 +174,14 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
 
   __attribute__((noinline)) void send_interrupt() {
     int ret = vfu_irq_trigger(this->vfuServer->vfu_ctx, this->irq_idx);
-    if_log_level(LOG_DEBUG, printf("Triggered interrupt. ret = %d, errno: %d\n", ret, errno));
+    if_log_level(LOG_DEBUG, printf("Triggered interrupt %d. ret = %d, errno: %d\n", this->irq_idx, ret, errno));
     if (ret < 0) {
-      die("Cannot trigger MSIX interrupt %d", this->irq_idx);
+      if (errno == ENOENT) {
+        // Libvfio-user may not have an eventfd to trigger the irq if the guest PCI driver never set up irq routing.
+        if_log_level(LOG_DEBUG, printf("Suppressing interrupt %d because guest didnt set up interrupt routing.\n", this->irq_idx));
+      } else {
+        die("Cannot trigger MSIX interrupt %d", this->irq_idx);
+      }
     }
   }
 };

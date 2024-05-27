@@ -34,18 +34,27 @@ typedef uint64_t __le64;
 
 // #include <include/linux/bitfield.h>
 
-// #include "sims/nic/e810_bm/base/i40e_adminq_cmd.h"
-// #include "sims/nic/e810_bm/base/i40e_devids.h"
-// #include "sims/nic/e810_bm/base/i40e_register.h"
-// #include "sims/nic/e810_bm/base/i40e_rxtxq.h"
 #include "sims/nic/e810_bm/base/ice_devids.h"
 #include "sims/nic/e810_bm/base/ice_type.h"
 #include "sims/nic/e810_bm/base/ice_hw_autogen.h"
 #include "sims/nic/e810_bm/base/ice_adminq_cmd.h"
 #include "sims/nic/e810_bm/base/ice_lan_tx_rx.h"
-#include "sims/nic/e810_bm/base/icrdma_hw.h"
-#include "sims/nic/e810_bm/base/defs.h"
-#include "sims/nic/e810_bm/base/hmc.h"
+#include "sims/nic/e810_bm/base/ice_status.h"
+#include "sims/nic/e810_bm/base_linux/defs.h" // from linux drivers/infiniband/hw/irdma/defs.h
+#include "sims/nic/e810_bm/base_linux/icrdma_hw.h" // from linux drivers/infiniband/hw/irdma/icrdma_hw.c
+
+// linux ice_lan_tx_rx.h
+#define ICE_ITR_GRAN_S		1	/* ITR granularity is always 2us */
+#define ICE_ITR_GRAN_US		BIT(ICE_ITR_GRAN_S)
+
+/* Vendor ID */
+#define E810_INTEL_VENDOR_ID		0x8086
+
+
+
+
+
+
 
 
 /* from i40e_types.h */

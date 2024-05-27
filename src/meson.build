@@ -1,5 +1,6 @@
 sources += files(
     'main.cpp', 'util.cpp', 'caps.cpp', 'interrupts/global.cpp',
+    'sims/nic/e810_bm/e810_switch.cc',
     'sims/nic/e810_bm/e810_bm.cc', 'sims/nic/e810_bm/logger.cc',
     'sims/nic/e810_bm/e810_adminq.cc', 'sims/nic/e810_bm/e810_ceq.cc',
     'sims/nic/e810_bm/e810_cqp.cc', 'sims/nic/e810_bm/e810_hmc.cc',

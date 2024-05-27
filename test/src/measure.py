@@ -279,9 +279,9 @@ class AbstractBenchTest(ABC):
     @abstractmethod
     def estimated_runtime(self) -> float:
         """
-        estimate time needed to run this benchmark excluding boottime in seconds
+        estimate time needed to run this benchmark excluding boottime in seconds. Return -1 if unknown.
         """
-        raise Exception("unimplemented")
+        raise -1
 
     def output_filepath(self, repetition: int):
         return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.log")
@@ -335,12 +335,16 @@ class AbstractBenchTest(ABC):
         total = 0
         needed = 0
         needed_s = 0.0
+        unknown_runtime = False
         for test_args in product_dict(test_matrix):
             test = cls(**test_args)
             total += 1
             if test.needed():
                 needed += 1
-                needed_s += test.estimated_runtime()
+                estimated_runtime = test.estimated_runtime()
+                if estimated_runtime == -1:
+                    unknown_runtime = True
+                needed_s += estimated_runtime
 
         # args not relevant for reboots
         args_no_reboot = [ key for key in test_matrix.keys() if key not in args_reboot ]
@@ -354,7 +358,10 @@ class AbstractBenchTest(ABC):
             test = cls(**test_args)
             needed_s += Measurement.estimated_boottime(test.num_vms)
 
-        info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
+        if unknown_runtime:
+            info(f"Test not cached yet: {needed}/{total}. Time to completion not known.")
+        else:
+            info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
 
         return needed_s
 

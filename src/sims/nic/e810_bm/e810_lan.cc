@@ -150,7 +150,10 @@ void lan::packet_received(const void *data, size_t len) {
 #endif
 
   uint32_t hash = 0;
-  uint16_t queue = 0;
+  // if the driver uses VSIs, it reserves queue 0 as VSI control queue. 
+  // Rss may have to account for that.
+  uint16_t queue = dev.vsi0_first_queue + 0;
+  this->dev.bcam.select_queue(data, len, &queue);
   rss_steering(data, len, queue, hash);
   if (!rxqs[queue]->is_enabled()) {
     // if we receive on uninitialized queues, we throw errors
@@ -159,6 +162,25 @@ void lan::packet_received(const void *data, size_t len) {
     #endif
     return; // silently drop packet
   }
+
+  // Obacht! Ineffizient :*)
+  while (false) { // while true: deliver packets in round robin fashion to queues
+    // wrap if initialized to -1
+    this->rss_last_queue = this->rss_last_queue % this->num_qs;
+    // try next queue
+    this->rss_last_queue = (this->rss_last_queue + 1) % this->num_qs;
+    // if we wrapped, skip vsi0 first queues
+    this->rss_last_queue = std::max(this->rss_last_queue, dev.vsi0_first_queue);
+
+    if (rxqs[this->rss_last_queue]->is_enabled()) {
+      queue = this->rss_last_queue;
+      break;
+    }
+  }
+
+  #ifdef DEBUG_LAN
+    std::cout << "rx packet queue " << std::dec << queue << "."<< logger::endl;
+  #endif
   rxqs[queue]->packet_received(data, len, hash);
 }
 
@@ -215,7 +237,7 @@ void lan_queue_base::disable() {
 }
 
 void lan_queue_base::interrupt() {
-  uint32_t qctl = reg_intqctl;
+  uint32_t qctl = reg_intqctl; // regs.qint_rqctl
   int index = reg_intqctl & QINT_TQCTL_MSIX_INDX_M;
   uint32_t gctl = lanmgr.dev.regs.pfint_dyn_ctln[index];
 #ifdef DEBUG_LAN
@@ -275,18 +297,13 @@ void lan_queue_rx::reset() {
 }
 
 void lan_queue_rx::initialize() {
-#ifdef DEBUG_LAN
-  std::cout << " lan_queue_rx initialize()" << logger::endl;
-  // dev.qrx_enabled = true;
-
-#endif
-  
+  uint32_t packed_ctx[8]; // Each QRX_CONTEXT queue has 8 registers
   for (int i = 0; i < 8; i++)
   { 
-    int index = QRX_CONTEXT(i, idx)-QRX_CONTEXT(0,0);
-    dev.ctx[i] = dev.regs.QRX_CONTEXT[index];
+    int index = (QRX_CONTEXT(i, idx)-QRX_CONTEXT(0,0)) / 4; // byte offset / 4 = uint32_t* offset
+    packed_ctx[i] = dev.regs.QRX_CONTEXT[index];
   }
-  uint8_t *ctx_p = reinterpret_cast<uint8_t *>(dev.ctx);
+  uint8_t *ctx_p = reinterpret_cast<uint8_t *>(&(packed_ctx[0]));
   
   uint16_t *head_p = reinterpret_cast<uint16_t *>(ctx_p + 0);
   uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 4);
@@ -299,6 +316,7 @@ void lan_queue_rx::initialize() {
 
   base = ((*base_p) & ((1ULL << 57) - 1)) * 128;
   len = (*qlen_p >> 1) & ((1 << 13) - 1);
+  printf("rx_init this 0x%p len %d (0x%p)\n", this, len, &len);
 
   dbuff_size = (((*dbsz_p) >> 6) & ((1 << 7) - 1)) * 128;
   hbuff_size = (((*hbsz_p) >> 5) & ((1 << 5) - 1)) * 64;
@@ -307,7 +325,13 @@ void lan_queue_rx::initialize() {
   desc_len = (longdesc ? 32 : 16);
   crc_strip = !!(((*hbsz_p) >> 13) & 0x1);
   rxmax = (((*rxmax_p) >> 6) & ((1 << 14) - 1)) * 128;
-  std::cout<<" base: " << base << logger::endl;
+
+// #ifdef DEBUG_LAN
+  std::cout << " lan_queue_rx " << this->qname << " initialize() -> iova 0x" << std::hex << base << logger::endl;
+  // dev.qrx_enabled = true;
+
+// #endif
+  
   
   if (!longdesc) {
     std::cout << "lan_queue_rx::initialize: currently only 32B descs "
@@ -425,18 +449,21 @@ void lan_queue_tx::reset() {
 }
 
 void lan_queue_tx::initialize() {
-#ifdef DEBUG_LAN
-  std::cout << " initialize()" << logger::endl;
-#endif
-  uint8_t *ctx_p = reinterpret_cast<uint8_t *>(dev.ctx_addr);
+  uint8_t *ctx_p = reinterpret_cast<uint8_t *>(dev.ctx_addr[idx]);
 
-  uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
-  uint16_t *hwb_qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 16);
+  // Table 10-29. LAN Tx-Queue Context in the QTXCOMM_CNTX Array
+  uint64_t *base_p;
+  uint32_t *hwb_qlen_p;
+  base_p = reinterpret_cast<uint64_t *>(ctx_p + 0);
+  hwb_qlen_p = reinterpret_cast<uint32_t *>(ctx_p + 16);
+  base = ((*base_p) & ((1ULL << 57) - 1))*128; // + idx * sizeof(ice_tx_desc); // bit 0 - 56
+  len = ((*hwb_qlen_p) >> 7) & ((1 << 14) - 1); // bit 135 (12 bits long)
   uint64_t *hwb_p = reinterpret_cast<uint64_t *>(ctx_p + 12);
 
-  base = ((*base_p) & ((1ULL << 57) - 1))*128 + idx * sizeof(ice_tx_desc);
-  len = ((*hwb_qlen_p) >> 7) & ((1 << 13) - 1);
 
+// #ifdef DEBUG_LAN
+  std::cout << " lan_queue_tx " << this->qname << " initialize() -> iova 0x" << std::hex << base << logger::endl;
+// #endif
   hwb = !!((*hwb_p) >> 5 & (1 << 0));
 #ifdef DEBUG_LAN
   // std::cout << "  head=" << reg_dummy_head << " base=" << base << " len=" << len

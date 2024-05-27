@@ -248,6 +248,7 @@
         ninja
         boost
         gdb
+        bpftrace
         (writeScriptBin "devmem" ''
           ${busybox}/bin/devmem $@
         '')
@@ -302,6 +303,8 @@
           # dependencies for nic-emu
           rustc
           cargo
+          # dependencies for vmux
+          libbsd
         ] ++ common_deps;
         hardeningDisable = [ "all" ];
 

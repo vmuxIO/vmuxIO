@@ -34,9 +34,11 @@ extern "C" {
 }
 #include <src/libsimbricks/simbricks/nicbm/nicbm.h>
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
+#include "sims/nic/e810_bm/e810_bm.h"
 
 // #define DEBUG_DEV
 // #define DEBUG_ADMINQ
+// #define DEBUG_QUEUES
 // #define DEBUG_LAN
 // #define DEBUG_HMC
 // #define DEBUG_QUEUES
@@ -264,7 +266,7 @@ class queue_admin_tx : public queue_base {
    protected:
     queue_admin_tx &aq;
     e810_bm &dev;
-    struct i40e_aq_desc *d;
+    struct ice_aq_desc *d;
     // struct ice_aq_desc *ice_d;
     
     
@@ -718,6 +720,7 @@ class lan {
   const size_t num_qs;
   lan_queue_rx **rxqs;
   lan_queue_tx **txqs;
+  size_t rss_last_queue = -1; // may be used to serve queues in round robin fashion. Consumers shall wrap to MIN_QUEUE value if this exceeds MAX_QUEUE value.
 
   bool rss_steering(const void *data, size_t len, uint16_t &queue,
                     uint32_t &hash);
@@ -762,6 +765,17 @@ class shadow_ram {
   void write(uint16_t addr, uint16_t val);
 };
 
+class e810_switch {
+  std::map<uint64_t, uint16_t> mac_rules; // dst mac address (odd alignment/byte order...) -> dst queue idx
+
+  public:
+
+  bool add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
+
+  void select_queue(const void* data, size_t len, uint16_t* queue);
+
+  static void print_sw_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
+};
 
 class e810_bm : public nicbm::Runner::Device {
  protected:
@@ -786,9 +800,8 @@ class e810_bm : public nicbm::Runner::Device {
   static const uint16_t MAX_MTU = 2048;
   static const uint8_t NUM_ITR = 3;
   static const uint32_t NUM_RXDID = 64;
-  uint32_t QRX_CONTEXT[8192*4];
-  uint32_t ctx[8];
-
+  static const uint16_t NUM_FD_GUAR = 8192;
+  static const uint16_t NUM_FD_BEST_EFFORT = 8192;
   
 
   struct i40e_regs {
@@ -812,7 +825,7 @@ class e810_bm : public nicbm::Runner::Device {
     uint32_t glnvm_srdata;
 
     uint32_t qint_tqctl[NUM_QUEUES];
-    uint32_t qtx_ena[2048];
+    uint32_t qtx_ena[2048]; // does not exist in reality (replaced by admin command), but we just use the same format as for qrx_ena.
     uint32_t qtx_tail[NUM_QUEUES];
     uint32_t qtx_ctl[NUM_QUEUES];
     uint32_t qint_rqctl[NUM_QUEUES];
@@ -879,7 +892,7 @@ class e810_bm : public nicbm::Runner::Device {
     uint32_t QRXFLXP_CNTXT[2048];
     uint32_t qtx_comm_head[NUM_QUEUES];
 
-    uint32_t QRX_CONTEXT[QRX_CONTEXT(7, 2047)];
+    uint32_t QRX_CONTEXT[8*2048]; // 8 registers per queue
 
     uint32_t GLINT_ITR0[2048];
     uint32_t GLINT_ITR1[2048];
@@ -971,10 +984,14 @@ class e810_bm : public nicbm::Runner::Device {
   shadow_ram shram;
   lan lanmgr;
   completion_event_manager cem;
+  e810_switch bcam; // binary content addressable memory aka switch
 
-  u8 ctx_addr[4][22];
+  u8 ctx_addr[2048][22]; // 22 byte descriptors for each tx queue
   int last_used_parent_node = 3;
-  int last_returned_node = 7;
+#define E810_STATIC_NODES 59
+  int last_returned_node = E810_STATIC_NODES + 1; // actually, i believe this is the next returned node
+  std::map<int, struct ice_aqc_txsched_elem_data*> sched_nodes; // allocated nodes
+  size_t vsi0_first_queue = 0; // index to use for first VSI queue (or 0 if VSI disabled)
 
 
 

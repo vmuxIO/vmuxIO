@@ -1,15 +1,19 @@
 iommu_on: true
-hugepages1G: 0
+hugepages1G: 8
 devices:
   - name: ethLoadgen
     pci: "00:06.0"
-    if: ens7 # ens7 with vm-libvfio-user and vmux
+    if: enp0s6
     mac: b4:96:91:aa:a1:c0
     type: Intel E810-C 100G
     pciid: 8086:1592
     # known good versions:
     firmware-versions: 
-      - "2.15 0x800049c3 1.2789.0"
-      - "2.30 0x80005d1e 1.2877.0"
-    dpdk-driver: igb_uio
+      # - "2.15 0x800049c3 1.2789.0"
+      # - "2.30 0x80005d1e 1.2877.0"
+      # The only one that can do rte_flow: ~>4.x
+      - "4.40 0x8001c979 1.3534.0"
+      # vmux reports wrong firmware string i think
+      - "0.40 0x400040 0.0.0"
+    dpdk-driver: vfio-pci
     kernel-driver: ice
