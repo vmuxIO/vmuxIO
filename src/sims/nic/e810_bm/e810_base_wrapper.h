@@ -34,10 +34,6 @@ typedef uint64_t __le64;
 
 // #include <include/linux/bitfield.h>
 
-// #include "sims/nic/e810_bm/base/i40e_adminq_cmd.h"
-// #include "sims/nic/e810_bm/base/i40e_devids.h"
-// #include "sims/nic/e810_bm/base/i40e_register.h"
-// #include "sims/nic/e810_bm/base/ice_rxtxq.h" // replaced by ice_hw_autogen.h
 #include "sims/nic/e810_bm/base/ice_devids.h"
 #include "sims/nic/e810_bm/base/ice_type.h"
 #include "sims/nic/e810_bm/base/ice_hw_autogen.h"
@@ -46,7 +42,6 @@ typedef uint64_t __le64;
 #include "sims/nic/e810_bm/base/ice_status.h"
 #include "sims/nic/e810_bm/base_linux/defs.h" // from linux drivers/infiniband/hw/irdma/defs.h
 #include "sims/nic/e810_bm/base_linux/icrdma_hw.h" // from linux drivers/infiniband/hw/irdma/icrdma_hw.c
-// #include "sims/nic/e810_bm/base/hmc.h" // do we need this?
 
 // linux ice_lan_tx_rx.h
 #define ICE_ITR_GRAN_S		1	/* ITR granularity is always 2us */
