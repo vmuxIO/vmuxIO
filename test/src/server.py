@@ -1963,12 +1963,12 @@ class Guest(Server):
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
 
 
-    def start_iperf_server(self, ipt: "IPerfTest"):
+    def start_iperf_server(self, server_hostname: str):
         """
         Starts an iperf server listening on port "port". Returns the ip address the server is bound to.
         """
 
-        self.tmux_new("iperf3-server", f"iperf3 -s --bind {ipt.guest_hostname} -p {ipt.port}")
+        self.tmux_new("iperf3-server", f"iperf3 -s --bind {server_hostname}")
     
 
     def stop_iperf_server(self):
@@ -2153,7 +2153,7 @@ class LoadGen(Server):
         self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
 
 
-    def run_iperf_client(self, ipt: "IPerfTest", repetition: int):
+    def run_iperf_client(self, ipt: "IPerfTest", runtime: int, server_hostname: str, output_path: str, tmp_out_path: str):
         """
         Starts iperf client
         """
@@ -2172,9 +2172,9 @@ class LoadGen(Server):
         elif ipt.direction != "forward":
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
 
-    
-        info("Starting iperf client on " + ipt.guest_hostname + ":" + str(ipt.port))
+        info("Starting iperf client on " + server_hostname)
+        self.tmux_new("iperf3-client", f"iperf3 -c {server_hostname} -t {runtime} {options} | tee {tmp_out_path}; cp {tmp_out_path} {output_path}; sleep 999")
 
-        # create output folder since it might not exist
-        self.exec(f"mkdir -p {path_dirname(ipt.output_path_per_vm(ipt.direction, repetition, ipt.num_vms))}")
-        self.exec(f"iperf3 -c {ipt.guest_hostname} -p {str(ipt.port)} {options} | sudo tee {ipt.output_path_per_vm(ipt.direction, repetition, ipt.num_vms)}")
+
+    def stop_iperf_client(self):
+        self.tmux_kill("iperf3-client")
