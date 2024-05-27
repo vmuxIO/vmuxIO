@@ -394,11 +394,11 @@ public:
 
     // info->mapping indicates if mapped
     if (!info->mapping.iov_base) {
-      printf("Region not mapped, nothing to do\n"); // 2
+      printf("Region not mapped, nothing to do\n");
       return false; // fake success (actually what is success value expected?)
     }
 
-    if (!vfu->mapped.count(info->iova.iov_base)) { // 1, 3, ...
+    if (!vfu->mapped.count(info->iova.iov_base)) {
       printf("Region seems not to be mapped\n");
       // return;
     }

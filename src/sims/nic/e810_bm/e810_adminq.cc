@@ -526,7 +526,6 @@ void queue_admin_tx::admin_desc_ctx::process() {
 
     desc_complete_indir(0, &dev.topo_elem, sizeof(dev.topo_elem));
   } else if (d->opcode == ice_aqc_opc_get_sched_elems) {
-    // actually, this should return what was set via ice_aqc_opc_add_sched_elems, but we just hardcode it
     struct ice_aqc_sched_elem_cmd *get_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
     get_elem_cmd->num_elem_resp = 1;
     struct ice_aqc_txsched_elem_data *get_elem = reinterpret_cast<struct ice_aqc_txsched_elem_data*> (data);
@@ -649,9 +648,9 @@ void queue_admin_tx::admin_desc_ctx::process() {
     add_txqs->txqs[0].info.cir_bw.bw_alloc = 100;
     add_txqs->txqs[0].info.eir_bw.bw_alloc = 100;
     cout<< "ice_aqc_opc_add_txqs. txd id = "<< add_txqs->txqs[0].txq_id << logger::endl;
-    if (add_txqs->txqs[0].txq_id >=4){ // TODO
+    if (add_txqs->txqs[0].txq_id >=4){
       cout<< "ice_aqc_opc_add_txqs error. txd id = "<< add_txqs->txqs[0].txq_id << logger::endl;
-      // TODO this gets thrown leading to ctx_addr being incorrect, leading to lan_queue_tx::initialize() setting len to 0, leading to devision by 0
+      // TODO peter: this gets thrown leading to ctx_addr being incorrect, leading to lan_queue_tx::initialize() setting len to 0, leading to devision by 0
       // Problem was that the VM had 8 cores and thus allocated 8 tx queues which is more than the 4 expected here. Likely this number is just arbitrary and can be raised?
     }
     memcpy(dev.ctx_addr[add_txqs->txqs[0].txq_id], add_txqs->txqs[0].txq_ctx, sizeof(u8)*22);
