@@ -1773,7 +1773,7 @@ class Host(Server):
         args = ""
         dpdk_args = ""
         vmux_mode = ""
-        vmux_socket = ""
+        vmux_socket = f"{self.vmux_socket_path}"
         if interface.is_passthrough():
             args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
         if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810 ]:
@@ -1784,7 +1784,6 @@ class Host(Server):
             vmux_mode = "e1000-emu"
         if not interface.is_passthrough():
             if num_vms == 0:
-                vmux_socket = f"{self.vmux_socket_path}"
                 args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'
             else:
                 for vm_number in MultiHost.range(num_vms):
