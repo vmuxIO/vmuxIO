@@ -73,7 +73,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_DPDK_E810 
           ]
     directions = [ "forward" ]
-    vm_nums = [ 1, 2 ]
+    vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
     repetitions = 3
     DURATION_S = 61 if not BRIEF else 11
     if BRIEF:
@@ -138,29 +138,27 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     except Exception:
                         pass
 
-                    try:
-                        guest.setup_test_iface_ip_net()
-                        loadgen.setup_test_iface_ip_net()
+                    guest.setup_test_iface_ip_net()
+                    loadgen.setup_test_iface_ip_net()
 
-                        for repetition in range(repetitions):
-                            remote_output_file = "/tmp/iperf_result.json"
-                            tmp_remote_output_file = "/tmp/tmp_iperf_result.json"
-                            local_output_file = ipt.output_filepath(repetition)
-                            loadgen.exec(f"sudo rm {remote_output_file} || true")
-                            loadgen.exec(f"sudo rm {tmp_remote_output_file} || true")
+                    for repetition in range(repetitions):
+                        remote_output_file = "/tmp/iperf_result.json"
+                        tmp_remote_output_file = "/tmp/tmp_iperf_result.json"
+                        local_output_file = ipt.output_filepath(repetition)
+                        loadgen.exec(f"sudo rm {remote_output_file} || true")
+                        loadgen.exec(f"sudo rm {tmp_remote_output_file} || true")
 
-                            info("Starting iperf")
-                            guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
-                            loadgen.run_iperf_client(ipt, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file, tmp_remote_output_file)
-                            time.sleep(DURATION_S)
-                            
-                            try:
-                                loadgen.wait_for_success(f'[[ -e {remote_output_file} ]]')
-                            except TimeoutError:
-                                error('Waiting for output file timed out.')
-                            loadgen.copy_from(remote_output_file, local_output_file)
+                        info("Starting iperf")
+                        guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
+                        loadgen.run_iperf_client(ipt, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file, tmp_remote_output_file)
+                        time.sleep(DURATION_S)
+                        
+                        try:
+                            loadgen.wait_for_success(f'[[ -e {remote_output_file} ]]')
+                        except TimeoutError:
+                            error('Waiting for output file timed out.')
+                        loadgen.copy_from(remote_output_file, local_output_file)
 
-                    finally:
                         # teardown
                         guest.stop_iperf_server()
                         loadgen.stop_iperf_client()
