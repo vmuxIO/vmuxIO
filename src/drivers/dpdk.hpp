@@ -362,7 +362,7 @@ public:
 		this->port_id = port_id;
 
 		/* Initializing all ports. 8< */
-		filtering_init_port(port_id, nr_queues, mbuf_pool);
+		filtering_init_port(port_id, nr_queues + 10, mbuf_pool); // TODO (peter)
 		// RTE_ETH_FOREACH_DEV(portid)
 		// 	if (port_init(portid, mbuf_pool) != 0)
 		// 		rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
@@ -504,8 +504,32 @@ public:
     this->nb_bufs_used = 0;
   }
 
-  virtual bool add_switch_rule(uint64_t mac_addr, uint16_t dst_queue) {
+  virtual bool add_switch_rule(uint64_t dst_addr, uint16_t dst_queue) {
   	printf("dpdk add switch rule\n");
-  	return false;
+
+		struct rte_flow_error error;
+  	struct rte_flow* flow;
+		struct rte_ether_addr src_mac;
+		struct rte_ether_addr src_mask;
+		struct rte_ether_addr dest_mac;
+		struct rte_ether_addr dest_mask;
+
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);
+		// rte_ether_unformat_addr("52:54:00:fa:00:60", &dest_mac);
+		rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
+
+		memcpy(&dest_mac, (void*)&dst_addr, 6);
+		flow = generate_eth_flow(port_id, dst_queue,
+					&src_mac, &src_mask,
+					&dest_mac, &dest_mask, &error);
+		if (!flow) {
+			printf("Flow can't be created %d message: %s\n",
+				error.type,
+				error.message ? error.message : "(no stated reason)");
+			return false;
+		}
+
+  	return true;
   }
 };
