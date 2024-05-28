@@ -318,6 +318,12 @@ private:
 	struct rte_mbuf *bufs[BURST_SIZE];
 	uint16_t port_id;
 
+	const uint16_t max_queues_per_vm = 4;
+
+	uint16_t get_queue_id(int vm, int queue) {
+		return vm * this->max_queues_per_vm + queue;
+	}
+
 public:
 	Dpdk(int num_vms, const uint8_t (*mac_addr)[6], int argc, char *argv[]) {
 		this->alloc_rx_lists(BURST_SIZE);
@@ -356,7 +362,7 @@ public:
 			rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
 		static uint16_t port_id = 0;
-		static uint16_t nr_queues = num_vms * 4; // allocate n queues per VM
+		static uint16_t nr_queues = num_vms * this->max_queues_per_vm;
 		struct rte_flow *flow;
 		struct rte_flow_error error;
 		this->port_id = port_id;
@@ -467,15 +473,15 @@ public:
 	 	 * Receive packets on a port and forward them on the same
 	 	 * port. 
 	 	 */
-		// for (int queue_id = 0; queue_id < 2; queue_id++) {
-		int queue_id = vm_id;
+		for (int q_idx = 0; q_idx < this->max_queues_per_vm; q_idx++) {
+			int queue_id = this->get_queue_id(vm_id, q_idx);
 
 			/* Get burst of RX packets, from first port of pair. */
 			const uint16_t nb_rx = rte_eth_rx_burst(port, queue_id,
 					this->bufs, BURST_SIZE);
 
 			if (unlikely(nb_rx == 0))
-				return;
+				continue;
 				// continue;
 
 			// pass pointers to packet buffers via rxBufs to behavioral model
@@ -493,7 +499,7 @@ public:
 				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}
 			this->nb_bufs_used = nb_rx;
-		// }
+		}
   }
 
   virtual void recv_consumed(int vm_id) {
