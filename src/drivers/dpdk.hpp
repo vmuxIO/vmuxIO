@@ -356,13 +356,13 @@ public:
 			rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
 		static uint16_t port_id = 0;
-		static uint16_t nr_queues = num_vms;
+		static uint16_t nr_queues = num_vms * 4; // allocate n queues per VM
 		struct rte_flow *flow;
 		struct rte_flow_error error;
 		this->port_id = port_id;
 
 		/* Initializing all ports. 8< */
-		filtering_init_port(port_id, nr_queues + 10, mbuf_pool); // TODO (peter)
+		filtering_init_port(port_id, nr_queues, mbuf_pool);
 		// RTE_ETH_FOREACH_DEV(portid)
 		// 	if (port_init(portid, mbuf_pool) != 0)
 		// 		rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
