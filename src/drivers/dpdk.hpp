@@ -510,7 +510,7 @@ public:
     this->nb_bufs_used = 0;
   }
 
-  virtual bool add_switch_rule(uint64_t dst_addr, uint16_t dst_queue) {
+  virtual bool add_switch_rule(int vm_id, uint64_t dst_addr, uint16_t dst_queue) {
   	printf("dpdk add switch rule\n");
 
 		struct rte_flow_error error;
@@ -526,7 +526,7 @@ public:
 		rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
 
 		memcpy(&dest_mac, (void*)&dst_addr, 6);
-		flow = generate_eth_flow(port_id, dst_queue,
+		flow = generate_eth_flow(port_id, this->get_queue_id(vm_id, dst_queue),
 					&src_mac, &src_mask,
 					&dest_mac, &dest_mask, &error);
 		if (!flow) {
