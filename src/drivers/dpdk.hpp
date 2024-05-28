@@ -503,4 +503,9 @@ public:
 		
     this->nb_bufs_used = 0;
   }
+
+  virtual bool add_switch_rule(uint64_t mac_addr, uint16_t dst_queue) {
+  	printf("dpdk add switch rule\n");
+  	return false;
+  }
 };

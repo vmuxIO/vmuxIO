@@ -133,7 +133,7 @@ class Runner {
 
   class Device {
    public:
-    Runner *runner_; // vmux leaves this at null and replaces it with CallbackAdaptor // TODO replace all usages of runner by vmux
+    Runner *runner_; // vmux leaves this at null and replaces it with CallbackAdaptor
     std::shared_ptr<CallbackAdaptor> vmux;
 
    protected:

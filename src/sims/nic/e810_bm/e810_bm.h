@@ -767,8 +767,11 @@ class shadow_ram {
 
 class e810_switch {
   std::map<uint64_t, uint16_t> mac_rules; // dst mac address (odd alignment/byte order...) -> dst queue idx
+  e810_bm &dev;
 
   public:
+
+  e810_switch(e810_bm &dev_) : dev(dev_) {};
 
   bool add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
 

@@ -43,7 +43,8 @@ e810_bm::e810_bm()
       cqp(*this, regs.reg_PFPE_CCQPHIGH, regs.reg_PFPE_CCQPLOW, regs.pf_atqh, regs.pf_atqt),
       shram(*this),
       lanmgr(*this, NUM_QUEUES),
-      cem(*this, NUM_QUEUES) {
+      cem(*this, NUM_QUEUES),
+      bcam(*this) {
   reset(false);
 }
 

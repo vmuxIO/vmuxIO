@@ -37,4 +37,9 @@ public:
   virtual void send(const char *buf, const size_t len) = 0;
   virtual void recv(int vm_id) = 0;
   virtual void recv_consumed(int vm_id) = 0;
+
+  // return false if rule cant be allocated
+  virtual bool add_switch_rule(uint64_t mac_addr, uint16_t dst_queue) {
+    return false;
+  }
 };
