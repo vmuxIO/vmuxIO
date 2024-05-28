@@ -55,7 +55,7 @@ private:
 public:
   std::shared_ptr<i40e::e810_bm> model;
 
-  E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(driver) {
+  E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(device_id, driver) {
     this->driver = driver;
     memcpy((void*)this->mac_addr, mac_addr, 6);
 

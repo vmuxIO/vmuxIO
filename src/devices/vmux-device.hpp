@@ -69,17 +69,19 @@ public:
 
   std::shared_ptr<Driver> driver;
 
+  int device_id;
+
   callback_fn rx_callback;
 
   virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) = 0;
 
-  VmuxDevice(std::shared_ptr<Driver> driver) : driver(driver), rx_callback(NULL) {};
+  VmuxDevice(int device_id, std::shared_ptr<Driver> driver) : driver(driver), device_id(device_id), rx_callback(NULL) {};
 
   virtual ~VmuxDevice() = default;
 };
 
 class StubDevice : public VmuxDevice {
 public:
-  StubDevice() : VmuxDevice(NULL) { this->vfioc = NULL; }
+  StubDevice() : VmuxDevice(-1, NULL) { this->vfioc = NULL; }
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu){};
 };
