@@ -1,1 +1,2 @@
+option('e1000_emu', type : 'boolean', value : true, description : 'Link against libnic_emu to support e1000 emulation.')
 option('dont_build_libnic_emu', type : 'boolean', value : false, description : 'Skip libnic_emu subproject build. Instead expect artifacts in path.')

@@ -33,7 +33,9 @@
 
 #include "src/runner.hpp"
 
-#include "devices/e1000.hpp"
+#ifdef BUILD_E1000_EMU
+  #include "devices/e1000.hpp"
+#endif
 #include "devices/e810.hpp"
 #include "devices/passthrough.hpp"
 #include "src/devices/vmux-device.hpp"
@@ -259,8 +261,12 @@ Result<void> _main(int argc, char **argv) {
       device = std::make_shared<E810EmulatedDevice>(drivers[i], efd, &mac_addr, globalIrq);
     }
     if (modes[i] == "e1000-emu") {
+#ifdef BUILD_E1000_EMU
       device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true,
                                                      globalIrq, &mac_addr);
+#else
+      die("E1000 emulation support was disabled for this build.");
+#endif
     }
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
@@ -310,6 +316,7 @@ Result<void> _main(int argc, char **argv) {
     for (size_t i = 0; i < runner.size(); i++) {
       struct epoll_event events[1024];
 
+#ifdef BUILD_E1000_EMU
       if (foobar) {
         // simulate that the NIC received a small bogus packet
         uint64_t data = 0xdeadbeef;
@@ -317,6 +324,7 @@ Result<void> _main(int argc, char **argv) {
             ->ethRx((char *)&data, sizeof(data));
         foobar = false;
       }
+#endif
       for (size_t j = 0; j < pollingDevices.size(); j++) {
         // dpdk: do busy polling
         devices[j]->rx_callback(j, devices[j].get());
