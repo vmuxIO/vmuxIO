@@ -1,0 +1,32 @@
+# docs for this config file: https://github.com/bkryza/clang-uml/blob/master/docs/configuration_file.md
+compilation_database_dir: ../build
+output_directory: .
+diagrams:
+  sim_e810:
+    type: class
+    glob:
+      - ../src/*.hpp
+      - ../src/*.cpp
+      - ../src/*.cc
+    using_namespace: i40e
+    include:
+      namespaces:
+        - i40e
+    exclude:
+      elements:
+        - i40e::e810_bm::i40e_regs
+  # vmux:
+  #   type: class
+  #   glob:
+  #     - ../src/*.hpp
+  #     - ../src/*.cpp
+  #     - ../src/*.cc
+  #   # using_namespace: i40e
+  #   include:
+  #     context:
+  #       - E810EmulatedDevice
+  #   #   element:
+  #   #     - E810EmulatedDevice
+  #   exclude:
+  #     namespaces:
+  #       - myproject::detail

@@ -1,0 +1,762 @@
+classDiagram
+    class C_0000386084317123652512["dma_base"]
+    class C_0000386084317123652512 {
+        <<abstract>>
+        +done() : void*
+    }
+    class C_0000289207247874986057["int_ev"]
+    class C_0000289207247874986057 {
+        +int_ev() : void
+        +armed : bool
+        +vec : uint16_t
+    }
+    class C_0001003942791255495555["logger"]
+    class C_0001003942791255495555 {
+        +logger(const std::string & label_, nicbm::Runner * runner_) : void
+        +operator<<(char c) : logger &
+        +operator<<(int32_t c) : logger &
+        +operator<<(uint8_t i) : logger &
+        +operator<<(uint16_t i) : logger &
+        +operator<<(uint32_t i) : logger &
+        +operator<<(uint64_t i) : logger &
+        +operator<<(bool c) : logger &
+        +operator<<(const char * str) : logger &
+        +operator<<(void * str) : logger &
+        +endl : const char
+        #label : std::string
+        #runner : nicbm::Runner *
+        #ss : std::stringstream
+    }
+    class C_0000919830575773330865["queue_base"]
+    class C_0000919830575773330865 {
+        <<abstract>>
+        +queue_base(const std::string & qname_, uint32_t & reg_head_, uint32_t & reg_tail_, e810_bm & dev_) : void
+        #ctxs_init() : void
+        #desc_ctx_create() : desc_ctx &*
+        #do_writeback(uint32_t first_idx, uint32_t first_pos, uint32_t cnt) : void
+        #interrupt() : void
+        +is_enabled() : bool
+        #max_active_capacity() : uint32_t
+        #max_fetch_capacity() : uint32_t
+        #max_writeback_capacity() : uint32_t
+        +reg_updated() : void
+        +reset() : void
+        #trigger() : void
+        #trigger_fetch() : void
+        #trigger_process() : void
+        #trigger_writeback() : void
+        #writeback_done(uint32_t first_pos, uint32_t cnt) : void
+        #MAX_ACTIVE_DESCS : const uint32_t
+        #active_cnt : uint32_t
+        #active_first_idx : uint32_t
+        #active_first_pos : uint32_t
+        #base : uint64_t
+        #desc_ctxs : desc_ctx *[128]
+        #desc_len : size_t
+        #dev : e810_bm &
+        #enabled : bool
+        +host_cq_pa : uint64_t
+        #len : uint32_t
+        +log : logger
+        +qname : std::string
+        #reg_head : uint32_t &
+        #reg_tail : uint32_t &
+    }
+    class C_0001241611728661794294["queue_base::desc_ctx"]
+    class C_0001241611728661794294 {
+        <<abstract>>
+        #data_fetch(uint64_t addr, size_t len) : void
+        #data_fetched(uint64_t addr, size_t len) : void
+        #data_write(uint64_t addr, size_t len, const void * buf) : void
+        #data_written(uint64_t addr, size_t len) : void
+        +desc_ctx(queue_base & queue_) : void
+        +prepare() : void
+        +prepared() : void
+        +process() : void*
+        +processed() : void
+        +~desc_ctx() : void
+        +data : void *
+        +data_capacity : size_t
+        +data_len : size_t
+        +desc : void *
+        +index : uint32_t
+        #queue : queue_base &
+        +state : enum state
+    }
+    class C_0000745729693198478003["queue_base::desc_ctx::state"]
+    class C_0000745729693198478003 {
+        <<enumeration>>
+        DESC_EMPTY
+        DESC_FETCHING
+        DESC_PREPARING
+        DESC_PREPARED
+        DESC_PROCESSING
+        DESC_PROCESSED
+        DESC_WRITING_BACK
+        DESC_WRITTEN_BACK
+    }
+    class C_0000611941175840043508["queue_base::dma_fetch"]
+    class C_0000611941175840043508 {
+        +dma_fetch(queue_base & queue_, size_t len) : void
+        +done() : void
+        +~dma_fetch() : void
+        +pos : uint32_t
+        #queue : queue_base &
+    }
+    class C_0001192002937225533140["queue_base::dma_wb"]
+    class C_0001192002937225533140 {
+        +dma_wb(queue_base & queue_, size_t len) : void
+        +done() : void
+        +~dma_wb() : void
+        +pos : uint32_t
+        #queue : queue_base &
+    }
+    class C_0000775142547048794812["queue_base::dma_data_fetch"]
+    class C_0000775142547048794812 {
+        +dma_data_fetch(desc_ctx & ctx_, size_t len, void * buffer) : void
+        +done() : void
+        +~dma_data_fetch() : void
+        #ctx : desc_ctx &
+        +part_offset : size_t
+        +total_len : size_t
+    }
+    class C_0002024357221638127978["queue_base::dma_data_wb"]
+    class C_0002024357221638127978 {
+        +dma_data_wb(desc_ctx & ctx_, size_t len) : void
+        +done() : void
+        +~dma_data_wb() : void
+        #ctx : desc_ctx &
+        +part_offset : size_t
+        +total_len : size_t
+    }
+    class C_0002003870449232317281["queue_admin_tx"]
+    class C_0002003870449232317281 {
+        +queue_admin_tx(e810_bm & dev_, uint64_t & reg_base_, uint32_t & reg_len_, uint32_t & reg_head_, uint32_t & reg_tail_) : void
+        #desc_ctx_create() : desc_ctx &
+        +reg_updated() : void
+        #reg_base : uint64_t &
+        #reg_len : uint32_t &
+    }
+    class C_0000526151086617649148["queue_admin_tx::admin_desc_ctx"]
+    class C_0000526151086617649148 {
+        +admin_desc_ctx(queue_admin_tx & queue_, e810_bm & dev) : void
+        #data_written(uint64_t addr, size_t len) : void
+        #desc_compl_prepare(uint16_t retval, uint16_t extra_flags) : void
+        #desc_complete(uint16_t retval, uint16_t extra_flags = 0) : void
+        #desc_complete_indir(uint16_t retval, const void * data, size_t len, uint16_t extra_flags = 0, bool ignore_datalen = false) : void
+        +prepare() : void
+        +process() : void
+        #aq : queue_admin_tx &
+        #d : struct ice_aq_desc *
+        #dev : e810_bm &
+    }
+    class C_0000530677309574264448["completion_queue"]
+    class C_0000530677309574264448 {
+        +completion_queue(e810_bm & dev_, uint32_t & reg_high_, uint32_t & reg_low_, uint32_t & reg_head_, uint32_t & reg_tail_) : void
+        +create_cqp() : void
+        +ctx_fetched() : void
+        #desc_ctx_create() : desc_ctx &
+        +reg_updated() : void
+        +trigger() : void
+        +trigger_fetch() : void
+        +trigger_process() : void
+        +trigger_writeback() : void
+        #cqe : uint64_t[8]
+        #cqe_base : u64
+        #cqp_ctx : uint64_t[8]
+        #reg_high : uint32_t &
+        #reg_low : uint32_t &
+    }
+    class C_0000924227832482089144["completion_queue::admin_desc_ctx"]
+    class C_0000924227832482089144 {
+        +admin_desc_ctx(completion_queue & queue_, e810_bm & dev) : void
+        #data_write(uint64_t addr, size_t data_len, const void * buf) : void
+        #data_written(uint64_t addr, size_t len) : void
+        #desc_compl_prepare(uint16_t retval, uint16_t extra_flags) : void
+        #desc_complete(uint16_t retval, uint16_t extra_flags = 0) : void
+        #desc_complete_indir(uint16_t retval, const void * data, size_t len, u64 buf_addr, uint16_t extra_flags = 0, bool ignore_datalen = false) : void
+        +prepare() : void
+        +process() : void
+        #aq : completion_queue &
+        #cq_base : uint64_t
+        #d : uint64_t *
+        #dev : e810_bm &
+        #wcursor : uint32_t
+    }
+    class C_0000289190385320360042["completion_queue::dma_data_wb"]
+    class C_0000289190385320360042 {
+        +dma_data_wb(desc_ctx & ctx_, size_t len) : void
+        +done() : void
+        +~dma_data_wb() : void
+        #ctx : desc_ctx &
+        +part_offset : size_t
+        +total_len : size_t
+    }
+    class C_0001497667813054379307["completion_queue::cqe_fetch"]
+    class C_0001497667813054379307 {
+        +cqe_fetch(completion_queue & queue_, size_t len, void * buffer) : void
+        +done() : void
+        +~cqe_fetch() : void
+        #buf_addr : void *
+        #cq_ : completion_queue &
+        +pos : uint32_t
+    }
+    class C_0001103294864601894106["completion_queue::cq_ctx_fetch"]
+    class C_0001103294864601894106 {
+        +cq_ctx_fetch(completion_queue & cq, size_t len, void * buffer) : void
+        +done() : void
+        +~cq_ctx_fetch() : void
+        #buf_addr : void *
+        #cq_ : completion_queue &
+        +part_offset : size_t
+        +total_len : size_t
+    }
+    class C_0000195475260203211066["control_queue_pair"]
+    class C_0000195475260203211066 {
+        +control_queue_pair(e810_bm & dev_, uint32_t & reg_high_, uint32_t & reg_low_, uint32_t & reg_head_, uint32_t & reg_tail_) : void
+        +create_cqp() : void
+        +ctx_fetched() : void
+        #desc_ctx_create() : desc_ctx &
+        +reg_updated() : void
+        +trigger() : void
+        +trigger_fetch() : void
+        +trigger_process() : void
+        +trigger_writeback() : void
+        #cqe : uint64_t[8]
+        #cqe_base : u64
+        #cqp_ctx : uint64_t[8]
+        #reg_high : uint32_t &
+        #reg_low : uint32_t &
+    }
+    class C_0000803425317550470696["control_queue_pair::admin_desc_ctx"]
+    class C_0000803425317550470696 {
+        +admin_desc_ctx(control_queue_pair & queue_, e810_bm & dev) : void
+        #data_write(uint64_t addr, size_t data_len, const void * buf) : void
+        #data_written(uint64_t addr, size_t len) : void
+        #desc_compl_prepare(uint16_t retval, uint16_t extra_flags) : void
+        #desc_complete(uint16_t retval, uint16_t extra_flags = 0) : void
+        #desc_complete_indir(uint16_t retval, const void * data, size_t len, u64 buf_addr, uint16_t extra_flags = 0, bool ignore_datalen = false) : void
+        +prepare() : void
+        +process() : void
+        #aq : control_queue_pair &
+        #cnt : uint32_t
+        #cqp_base : uint64_t
+        #d : uint64_t *
+        #dev : e810_bm &
+    }
+    class C_0000232736345182519158["control_queue_pair::dma_data_wb"]
+    class C_0000232736345182519158 {
+        +dma_data_wb(desc_ctx & ctx_, size_t len) : void
+        +done() : void
+        +~dma_data_wb() : void
+        #ctx : desc_ctx &
+        +part_offset : size_t
+        +total_len : size_t
+    }
+    class C_0001792372639563177743["control_queue_pair::cqe_fetch"]
+    class C_0001792372639563177743 {
+        +cqe_fetch(control_queue_pair & queue_, size_t len, void * buffer) : void
+        +done() : void
+        +~cqe_fetch() : void
+        #buf_addr : void *
+        #cqp_ : control_queue_pair &
+        +pos : uint32_t
+    }
+    class C_0000960597573376293968["control_queue_pair::cqp_ctx_fetch"]
+    class C_0000960597573376293968 {
+        +cqp_ctx_fetch(control_queue_pair & cqp, size_t len, void * buffer) : void
+        +done() : void
+        +~cqp_ctx_fetch() : void
+        #buf_addr : void *
+        #cqp_ : control_queue_pair &
+        +part_offset : size_t
+        +total_len : size_t
+    }
+    class C_0001335912639478337919["completion_event_queue"]
+    class C_0001335912639478337919 {
+        +completion_event_queue(e810_bm & dev_, uint64_t ceq_base, uint32_t & reg_head_, uint32_t & reg_tail_) : void
+        +ctx_fetched() : void
+        +desc_ctx_create() : desc_ctx &
+        +disable() : void
+        +enable() : void
+        +initialize() : void
+        +interrupt() : void
+        +qena_updated(uint16_t idx) : void
+        +tail_updated(u32 msix_idx, u32 itr_idx) : void
+        +trigger() : void
+        +trigger_fetch() : void
+        +trigger_process() : void
+        +trigger_writeback() : void
+        +writeback_done(uint32_t first_pos, uint32_t cnt) : void
+        +ceq_base : u64
+        +ceq_id : u32
+        #ceq_size : uint64_t
+        +cnt : uint32_t
+        #cqe : uint64_t[8]
+        #cqp_ctx : uint64_t[8]
+        +part_offset : size_t
+        +pos : uint32_t
+        +total_len : size_t
+    }
+    class C_0001075818780252436545["completion_event_queue::dma_data_wb"]
+    class C_0001075818780252436545 {
+        +dma_data_wb(completion_event_queue & ceq_) : void
+        +done() : void
+        +~dma_data_wb() : void
+        #ceq : completion_event_queue &
+    }
+    class C_0002230002073081656889["host_mem_cache"]
+    class C_0002230002073081656889 {
+        +host_mem_cache(e810_bm & dev) : void
+        +issue_mem_op(mem_op & op) : void
+        +reg_updated(uint64_t addr) : void
+        +reset() : void
+        #MAX_SEGMENTS : const uint16_t
+        #dev : e810_bm &
+        #segs : segment[4096]
+    }
+    class C_0002077940046411990756["host_mem_cache::segment"]
+    class C_0002077940046411990756 {
+        +addr : uint64_t
+        +direct : bool
+        +pgcount : uint16_t
+        +valid : bool
+    }
+    class C_0001504307703237712490["host_mem_cache::mem_op"]
+    class C_0001504307703237712490 {
+        +failed : bool
+    }
+    class C_0000353990412923195528["lan_queue_base"]
+    class C_0000353990412923195528 {
+        <<abstract>>
+        +lan_queue_base(lan & lanmgr_, const std::string & qtype, uint32_t & reg_tail, size_t idx_, uint32_t & reg_ena_, uint32_t & fpm_basereg, uint32_t & reg_intqctl, uint16_t ctx_size) : void
+        #ctx_fetched(bool rx) : void
+        #ctx_written_back() : void
+        +disable() : void
+        +enable(bool rx) : void
+        #initialize() : void*
+        #interrupt() : void
+        +reset() : void
+        +ctx : void *
+        +ctx_size : size_t
+        +enabling : bool
+        +fpm_basereg : uint32_t &
+        +idx : size_t
+        #lanmgr : lan &
+        +reg_dummy_head : uint32_t
+        +reg_ena : uint32_t &
+        +reg_intqctl : uint32_t &
+    }
+    class C_0001647595505869839315["lan_queue_base::qctx_fetch"]
+    class C_0001647595505869839315 {
+        +done() : void
+        +qctx_fetch(lan_queue_base & lq_) : void
+        +lq : lan_queue_base &
+    }
+    class C_0000752485586291469764["lan_queue_tx"]
+    class C_0000752485586291469764 {
+        +lan_queue_tx(lan & lanmgr_, uint32_t & reg_tail, size_t idx, uint32_t & reg_ena, uint32_t & fpm_basereg, uint32_t & reg_intqctl) : void
+        #desc_ctx_create() : desc_ctx &
+        #do_writeback(uint32_t first_idx, uint32_t first_pos, uint32_t cnt) : void
+        #initialize() : void
+        +reset() : void
+        #trigger_tx() : void
+        #trigger_tx_packet() : bool
+        #MTU : const uint16_t
+        #hwb : bool
+        #hwb_addr : uint64_t
+        #pktbuf : uint8_t[9024]
+        #ready_segments : std::deque&lt;tx_desc_ctx *&gt;
+        #tso_len : uint32_t
+        #tso_off : uint32_t
+    }
+    class C_0001458958468719460719["lan_queue_tx::tx_desc_ctx"]
+    class C_0001458958468719460719 {
+        +prepare() : void
+        +process() : void
+        +processed() : void
+        +tx_desc_ctx(lan_queue_tx & queue_) : void
+        +d : ice_tx_desc *
+        #tq : lan_queue_tx &
+    }
+    class C_0001823594872019141099["lan_queue_tx::dma_hwb"]
+    class C_0001823594872019141099 {
+        +dma_hwb(lan_queue_tx & queue_, uint32_t pos, uint32_t cnt, uint32_t next_head) : void
+        +done() : void
+        +~dma_hwb() : void
+        +cnt : uint32_t
+        +next_head : uint32_t
+        +pos : uint32_t
+        #queue : lan_queue_tx &
+    }
+    class C_0001319659230247428865["lan_queue_rx"]
+    class C_0001319659230247428865 {
+        +lan_queue_rx(lan & lanmgr_, uint32_t & reg_tail, size_t idx, uint32_t & reg_ena, uint32_t & fpm_basereg, uint32_t & reg_intqctl) : void
+        #desc_ctx_create() : desc_ctx &
+        #initialize() : void
+        +packet_received(const void * data, size_t len, uint32_t hash) : void
+        +reset() : void
+        #crc_strip : bool
+        #dbuff_size : uint16_t
+        #dcache : std::deque&lt;rx_desc_ctx *&gt;
+        #hbuff_size : uint16_t
+        #rxmax : uint16_t
+    }
+    class C_0001178457511524015063["lan_queue_rx::rx_desc_ctx"]
+    class C_0001178457511524015063 {
+        #data_written(uint64_t addr, size_t len) : void
+        +packet_received(const void * data, size_t len, bool last) : void
+        +process() : void
+        +rx_desc_ctx(lan_queue_rx & queue_) : void
+        #rq : lan_queue_rx &
+    }
+    class C_0000991480968877122627["rss_key_cache"]
+    class C_0000991480968877122627 {
+        +rss_key_cache(const uint32_t (&)[13] key_) : void
+        #build() : void
+        +hash_ipv4(uint32_t sip, uint32_t dip, uint16_t sp, uint16_t dp) : uint32_t
+        +set_dirty() : void
+        #cache : uint32_t[288]
+        #cache_dirty : bool
+        #cache_len : const size_t
+        #key : const uint32_t &lpar;&&rpar;[13]
+        #key_len : const size_t
+    }
+    class C_0000612576104166672940["lan"]
+    class C_0000612576104166672940 {
+        +lan(e810_bm & dev, size_t num_qs) : void
+        +packet_received(const void * data, size_t len) : void
+        +qena_updated(uint16_t idx, bool rx) : void
+        +reset() : void
+        +rss_key_updated() : void
+        #rss_steering(const void * data, size_t len, uint16_t & queue, uint32_t & hash) : bool
+        +tail_updated(uint16_t idx, bool rx) : void
+        #dev : e810_bm &
+        #log : logger
+        #num_qs : const size_t
+        #rss_kc : rss_key_cache
+        #rss_last_queue : size_t
+        #rxqs : lan_queue_rx **
+        #txqs : lan_queue_tx **
+    }
+    class C_0001242961382728679267["completion_event_manager"]
+    class C_0001242961382728679267 {
+        +completion_event_manager(e810_bm & dev, size_t num_qs) : void
+        +qena_updated(uint16_t idx) : void
+        +reset() : void
+        +tail_updated(uint16_t idx) : void
+        +ceqs : completion_event_queue **
+        #dev : e810_bm &
+        #log : logger
+        #num_qs : const size_t
+    }
+    class C_0002062517402874902700["shadow_ram"]
+    class C_0002062517402874902700 {
+        +shadow_ram(e810_bm & dev) : void
+        +read(uint16_t addr) : uint16_t
+        +reg_updated() : void
+        +write(uint16_t addr, uint16_t val) : void
+        #dev : e810_bm &
+        #log : logger
+    }
+    class C_0001686106494396747874["e810_switch"]
+    class C_0001686106494396747874 {
+        +add_rule(struct ice_aqc_sw_rules_elem * add_sw_rules) : bool
+        +print_sw_rule(struct ice_aqc_sw_rules_elem * add_sw_rules) : void$
+        +select_queue(const void * data, size_t len, uint16_t * queue) : void
+        -mac_rules : std::map&lt;uint64_t,uint16_t&gt;
+    }
+    class C_0000379814251055047434["e810_bm"]
+    class C_0000379814251055047434 {
+        +e810_bm() : void
+        +~e810_bm() : void
+        +DmaComplete(nicbm::DMAOp & op) : void
+        +EthRx(uint8_t port, const void * data, size_t len) : void
+        +RegRead(uint8_t bar, uint64_t addr, void * dest, size_t len) : void
+        +RegRead32(uint8_t bar, uint64_t addr) : uint32_t
+        +RegWrite(uint8_t bar, uint64_t addr, const void * src, size_t len) : void
+        +RegWrite32(uint8_t bar, uint64_t addr, uint32_t val) : void
+        +SetupIntro(struct SimbricksProtoPcieDevIntro & di) : void
+        +SignalInterrupt(uint16_t vector, uint8_t itr) : void
+        +Timed(nicbm::TimedEvent & ev) : void
+        #reg_io_read(uint64_t addr) : uint32_t
+        #reg_io_write(uint64_t addr, uint32_t val) : void
+        #reg_mem_read32(uint64_t addr) : uint32_t
+        #reg_mem_write32(uint64_t addr, uint32_t val) : void
+        #reset(bool indicate_done) : void
+        #BAR_IO : const unsigned int
+        #BAR_MSIX : const unsigned int
+        #BAR_REGS : const unsigned int
+        #MAX_MTU : const uint16_t
+        #NUM_FD_BEST_EFFORT : const uint16_t
+        #NUM_FD_GUAR : const uint16_t
+        #NUM_ITR : const uint8_t
+        #NUM_PFINTS : const uint32_t
+        #NUM_QUEUES : const uint32_t
+        #NUM_RXDID : const uint32_t
+        #NUM_VSIS : const uint32_t
+        #bcam : e810_switch
+        #cem : completion_event_manager
+        #cqp : control_queue_pair
+        #ctx_addr : u8[2048][22]
+        #hmc : host_mem_cache
+        #intevs : int_ev[2048]
+        #lanmgr : lan
+        #last_returned_node : int
+        #last_used_parent_node : int
+        #log : logger
+        #node1 : bool
+        #node3 : bool
+        #node4 : bool
+        #node5 : bool
+        #node6 : bool
+        #pf_atq : queue_admin_tx
+        #pf_mbx_atq : queue_admin_tx
+        #regs : i40e_regs
+        #sched_nodes : std::map&lt;int,struct ice_aqc_txsched_elem_data *&gt;
+        #shram : shadow_ram
+        #topo_elem : struct ice_aqc_get_topo_elem
+        #vsi0_first_queue : size_t
+    }
+    class C_0001538886357076207462["e810_bm::i40e_regs"]
+    class C_0001538886357076207462 {
+        +GLINT_ITR0 : uint32_t[2048]
+        +GLINT_ITR1 : uint32_t[2048]
+        +GLINT_ITR2 : uint32_t[2048]
+        +GLPRT_BPRCL : uint32_t[8]
+        +GLPRT_BPTCL : uint32_t[8]
+        +GLPRT_CRCERRS : uint32_t[8]
+        +GLPRT_GORCL : uint32_t[8]
+        +GLPRT_GOTCL : uint32_t[8]
+        +GLPRT_ILLERRC : uint32_t[8]
+        +GLPRT_LXOFFRXC : uint32_t[8]
+        +GLPRT_LXOFFTXC : uint32_t[8]
+        +GLPRT_LXONRXC : uint32_t[8]
+        +GLPRT_LXONTXC : uint32_t[8]
+        +GLPRT_MLFC : uint32_t[8]
+        +GLPRT_MPRCL : uint32_t[8]
+        +GLPRT_MPTCL : uint32_t[8]
+        +GLPRT_MRFC : uint32_t[8]
+        +GLPRT_PRC1023L : uint32_t[8]
+        +GLPRT_PRC127L : uint32_t[8]
+        +GLPRT_PRC1522L : uint32_t[8]
+        +GLPRT_PRC255L : uint32_t[8]
+        +GLPRT_PRC511L : uint32_t[8]
+        +GLPRT_PRC64L : uint32_t[8]
+        +GLPRT_PRC9522L : uint32_t[8]
+        +GLPRT_PTC1023L : uint32_t[8]
+        +GLPRT_PTC127L : uint32_t[8]
+        +GLPRT_PTC1522L : uint32_t[8]
+        +GLPRT_PTC255L : uint32_t[8]
+        +GLPRT_PTC511L : uint32_t[8]
+        +GLPRT_PTC64L : uint32_t[8]
+        +GLPRT_PTC9522L : uint32_t[8]
+        +GLPRT_RFC : uint32_t[8]
+        +GLPRT_RJC : uint32_t[8]
+        +GLPRT_RLEC : uint32_t[8]
+        +GLPRT_ROC : uint32_t[8]
+        +GLPRT_RUC : uint32_t[8]
+        +GLPRT_TDOLD : uint32_t[8]
+        +GLPRT_UPRCL : uint32_t[8]
+        +GLPRT_UPTCL : uint32_t[8]
+        +GLV_BPRCL : uint32_t[8]
+        +GLV_BPTCL : uint32_t[8]
+        +GLV_GORCL : uint32_t[768]
+        +GLV_GOTCL : uint32_t[768]
+        +GLV_MPRCL : uint32_t[768]
+        +GLV_MPTCL : uint32_t[768]
+        +GLV_RDPC : uint32_t[768]
+        +GLV_TEPC : uint32_t[768]
+        +GLV_UPRCL : uint32_t[768]
+        +GLV_UPTCL : uint32_t[768]
+        +QRXFLXP_CNTXT : uint32_t[2048]
+        +QRX_CONTEXT : uint32_t[16384]
+        +QRX_CTRL : uint32_t[2048]
+        +QTX_COMM_DBELL : uint32_t[1536]
+        +flex_rxdid_0 : uint32_t[64]
+        +flex_rxdid_1 : uint32_t[64]
+        +flex_rxdid_2 : uint32_t[64]
+        +flex_rxdid_3 : uint32_t[64]
+        +glgen_rstctl : uint32_t
+        +glgen_stat : uint32_t
+        +glhmc_lanrxbase : uint32_t[16]
+        +glhmc_lanrxcnt : uint32_t[16]
+        +glhmc_lantxbase : uint32_t[16]
+        +glhmc_lantxcnt : uint32_t[16]
+        +glint_ceqctl : uint32_t[2048]
+        +glint_ctl : uint32_t
+        +gllan_rctl_0 : uint32_t
+        +gllan_txpre_qdis : uint32_t[12]
+        +glnvm_srctl : uint32_t
+        +glnvm_srdata : uint32_t
+        +glrpb_ghw : uint32_t
+        +glrpb_glw : uint32_t
+        +glrpb_phw : uint32_t
+        +glrpb_plw : uint32_t
+        +pf_arqba : uint64_t
+        +pf_arqh : uint32_t
+        +pf_arqlen : uint32_t
+        +pf_arqt : uint32_t
+        +pf_atqba : uint64_t
+        +pf_atqh : uint32_t
+        +pf_atqlen : uint32_t
+        +pf_atqt : uint32_t
+        +pf_mbx_arqba : uint64_t
+        +pf_mbx_arqh : uint32_t
+        +pf_mbx_arqlen : uint32_t
+        +pf_mbx_arqt : uint32_t
+        +pf_mbx_atqba : uint64_t
+        +pf_mbx_atqh : uint32_t
+        +pf_mbx_atqlen : uint32_t
+        +pf_mbx_atqt : uint32_t
+        +pf_mbx_vt_pfalloc : uint32_t
+        +pfhmc_errordata : uint32_t
+        +pfhmc_errorinfo : uint32_t
+        +pfhmc_pdinv : uint32_t
+        +pfhmc_sdcmd : uint32_t
+        +pfhmc_sddatahigh : uint32_t
+        +pfhmc_sddatalow : uint32_t
+        +pfint_dyn_ctl0 : uint32_t
+        +pfint_dyn_ctln : uint32_t[2047]
+        +pfint_icr0 : uint32_t
+        +pfint_icr0_ena : uint32_t
+        +pfint_itrn : uint32_t[3][2048]
+        +pfint_lnklst0 : uint32_t
+        +pfint_lnklstn : uint32_t[2047]
+        +pfint_raten : uint32_t[2047]
+        +pfint_stat_ctl0 : uint32_t
+        +pfqf_ctl_0 : uint32_t
+        +pfqf_hkey : uint32_t[13]
+        +pfqf_hlut : uint32_t[128]
+        +prt_l2tagsen : uint32_t
+        +prtdcb_fccfg : uint32_t
+        +prtdcb_mflcn : uint32_t
+        +prtqf_ctl_0 : uint32_t
+        +qint_rqctl : uint32_t[1536]
+        +qint_tqctl : uint32_t[1536]
+        +qrx_ena : uint32_t[2048]
+        +qrx_tail : uint32_t[2048]
+        +qtx_comm_head : uint32_t[1536]
+        +qtx_ctl : uint32_t[1536]
+        +qtx_ena : uint32_t[2048]
+        +qtx_tail : uint32_t[1536]
+        +reg_PFPE_CCQPHIGH : uint32_t
+        +reg_PFPE_CCQPLOW : uint32_t
+        +reg_PFPE_CCQPSTATUS : uint32_t
+        +reg_PFPE_CQPDB : uint32_t
+        +reg_PFPE_CQPTAIL : uint32_t
+    }
+    class C_0000478844463769291504["cem"]
+    class C_0000478844463769291504 {
+    }
+    C_0000919830575773330865 o-- C_0001003942791255495555 : +log
+    C_0000919830575773330865 --> C_0000379814251055047434 : #dev
+    C_0000919830575773330865 ()-- C_0001241611728661794294 : 
+    C_0001241611728661794294 --> C_0000919830575773330865 : #queue
+    C_0001241611728661794294 <.. C_0000919830575773330865 : +[friend]
+    C_0001241611728661794294 ()-- C_0000745729693198478003 : 
+    C_0000919830575773330865 ()-- C_0000611941175840043508 : 
+    C_0000611941175840043508 --> C_0000919830575773330865 : #queue
+    C_0000386084317123652512 <|-- C_0000611941175840043508
+    C_0000919830575773330865 ()-- C_0001192002937225533140 : 
+    C_0001192002937225533140 --> C_0000919830575773330865 : #queue
+    C_0000386084317123652512 <|-- C_0001192002937225533140
+    C_0000919830575773330865 ()-- C_0000775142547048794812 : 
+    C_0000386084317123652512 <|-- C_0000775142547048794812
+    C_0000919830575773330865 ()-- C_0002024357221638127978 : 
+    C_0000386084317123652512 <|-- C_0002024357221638127978
+    C_0002003870449232317281 ..> C_0000379814251055047434 : 
+    C_0000919830575773330865 <|-- C_0002003870449232317281
+    C_0002003870449232317281 ()-- C_0000526151086617649148 : 
+    C_0000526151086617649148 --> C_0002003870449232317281 : #aq
+    C_0000526151086617649148 --> C_0000379814251055047434 : #dev
+    C_0000530677309574264448 ..> C_0000379814251055047434 : 
+    C_0000919830575773330865 <|-- C_0000530677309574264448
+    C_0000530677309574264448 ()-- C_0000924227832482089144 : 
+    C_0000924227832482089144 --> C_0000530677309574264448 : #aq
+    C_0000924227832482089144 --> C_0000379814251055047434 : #dev
+    C_0000530677309574264448 ()-- C_0000289190385320360042 : 
+    C_0000386084317123652512 <|-- C_0000289190385320360042
+    C_0000530677309574264448 ()-- C_0001497667813054379307 : 
+    C_0001497667813054379307 --> C_0000530677309574264448 : #cq_
+    C_0000386084317123652512 <|-- C_0001497667813054379307
+    C_0000530677309574264448 ()-- C_0001103294864601894106 : 
+    C_0001103294864601894106 --> C_0000530677309574264448 : #cq_
+    C_0001103294864601894106 <.. C_0000530677309574264448 : +[friend]
+    C_0000386084317123652512 <|-- C_0001103294864601894106
+    C_0000195475260203211066 ..> C_0000379814251055047434 : 
+    C_0000919830575773330865 <|-- C_0000195475260203211066
+    C_0000195475260203211066 ()-- C_0000803425317550470696 : 
+    C_0000803425317550470696 --> C_0000195475260203211066 : #aq
+    C_0000803425317550470696 --> C_0000379814251055047434 : #dev
+    C_0000195475260203211066 ()-- C_0000232736345182519158 : 
+    C_0000386084317123652512 <|-- C_0000232736345182519158
+    C_0000195475260203211066 ()-- C_0001792372639563177743 : 
+    C_0001792372639563177743 --> C_0000195475260203211066 : #cqp_
+    C_0000386084317123652512 <|-- C_0001792372639563177743
+    C_0000195475260203211066 ()-- C_0000960597573376293968 : 
+    C_0000960597573376293968 --> C_0000195475260203211066 : #cqp_
+    C_0000960597573376293968 <.. C_0000195475260203211066 : +[friend]
+    C_0000386084317123652512 <|-- C_0000960597573376293968
+    C_0001335912639478337919 ..> C_0000379814251055047434 : 
+    C_0000919830575773330865 <|-- C_0001335912639478337919
+    C_0001335912639478337919 ()-- C_0001075818780252436545 : 
+    C_0001075818780252436545 --> C_0001335912639478337919 : #ceq
+    C_0000386084317123652512 <|-- C_0001075818780252436545
+    C_0002230002073081656889 --> C_0000379814251055047434 : #dev
+    C_0002230002073081656889 ()-- C_0002077940046411990756 : 
+    C_0002230002073081656889 ()-- C_0001504307703237712490 : 
+    C_0000386084317123652512 <|-- C_0001504307703237712490
+    C_0000353990412923195528 --> C_0000612576104166672940 : #lanmgr
+    C_0000919830575773330865 <|-- C_0000353990412923195528
+    C_0000353990412923195528 ()-- C_0001647595505869839315 : 
+    C_0001647595505869839315 --> C_0000353990412923195528 : +lq
+    C_0000752485586291469764 ..> C_0000612576104166672940 : 
+    C_0000353990412923195528 <|-- C_0000752485586291469764
+    C_0000752485586291469764 ()-- C_0001458958468719460719 : 
+    C_0001458958468719460719 --> C_0000752485586291469764 : #tq
+    C_0000752485586291469764 ()-- C_0001823594872019141099 : 
+    C_0001823594872019141099 --> C_0000752485586291469764 : #queue
+    C_0000386084317123652512 <|-- C_0001823594872019141099
+    C_0001319659230247428865 ..> C_0000612576104166672940 : 
+    C_0000353990412923195528 <|-- C_0001319659230247428865
+    C_0001319659230247428865 ()-- C_0001178457511524015063 : 
+    C_0001178457511524015063 --> C_0001319659230247428865 : #rq
+    C_0000612576104166672940 --> C_0000379814251055047434 : #dev
+    C_0000612576104166672940 o-- C_0001003942791255495555 : #log
+    C_0000612576104166672940 o-- C_0000991480968877122627 : #rss_kc
+    C_0000612576104166672940 --> C_0001319659230247428865 : #rxqs
+    C_0000612576104166672940 --> C_0000752485586291469764 : #txqs
+    C_0000612576104166672940 <.. C_0001319659230247428865 : +[friend]
+    C_0000612576104166672940 <.. C_0000752485586291469764 : +[friend]
+    C_0000612576104166672940 <.. C_0000353990412923195528 : +[friend]
+    C_0001242961382728679267 --> C_0000379814251055047434 : #dev
+    C_0001242961382728679267 o-- C_0001003942791255495555 : #log
+    C_0001242961382728679267 --> C_0001335912639478337919 : +ceqs
+    C_0001242961382728679267 <.. C_0001335912639478337919 : +[friend]
+    C_0002062517402874902700 --> C_0000379814251055047434 : #dev
+    C_0002062517402874902700 o-- C_0001003942791255495555 : #log
+    C_0000379814251055047434 o-- C_0001003942791255495555 : #log
+    C_0000379814251055047434 o-- C_0002003870449232317281 : #pf_atq
+    C_0000379814251055047434 o-- C_0002003870449232317281 : #pf_mbx_atq
+    C_0000379814251055047434 o-- C_0002230002073081656889 : #hmc
+    C_0000379814251055047434 o-- C_0000195475260203211066 : #cqp
+    C_0000379814251055047434 o-- C_0002062517402874902700 : #shram
+    C_0000379814251055047434 o-- C_0000612576104166672940 : #lanmgr
+    C_0000379814251055047434 o-- C_0001242961382728679267 : #cem
+    C_0000379814251055047434 o-- C_0001686106494396747874 : #bcam
+    C_0000379814251055047434 o-- C_0000289207247874986057 : #intevs
+    C_0000379814251055047434 <.. C_0002062517402874902700 : +[friend]
+    C_0000379814251055047434 <.. C_0000752485586291469764 : +[friend]
+    C_0000379814251055047434 <.. C_0001319659230247428865 : +[friend]
+    C_0000379814251055047434 <.. C_0000353990412923195528 : +[friend]
+    C_0000379814251055047434 <.. C_0001242961382728679267 : +[friend]
+    C_0000379814251055047434 <.. C_0000612576104166672940 : +[friend]
+    C_0000379814251055047434 <.. C_0001335912639478337919 : +[friend]
+    C_0000379814251055047434 <.. C_0000195475260203211066 : +[friend]
+    C_0000379814251055047434 <.. C_0002230002073081656889 : +[friend]
+    C_0000379814251055047434 <.. C_0002003870449232317281 : +[friend]
+    C_0000379814251055047434 ()-- C_0001538886357076207462 : 
+
+%% Generated with clang-uml, version 0.0.0-unknown
+%% LLVM version clang version 17.0.6
