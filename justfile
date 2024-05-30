@@ -23,6 +23,10 @@ help:
 autoformat:
   clang-format -i src/* devices/* || true
 
+uml:
+  nix shell github:pogobanane/clang-uml --command clang-uml-wrapped -g mermaid -c ./design/clang-uml.yml
+  echo You may view the result .mmd files with https://marmaid.live
+
 # vmux passthrough (uses config: hosts/yourhostname.yaml)
 vmux DEVICE=`yq -r '.devices[] | select(.name=="ethDut") | ."pci_full"' hosts/$(hostname).yaml`:
   sudo {{proot}}/build/vmux -d {{DEVICE}} -s {{vmuxSock}}
