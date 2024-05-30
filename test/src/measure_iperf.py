@@ -15,9 +15,10 @@ from os.path import isfile, join as path_join
 import yaml
 import json
 from root import *
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 import subprocess
 import os
+from pandas import DataFrame
 
 
 
@@ -26,7 +27,7 @@ class IPerfTest(AbstractBenchTest):
     
     # test options
     direction: str # can be: forward | reverse | bidirectional
-    output_json = False # sets / unsets -J flag on iperf client 
+    output_json = True # sets / unsets -J flag on iperf client 
 
     interface: str # network interface used
 
@@ -48,6 +49,31 @@ class IPerfTest(AbstractBenchTest):
                 failure = True
         return failure
 
+    def summarize(self, repetition: int) -> DataFrame:
+        with open(self.output_filepath(repetition), 'r') as f:
+            data = json.load(f)
+
+        # Extract important values
+        start = data['start']
+        end = data['end']
+        intervals = data['intervals']
+
+        duration_secs = end['sum_sent']['seconds']
+        sent_bytes = end['sum_sent']['bytes']
+        sent_bits_per_second = end['sum_sent']['bits_per_second']
+        received_bytes = end['sum_received']['bytes']
+        received_bits_per_second = end['sum_received']['bits_per_second']
+
+        gbitps = received_bits_per_second / 1024 / 1024 / 1024
+
+        data = [{
+            **asdict(self), # put selfs member variables and values into this dict
+            "repetition": repetition,
+            # "vm_number": vm_number,
+            "GBit/s": gbitps,
+        }]
+        return DataFrame(data=data)
+
 
 
 def strip_subnet_mask(ip_addr: str):
@@ -66,6 +92,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [ 
           Interface.VFIO, 
+          Interface.BRIDGE,
+          Interface.BRIDGE_E1000,
           Interface.VMUX_PT, 
           Interface.VMUX_EMU, 
           # Interface.VMUX_EMU_E810, # tap backend not implemented for e810 (see #127)
@@ -162,6 +190,16 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         # teardown
                         guest.stop_iperf_server()
                         loadgen.stop_iperf_client()
+
+                        # summarize results of VM
+                        local_summary = ipt.output_filepath(repetition, extension = "summary")
+                        with open(local_summary, 'w') as file:
+                            try:
+                                # to_string preserves all cols
+                                summary = ipt.summarize(repetition).to_string()
+                            except Exception as e:
+                                summary = str(e)
+                            file.write(summary) 
 
 
     for ipt in all_tests:

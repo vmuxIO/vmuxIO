@@ -283,8 +283,8 @@ class AbstractBenchTest(ABC):
         """
         raise -1
 
-    def output_filepath(self, repetition: int):
-        return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.log")
+    def output_filepath(self, repetition: int, extension: str = "log"):
+        return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.{extension}")
 
     def test_done(self, repetition: int):
         output_file = self.output_filepath(repetition)

@@ -68,7 +68,7 @@ class YcsbTest(AbstractBenchTest):
             lines = file.readlines()
             data = []
             test_spec = {
-                **asdict(self),
+                **asdict(self), # put selfs member variables and values into this dict
                 "repetition": repetition,
                 "vm_number": vm_number,
             }
@@ -89,7 +89,7 @@ class YcsbTest(AbstractBenchTest):
                 "ops": int(find(lines, "[UPDATE], Operations,"))
             }]
             data += [{
-                **test_spec,
+                **test_spec, # merge test_spec dict with this dict
                 "op": "overall",
                 "runtime": float(find(lines, "[OVERALL], RunTime(ms),")),
                 "ops_per_sec": float(find(lines, "[OVERALL], Throughput(ops/sec),"))
