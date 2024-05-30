@@ -24,7 +24,7 @@ autoformat:
   clang-format -i src/* devices/* || true
 
 uml:
-  nix shell github:pogobanane/clang-uml --command clang-uml-wrapped -g mermaid -c ./design/clang-uml.yml
+  nix shell github:bkryza/clang-uml --command clang-uml-wrapped -g mermaid -c ./design/clang-uml.yml
   echo You may view the result .mmd files with https://marmaid.live
 
 # vmux passthrough (uses config: hosts/yourhostname.yaml)
