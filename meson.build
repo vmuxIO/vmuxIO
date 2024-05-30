@@ -2,6 +2,7 @@ project('vmux', ['c' ,'cpp'],
   version : '0.1',
   default_options : ['warning_level=3', 'cpp_std=c++20', 'default_library=static'])
 
+e1000_emu = get_option('e1000_emu')
 dont_build_libnic_emu = get_option('dont_build_libnic_emu')
 
 #incdir = include_directories('deps/libvfio-user/include')
@@ -58,13 +59,19 @@ dpdk_link_args = [
 libvfio_user = subproject('libvfio-user')
 libvfio_user_dep = libvfio_user.get_variable('libvfio_user_dep')
 
-if dont_build_libnic_emu
-  nic_emu_dep = declare_dependency(
-    link_args : ['-L./libnic_emu.a', '-lnic_emu'],
-    )
-else 
-  nic_emu = subproject('nic-emu')
-  nic_emu_dep = nic_emu.get_variable('nic_emu_dep')
+if e1000_emu
+  if dont_build_libnic_emu
+    nic_emu_dep = declare_dependency(
+      link_args : ['-L./libnic_emu.a', '-lnic_emu'],
+      )
+  else 
+    nic_emu = subproject('nic-emu')
+    nic_emu_dep = nic_emu.get_variable('nic_emu_dep')
+  endif
+  add_project_arguments('-DBUILD_E1000_EMU', language : 'c')
+  add_project_arguments('-DBUILD_E1000_EMU', language : 'cpp')
+else
+  nic_emu_dep = dependency('', required: false)
 endif
 
 sources = files()

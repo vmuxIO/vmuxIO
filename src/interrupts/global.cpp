@@ -1,6 +1,6 @@
 #include <memory>
 #include <algorithm>
-#include "devices/e1000.hpp"
+#include "interrupts/interface.hpp"
 #include "interrupts/global.hpp"
 
 GlobalInterrupts::GlobalInterrupts(int nr_threads) {
