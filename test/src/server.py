@@ -1571,7 +1571,7 @@ class Host(Server):
                   debug_qemu: bool = False,
                   ioregionfd: bool = False,
                   qemu_build_dir: str = None,
-                  vhost: bool = True,
+                  vhost: bool = False,
                   rx_queue_size: int = 256,
                   tx_queue_size: int = 256,
                   vm_number: int = 0,
