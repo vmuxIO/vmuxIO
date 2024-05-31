@@ -413,6 +413,7 @@ public:
 	}
 
 	virtual ~Dpdk() {
+		// TODO (peter) dealloc rxBufs etc...
 		struct rte_flow_error error;
 		int ret;
 
@@ -495,6 +496,7 @@ public:
 				// rte_memcpy(this->rxBufs[i], pkt, buf->pkt_len);
 				this->rxBufs[i] = pkt;
 				this->rxBuf_used[i] = buf->pkt_len;
+				this->rxBuf_queue[i] = q_idx;
 				if_log_level(LOG_DEBUG, printf("queue %d: ", queue_id));
 				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}

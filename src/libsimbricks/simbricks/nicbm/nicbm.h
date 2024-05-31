@@ -102,8 +102,8 @@ class Runner {
 
       // when calling this, the  device will do all pending DMAs.
       void DmaComplete(DMAOp &op);
-      // send a packet from the network fabric to the NIC device
-      void EthRx(uint8_t port, const void *data, size_t len);
+      // send a packet from the network fabric to the NIC device. Optional destination queue hint.
+      void EthRx(uint8_t port, std::optional<uint16_t> queue, const void *data, size_t len);
 
       // Functions to be called by the Device
       // IssueDma, MsiXIssue, EthSend, EventSchedule, ...
@@ -169,9 +169,9 @@ class Runner {
 
     /**
      * A packet has arrived on the wire, of length `len` with
-     * payload `data`.
+     * payload `data`. Optional destination queue hint.
      */
-    virtual void EthRx(uint8_t port, const void *data, size_t len) = 0;
+    virtual void EthRx(uint8_t port, std::optional<uint16_t> queue, const void *data, size_t len) = 0;
 
     /**
      * A timed event is due.

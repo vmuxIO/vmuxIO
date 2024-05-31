@@ -972,7 +972,7 @@ class e810_bm : public nicbm::Runner::Device {
                 size_t len) override;
   virtual void RegWrite32(uint8_t bar, uint64_t addr, uint32_t val);
   void DmaComplete(nicbm::DMAOp &op) override;
-  void EthRx(uint8_t port, const void *data, size_t len) override;
+  void EthRx(uint8_t port, std::optional<uint16_t> queue, const void *data, size_t len) override;
   void Timed(nicbm::TimedEvent &ev) override;
 
   virtual void SignalInterrupt(uint16_t vector, uint8_t itr);

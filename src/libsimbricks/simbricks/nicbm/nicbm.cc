@@ -354,7 +354,7 @@ void Runner::EthRecv(volatile struct SimbricksProtoNetMsgPacket *packet) {
          packet->port, packet->len);
 #endif
 
-  dev_.EthRx(packet->port, (void *)packet->data, packet->len);
+  dev_.EthRx(packet->port, {}, (void *)packet->data, packet->len);
 }
 
 void Runner::EthSend(const void *data, size_t len) {

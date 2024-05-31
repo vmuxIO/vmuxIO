@@ -83,7 +83,7 @@ void e810_bm::DmaComplete(nicbm::DMAOp &op) {
   dma.done();
 }
 
-void e810_bm::EthRx(uint8_t port, const void *data, size_t len) {
+void e810_bm::EthRx(uint8_t port, std::optional<uint16_t> queue, const void *data, size_t len) {
 #ifdef DEBUG_DEV
   std::cout << "i40e: received packet len=" << len << logger::endl;
 #endif
