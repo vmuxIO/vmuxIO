@@ -93,6 +93,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     interfaces = [ 
           Interface.VFIO, 
           Interface.BRIDGE,
+          Interface.BRIDGE_VHOST,
           Interface.BRIDGE_E1000,
           Interface.VMUX_PT, 
           Interface.VMUX_EMU, 

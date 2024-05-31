@@ -23,6 +23,11 @@ class Interface(Enum):
     # connected to it via TAP device
     BRIDGE = "bridge"
 
+    # Bridge to physical NIC on host, and for VM additionally VirtIO NIC
+    # connected to it via TAP device. Uses linux kernel virtio vhost and 
+    # overrides other vhost options to on.
+    BRIDGE_VHOST = "bridge-vhost"
+
     # Same as BRIDGE, but with e1000 instead of virtio-net
     BRIDGE_E1000 = "bridge-e1000"
 
@@ -50,7 +55,7 @@ class Interface(Enum):
 
 
     def needs_br_tap(self) -> bool:
-        return self in [ Interface.BRIDGE, Interface.BRIDGE_E1000, Interface.VMUX_EMU, Interface.VMUX_EMU_E810 ]
+        return self in [ Interface.BRIDGE, Interface.BRIDGE_VHOST, Interface.BRIDGE_E1000, Interface.VMUX_EMU, Interface.VMUX_EMU_E810 ]
 
     def needs_macvtap(self) -> bool:
         return self in [ Interface.MACVTAP ]
@@ -69,7 +74,7 @@ class Interface(Enum):
             return "ice"
         if self in [ Interface.BRIDGE_E1000, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
             return "e1000"
-        if self in [ Interface.BRIDGE, Interface.MACVTAP ]:
+        if self in [ Interface.BRIDGE, Interface.BRIDGE_VHOST, Interface.MACVTAP ]:
             return "virtio-net"
         raise Exception(f"Dont know which guest driver is used with {self}")
 

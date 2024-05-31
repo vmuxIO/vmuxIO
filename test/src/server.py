@@ -1647,13 +1647,16 @@ class Host(Server):
         # Build test network parameters
 
         test_net_config = ''
-        if net_type == Interface.BRIDGE:
+        if net_type == Interface.BRIDGE or net_type == Interface.BRIDGE_VHOST:
             if BRIDGE_QUEUES == 0:
                 queues = ""
                 multi_queue = ""
             else:
                 queues = f",queues={BRIDGE_QUEUES}"
                 multi_queue = ",mq=on"
+            if net_type == Interface.BRIDGE_VHOST:
+                vhost = True
+
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
                 f'id=test0,ifname={MultiHost.iface_name(self.test_tap, vm_number)},script=no,' +
