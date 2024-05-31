@@ -25,6 +25,7 @@ function configure(parser)
 	parser:option("-r --rate", "Transmit rate in kpps."):default(14000):convert(tonumber)
     parser:option("-s --size", "Packet size in bytes."):default(60):convert(tonumber)
 	parser:option("-f --file", "Filename of the latency histogram."):default("histogram.csv")
+	parser:option("-c --csv", "Filename of the output csv."):default("")
 	parser:option("-t --threads", "Number of threads per device."):args(1):convert(tonumber):default(1)
 	parser:option("-T --time", "Time to transmit for in seconds."):default(60):convert(tonumber)
 	parser:option("-m --macs", "Send in round robin to (ethDst...ethDst+macs)."):default(0):convert(tonumber)
@@ -38,6 +39,9 @@ function master(args)
 	    mg.startTask("loadSlave", dev:getTxQueue(i), dev:getMac(true), args.mac, args.size, args.macs)
     end
 	stats.startStatsTask{dev}
+	if args.csv ~= "" then
+		stats.startStatsTask{devices={dev}, format="csv", file=args.csv}
+	end
 	mg.startSharedTask("timerSlave", dev:getTxQueue(args.threads), dev:getRxQueue(args.threads), args.mac, args.file)
 	if args.time >= 0 then
 		runtime = timer:new(args.time)
