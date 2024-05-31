@@ -8,20 +8,52 @@ diagrams:
       - ../src/*.hpp
       - ../src/*.cpp
       - ../src/*.cc
+      - ../src/*.h
     include:
       namespaces:
         - i40e
     exclude:
       elements:
         - r: ".*i40e_regs.*"
-  vmux_part1:
+  vmux:
     type: class
     glob:
       - ../src/*.hpp
       - ../src/*.cpp
       - ../src/*.cc
-    # using_namespace: i40e
+      - ../src/*.h
     include:
       context:
-        - ::E810EmulatedDevice
-        # - r: ".*E810EmulatedDevice.*"
+        - VmuxDevice
+        - E810EmulatedDevice
+        - InterruptThrottlerSimbricks
+        - VfioConsumer
+        - VfioServer
+        - Dpdk
+      subclasses:
+        - VmuxDevice
+        - VmuxRunner
+        - InterruptThrottler
+        - VfioConsumer
+        - VfioServer
+        - Driver
+  vmux_simbricks:
+    type: class
+    glob:
+      - ../src/*.hpp
+      - ../src/*.cpp
+      - ../src/*.cc
+      - ../src/*.h
+    include:
+      context:
+        - E810EmulatedDevice
+        - InterruptThrottlerSimbricks
+        - VfioConsumer
+        - VfioServer
+        - Dpdk
+        - i40e::e810_bm
+        - r: ".*nicbm::Runner::Device.*"
+    exclude:
+      elements:
+        - r: ".*i40e_regs.*"
+        - r: "i40e::(?!(e810)).*"
