@@ -1002,6 +1002,78 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         regs.pf_mbx_arqt = val;
         break;
 
+      // PTP
+
+      CASE_2(GLTSYN_ENA, regs.REG_GLTSYN_ENA[INDEX] = (val & 1))
+      CASE(GLTSYN_CMD, regs.REG_GLTSYN_CMD = val)
+      CASE(GLTSYN_CMD_SYNC, {
+          DEBUG_LOG_PTP("cmd sync " << val);
+          if(val == PTP_GLTSYN_CMD_SYNC_INC) {
+            DEBUG_LOG_PTP("gltsyn sync inc called");
+
+          } else if(val == PTP_GLTSYN_CMD_SYNC_DEC) {
+            DEBUG_LOG_PTP("gltsyn sync dec called");
+
+          } else if (val == PTP_GLTSYN_CMD_SYNC_EXEC) {
+            uint8_t sel_master = PTP_GLTSYN_CMD_SEL_MASTER(regs.REG_GLTSYN_CMD);
+
+            uint8_t cmd = PTP_GLTSYN_CMD(regs.REG_GLTSYN_CMD);
+            switch(cmd) {
+              case PTP_GLTSYN_CMD_INIT_TIME_INCVAL: {
+
+                for (uint32_t i = 0; i < 6; i++)
+                  regs.REG_GLTSYN_TIME[i] = regs.REG_GLTSYN_SHTIME[i];
+
+                for (uint32_t i = 0; i < 4; i++)
+                  regs.REG_GLTSYN_INCVAL[i] = regs.REG_GLTSYN_SHADJ[i];
+
+                uint64_t adj = ((uint64_t) regs.REG_GLTSYN_SHADJ[2 * sel_master] << 32)
+                  | regs.REG_GLTSYN_SHADJ[2 * sel_master + 1];
+                ptp.adj_set(adj);
+                break;
+              }
+              case PTP_GLTSYN_CMD_ADJ_TIME:{
+
+                uint64_t adj = ((uint64_t) regs.REG_GLTSYN_SHADJ[2 * sel_master] << 32)
+                  | regs.REG_GLTSYN_SHADJ[2 * sel_master + 1];
+                ptp.adj_set(adj);
+                break;
+              }
+              case PTP_GLTSYN_CMD_ADJ_TIME_AFTER_TGT: {
+                DEBUG_LOG_PTP("ERR ptp sync command not implemented");
+              } default:
+                return;
+            }
+          }
+      })
+
+      CASE(PF_SB_ATQBAL, {
+          if(PTP_ATQBAL_MASK(val)) {
+            uint8_t index = PTP_ATQBAL_INDEX(val);
+
+            // write timestamp back to AQTBA registers
+            gltsyn_ts_t timestamp = ptp.phc_read();
+            regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, timestamp.value);
+            regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, timestamp.value);
+          }
+        })
+      CASE(PF_SB_ATQBAH, regs.REG_PF_SB_ATQBAH = val)
+
+      CASE_6(GLTSYN_SHTIME, 0, regs.REG_GLTSYN_SHTIME[INDEX] = val)
+
+      CASE_4(GLTSYN_SHADJ, 0, regs.REG_GLTSYN_SHADJ[INDEX] = val)
+
+      CASE_4(GLTSYN_TGT, 0, regs.REG_GLTSYN_TGT[INDEX] = val)
+      CASE_4(GLTSYN_TGT, 4, regs.REG_GLTSYN_TGT[INDEX] = val)
+      CASE_4(GLTSYN_TGT, 8, regs.REG_GLTSYN_TGT[INDEX] = val)
+      CASE_4(GLTSYN_TGT, 12, regs.REG_GLTSYN_TGT[INDEX] = val)
+
+      CASE_4(GLTSYN_AUX_OUT, 0, regs.REG_GLTSYN_TGT[INDEX] = val)
+      CASE_4(GLTSYN_AUX_OUT, 4, regs.REG_GLTSYN_TGT[INDEX] = val)
+
+      CASE_6(GLTSYN_AUX_IN, 0, regs.REG_GLTSYN_AUX_IN[INDEX] = val)
+
+
 
       default:
 #ifdef DEBUG_DEV
