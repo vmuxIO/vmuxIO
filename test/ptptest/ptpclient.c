@@ -472,6 +472,7 @@ parse_fup(struct ptpv2_data_slave_ordinary *ptp_data)
 		rte_memcpy(&ptp_data->client_clock_id,
 			   client_clkid,
 			   sizeof(struct clock_id));
+        
 
 		/* Enable flag for hardware timestamping. */
 		created_pkt->ol_flags |= RTE_MBUF_F_TX_IEEE1588_TMST;
@@ -479,6 +480,8 @@ parse_fup(struct ptpv2_data_slave_ordinary *ptp_data)
 		/*Read value from NIC to prevent latching with old value. */
 		rte_eth_timesync_read_tx_timestamp(ptp_data->portid,
 				&ptp_data->tstamp3);
+        
+        printf("Read Timestamp: %lus %luns \n", ptp_data->tstamp3.tv_sec, ptp_data->tstamp3.tv_nsec);
 
 		/* Transmit the packet. */
 		rte_eth_tx_burst(ptp_data->portid, 0, &created_pkt, 1);
@@ -556,6 +559,8 @@ parse_drsp(struct ptpv2_data_slave_ordinary *ptp_data)
 			/* Evaluate the delta for adjustment. */
 			ptp_data->delta = delta_eval(ptp_data);
 
+			printf("PTP: Adjust time by %luns\n", ptp_data->delta);
+
 			rte_eth_timesync_adjust_time(ptp_data->portid,
 						     ptp_data->delta);
 
@@ -582,8 +587,11 @@ parse_ptp_frames(uint16_t portid, struct rte_mbuf *m) {
 	struct rte_ether_hdr *eth_hdr;
 	uint16_t eth_type;
 
+
 	eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 	eth_type = rte_be_to_cpu_16(eth_hdr->ether_type);
+
+    printf("Parse PTP packet %x\n", eth_type);
 
 	if (eth_type == PTP_PROTOCOL) {
 		ptp_data.m = m;
@@ -593,16 +601,20 @@ parse_ptp_frames(uint16_t portid, struct rte_mbuf *m) {
 
 		switch (ptp_hdr->msg_type) {
 		case SYNC:
+		    printf("Received SYNC packet\n");
 			parse_sync(&ptp_data, m->timesync);
 			break;
 		case FOLLOW_UP:
+		    printf("Received FUP packet\n");
 			parse_fup(&ptp_data);
 			break;
 		case DELAY_RESP:
+		    printf("Received DRESP packet\n");
 			parse_drsp(&ptp_data);
 			print_clock_info(&ptp_data);
 			break;
 		default:
+		    printf("Received mystery packet 0x%x\n", ptp_hdr->msg_type);
 			break;
 		}
 	}
@@ -623,6 +635,7 @@ lcore_main(void)
 	printf("\nCore %u Waiting for SYNC packets. [Ctrl+C to quit]\n",
 			rte_lcore_id());
 
+
 	/* Run until the application is quit or killed. */
 
 	while (!force_quit) {
@@ -635,10 +648,15 @@ lcore_main(void)
 			if (likely(nb_rx == 0))
 				continue;
 
+
 			/* Packet is parsed to determine which type. 8< */
-			if (m->ol_flags & RTE_MBUF_F_RX_IEEE1588_PTP)
+			if (m->ol_flags & RTE_MBUF_F_RX_IEEE1588_PTP | 1) {
+
+                printf("received\n");
 				parse_ptp_frames(portid, m);
-			/* >8 End of packet is parsed to determine which type. */
+            }
+
+            /* >8 End of packet is parsed to determine which type. */
 
 			rte_pktmbuf_free(m);
 		}
