@@ -1158,6 +1158,22 @@ class Server(ABC):
         self.tmux_kill("ycsb")
 
 
+    def start_fastclick(self, program: str, outfile: str):
+        """
+        program: path to .click file relative to project root
+        outfile: path to remote log file
+        """
+        project_root = f"{self.moonprogs_dir}/../../"
+        fastclick_bin = f"{project_root}/fastclick/bin/click"
+        fastclick_program = f"{project_root}{program}"
+        self.tmux_new('fastclick', f'{fastclick_bin} --dpdk "-l 0" -- {fastclick_program} 2>&1 | tee {outfile}; echo FASTCLICK_DONE >> {outfile}; sleep 999');
+
+
+    def stop_fastclick(self):
+        self.exec("pkill click")
+        self.tmux_kill("fastclick")
+
+
     def upload_moonprogs(self: 'Server', source_dir: str):
         """
         Upload the MoonGen programs to the server.
@@ -2070,6 +2086,7 @@ class LoadGen(Server):
                             runtime: int = 60,
                             size: int = 60,
                             histfile: str = 'histogram.csv',
+                            statsfile: str = 'throughput.csv',
                             outfile: str = 'output.log'
                             ):
         """
@@ -2087,8 +2104,10 @@ class LoadGen(Server):
             The size of the packets in bytes.
         histfile : str
             The path of the histogram file.
+        statsfile: str
+            The path of the csv file with a throughput time series.
         outfile : str
-            The path of the output file.
+            The path of the log output file.
 
         Returns
         -------
@@ -2104,6 +2123,7 @@ class LoadGen(Server):
                       'sudo bin/MoonGen '
                       f'{server.moonprogs_dir}/l2-load-latency.lua ' +
                       f'-r {rate} -f {histfile} -T {runtime} -s {size} ' +
+                      f' -c {statsfile} ' +
                       f'{server._test_iface_id} {mac} ' +
                       f'2>&1 | tee {outfile}')
 
