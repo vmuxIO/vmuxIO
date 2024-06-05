@@ -30,7 +30,7 @@ fd0 :: FromDPDKDevice(
 	// , PAUSE full // according to click docs this is needed for rte_flow but i claim it is entirely unrelated
 );
 
-fd0 -> c :: Classifier(0/000000000000, 0/000000000001, 0/000000000002, -);
+fd0 -> c :: Classifier(0/000000000000, 0/010000000000, 0/020000000000, -);
 
 c[0] -> dropped0 :: AverageCounterIMP()
   	 -> Discard;

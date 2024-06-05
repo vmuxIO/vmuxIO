@@ -6,7 +6,7 @@
 
 /**
  * Deploy as follows:
- * sudo ../../bin/click --dpdk -l 0-4 -w 0000:11:00.0 -v -- dpdk-flow-parser.click
+ * sudo ../../bin/click --dpdk -l 0-4 -w 0000:11:00.0 -v -- dpdk-flow-parser.click rules=./path/to/rulesfile
  */
 
 define(
