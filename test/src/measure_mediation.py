@@ -18,7 +18,7 @@ from root import *
 from dataclasses import dataclass, field, asdict
 import subprocess
 import os
-from pandas import DataFrame
+from pandas import DataFrame, read_csv
 
 
 
@@ -30,6 +30,15 @@ class MediationTest(AbstractBenchTest):
 
     def test_infix(self):
         return f"mediation_{self.num_vms}vms_{self.interface}"
+
+    def output_filepath_histogram(self, repetition: int) -> str:
+        return self.output_filepath(repetition, extension = "histogram.csv")
+
+    def output_filepath_throughput(self, repetition: int) -> str:
+        return self.output_filepath(repetition, extension = "throughput.csv")
+
+    def output_filepath_fastclick(self, repetition: int) -> str:
+        return self.output_filepath(repetition, extension = "fastclick.log")
 
     def estimated_runtime(self) -> float:
         """
@@ -47,27 +56,30 @@ class MediationTest(AbstractBenchTest):
     #     return failure
 
     def summarize(self, repetition: int) -> DataFrame:
-        with open(self.output_filepath(repetition), 'r') as f:
-            data = json.load(f)
+        with open(self.output_filepath_fastclick(repetition), 'r') as f:
+            fastclickLog: List[str] = f.readlines()
+        with open(self.output_filepath_throughput(repetition), 'r') as f:
+            moongen = read_csv(f)
 
-        # Extract important values
-        start = data['start']
-        end = data['end']
-        intervals = data['intervals']
+        # parse fastclickLog
+        packet_count_lines = [line for line in fastclickLog if "thread " in line and " count:" in line]
+        packet_counts = [int(line.strip().split(' ')[-1]) for line in packet_count_lines]
+        rx_packets = sum(packet_counts)
 
-        duration_secs = end['sum_sent']['seconds']
-        sent_bytes = end['sum_sent']['bytes']
-        sent_bits_per_second = end['sum_sent']['bits_per_second']
-        received_bytes = end['sum_received']['bytes']
-        received_bits_per_second = end['sum_received']['bits_per_second']
+        # parse moongen
+        tx_packets = moongen[moongen.Direction=='TX'].tail(1)['TotalPackets'].iloc[0]
+        tx_mpps = moongen[moongen.Direction=='TX'].tail(1)['PacketRate'].iloc[0]
 
-        gbitps = received_bits_per_second / 1024 / 1024 / 1024
+        packet_loss = (tx_packets - rx_packets) / rx_packets
+        rx_mpps_calc = (rx_packets / tx_packets) * tx_mpps
 
         data = [{
             **asdict(self), # put selfs member variables and values into this dict
             "repetition": repetition,
-            # "vm_number": vm_number,
-            "GBit/s": gbitps,
+            "rxPackets": rx_packets,
+            "txPackets": tx_packets,
+            "txMpps": tx_mpps,
+            "rxMppsCalc": rx_mpps_calc,
         }]
         return DataFrame(data=data)
 
@@ -145,37 +157,58 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 loadgen.modprobe_test_iface_drivers()
                 loadgen.bind_test_iface() # bind vfio driver
 
-                guest.modprobe_test_iface_drivers()
+                # guest.modprobe_test_iface_drivers()
                 guest.bind_test_iface() # bind vfio driver
 
                 for repetition in range(repetitions):
-                    remote_output_file = "/tmp/fastclick.log"
-                    tmp_remote_output_file = "/tmp/tmp_iperf_result.json"
-                    local_output_file = ipt.output_filepath(repetition)
-                    loadgen.exec(f"sudo rm {remote_output_file} || true")
-                    loadgen.exec(f"sudo rm {tmp_remote_output_file} || true")
+                    remote_fastclick_log = "/tmp/fastclick.log"
+                    local_fastclick_log = ipt.output_filepath_fastclick(repetition)
+                    remote_moongen_throughput = "/tmp/throughput.csv"
+                    local_moongen_throughput = ipt.output_filepath_throughput(repetition)
+                    remote_moongen_histogram = "/tmp/histogram.csv"
+                    local_moongen_histogram = ipt.output_filepath_histogram(repetition)
+                    local_summary_file = ipt.output_filepath(repetition)
+                    guest.exec(f"sudo rm {remote_fastclick_log} || true")
+                    loadgen.exec(f"sudo rm {remote_moongen_throughput} || true")
+                    loadgen.exec(f"sudo rm {remote_moongen_histogram} || true")
 
                     info("Starting Fastclick")
-                    guest.start_fastclick("test/fastclick/dpdk-flow-parser.click", remote_output_file)
-                    breakpoint()
+                    guest.start_fastclick("test/fastclick/mac-switch-software.click", remote_fastclick_log, script_args={'ifacePCI0': guest.test_iface_addr})
                     info("Starting MoonGen")
-                    guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
-                    loadgen.run_iperf_client(ipt, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file, tmp_remote_output_file)
-                    time.sleep(DURATION_S)
-                    
+                    loadgen.run_l2_load_latency(loadgen, "00:00:00:00:00:00", 1000, 
+                            runtime = DURATION_S,
+                            size = 60,
+                            nr_macs = 3,
+                            histfile = remote_moongen_histogram,
+                            statsfile = remote_moongen_throughput,
+                            outfile = '/tmp/output.log'
+                            )
+                    time.sleep(DURATION_S + 5)
+
+                    # await moongen done
                     try:
-                        loadgen.wait_for_success(f'[[ -e {remote_output_file} ]]')
+                        loadgen.wait_for_success(f'[[ -e {remote_moongen_histogram} ]]')
                     except TimeoutError:
-                        error('Waiting for output file timed out.')
-                    loadgen.copy_from(remote_output_file, local_output_file)
+                        error('Waiting for moongen output file timed out.')
+
+                    # await fastclick logs
+                    guest.stop_fastclick()
+                    try:
+                        guest.wait_for_success(f'[[ $(tail -n 5 {remote_fastclick_log}) = *"AUTOTEST_DONE"* ]]')
+                    except TimeoutError:
+                        error('Waiting for fastclick output file to appear timed out')
 
                     # teardown
-                    guest.stop_iperf_server()
-                    loadgen.stop_iperf_client()
+                    loadgen.stop_l2_load_latency(loadgen)
+                    guest.kill_fastclick()
+
+                    # collect artefacts
+                    guest.copy_from(remote_fastclick_log, local_fastclick_log)
+                    loadgen.copy_from(remote_moongen_throughput, local_moongen_throughput)
+                    loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
 
                     # summarize results of VM
-                    local_summary = ipt.output_filepath(repetition, extension = "summary")
-                    with open(local_summary, 'w') as file:
+                    with open(local_summary_file, 'w') as file:
                         try:
                             # to_string preserves all cols
                             summary = ipt.summarize(repetition).to_string()
@@ -184,9 +217,9 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         file.write(summary) 
 
 
-    for ipt in all_tests:
-        for repetition in range(repetitions):
-            ipt.find_error(repetition)
+    # for ipt in all_tests:
+    #     for repetition in range(repetitions):
+    #         ipt.find_error(repetition)
 
 
 if __name__ == "__main__":

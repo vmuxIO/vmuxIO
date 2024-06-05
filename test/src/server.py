@@ -847,6 +847,7 @@ class Server(ABC):
             return
 
         # bind test interface to DPDK
+        self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.bind_device(self.test_iface_addr, self.test_iface_dpdk_driv)
 
         # get the test interface id
@@ -1158,19 +1159,24 @@ class Server(ABC):
         self.tmux_kill("ycsb")
 
 
-    def start_fastclick(self, program: str, outfile: str):
+    def start_fastclick(self, program: str, outfile: str, script_args: dict = dict()):
         """
         program: path to .click file relative to project root
         outfile: path to remote log file
+        script_args: arguements to override click scripts define() directive variables
         """
         project_root = f"{self.moonprogs_dir}/../../"
         fastclick_bin = f"{project_root}/fastclick/bin/click"
         fastclick_program = f"{project_root}{program}"
-        self.tmux_new('fastclick', f'{fastclick_bin} --dpdk "-l 0" -- {fastclick_program} 2>&1 | tee {outfile}; echo FASTCLICK_DONE >> {outfile}; sleep 999');
+        args = ' '.join([f'{key}={value}' for key, value in script_args.items()])
+        self.tmux_new('fastclick', f'{fastclick_bin} --dpdk \'-l 0\' -- {fastclick_program} {args} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
 
 
     def stop_fastclick(self):
         self.exec("pkill click")
+
+
+    def kill_fastclick(self):
         self.tmux_kill("fastclick")
 
 
@@ -2085,6 +2091,7 @@ class LoadGen(Server):
                             rate: int = 10000,
                             runtime: int = 60,
                             size: int = 60,
+                            nr_macs: int = 0,
                             histfile: str = 'histogram.csv',
                             statsfile: str = 'throughput.csv',
                             outfile: str = 'output.log'
@@ -2123,7 +2130,7 @@ class LoadGen(Server):
                       'sudo bin/MoonGen '
                       f'{server.moonprogs_dir}/l2-load-latency.lua ' +
                       f'-r {rate} -f {histfile} -T {runtime} -s {size} ' +
-                      f' -c {statsfile} ' +
+                      f' -c {statsfile} -m {nr_macs} ' +
                       f'{server._test_iface_id} {mac} ' +
                       f'2>&1 | tee {outfile}')
 
