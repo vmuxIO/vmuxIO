@@ -57,3 +57,25 @@ diagrams:
       elements:
         - r: ".*i40e_regs.*"
         - r: "i40e::(?!(e810)).*"
+  rx_sequence: # broken
+    type: sequence
+    glob:
+      - ../src/*.hpp
+      - ../src/*.cpp
+      - ../src/*.cc
+      - ../src/*.h
+    include:
+      context:
+        - E810EmulatedDevice
+        - InterruptThrottlerSimbricks
+        - VfioConsumer
+        - VfioServer
+        - Dpdk
+        - i40e::e810_bm
+        - r: ".*nicbm::Runner::Device.*"
+      namespaces:
+        - r: ".*"
+    from:
+      # - function: "Dpdk::recv"
+      # - function: "E810EmulatedDevice::driver_cb()"
+      - function: "main()"
