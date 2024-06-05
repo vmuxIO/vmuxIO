@@ -24,7 +24,7 @@ autoformat:
   clang-format -i src/* devices/* || true
 
 uml:
-  nix shell github:bkryza/clang-uml --command clang-uml-wrapped -g mermaid -c ./design/clang-uml.yml
+  nix shell github:bkryza/clang-uml --command clang-uml-wrapped -g mermaid -c ./docs/clang-uml.yml
   echo You may view the result .mmd files with https://marmaid.live
 
 # vmux passthrough (uses config: hosts/yourhostname.yaml)
@@ -393,6 +393,7 @@ build:
   nix build -o {{proot}}/xdp .#xdp-reflector
   nix build -o {{proot}}/qemu-ioregionfd .#qemu-ioregionfd
   nix build -o {{proot}}/ycsb .#ycsb
+  nix build -o {{proot}}/fastclick .#fastclick
   nix build -o {{proot}}/vmux-nixbuild .#vmux
   [[ -z $(git submodule status | grep "^-") ]] || echo WARN: git submodules status: not in sync
 
@@ -532,7 +533,7 @@ dpdk_helloworld: dpdk-setup
   meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
 
 fastclick: 
-  sudo ./result/bin/click --dpdk "-l 2-10" -- ./test/fastclick/dpdk-flow-parser.click
+  sudo ./fastclick/bin/click --dpdk "-l 2-10" -- ./test/fastclick/dpdk-flow-parser.click
 
 pktgen: 
   nix shell .#pktgen
