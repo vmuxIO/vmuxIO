@@ -178,6 +178,13 @@
     "igb_uio"
     "vfio_pci"
   ];
+  # TODO (peter): this likely breaks some measure_ycsb or so, because now ice is not bound automatically and OS doesnt auto manage eth1 (boot hangs a bit)
+  boot.extraModprobeConfig = ''
+    blacklist ice
+    blacklist ixgbe
+    blacklist e1000
+    blacklist e1000e
+  '';
 
   # system.activationScripts = {
   #   linkHome = {
