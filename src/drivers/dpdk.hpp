@@ -314,11 +314,12 @@ static void lcore_init_checks() {
 
 class Dpdk : public Driver {
 private:
+	const static uint16_t max_queues_per_vm = 4;
+
 	struct rte_mempool *mbuf_pool;
-	struct rte_mbuf *bufs[BURST_SIZE];
+	struct rte_mbuf *bufs[BURST_SIZE * max_queues_per_vm];
 	uint16_t port_id;
 
-	const uint16_t max_queues_per_vm = 4;
 
 	uint16_t get_queue_id(int vm, int queue) {
 		return vm * this->max_queues_per_vm + queue;
@@ -326,7 +327,7 @@ private:
 
 public:
 	Dpdk(int num_vms, const uint8_t (*mac_addr)[6], int argc, char *argv[]) {
-		this->alloc_rx_lists(BURST_SIZE);
+		this->alloc_rx_lists(BURST_SIZE * this->max_queues_per_vm);
 
 		/*
  	 	 * The main function, which does initialization and calls the per-lcore
@@ -479,14 +480,14 @@ public:
 
 			/* Get burst of RX packets, from first port of pair. */
 			const uint16_t nb_rx = rte_eth_rx_burst(port, queue_id,
-					this->bufs, BURST_SIZE);
+					&(this->bufs[this->nb_bufs_used]), BURST_SIZE);
 
 			if (unlikely(nb_rx == 0))
 				continue;
 				// continue;
 
 			// pass pointers to packet buffers via rxBufs to behavioral model
-			for (uint16_t i = 0; i < nb_rx; i++) {
+			for (uint16_t i = this->nb_bufs_used; i < (this->nb_bufs_used + nb_rx); i++) {
 				struct rte_mbuf* buf = this->bufs[i]; // we checked before that there is at least one packet
 				char* pkt = rte_pktmbuf_mtod(buf, char*);
 				if (buf->nb_segs != 1)
@@ -500,7 +501,7 @@ public:
 				if_log_level(LOG_DEBUG, printf("queue %d: ", queue_id));
 				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}
-			this->nb_bufs_used = nb_rx;
+			this->nb_bufs_used += nb_rx;
 		}
   }
 
