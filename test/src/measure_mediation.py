@@ -89,6 +89,70 @@ class MediationTest(AbstractBenchTest):
 def strip_subnet_mask(ip_addr: str):
     return ip_addr[ : ip_addr.index("/")]
 
+def run_test(host: Host, loadgen: LoadGen, guest: Guest, test: MediationTest, repetition: int):
+    remote_fastclick_log = "/tmp/fastclick.log"
+    local_fastclick_log = test.output_filepath_fastclick(repetition)
+    remote_moongen_throughput = "/tmp/throughput.csv"
+    local_moongen_throughput = test.output_filepath_throughput(repetition)
+    remote_moongen_histogram = "/tmp/histogram.csv"
+    local_moongen_histogram = test.output_filepath_histogram(repetition)
+    guest.exec(f"sudo rm {remote_fastclick_log} || true")
+    loadgen.exec(f"sudo rm {remote_moongen_throughput} || true")
+    loadgen.exec(f"sudo rm {remote_moongen_histogram} || true")
+
+    info("Starting Fastclick")
+    if test.fastclick == "software":
+        fastclick_program = "test/fastclick/mac-switch-software.click"
+        fastclick_args = {
+            'ifacePCI0': guest.test_iface_addr,
+        }
+    elif test.fastclick == "hardware":
+        fastclick_program = "test/fastclick/mac-switch-hardware.click"
+        project_root = f"{guest.moonprogs_dir}/../../"
+        fastclick_rules = f"{project_root}/test/fastclick/test_dpdk_nic_rules"
+        fastclick_rules = "/home/host/vmuxIO/test/fastclick/test_dpdk_nic_rules"
+        fastclick_args = {
+            'ifacePCI0': guest.test_iface_addr,
+            'rules': fastclick_rules
+        }
+    else:
+        raise Exception("Unknown fastclick program type")
+        
+    guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=fastclick_args)
+    time.sleep(10) # fastclick takes roughly as long as moongen to start, be we give it some slack nevertheless
+    info("Starting MoonGen")
+    loadgen.run_l2_load_latency(loadgen, "00:00:00:00:00:00", 1000, 
+            runtime = DURATION_S,
+            size = 60,
+            nr_macs = 3,
+            histfile = remote_moongen_histogram,
+            statsfile = remote_moongen_throughput,
+            outfile = '/tmp/output.log'
+            )
+    time.sleep(DURATION_S + 5)
+
+    # await moongen done
+    try:
+        loadgen.wait_for_success(f'[[ -e {remote_moongen_histogram} ]]')
+    except TimeoutError:
+        error('Waiting for moongen output file timed out.')
+
+    # await fastclick logs
+    guest.stop_fastclick()
+    try:
+        guest.wait_for_success(f'[[ $(tail -n 5 {remote_fastclick_log}) = *"AUTOTEST_DONE"* ]]')
+    except TimeoutError:
+        error('Waiting for fastclick output file to appear timed out')
+
+    # teardown
+    loadgen.stop_l2_load_latency(loadgen)
+    guest.kill_fastclick()
+
+    # collect artefacts
+    guest.copy_from(remote_fastclick_log, local_fastclick_log)
+    loadgen.copy_from(remote_moongen_throughput, local_moongen_throughput)
+    loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
+
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
@@ -104,8 +168,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_DPDK_E810 
           ]
     fastclicks = [
+            "hardware",
             "software",
-            "hardware"
             ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
     repetitions = 3
@@ -113,6 +177,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     if BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
         interfaces = [ Interface.VMUX_DPDK_E810 ]
+        # interfaces = [ Interface.VFIO ]
         # fastclicks = [ "software" ]
         vm_nums = [ 1 ]
         repetitions = 1
@@ -134,25 +199,19 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     for num_vms in vm_nums:
         for interface in interfaces:
+            for fastclick in fastclicks:
+                for repetition in range(repetitions):
+                    # skip VM boots if possible
+                    test_matrix = dict(
+                        repetitions=[ repetitions ],
+                        interface=[ interface.value ],
+                        fastclick=[ fastclick ],
+                        num_vms=[ num_vms ],
+                        )
+                    if not MediationTest.any_needed(test_matrix):
+                        warning(f"Skipping {fastclick}@{interface}: All measurements done already.")
+                        continue
 
-            # skip VM boots if possible
-            test_matrix = dict(
-                repetitions=[ repetitions ],
-                interface=[ interface.value ],
-                fastclick=fastclicks,
-                num_vms=[ num_vms ],
-                )
-            if not MediationTest.any_needed(test_matrix):
-                warning(f"Skipping {interface}@{num_vms}VMs: All measurements done already.")
-                continue
-
-            info(f"Testing configuration iface: {interface} vm_num: {num_vms}")
-            
-            info("Booting VM")
-
-            # boot VMs
-            with measurement.virtual_machine(interface) as guest:
-                for fastclick in fastclicks:
                     # build test object
                     test = MediationTest(
                             interface=interface.value,
@@ -160,83 +219,24 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                             fastclick=fastclick,
                             num_vms=num_vms)
                     all_tests += [ test ]
-                    info(f"Test: {test}")
+                    info(f"Testing repetition {repetition}: {test}")
+                    
+                    info("Booting VM")
+                    with measurement.virtual_machine(interface) as guest:
+                        # loadgen: set up interfaces and networking
 
-                    # loadgen: set up interfaces and networking
+                        info('Binding loadgen interface')
+                        loadgen.modprobe_test_iface_drivers()
+                        loadgen.bind_test_iface() # bind vfio driver
 
-                    info('Binding loadgen interface')
-                    loadgen.modprobe_test_iface_drivers()
-                    loadgen.bind_test_iface() # bind vfio driver
+                        # guest.modprobe_test_iface_drivers()
+                        guest.bind_test_iface() # bind vfio driver
 
-                    # guest.modprobe_test_iface_drivers()
-                    guest.bind_test_iface() # bind vfio driver
+                        # run test
+                        run_test(host, loadgen, guest, test, repetition)
 
-                    for repetition in range(repetitions):
-                        remote_fastclick_log = "/tmp/fastclick.log"
-                        local_fastclick_log = test.output_filepath_fastclick(repetition)
-                        remote_moongen_throughput = "/tmp/throughput.csv"
-                        local_moongen_throughput = test.output_filepath_throughput(repetition)
-                        remote_moongen_histogram = "/tmp/histogram.csv"
-                        local_moongen_histogram = test.output_filepath_histogram(repetition)
+                        # summarize results
                         local_summary_file = test.output_filepath(repetition)
-                        guest.exec(f"sudo rm {remote_fastclick_log} || true")
-                        loadgen.exec(f"sudo rm {remote_moongen_throughput} || true")
-                        loadgen.exec(f"sudo rm {remote_moongen_histogram} || true")
-
-                        info("Starting Fastclick")
-                        if test.fastclick == "software":
-                            fastclick_program = "test/fastclick/mac-switch-software.click"
-                            fastclick_args = {
-                                'ifacePCI0': guest.test_iface_addr,
-                            }
-                        elif test.fastclick == "hardware":
-                            fastclick_program = "test/fastclick/mac-switch-hardware.click"
-                            project_root = f"{guest.moonprogs_dir}/../../"
-                            fastclick_rules = f"{project_root}/test/fastclick/test_dpdk_nic_rules"
-                            fastclick_rules = "/home/host/vmuxIO/test/fastclick/test_dpdk_nic_rules"
-                            fastclick_args = {
-                                'ifacePCI0': guest.test_iface_addr,
-                                'rules': fastclick_rules
-                            }
-                        else:
-                            raise Exception("Unknown fastclick program type")
-                            
-                        guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=fastclick_args)
-                        time.sleep(10) # fastclick takes roughly as long as moongen to start, be we give it some slack nevertheless
-                        info("Starting MoonGen")
-                        loadgen.run_l2_load_latency(loadgen, "00:00:00:00:00:00", 1000, 
-                                runtime = DURATION_S,
-                                size = 60,
-                                nr_macs = 3,
-                                histfile = remote_moongen_histogram,
-                                statsfile = remote_moongen_throughput,
-                                outfile = '/tmp/output.log'
-                                )
-                        time.sleep(DURATION_S + 5)
-
-                        # await moongen done
-                        try:
-                            loadgen.wait_for_success(f'[[ -e {remote_moongen_histogram} ]]')
-                        except TimeoutError:
-                            error('Waiting for moongen output file timed out.')
-
-                        # await fastclick logs
-                        guest.stop_fastclick()
-                        try:
-                            guest.wait_for_success(f'[[ $(tail -n 5 {remote_fastclick_log}) = *"AUTOTEST_DONE"* ]]')
-                        except TimeoutError:
-                            error('Waiting for fastclick output file to appear timed out')
-
-                        # teardown
-                        loadgen.stop_l2_load_latency(loadgen)
-                        guest.kill_fastclick()
-
-                        # collect artefacts
-                        guest.copy_from(remote_fastclick_log, local_fastclick_log)
-                        loadgen.copy_from(remote_moongen_throughput, local_moongen_throughput)
-                        loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
-
-                        # summarize results of VM
                         with open(local_summary_file, 'w') as file:
                             try:
                                 # to_string preserves all cols
