@@ -377,6 +377,14 @@ public:
 		/* >8 End of initializing all ports. */
 
 		/* Create flow for send packet with. 8< */
+		/* closing and releasing resources */
+		ret = rte_flow_flush(this->port_id, &error);
+		if (ret != 0) {
+			printf("Flow can't be flushed %d message: %s\n",
+				error.type,
+				error.message ? error.message : "(no stated reason)");
+			rte_exit(EXIT_FAILURE, "error in flushing flows");
+		}
 
 #define SRC_IP ((0<<24) + (0<<16) + (0<<8) + 0) /* src ip = 0.0.0.0 */
 #define DEST_IP ((192<<24) + (168<<16) + (1<<8) + 1) /* dest ip = 192.168.1.1 */
@@ -513,7 +521,7 @@ public:
     this->nb_bufs_used = 0;
   }
 
-  virtual bool add_switch_rule(int vm_id, uint64_t dst_addr, uint16_t dst_queue) {
+  virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
   	printf("dpdk add switch rule\n");
 
 		struct rte_flow_error error;
@@ -522,14 +530,16 @@ public:
 		struct rte_ether_addr src_mask;
 		struct rte_ether_addr dest_mac;
 		struct rte_ether_addr dest_mask;
+		char fmt[20];
+		uint16_t queue_id = this->get_queue_id(vm_id, dst_queue);
 
 		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
 		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);
 		// rte_ether_unformat_addr("52:54:00:fa:00:60", &dest_mac);
 		rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
 
-		memcpy(&dest_mac, (void*)&dst_addr, 6);
-		flow = generate_eth_flow(port_id, this->get_queue_id(vm_id, dst_queue),
+		memcpy(dest_mac.addr_bytes, dst_addr, 6);
+		flow = generate_eth_flow(port_id, queue_id,
 					&src_mac, &src_mask,
 					&dest_mac, &dest_mask, &error);
 		if (!flow) {
@@ -538,6 +548,8 @@ public:
 				error.message ? error.message : "(no stated reason)");
 			return false;
 		}
+		rte_ether_format_addr(fmt, sizeof(fmt), &dest_mac);
+  	printf("added rule dst_mac %s -> queue %d\n", fmt, queue_id);
 
   	return true;
   }

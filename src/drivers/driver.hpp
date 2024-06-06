@@ -43,7 +43,7 @@ public:
   virtual void recv_consumed(int vm_id) = 0;
 
   // return false if rule cant be allocated
-  virtual bool add_switch_rule(int vm_id, uint64_t mac_addr, uint16_t dst_queue) {
+  virtual bool add_switch_rule(int vm_id, uint8_t mac_addr[6], uint16_t dst_queue) {
     return false;
   }
 };
