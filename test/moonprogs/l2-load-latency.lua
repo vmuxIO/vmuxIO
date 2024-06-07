@@ -76,7 +76,7 @@ function sendMacs(queue, bufs, pktSize, dstMac, numDstMacs)
 	while mg.running() do
     bufs:alloc(pktSize)
     for i, buf in ipairs(bufs) do
-      local dst = mac_nr + bit.lshift(((i-1) % numDstMacs) + 0ULL, 40ULL)
+      local dst = mac_nr + ((i-1) % numDstMacs)
       -- print(dst)
       setMac(buf, dst)
     end
