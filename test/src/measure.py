@@ -131,7 +131,9 @@ class Measurement:
         """
         estimated time to boot this system in seconds
         """
-        vm_boot = (num_vms / 32) * 60 * 2 # time taken to boot a batch of VMs
+        # time taken to boot a batch of VMs (2min each)
+        # min(factor for 1 VM, factor for more VMs)
+        vm_boot = max(0.3, (num_vms / 32)) * 60 * 2
         return vm_boot
 
 

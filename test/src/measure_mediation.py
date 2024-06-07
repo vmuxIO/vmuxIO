@@ -46,7 +46,8 @@ class MediationTest(AbstractBenchTest):
         estimate time needed to run this benchmark excluding boot time in seconds
         """
         time_sleeps = DURATION_S + 10 + 5
-        return self.repetitions * (time_sleeps + 2)
+        overheads = 35
+        return self.repetitions * (time_sleeps + overheads)
 
     # def find_error(self, repetition: int) -> bool:
     #     failure = False
