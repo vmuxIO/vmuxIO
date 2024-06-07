@@ -731,7 +731,7 @@ class lan {
   void qena_updated(uint16_t idx, bool rx);
   void tail_updated(uint16_t idx, bool rx);
   void rss_key_updated();
-  void packet_received(const void *data, size_t len);
+  void packet_received(const void *data, size_t len, std::optional<uint16_t> queue_hint);
 };
 
 
@@ -792,6 +792,7 @@ class e810_bm : public nicbm::Runner::Device {
   friend class lan_queue_rx;
   friend class lan_queue_tx;
   friend class shadow_ram;
+  friend class e810_switch;
 
   static const unsigned BAR_REGS = 0;
   static const unsigned BAR_IO = 2;

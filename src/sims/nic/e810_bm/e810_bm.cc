@@ -87,7 +87,7 @@ void e810_bm::EthRx(uint8_t port, std::optional<uint16_t> queue, const void *dat
 #ifdef DEBUG_DEV
   std::cout << "i40e: received packet len=" << len << logger::endl;
 #endif
-  lanmgr.packet_received(data, len);
+  lanmgr.packet_received(data, len, queue);
 }
 
 void e810_bm::RegRead(uint8_t bar, uint64_t addr, void *dest, size_t len) {
