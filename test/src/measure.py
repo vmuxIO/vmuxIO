@@ -268,7 +268,10 @@ class Measurement:
 
 @dataclass
 class AbstractBenchTest(ABC):
-    repetitions: int
+    # magic parameter: repetitions
+    # Feature matrixes for other parameters take lists of values to iterate over. 
+    # Wile repetitions is also a list in the feature matrix, even single value (e.g. 3) still means that this test will be run 3 times.
+    repetitions: int 
     num_vms: int
 
     @abstractmethod
@@ -297,12 +300,24 @@ class AbstractBenchTest(ABC):
         return False
 
     @classmethod
+    def list_tests(cls, test_matrix: Dict[str, List[Any]]) -> List[Any]:
+        """
+        test_matrix:
+        dict where every key corresponds to a constructor parameter/field for this cls/BenchTest (same list as test_parameters() returns).
+        Each value is a list of values to be tested.
+        """
+        ret = []
+        for test_args in product_dict(test_matrix):
+            test = cls(**test_args)
+            ret += [ test ]
+        return ret
+
+    @classmethod
     def any_needed(cls, test_matrix: Dict[str, List[Any]]) -> bool:
         """
         Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
         """
-        for test_args in product_dict(test_matrix):
-            test = cls(**test_args)
+        for test in cls.list_tests(test_matrix):
             if test.needed():
                 debug(f"any_needed: needs {test}")
                 return True
@@ -356,7 +371,10 @@ class AbstractBenchTest(ABC):
         for test_args in product_dict(reboot_matrix):
             test_args = {**test_args, **kwargs_no_reboot}
             test = cls(**test_args)
-            needed_s += Measurement.estimated_boottime(test.num_vms)
+            duration_s = Measurement.estimated_boottime(test.num_vms)
+            if "repetitions" in args_reboot:
+                duration_s *= test.repetitions
+            needed_s += duration_s
 
         if unknown_runtime:
             info(f"Test not cached yet: {needed}/{total}. Time to completion not known.")
@@ -364,6 +382,14 @@ class AbstractBenchTest(ABC):
             info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
 
         return needed_s
+
+    @classmethod
+    def test_parameters(cls) -> List[str]:
+        """
+        return the list of names of input parameters for this test
+        """
+        return [i for i in cls.__match_args__]
+
 
 import measure_vnf
 import measure_hotel
