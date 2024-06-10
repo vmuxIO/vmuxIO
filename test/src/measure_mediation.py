@@ -167,6 +167,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     # set up test plan
     interfaces = [
+          Interface.VMUX_MED,
           Interface.VMUX_DPDK_E810
           ]
     fastclicks = [
@@ -178,11 +179,11 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     DURATION_S = 61 if not BRIEF else 11
     if BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_DPDK_E810 ]
+        interfaces = [ Interface.VMUX_MED ]
         # interfaces = [ Interface.VFIO ]
         # fastclicks = [ "software" ]
         vm_nums = [ 1 ]
-        repetitions = 6
+        repetitions = 1
 
     test_matrix = dict(
         repetitions=[ repetitions ],

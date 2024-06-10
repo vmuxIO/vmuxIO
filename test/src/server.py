@@ -1801,12 +1801,14 @@ class Host(Server):
         vmux_socket = f"{self.vmux_socket_path}"
         if interface.is_passthrough():
             args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
-        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810 ]:
+        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]:
             dpdk_args += " -u -- -l 1 -n 1"
         if interface.guest_driver() == "ice":
             vmux_mode = "emulation"
         elif interface.guest_driver() == "e1000":
             vmux_mode = "e1000-emu"
+        if interface == Interface.VMUX_MED:
+            vmux_mode = "mediation"
         if not interface.is_passthrough():
             if num_vms == 0:
                 args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'

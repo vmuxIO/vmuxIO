@@ -47,6 +47,9 @@ class Interface(Enum):
     # vMux e810 emulation to tap backend
     VMUX_EMU_E810 = "vmux-emu-e810"
 
+    # vMux e810 mediation (uses dpdk)
+    VMUX_MED = "vmux-med"
+
     # vMux e1000 emulation to dpdk backend
     VMUX_DPDK = "vmux-dpdk"
 
@@ -61,16 +64,16 @@ class Interface(Enum):
         return self in [ Interface.MACVTAP ]
 
     def needs_vfio(self) -> bool:
-        return self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810 ]
+        return self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]
 
     def needs_vmux(self) -> bool:
-        return self in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.VMUX_EMU_E810, Interface.VMUX_DPDK_E810 ]
+        return self in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.VMUX_EMU_E810, Interface.VMUX_MED, Interface.VMUX_DPDK_E810 ]
 
     def is_passthrough(self) -> bool:
         return self in [ Interface.VFIO, Interface.VMUX_PT ]
 
     def guest_driver(self) -> str:
-        if self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_EMU_E810, Interface.VMUX_DPDK_E810 ]:
+        if self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_EMU_E810, Interface.VMUX_MED, Interface.VMUX_DPDK_E810 ]:
             return "ice"
         if self in [ Interface.BRIDGE_E1000, Interface.VMUX_EMU, Interface.VMUX_DPDK ]:
             return "e1000"
