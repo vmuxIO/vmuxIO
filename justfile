@@ -193,6 +193,64 @@ vm-e1000:
         -nographic
       sudo ip link del tap0
 
+vm-strace-nonet EXTRA_CMDLINE="":
+    sudo strace -o /tmp/strace-nonet qemu-system-x86_64 \
+        -cpu host \
+        -smp 4 \
+        -enable-kvm \
+        -m 16G \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
+        -nographic
+
+vm-strace-vmux:
+    sudo rm {{qemuMem}} || true
+    sudo strace -o /tmp/strace-vmux qemu/bin/qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
+        -device vfio-user-pci,socket={{vmuxSock}} \
+        -nographic
+
+vm-strace-allnet:
+    sudo ip link delete {{vmuxTap}} || true
+    sudo ip tuntap add mode tap {{vmuxTap}}
+    sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
+    sudo ip link set dev {{vmuxTap}} up
+    sudo rm {{qemuMem}} || true
+    sudo strace -o /tmp/strace-allnet qemu/bin/qemu-system-x86_64 \
+        -cpu host \
+        -smp 8 \
+        -enable-kvm \
+        -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -netdev tap,id=admin1,ifname={{vmuxTap}},script=no,downscript=no \
+        -device e1000,netdev=admin1,mac=02:34:56:78:9a:bc \
+        -nographic
+
 prepare-guest:
     modprobe vfio-pci
     echo 8086 100e > /sys/bus/pci/drivers/vfio-pci/new_id
