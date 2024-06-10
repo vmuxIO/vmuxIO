@@ -74,6 +74,9 @@ vmuxDpdkE1000:
 vmuxDpdkE810:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
 
+vmuxMed:
+  sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1
+
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true
   sudo ip tuntap add mode tap {{vmuxTap}}

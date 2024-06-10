@@ -148,7 +148,7 @@ Result<void> _main(int argc, char **argv) {
              "as backend for emulation (or \"none\" if not applicable)\n"
           << "-s /tmp/vmux.sock                      Path of the socket\n"
           << "-m passthrough                         vMux mode: "
-             "passthrough, emulation, e1000-emu\n";
+             "passthrough, emulation, mediation, e1000-emu\n";
       return outcome::success();
     default:
       break;
@@ -259,6 +259,10 @@ Result<void> _main(int argc, char **argv) {
     }
     if (modes[i] == "emulation") {
       device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq);
+    }
+    if (modes[i] == "mediation") {
+      device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq);
+      device->driver->mediation_enable(i);
     }
     if (modes[i] == "e1000-emu") {
 #ifdef BUILD_E1000_EMU

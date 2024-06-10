@@ -319,6 +319,7 @@ private:
 	struct rte_mempool *mbuf_pool;
 	struct rte_mbuf *bufs[BURST_SIZE * max_queues_per_vm];
 	uint16_t port_id;
+	std::vector<bool> mediate; // per VM
 
 
 	uint16_t get_queue_id(int vm, int queue) {
@@ -328,6 +329,7 @@ private:
 public:
 	Dpdk(int num_vms, const uint8_t (*mac_addr)[6], int argc, char *argv[]) {
 		this->alloc_rx_lists(BURST_SIZE * this->max_queues_per_vm);
+		this->mediate = std::vector<bool>(num_vms, false);
 
 		/*
  	 	 * The main function, which does initialization and calls the per-lcore
@@ -505,7 +507,12 @@ public:
 				// rte_memcpy(this->rxBufs[i], pkt, buf->pkt_len);
 				this->rxBufs[i] = pkt;
 				this->rxBuf_used[i] = buf->pkt_len;
-				this->rxBuf_queue[i] = q_idx;
+				if (this->mediate[vm_id]) {
+					this->rxBuf_queue[i] = q_idx;
+				} else {
+					// make the behavioral model emulate the switching
+					this->rxBuf_queue[i] = {};
+				}
 				if_log_level(LOG_DEBUG, printf("queue %d: ", queue_id));
 				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}
@@ -522,6 +529,12 @@ public:
   }
 
   virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
+  	if (!this->mediate[vm_id]) {
+  		// for emulation we ignore switch rules.
+  		// Because we don't send queue hints to the behavioral model, it emulates the switch then.
+  		return true;
+  	}
+
   	printf("dpdk add switch rule\n");
 
 		struct rte_flow_error error;
@@ -552,5 +565,15 @@ public:
   	printf("added rule dst_mac %s -> queue %d\n", fmt, queue_id);
 
   	return true;
+  }
+
+  virtual bool mediation_enable(int vm_id) {
+		this->mediate[vm_id] = true;
+		return true;
+  }
+
+  virtual bool mediation_disable(int vm_id) {
+		// die("unimplemented: you need to flush switch rules from the emulator to the device");
+		return false;
   }
 };
