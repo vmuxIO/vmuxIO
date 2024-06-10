@@ -160,7 +160,7 @@
       };
 
       #patched qemu
-      qemu = pkgs.callPackage ./nix/qemu-libvfio.nix { 
+      qemu = pkgs.callPackage ./nix/qemu-libvfio.nix {
         # needs a nixpkgs with qemu ~7.1.0 for patches to apply.
         inherit pkgs2211;
       };
@@ -189,7 +189,7 @@
           echo "This app does not actually do anything. It just makes sure all packages for the dev shell are already loaded in the store."
           # Actually we should not do this workaround but place an actual garbage
           # collection root for the dev shell (also including compilers etc), but
-          # i don't know how to do so. 
+          # i don't know how to do so.
         '';
       };
 
@@ -227,17 +227,22 @@
         format = "qcow2";
       };
       # used by autotest
-      guest-image = nixos-generators.nixosGenerate {
+      test-guest-image = make-disk-image {
+        config = self.nixosConfigurations.test-guest.config;
         inherit pkgs;
-        modules = [ ./nix/guest-config.nix ];
-        specialArgs = {
-          inherit (flakepkgs) linux-firmware-pinned;
-        };
-        format = "qcow";
+        inherit (pkgs) lib;
+        format = "qcow2";
+      };
+      # used by autotest
+      test-guest-extkern-image = make-disk-image {
+        config = self.nixosConfigurations.test-guest-extkern.config;
+        inherit pkgs;
+        inherit (pkgs) lib;
+        format = "qcow2";
       };
     };
 
-    devShells = let 
+    devShells = let
       common_deps = with pkgs; [
         just
         iperf2
@@ -314,7 +319,7 @@
         '';
 
         # stub stuff to statisfy the build
-        src = ./LICENSE; 
+        src = ./LICENSE;
         dontUnpack = true;
         dontPatch = true;
         dontConfigure = true;
@@ -355,21 +360,24 @@
     in
       nixosMachines // packages // devShells // homeConfigurations;
   })) // {
-    all-images = let 
+    all-images = let
       pkgs = self.packages.x86_64-linux;
     in {
-      guest-image = pkgs.guest-image;
+      test-guest-image = pkgs.test-guest-image;
+      test-guest-extkern-image = pkgs.test-guest-extkern-image;
       nesting-guest-image = pkgs.nesting-guest-image;
       nesting-guest-image-noiommu = pkgs.nesting-guest-image-noiommu;
       nesting-host-extkern-image = pkgs.nesting-host-extkern-image;
       nesting-host-image = pkgs.nesting-host-image;
-    } // (let 
+    } // (let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         flakepkgs = self.packages.x86_64-linux;
+        # TODO do the same as everywhere else
         image = i: nixos-generators.nixosGenerate {
           inherit pkgs;
-          modules = [ 
+          modules = [
             ./nix/guest-config.nix
+            ./nix/extkern.nix
             ({...}: {
              networking.vm_number = i;
              })
@@ -416,7 +424,7 @@
             inherit (pkgs) lib;
             inherit flakepkgs;
             nested = true;
-          }) 
+          })
           ./nix/nixos-generators-qcow.nix
         ];
       };
@@ -428,9 +436,30 @@
             inherit flakepkgs;
             nested = true;
             noiommu = true;
-          }) 
+          })
           ./nix/nixos-generators-qcow.nix
         ];
+      };
+      test-guest = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ./nix/guest-config.nix
+          ./nix/nixos-generators-qcow.nix
+        ];
+        specialArgs = {
+          inherit (flakepkgs) linux-firmware-pinned;
+        };
+      };
+      test-guest-extkern = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ./nix/guest-config.nix
+          ./nix/nixos-generators-qcow.nix
+          ./nix/extkern.nix
+        ];
+        specialArgs = {
+          inherit (flakepkgs) linux-firmware-pinned;
+        };
       };
     };
   };

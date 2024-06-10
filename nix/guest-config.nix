@@ -5,11 +5,11 @@
     ./networking.nix
   ];
 
-  services.cloud-init = { 
+  services.cloud-init = {
     enable = true;
     network.enable = true;
     settings = {
-      datasource_list = { 
+      datasource_list = {
         NoCloud.keep = 1;
         ConfigDrive.keep = 1;
         Fallback.keep = 1;
@@ -31,10 +31,12 @@
 
   services.sshd.enable = true;
 
-  services.resolved.extraConfig = ''
-    # attempt to provide a DNS resolver where docker containers expect one
-    DNSStubListenerExtra=127.0.0.11
-  '';
+  services.resolved.enable = false;
+  # not necessary anymore, because we patch all docker container names anyways
+  # services.resolved.extraConfig = ''
+  #   # attempt to provide a DNS resolver where docker containers expect one
+  #   DNSStubListenerExtra=127.0.0.11
+  # '';
   networking.firewall.enable = false;
   # networking.firewall.allowedTCPPorts = [22];
 
@@ -95,6 +97,8 @@
     dpdk
     ethtool
     stress
+    # TODO remove?
+    (writeShellScriptBin "installBootLoader" "echo ${config.system.build.installBootLoader}")
   ];
 
   hardware.firmware = [ linux-firmware-pinned ];
@@ -194,4 +198,5 @@
   #     deps = [];
   #   };
   # };
+  boot.initrd.enable = lib.mkDefault true;
 }

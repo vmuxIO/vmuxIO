@@ -118,6 +118,37 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -device vfio-pci,host={{PASSTHROUGH}} \
         -nographic
 
+# uses host kernel and initrd for host-extkern
+prepare-direct-boot HOST="guest":
+    mkdir -p {{proot}}/nix/results
+    nix build .#nixosConfigurations.{{HOST}}.config.boot.kernelPackages.kernel --out-link {{proot}}/nix/results/{{HOST}}-kernel
+    nix build .#nixosConfigurations.{{HOST}}.config.system.build.initialRamdisk --out-link {{proot}}/nix/results/{{HOST}}-initrd
+    rm {{proot}}/nix/results/{{HOST}}-kernelParams || true
+    nix eval --write-to {{proot}}/nix/results/{{HOST}}-kernelParams .#nixosConfigurations.{{HOST}}.config.boot.kernelParams --apply 'builtins.concatStringsSep " "'
+
+vm-libvfio-user-extkern EXTRA_CMDLINE="":
+    sudo rm {{qemuMem}} || true
+    sudo qemu/bin/qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -kernel {{proot}}/nix/results/host-kernel/bzImage \
+        -initrd {{proot}}/nix/results/host-initrd/initrd \
+        -append "root=/dev/sda console=ttyS0 init=/sbin/init {{EXTRA_CMDLINE}}" \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{host_extkern_image}} \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -s \
+        -nographic
+
+
 vm-libvfio-user:
     sudo rm {{qemuMem}} || true
     sudo qemu/bin/qemu-system-x86_64 \
@@ -532,7 +563,8 @@ vm-overwrite NUM="35": vm-init
   set -x
   set -e
   mkdir -p {{proot}}/VMs
-  nix build -o {{proot}}/VMs/kernel nixpkgs#linux
+  just prepare-direct-boot test-guest
+  just prepare-direct-boot host
 
   # build images fast
 
@@ -547,11 +579,12 @@ vm-overwrite NUM="35": vm-init
   overwrite nesting-host-extkern-image
   overwrite nesting-guest-image
   overwrite nesting-guest-image-noiommu
-  overwrite guest-image
+  overwrite test-guest-image
+  overwrite test-guest-extkern-image
   for i in $(seq 1 {{NUM}}); do
-    # overwrite guest-image$i
-    install -D -m644 {{proot}}/VMs/ro-guest-image1/nixos.qcow2 {{proot}}/VMs/guest-image$i.qcow2
-    qemu-img resize {{proot}}/VMs/guest-image$i.qcow2 +16g
+    # roughly, but not quite overwrite test-guest-extkern-image$i
+    install -D -m644 {{proot}}/VMs/ro-test-guest-extkern-image/nixos.qcow2 {{proot}}/VMs/test-guest-extkern-image$i.qcow2
+    qemu-img resize {{proot}}/VMs/test-guest-extkern-image$i.qcow2 +16g
   done
 
 dpdk-setup:

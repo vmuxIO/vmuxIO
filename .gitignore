@@ -4,6 +4,7 @@ VMs/*
 __pycache__/
 outputs*/
 out_*/
+nix/results/
 .cache/
 linux-*/
 .local/
