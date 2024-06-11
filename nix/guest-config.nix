@@ -5,6 +5,7 @@
     ./networking.nix
   ];
 
+  networking.useDHCP = false; # use cloud-init network config!
   services.cloud-init = {
     enable = true;
     network.enable = true;
@@ -27,7 +28,18 @@
   systemd.services."cloud-config".enable = false;
   systemd.services."cloud-final".enable = false;
   # systemd.network.wait-online.timeout = 0;
-  systemd.network.wait-online.enable = false;
+  systemd.network.wait-online.enable = false; # TODO
+  systemd.network.links."01-foo" = {
+    matchConfig.MACAddress = "52:54:00:ea:00:0f";
+    linkConfig = {
+      NamePolicy = "";
+      Name="admin0";
+    };
+  };
+  environment.etc."systemd/network/10-cloud-init-admin0.network.d/no-LLDP.conf".text = ''
+    [Network]
+    LLDP=no
+  '';
 
   services.sshd.enable = true;
 
@@ -99,6 +111,7 @@
     stress
     # TODO remove?
     (writeShellScriptBin "installBootLoader" "echo ${config.system.build.installBootLoader}")
+    iptables
   ];
 
   hardware.firmware = [ linux-firmware-pinned ];
@@ -181,7 +194,9 @@
     "ice"
     "igb_uio"
     "vfio_pci"
+    "isofs" # needed for cloud-init ConfigDrive
   ];
+  boot.initrd.kernelModules = config.boot.kernelModules; # boot.kernelModules doesnt apply in extkern config, so we have to add them to initrd
   # TODO (peter): this likely breaks some measure_ycsb or so, because now ice is not bound automatically and OS doesnt auto manage eth1 (boot hangs a bit)
   boot.extraModprobeConfig = ''
     blacklist ice

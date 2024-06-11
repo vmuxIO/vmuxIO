@@ -533,7 +533,7 @@ vm-init:
     network_config = f"""
   version: 2
   ethernets:
-    eth0:
+    admin0:
       addresses:
         - {ip}/255.255.248.0
       gateway4: 192.168.1.254
