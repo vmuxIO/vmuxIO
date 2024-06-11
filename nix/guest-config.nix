@@ -195,6 +195,20 @@
     "igb_uio"
     "vfio_pci"
     "isofs" # needed for cloud-init ConfigDrive
+    "nf_tables" # needed for docker
+    "fuse"
+    "overlay"
+    "xt_MASQUERADE"
+    "xt_NETMAP"
+    "xt_REDIRECT"
+    "xt_tcpudp"
+    "xt_CHECKSUM"
+    "xt_addrtype"
+    "nft_compat"
+    "ipt_ah"
+    "ipt_REJECT"
+    "nf_reject_ipv4"
+    # "ip_tables"
   ];
   boot.initrd.kernelModules = config.boot.kernelModules; # boot.kernelModules doesnt apply in extkern config, so we have to add them to initrd
   # TODO (peter): this likely breaks some measure_ycsb or so, because now ice is not bound automatically and OS doesnt auto manage eth1 (boot hangs a bit)
