@@ -30,7 +30,7 @@
   # systemd.network.wait-online.timeout = 0;
   systemd.network.wait-online.enable = false; # TODO
   systemd.network.links."01-foo" = {
-    matchConfig.MACAddress = "52:54:00:ea:00:0f";
+    matchConfig.MACAddress = (builtins.fromJSON (builtins.readFile ./admin-macs.json)).macs;
     linkConfig = {
       NamePolicy = "";
       Name="admin0";
@@ -191,13 +191,14 @@
     config.boot.kernelPackages.dpdk-kmods
   ];
   boot.kernelModules = [
-    "ice"
     "igb_uio"
     "vfio_pci"
     "isofs" # needed for cloud-init ConfigDrive
   ];
   boot.initrd.kernelModules = config.boot.kernelModules; # boot.kernelModules doesnt apply in extkern config, so we have to add them to initrd
-  # TODO (peter): this likely breaks some measure_ycsb or so, because now ice is not bound automatically and OS doesnt auto manage eth1 (boot hangs a bit)
+  boot.initrd.availableKernelModules = [
+    "ice"
+  ];
   boot.extraModprobeConfig = ''
     blacklist ice
     blacklist ixgbe
