@@ -1,4 +1,7 @@
 from enum import Enum
+import netaddr
+from pathlib import Path
+import ipaddress
 
 class Machine(Enum):
     # Machine types
@@ -95,3 +98,81 @@ class Reflector(Enum):
 
     # XDP reflector
     XDP = "xdp"
+
+
+class MultiHost:
+    """
+    Starts from vm_number 1. Vm_number 0 leads to legacy outputs without numbers. -1 returns string matching all numbers.
+    """
+    @staticmethod
+    def range(num_vms: int) -> range:
+        return range(1, num_vms + 1)
+
+    @staticmethod
+    def ssh_hostname(ssh_hostname: str, vm_number: int):
+        if vm_number == 0: return ssh_hostname
+        fqdn = ssh_hostname.split(".")
+        fqdn[0] = f"{fqdn[0]}{vm_number}"
+        return ".".join(fqdn)
+
+    @staticmethod
+    def mac(base_mac: str, vm_number: int) -> str:
+        if vm_number == 0: return base_mac
+        base = netaddr.EUI(base_mac)
+        value = base.value + vm_number
+        fmt = netaddr.mac_unix
+        fmt.word_fmt = "%.2x"
+        return str(netaddr.EUI(value).format(fmt))
+
+    @staticmethod
+    def ip(base_ip: str, vm_number: int) -> str:
+        """
+        Increment ips with or without subnets
+        """
+        ip = base_ip.split("/") # split subnet mask
+        start = ipaddress.IPv4Address(ip[0])
+        if len(ip) == 1:
+            return f"{start + vm_number - 1}"
+        else:
+            # re-attach subnet
+            return f"{start + vm_number - 1}/{ip[1]}"
+
+    @staticmethod
+    def generic_path(path_: str, vm_number: int) -> str:
+        if vm_number == 0: return path_
+        path = Path(path_)
+        path = path.with_name(path.stem + str(vm_number) + path.suffix)
+        return str(path)
+
+    @staticmethod
+    def disk_path(root_disk_file: str, vm_number: int) -> str:
+        return MultiHost.generic_path(root_disk_file, vm_number)
+
+    @staticmethod
+    def vfu_path(vfio_user_socket_path: str, vm_number: int) -> str:
+        return MultiHost.generic_path(vfio_user_socket_path, vm_number)
+
+    @staticmethod
+    def cloud_init(disk_path: str, vm_number: int) -> str:
+        init_disk = Path(disk_path).resolve()
+        init_disk = init_disk.parent / f"cloud-init/vm{vm_number}.img"
+        return str(init_disk)
+
+    @staticmethod
+    def iface_name(tap_name: str, vm_number: int):
+        """
+        kernel interface name
+        """
+        if vm_number == 0: return tap_name
+        max_len = 15
+        length = max_len - len("-999")
+        if vm_number == -1: return f"{tap_name[:length]}-"
+        return f"{tap_name[:length]}-{vm_number}"
+
+
+    @staticmethod
+    def enumerate(enumeratable: str, vm_number: int) -> str:
+        if vm_number == 0: return enumeratable
+        return f"{enumeratable}-vm{vm_number}"
+
+

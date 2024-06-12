@@ -3,14 +3,14 @@ from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 from os.path import isfile, join as path_join
 from abc import ABC, abstractmethod
-from server import Host, Guest, LoadGen, MultiHost
+from server import Host, Guest, LoadGen
 import autotest as autotest
 from configparser import ConfigParser
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from typing import Tuple, Iterator, Any, Dict, Callable
 from contextlib import contextmanager
-from enums import Machine, Interface, Reflector
+from enums import Machine, Interface, Reflector, MultiHost
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from util import safe_cast

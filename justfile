@@ -854,7 +854,28 @@ gen-ssh-config:
   #!/usr/bin/env python3
   import ipaddress
   start = ipaddress.IPv4Address("192.168.56.20")
-  for i in range(0, 800):
+  for i in range(0, 801):
     print(f"Host vm{i + 1}.*")
     print(f"Hostname {start + i}")
     print("")
+
+gen-admin-macs MAC:
+  #!/usr/bin/env python3
+  import importlib.util
+  spec = importlib.util.spec_from_file_location("default_parser", "test/src/enums.py")
+  enums = importlib.util.module_from_spec(spec)
+  import json
+  spec.loader.exec_module(enums)
+  macs = ' '.join([ enums.MultiHost.mac('{{MAC}}', i) for i in range(0, 801) ])
+  data = {
+    'comment': 'Generated with `just gen-admin-macs`',
+    'macs': macs
+  }
+  filename = "{{proot}}/nix/admin-macs.json"
+  with open(filename, "w") as f:
+    json.dump(data , f)
+  print(f"Wrote macs to {filename}")
+
+
+
+

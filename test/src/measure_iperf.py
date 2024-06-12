@@ -5,8 +5,8 @@ from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
 from argcomplete import autocomplete
 from logging import (info, debug, error, warning, getLogger,
                      DEBUG, INFO, WARN, ERROR)
-from server import Host, Guest, LoadGen, MultiHost
-from enums import Machine, Interface, Reflector
+from server import Host, Guest, LoadGen
+from enums import Machine, Interface, Reflector, MultiHost
 from measure import AbstractBenchTest, Measurement, end_foreach, BRIEF, OUT_DIR
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
