@@ -1119,17 +1119,22 @@ class Server(ABC):
         for file in listdir(source_dir):
             self.copy_to(path_join(source_dir, file), self.moonprogs_dir)
 
-    def modprobe_test_iface_drivers(self):
+    def modprobe_test_iface_drivers(self, interface: Optional[Interface] = None):
         """
         Modprobe the test interface drivers.
 
         Parameters
         ----------
+        interface: may be given e.g. for guests that have NICs diverging from what is set in the config
 
         Returns
         -------
         """
-        self.exec(f'sudo modprobe {self.test_iface_driv}')
+        if interface is None:
+            self.exec(f'sudo modprobe {self.test_iface_driv}')
+        else:
+            self.exec(f'sudo modprobe {interface.guest_driver()}')
+
 
     def update_extra_hosts(self, extra_hosts: str):
         self.write(extra_hosts, "/tmp/extra_hosts")

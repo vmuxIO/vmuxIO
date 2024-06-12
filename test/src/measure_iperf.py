@@ -161,6 +161,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     # loadgen: set up interfaces and networking
 
                     info('Binding loadgen interface')
+                    guest.modprobe_test_iface_drivers(interface=interface)
                     loadgen.modprobe_test_iface_drivers()
                     loadgen.release_test_iface() # bind linux driver
                     
