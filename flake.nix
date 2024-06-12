@@ -227,17 +227,17 @@
         format = "qcow2";
       };
       # used by autotest
-      test-guest-image = make-disk-image {
+      test-guest-image = make-disk-image rec {
         config = self.nixosConfigurations.test-guest.config;
         inherit pkgs;
         inherit (pkgs) lib;
-        format = "qcow2";
-      };
-      # used by autotest
-      test-guest-extkern-image = make-disk-image {
-        config = self.nixosConfigurations.test-guest-extkern.config;
-        inherit pkgs;
-        inherit (pkgs) lib;
+        contents = [{
+          source = "${config.system.build.toplevel}/init";
+          target = "/init"; # useful when booting an external kernel
+          mode = "744";
+          user = "root";
+          group = "root";
+        }];
         format = "qcow2";
       };
     };
@@ -364,7 +364,6 @@
       pkgs = self.packages.x86_64-linux;
     in {
       test-guest-image = pkgs.test-guest-image;
-      test-guest-extkern-image = pkgs.test-guest-extkern-image;
       nesting-guest-image = pkgs.nesting-guest-image;
       nesting-guest-image-noiommu = pkgs.nesting-guest-image-noiommu;
       nesting-host-extkern-image = pkgs.nesting-host-extkern-image;
@@ -372,12 +371,10 @@
     } // (let
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         flakepkgs = self.packages.x86_64-linux;
-        # TODO do the same as everywhere else
         image = i: nixos-generators.nixosGenerate {
           inherit pkgs;
           modules = [
             ./nix/guest-config.nix
-            ./nix/extkern.nix
             ({...}: {
              networking.vm_number = i;
              })
@@ -445,17 +442,6 @@
         modules = [
           ./nix/guest-config.nix
           ./nix/nixos-generators-qcow.nix
-        ];
-        specialArgs = {
-          inherit (flakepkgs) linux-firmware-pinned;
-        };
-      };
-      test-guest-extkern = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          ./nix/guest-config.nix
-          ./nix/nixos-generators-qcow.nix
-          ./nix/extkern.nix
         ];
         specialArgs = {
           inherit (flakepkgs) linux-firmware-pinned;
