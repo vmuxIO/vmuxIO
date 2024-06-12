@@ -226,6 +226,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     info(f"Testing repetition {repetition}: {test}")
 
                     info("Booting VM")
+                    # with measurement.virtual_machine(interface, run_guest_args = { 'extkern': "foobar"}) as guest:
                     with measurement.virtual_machine(interface) as guest:
                         # loadgen: set up interfaces and networking
 

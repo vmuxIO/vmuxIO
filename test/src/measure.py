@@ -138,7 +138,7 @@ class Measurement:
 
 
     @contextmanager
-    def virtual_machine(self, interface: Interface) -> Iterator[Guest]:
+    def virtual_machine(self, interface: Interface, run_guest_args = dict()) -> Iterator[Guest]:
         """
         Creates a guest virtual machine
         """
@@ -169,7 +169,8 @@ class Measurement:
         self.host.run_guest(
                 net_type=interface,
                 machine_type='pc',
-                qemu_build_dir=QEMU_BUILD_DIR
+                qemu_build_dir=QEMU_BUILD_DIR,
+                **run_guest_args
                 )
 
         debug("Waiting for guest connectivity")

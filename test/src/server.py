@@ -1520,6 +1520,7 @@ class Host(Server):
                   rx_queue_size: int = 256,
                   tx_queue_size: int = 256,
                   vm_number: int = 0,
+                  extkern: Optional[str] = None,
                   ) -> None:
         # TODO this function should get a Guest object as argument
         """
@@ -1555,6 +1556,9 @@ class Host(Server):
             Size of the transmit queue for the test interface.
         vm_number: int
             If not set to 0, will start VM in a way that other VMs with different vm_number can be started at the same time.
+        extkern: Optional[str]
+            If not None, another root_disk will be booted with an external kernel which allows us to append str to the kernel command line.
+
 
         Returns
         -------
@@ -1651,6 +1655,13 @@ class Host(Server):
         memory_backend = f' -object memory-backend-file,mem-path={memory_path},prealloc=yes,id=bm,size={mem}M,share=on'
 
         # Actually start qemu in tmux
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        extkern_options = ""
+        if extkern is not None:
+            extkern_options = ("" +
+                f' -kernel {project_root}/nix/results/test-guest-kernel/bzImage' +
+                f' -initrd {project_root}/nix/results/test-guest-initrd/initrd' +
+                f' -append \\"root=/dev/vda console=ttyS0 init=/init $(cat {project_root}/nix/results/test-guest-kernelParams) {extkern}\\"')
 
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
@@ -1665,6 +1676,9 @@ class Host(Server):
             f' -m {mem}' +
             memory_backend +
             ' -numa node,memdev=bm' +
+
+            # optionally a linux kernel
+            extkern_options +
 
             ' -display none' + # avoid opening all the vnc ports
             ' -enable-kvm' +
