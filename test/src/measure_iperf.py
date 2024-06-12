@@ -25,10 +25,10 @@ import traceback
 
 @dataclass
 class IPerfTest(AbstractBenchTest):
-    
+
     # test options
     direction: str # can be: forward | reverse | bidirectional
-    output_json = True # sets / unsets -J flag on iperf client 
+    output_json = True # sets / unsets -J flag on iperf client
 
     interface: str # network interface used
 
@@ -92,16 +92,17 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     BRIEF = M_BRIEF
 
     # set up test plan
-    interfaces = [ 
-          Interface.VFIO, 
+    interfaces = [
+          Interface.VFIO,
           Interface.BRIDGE,
           Interface.BRIDGE_VHOST,
           Interface.BRIDGE_E1000,
-          Interface.VMUX_PT, 
-          Interface.VMUX_EMU, 
+          Interface.VMUX_PT,
+          Interface.VMUX_EMU,
           # Interface.VMUX_EMU_E810, # tap backend not implemented for e810 (see #127)
-          Interface.VMUX_DPDK, 
-          Interface.VMUX_DPDK_E810 
+          Interface.VMUX_DPDK,
+          Interface.VMUX_DPDK_E810,
+          Interface.VMUX_MED
           ]
     directions = [ "forward" ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
@@ -120,13 +121,13 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         interface=[ interface.value for interface in interfaces],
         num_vms=vm_nums
     )
-    
+
     info(f"Iperf Test execution plan:")
     IPerfTest.estimate_time(test_matrix, ["interface", "num_vms"])
 
     if plan_only:
         return
-    
+
     all_tests = []
 
     for num_vms in vm_nums:
@@ -145,12 +146,12 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
             for direction in directions:
                 info(f"Testing configuration iface: {interface} direction: {direction} vm_num: {num_vms}")
-                
+
                 # build test object
                 ipt = IPerfTest(
                         interface=interface.value,
-                        repetitions=repetitions, 
-                        direction=direction, 
+                        repetitions=repetitions,
+                        direction=direction,
                         num_vms=num_vms)
                 all_tests += [ ipt ]
 
@@ -164,7 +165,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     guest.modprobe_test_iface_drivers(interface=interface)
                     loadgen.modprobe_test_iface_drivers()
                     loadgen.release_test_iface() # bind linux driver
-                    
+
                     try:
                         loadgen.delete_nic_ip_addresses(loadgen.test_iface)
                     except Exception:
@@ -188,7 +189,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
                         loadgen.run_iperf_client(ipt, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file, tmp_remote_output_file)
                         time.sleep(DURATION_S)
-                        
+
                         try:
                             loadgen.wait_for_success(f'[[ -e {remote_output_file} ]]')
                         except TimeoutError:
