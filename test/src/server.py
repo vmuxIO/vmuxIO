@@ -1987,6 +1987,7 @@ class Guest(Server):
         """
         # sometimes the VM needs a bit of extra time until it can assign an IP
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
+        self.exec(f'sudo ip link set {self.test_iface} up')
 
 
     def start_iperf_server(self, server_hostname: str):

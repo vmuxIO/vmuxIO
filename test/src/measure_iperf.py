@@ -19,6 +19,7 @@ from dataclasses import dataclass, field, asdict
 import subprocess
 import os
 from pandas import DataFrame
+import traceback
 
 
 
@@ -38,7 +39,8 @@ class IPerfTest(AbstractBenchTest):
         """
         estimate time needed to run this benchmark excluding boot time in seconds
         """
-        return self.repetitions * (DURATION_S + 2)
+        overheads = 35
+        return (self.repetitions * (DURATION_S + 2) ) + overheads
 
     def find_error(self, repetition: int) -> bool:
         failure = False
@@ -171,6 +173,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     loadgen.setup_test_iface_ip_net()
 
                     for repetition in range(repetitions):
+                        #cleanup
+                        guest.stop_iperf_server()
+                        loadgen.stop_iperf_client()
+
                         remote_output_file = "/tmp/iperf_result.json"
                         tmp_remote_output_file = "/tmp/tmp_iperf_result.json"
                         local_output_file = ipt.output_filepath(repetition)
@@ -199,8 +205,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                                 # to_string preserves all cols
                                 summary = ipt.summarize(repetition).to_string()
                             except Exception as e:
-                                summary = str(e)
-                            file.write(summary) 
+                                summary = traceback.format_exc()
+                            file.write(summary)
 
 
     for ipt in all_tests:
