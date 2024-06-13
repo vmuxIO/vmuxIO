@@ -675,7 +675,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       default:
 
 #ifdef DEBUG_DEV
-        std::cout << "unhandled mem read addr=" << addr << logger::endl;
+        printf("Unhandled mem read at: %x\n", addr);
 #endif
         break;
     }
@@ -1037,14 +1037,27 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         regs.pf_mbx_arqt = val;
         break;
 
-      case PF_SB_ATQBAL: {
-        if(PTP_ATQBAL_MASK(val)) {
-            // write timestamp back to AQTBA registers
+     case PF_SB_ATQBAL: {
+
+        regs.REG_PF_SB_ATQBAL = val;
+        
+        // If bit 31 is set to 1b, read timestamp
+        if(PTP_ATQBAL_IS_ACTIVE(val)) {
+          
+          uint32_t reg_index = PTP_ATQBAL_REG_INDEX(val);  
+          // write timestamp back to AQTBA registers
           gltsyn_ts_t timestamp = ptp.phc_read();
           regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, timestamp.value);
-          regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, timestamp.value);
+          regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(regs.REG_PF_SB_ATQBAH);
         }
 
+        break;
+      }
+
+      case PF_SB_ATQBAH: {
+        // there is no documentation about what writing to this register is supposed to do but it's marked as RW
+        DEBUG_LOG_PTP("Tried to write PF_SB_ATQBAH"); 
+        regs.REG_PF_SB_ATQBAH = val;
         break;
       }
 
@@ -1052,7 +1065,9 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         regs.REG_GLTSYN_CMD = val; break;
 
       case PTP_GLTSYN_CMD_SYNC: {
+
           DEBUG_LOG_PTP("cmd sync " << val);
+        
           if(val == PTP_GLTSYN_CMD_SYNC_INC) {
             DEBUG_LOG_PTP("gltsyn sync inc called");
 

@@ -409,6 +409,10 @@ bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
   return false;
 }
 
+bool lan_queue_tx::ptp_should_sample_tx(const void *data, size_t len) {
+  return true;
+}
+
 void lan_queue_rx::packet_received(const void *data, size_t pktlen,
                                    uint32_t h) {
   size_t num_descs = (pktlen + dbuff_size - 1) / dbuff_size;

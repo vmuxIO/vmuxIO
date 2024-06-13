@@ -39,10 +39,12 @@ typedef union {
 #define PTP_GLTSYN_CMD_SYNC_DEC 0b10
 #define PTP_GLTSYN_CMD_SYNC_EXEC 0b11
 
-#define PTP_ATQBAL_MASK(i) (((i) >> 31) & 1)
-#define PTP_ATQBAL_INDEX(i) (((i) >> 24) & 0b1111)
-#define PTP_ATQBAL_SET_TS(i, ts) (((i) & 0xff00ffff) | (((ts) & 0xff00000000) >> 16))
-#define PTP_ATQBAH_SET_TS(ts) ((ts) & 0xffffffff)
+#define PTP_ATQBAL_IS_ACTIVE(i) (!!((i) & 0x8000'0000))
+#define PTP_ATQBAL_REG_INDEX(i) (((i) >> 24) & 0b1111)
+
+// bit 31 must be zero and bits 16:23 must contain upper 8 bits of the TS
+#define PTP_ATQBAL_SET_TS(i, ts) (((i) & 0x70ff'0000) | ((uint32_t) ((ts) & 0xff'0000'0000) >> 16)) 
+#define PTP_ATQBAH_SET_TS(ts) ((ts) & 0xffff'ffff)
 
 // PTP capabilities
 //#define CAP_TIME_SYNC_ENA 0b1
