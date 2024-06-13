@@ -587,6 +587,13 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
         break;
       // e810
 
+      case PF_SB_ATQBAL: {
+        val = regs.REG_PF_SB_ATQBAL; break;
+      }
+
+      case PF_SB_ATQBAH: {
+        val = regs.REG_PF_SB_ATQBAH; break;
+      }
 
       // timesync (PTP)      
       case PTP_GLTSYN_CMD:
@@ -604,38 +611,30 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case PFTSYN_SEM:
         val = regs.REG_PFTSYN_SEM; break;
 
-      //CASE_2(PTP_GLTSYN_STAT, val = regs.REG_GLTSYN_STAT[INDEX])
+      case PTP_GLTSYN_ENA(0):
+       val = regs.REG_GLTSYN_ENA[0];
+      
+      case PTP_GLTSYN_ENA(1):
+       val = regs.REG_GLTSYN_ENA[1];
 
-      CASE_2(PTP_GLTSYN_ENA, val = regs.REG_GLTSYN_ENA[INDEX])
       CASE_6(PTP_GLTSYN_TIME, 0, {
-        struct timespec ts;
+        struct timespec ts = (dynamic_pointer_cast<E810EmulatedDevice>(this->vmux->device))->read_global_time();
 
-        ts = (dynamic_pointer_cast<E810EmulatedDevice>(this->vmux->device))->getNextTimestamp();
-
-        printf("Read TIME: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
-        
         if (INDEX == 0)
             val = (uint32_t) ts.tv_nsec;
         else if (INDEX == 1)
             val = (uint32_t) ((ts.tv_nsec >> 32) & 0xffffffff);
         else 
             val = (uint32_t) (ts.tv_sec & 0xffffffff);
-
-        printf("Return TIME: %u \n", val);
       })
 
       CASE_6(PTP_GLTSYN_SHTIME, 0, {
         gltsyn_ts_t timestamp = ptp.phc_read();
         val = (uint32_t) (timestamp.value >> (32 * (INDEX / 2))) & (__int128) 0xffffffff;
 
-        printf("SHTIME %d\n", val);
       })
 
-      //CASE_4(PTP_GLTSYN_HHTIME, 0, val = regs.REG_GLTSYN_HHTIME[INDEX])
-
       CASE_4(PTP_GLTSYN_SHADJ, 0, {
-
-        DEBUG_LOG_PTP("Read shadj");
 
         if (INDEX < 2) {
           // lower register
@@ -645,37 +644,13 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
         }
       })
 
-      CASE(PTP_GLTSYN_INCVAL(0), val = (uint32_t) ptp.inc_get())
-
-      /*
-      CASE_4(PTP_GLTSYN_TGT, 0, val = regs.REG_GLTSYN_TGT[INDEX])
-      CASE_4(PTP_GLTSYN_TGT, 4, val = regs.REG_GLTSYN_TGT[INDEX])
-      CASE_4(PTP_GLTSYN_TGT, 8, val = regs.REG_GLTSYN_TGT[INDEX])
-      CASE_4(PTP_GLTSYN_TGT, 12, val = regs.REG_GLTSYN_TGT[INDEX])
-
-
-      CASE_6(PTP_GLTSYN_EVNT, 0, val = regs.REG_GLTSYN_EVNT[INDEX])
-      CASE_6(PTP_GLTSYN_EVNT, 6, val = regs.REG_GLTSYN_EVNT[INDEX])
-
-      CASE_4(PTP_GLTSYN_AUX_OUT, 0, val = regs.REG_GLTSYN_TGT[INDEX])
-      CASE_4(PTP_GLTSYN_AUX_OUT, 4, val = regs.REG_GLTSYN_TGT[INDEX])
-
-      CASE_4(PTP_GLTSYN_CLKO, 0, val = regs.REG_GLTSYN_CLKO[INDEX])
-      CASE_4(PTP_GLTSYN_CLKO, 4, val = regs.REG_GLTSYN_CLKO[INDEX])
-
-      CASE_6(PTP_GLTSYN_AUX_IN, 0, val = regs.REG_GLTSYN_AUX_IN[INDEX])
-
-
-      CASE(GLHH_ART_CTL, val = regs.REG_GLHH_ART_CTL)
-      CASE_2(GLHH_ART_TIME, val = regs.REG_GLHH_ART_TIME[INDEX])
-      CASE(GLHH_ART_DATA, val = regs.REG_GLHH_ART_DATA)
-      CASE(PFHH_SEM, val = regs.REG_PFHH_SEM)
-      */
+      case PTP_GLTSYN_INCVAL(0):
+        val = (uint32_t) ptp.inc_get(); break;
 
       default:
 
 #ifdef DEBUG_DEV
-        printf("Unhandled mem read at: %x\n", addr);
+        printf("Unhandled mem read at: %lx\n", addr);
 #endif
         break;
     }
@@ -1046,9 +1021,10 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
           
           uint32_t reg_index = PTP_ATQBAL_REG_INDEX(val);  
           // write timestamp back to AQTBA registers
-          gltsyn_ts_t timestamp = ptp.phc_read();
-          regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, timestamp.value);
-          regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(regs.REG_PF_SB_ATQBAH);
+          struct timespec ts = (dynamic_pointer_cast<E810EmulatedDevice>(this->vmux->device))->read_tx_timestamp(0);
+
+          regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, ts.tv_nsec);
+          regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(ts.tv_nsec);
         }
 
         break;
@@ -1066,13 +1042,11 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
       case PTP_GLTSYN_CMD_SYNC: {
 
-          DEBUG_LOG_PTP("cmd sync " << val);
-        
           if(val == PTP_GLTSYN_CMD_SYNC_INC) {
-            DEBUG_LOG_PTP("gltsyn sync inc called");
+            DEBUG_LOG_PTP("Warning: HW Command GLTSYN_CMD_SYNC_INC not implemented!");
 
           } else if(val == PTP_GLTSYN_CMD_SYNC_DEC) {
-            DEBUG_LOG_PTP("gltsyn sync dec called");
+            DEBUG_LOG_PTP("Warning: HW Command GLTSYN_CMD_SYNC_DEC not implemented!");
 
           } else if (val == PTP_GLTSYN_CMD_SYNC_EXEC) {
             uint8_t sel_master = PTP_GLTSYN_CMD_SEL_MASTER(regs.REG_GLTSYN_CMD);
@@ -1080,16 +1054,12 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
             uint8_t cmd = PTP_GLTSYN_GET_CMD(regs.REG_GLTSYN_CMD);
             switch(cmd) {
               case PTP_GLTSYN_CMD_INIT_TIME_INCVAL: {
-               
-
-                DEBUG_LOG_PTP("cmd init time incval");
                 // only emulate timer 0
                 gltsyn_ts_t new_time = {
                     .value = (__int128) regs.REG_GLTSYN_SHTIME[0]
                         | ((__int128) regs.REG_GLTSYN_SHTIME << 32) 
                         | ((__int128) regs.REG_GLTSYN_SHTIME << 64) 
                 };
-
 
                 ptp.phc_write(new_time);
                 
@@ -1104,17 +1074,18 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
                 ptp.adj_set(adj);
                 break;
               }
-              case PTP_GLTSYN_CMD_ADJ_TIME:{
 
-                DEBUG_LOG_PTP("PTP Adjust time");
+              case PTP_GLTSYN_CMD_ADJ_TIME:{
 
                 uint64_t adj = ((uint64_t) regs.REG_GLTSYN_SHADJ[2 * sel_master] << 32)
                   | regs.REG_GLTSYN_SHADJ[2 * sel_master + 1];
                 ptp.adj_set(adj);
                 break;
               }
+              
               case PTP_GLTSYN_CMD_ADJ_TIME_AFTER_TGT: {
-                DEBUG_LOG_PTP("ERR ptp sync command not implemented");
+                DEBUG_LOG_PTP("Warning: HW Command GLTSYN_CMD_ADJ_TIME_AFTER_TGT not implemented!");
+
               } default:
                 return;
             }
@@ -1124,21 +1095,12 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
       CASE_6(PTP_GLTSYN_SHTIME, 0, regs.REG_GLTSYN_SHTIME[INDEX] = val)
       CASE_4(PTP_GLTSYN_SHADJ, 0, regs.REG_GLTSYN_SHADJ[INDEX] = val)
-      CASE_2(PTP_GLTSYN_ENA, regs.REG_GLTSYN_ENA[INDEX] = (val & 1))
-
-      /*
-      CASE(PF_SB_ATQBAH, regs.REG_PF_SB_ATQBAH = val)
-
-      CASE_4(PTP_GLTSYN_TGT, 0, regs.REG_GLTSYN_TGT[INDEX] = val)
-      CASE_4(PTP_GLTSYN_TGT, 4, regs.REG_GLTSYN_TGT[INDEX] = val)
-      CASE_4(PTP_GLTSYN_TGT, 8, regs.REG_GLTSYN_TGT[INDEX] = val)
-      CASE_4(PTP_GLTSYN_TGT, 12, regs.REG_GLTSYN_TGT[INDEX] = val)
-
-      CASE_4(PTP_GLTSYN_AUX_OUT, 0, regs.REG_GLTSYN_TGT[INDEX] = val)
-      CASE_4(PTP_GLTSYN_AUX_OUT, 4, regs.REG_GLTSYN_TGT[INDEX] = val)
-
-      CASE_6(PTP_GLTSYN_AUX_IN, 0, regs.REG_GLTSYN_AUX_IN[INDEX] = val)
-      */
+      
+      case PTP_GLTSYN_ENA(0):
+        regs.REG_GLTSYN_ENA[0] = (val & 1); break;
+    
+      case PTP_GLTSYN_ENA(1):
+        regs.REG_GLTSYN_ENA[1] = (val & 1); break;
 
       default:
         DEBUG_LOG_DEV("unhandled mem write addr=" << addr << " val=" << val)

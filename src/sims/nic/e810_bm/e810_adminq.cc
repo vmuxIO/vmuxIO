@@ -713,7 +713,6 @@ void queue_admin_tx::admin_desc_ctx::process() {
     uint32_t offset = 0;
     offset |= nvm_read_cmd->offset_low;
     offset |= (nvm_read_cmd->offset_high) << 16;
-    printf("nvm read at 0x%x\n", offset);
 
     // copy responses observed on real hardware.
     if (offset == 0x0) { // some control register defining nvm layout
