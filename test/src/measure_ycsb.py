@@ -226,6 +226,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 loadgen.setup_test_iface_ip_net()
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                    guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
                 
