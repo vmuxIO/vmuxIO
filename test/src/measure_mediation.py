@@ -189,7 +189,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     )
     all_tests = MediationTest.list_tests(test_matrix)
 
-    info(f"Iperf Test execution plan:")
+    info(f"Mediation test execution plan:")
     MediationTest.estimate_time(test_matrix, ["interface", "num_vms", "repetitions", "fastclick"])
 
     if plan_only:
@@ -227,6 +227,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         # loadgen: set up interfaces and networking
 
                         info('Binding loadgen interface')
+                        try:
+                            loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+                        except Exception:
+                            pass
                         loadgen.modprobe_test_iface_drivers()
                         loadgen.bind_test_iface() # bind vfio driver
 
