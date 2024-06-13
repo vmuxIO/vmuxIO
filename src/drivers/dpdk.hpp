@@ -552,22 +552,41 @@ public:
 
   virtual void recv_consumed(int vm_id) {
     // free pkt
-		for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++)
-			rte_pktmbuf_free(this->bufs[buf]);
+	for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++) 
+		rte_pktmbuf_free(this->bufs[buf]);
 		
     this->nb_bufs_used = 0;
   
   }
   
   /* Get timestamp from NIC (global clock 0) */
-  int getHWTimestamp(struct timespec *ts) {
+  int readCurrentTimestamp(struct timespec *ts) {
     if(rte_eth_timesync_read_time(0, ts)) {
-		perror("HW timestamp failed!");
+		perror("Dpdk current time failed!");
+		return -1;
 	}
     
-	printf("Debug: Read dpdk hw time\n");
 	return 0;
   }
+
+  int readTxTimestamp(uint16_t portid, struct timespec *ts) {
+	if(rte_eth_timesync_read_tx_timestamp(portid, ts)) {
+		perror("Dpdk TX timestamp failed!");
+		return -1;
+	}
+
+	return 0;
+  };
+  
+  int readRxTimestamp(uint16_t portid, struct timespec *ts) { 
+	if(rte_eth_timesync_read_rx_timestamp(portid, ts, 0)) {
+		perror("Dpdk RX timestamp failed!");
+		return -1;
+	}
+
+	return 0;
+  };
+
 
   virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
   	if (!this->mediate[vm_id]) {
@@ -579,7 +598,7 @@ public:
   	printf("dpdk add switch rule\n");
 
 		struct rte_flow_error error;
-  	struct rte_flow* flow;
+  		struct rte_flow* flow;
 		struct rte_ether_addr src_mac;
 		struct rte_ether_addr src_mask;
 		struct rte_ether_addr dest_mac;

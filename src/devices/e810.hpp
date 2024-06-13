@@ -143,17 +143,45 @@ public:
     this->model->SetupIntro(this->deviceIntro);
   }
 
-struct timespec getNextTimestamp() {
+struct timespec read_global_time() {
   struct timespec ts;
 
-  if(this->driver->getHWTimestamp(&ts)) {
+  if(this->driver->readCurrentTimestamp(&ts)) {
     
+    // fallback
     if(!clock_gettime(CLOCK_MONOTONIC, &ts)) {
       printf("Error: Could not get unix timestamp!\n");
       return {0, 0};
     }
   }
   
+  printf("Debug: Read Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
+  return ts;
+}
+
+
+struct timespec read_rx_timestamp(uint16_t portid) {
+  struct timespec ts;
+
+  if(this->driver->readRxTimestamp(portid, &ts)) {
+    // fallback
+    return read_global_time();
+  }
+
+  printf("Debug: Read RX Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
+  return ts;
+}
+
+struct timespec read_tx_timestamp(uint16_t portid) {
+  struct timespec ts;
+
+  if(this->driver->readTxTimestamp(portid, &ts)) {
+    
+    // fallback
+    return read_global_time();
+  }
+  
+  printf("Debug: Read TX Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
   return ts;
 }
 

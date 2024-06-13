@@ -376,7 +376,6 @@ bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
   const headers::pkt_udp *udp =
       reinterpret_cast<const headers::pkt_udp *>(data);
   const void *ptp_start;
-  bool is_udp = false;
 
   if (udp->eth.type == htons(ETH_TYPE_IP) && udp->ip.proto == IP_PROTO_UDP) {
 
@@ -384,7 +383,6 @@ bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
     if (port != PTP_UDP_1 && port != PTP_UDP_2)
       return false;
 
-    is_udp = true;
     ptp_start = udp + 1;
 
   } else if (udp->eth.type == htons(ETH_TYPE_PTP)) {
@@ -407,10 +405,6 @@ bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
   }
 
   return false;
-}
-
-bool lan_queue_tx::ptp_should_sample_tx(const void *data, size_t len) {
-  return true;
 }
 
 void lan_queue_rx::packet_received(const void *data, size_t pktlen,
@@ -436,11 +430,7 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
 
   if (ptp_should_sample_rx(data, pktlen)) {
     if (!PTP_GLTSYN_SEM_BUSY(dev.regs.REG_PFTSYN_SEM)) {
-        // TODO: Write PF ID (owner) to semaphore register
-        dev.regs.REG_PFTSYN_SEM = PTP_GLTSYN_SEM_SET_BUSY(dev.regs.REG_PFTSYN_SEM, true);
-        timestamp = dev.ptp.phc_read();
-
-        dev.regs.REG_PFTSYN_SEM = PTP_GLTSYN_SEM_SET_BUSY(dev.regs.REG_PFTSYN_SEM, false);
+        printf("DEBUG: Should sample RX\n");
     }
   }
 
