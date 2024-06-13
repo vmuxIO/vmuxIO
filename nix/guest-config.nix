@@ -45,7 +45,7 @@
 
   services.sshd.enable = true;
 
-  services.resolved.enable = false;
+  services.resolved.enable = true; # needed to run docker-compose (measure_hotel)
   networking.firewall.enable = false;
   # networking.firewall.allowedTCPPorts = [22];
 
