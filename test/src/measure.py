@@ -20,12 +20,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
 from root import QEMU_BUILD_DIR
+from conf import G
 
-
-OUT_DIR: str = "/tmp/out1"
-BRIEF: bool = False
-NUM_WORKERS: int = 8 # with 16, it already starts failing on rose
-
+NUM_WORKERS = 8 # with 16, it already starts failing on rose
 
 def setup_parser() -> ArgumentParser:
     """
@@ -48,7 +45,7 @@ def setup_parser() -> ArgumentParser:
                         )
     parser.add_argument('-o',
                         '--outdir',
-                        default=OUT_DIR,
+                        default='/tmp/out1',
                         help='Directory to expect old results in and write new ones to',
                         )
     parser.add_argument('-b',
@@ -113,13 +110,11 @@ class Measurement:
 
         self.guests = dict()
 
-        global BRIEF
-        global OUT_DIR
-        BRIEF = self.args.brief
-        OUT_DIR = self.args.outdir
+        G.OUT_DIR = self.args.outdir
+        G.BRIEF = self.args.brief
 
-        if BRIEF:
-            subprocess.run(["sudo", "rm", "-r", OUT_DIR])
+        if G.BRIEF:
+            subprocess.run(["sudo", "rm", "-r", G.OUT_DIR])
 
 
     def hosts(self) -> Tuple[Host, LoadGen]:
@@ -290,7 +285,7 @@ class AbstractBenchTest(ABC):
         raise -1
 
     def output_filepath(self, repetition: int, extension: str = "log"):
-        return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.{extension}")
+        return path_join(G.OUT_DIR, f"{self.test_infix()}_rep{repetition}.{extension}")
 
     def test_done(self, repetition: int):
         output_file = self.output_filepath(repetition)

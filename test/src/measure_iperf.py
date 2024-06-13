@@ -7,7 +7,7 @@ from logging import (info, debug, error, warning, getLogger,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
 from enums import Machine, Interface, Reflector, MultiHost
-from measure import AbstractBenchTest, Measurement, end_foreach, BRIEF, OUT_DIR
+from measure import AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
@@ -20,6 +20,7 @@ import subprocess
 import os
 from pandas import DataFrame
 import traceback
+from conf import G
 
 
 
@@ -84,12 +85,7 @@ def strip_subnet_mask(ip_addr: str):
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
-    from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
-    global OUT_DIR
-    global BRIEF
     global DURATION_S
-    OUT_DIR = M_OUT_DIR
-    BRIEF = M_BRIEF
 
     # set up test plan
     interfaces = [
@@ -107,8 +103,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     directions = [ "forward" ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
     repetitions = 3
-    DURATION_S = 61 if not BRIEF else 11
-    if BRIEF:
+    DURATION_S = 61 if not G.BRIEF else 11
+    if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
         interfaces = [ Interface.VMUX_DPDK_E810 ]
         directions = [ "forward" ]

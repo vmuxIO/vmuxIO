@@ -7,7 +7,7 @@ from logging import (info, debug, error, warning, getLogger,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
 from enums import Machine, Interface, Reflector, MultiHost
-from measure import AbstractBenchTest, Measurement, end_foreach, BRIEF, OUT_DIR
+from measure import AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
@@ -19,6 +19,7 @@ from dataclasses import dataclass, field, asdict
 import subprocess
 import os
 from pandas import DataFrame, read_csv, concat
+from conf import G
 
 
 
@@ -158,12 +159,7 @@ def run_test(host: Host, loadgen: LoadGen, guest: Guest, test: MediationTest, re
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
-    from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
-    global OUT_DIR
-    global BRIEF
     global DURATION_S
-    OUT_DIR = M_OUT_DIR
-    BRIEF = M_BRIEF
 
     # set up test plan
     interfaces = [
@@ -176,8 +172,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
     repetitions = 9
-    DURATION_S = 61 if not BRIEF else 11
-    if BRIEF:
+    DURATION_S = 61 if not G.BRIEF else 11
+    if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
         interfaces = [ Interface.VMUX_MED ]
         # interfaces = [ Interface.VFIO ]
@@ -259,7 +255,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             all_summaries += [ read_csv(test.output_filepath(repetition), sep='\\s+') ]
     df = concat(all_summaries).groupby(MediationTest.test_parameters())['rxMppsCalc'].describe()
 
-    with open(path_join(OUT_DIR, f"mediation_summary.log"), 'w') as file:
+    with open(path_join(G.OUT_DIR, f"mediation_summary.log"), 'w') as file:
         file.write(df.to_string())
 
     # for ipt in all_tests:
