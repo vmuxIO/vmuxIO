@@ -392,6 +392,7 @@ class completion_queue : public queue_base {
 
 
 class control_queue_pair : public queue_base {
+
  protected:
   class admin_desc_ctx : public desc_ctx {
    protected:
@@ -401,8 +402,6 @@ class control_queue_pair : public queue_base {
     uint64_t cqp_base;
     uint32_t cnt;
     // struct ice_aq_desc *ice_d;
-
-
 
     virtual void data_written(uint64_t addr, size_t len);
     virtual void data_write(uint64_t addr, size_t data_len,
@@ -485,8 +484,8 @@ class control_queue_pair : public queue_base {
 
 
 class completion_event_queue : public queue_base {
- protected:
 
+ protected:
   class dma_data_wb : public dma_base {
    protected:
     completion_event_queue &ceq;
@@ -499,10 +498,7 @@ class completion_event_queue : public queue_base {
   };
 
   __le64 cqp_ctx[8];
-
   __le64 cqe[8];
-
-
   uint64_t ceq_size;
 
 
@@ -567,12 +563,11 @@ class host_mem_cache {
 };
 
 
-
-
-
 class lan_queue_base : public queue_base {
+
  protected:
   class qctx_fetch : public host_mem_cache::mem_op {
+
    public:
     lan_queue_base &lq;
 
@@ -597,12 +592,12 @@ class lan_queue_base : public queue_base {
   size_t ctx_size;
   void *ctx;
 
-
   uint32_t reg_dummy_head;
 
   lan_queue_base(lan &lanmgr_, const std::string &qtype, uint32_t &reg_tail,
                  size_t idx_, uint32_t &reg_ena_, uint32_t &fpm_basereg,
                  uint32_t &reg_intqctl, uint16_t ctx_size);
+
   virtual void reset();
   void enable(bool rx);
   void disable();
@@ -659,7 +654,7 @@ class lan_queue_tx : public lan_queue_base {
  public:
   lan_queue_tx(lan &lanmgr_, uint32_t &reg_tail, size_t idx, uint32_t &reg_ena,
                uint32_t &fpm_basereg, uint32_t &reg_intqctl);
-               
+
   virtual void reset();
 };
 
