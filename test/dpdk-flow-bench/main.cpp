@@ -29,12 +29,15 @@
 #include <rte_cycles.h>
 
 static volatile bool force_quit;
+static volatile size_t installed_rules = 0;
+static size_t max_rules = 49144;
 
 static uint16_t port_id;
 static uint16_t nr_queues = 5;
 static uint8_t selected_queue = 1;
 struct rte_mempool *mbuf_pool;
 struct rte_flow *flow;
+static int stat_interval_s = 10;
 
 #define SRC_IP ((0<<24) + (0<<16) + (0<<8) + 0) /* src ip = 0.0.0.0 */
 #define DEST_IP ((192<<24) + (168<<16) + (1<<8) + 1) /* dest ip = 192.168.1.1 */
@@ -227,6 +230,10 @@ signal_handler(int signum)
 				signum);
 		force_quit = true;
 	}
+	if (signum == SIGALRM) {
+		printf("Rules installed: %zu/%zu\n", installed_rules, max_rules);
+		alarm(stat_interval_s);
+	}
 }
 
 struct timespec start = {0, 0};
@@ -271,6 +278,7 @@ main(int argc, char **argv)
 	force_quit = false;
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
+	signal(SIGALRM, signal_handler);
 
 	nr_ports = rte_eth_dev_count_avail();
 	if (nr_ports == 0)
@@ -294,9 +302,7 @@ main(int argc, char **argv)
 
 	/* Create flow for send packet with. 8< */
 	char string_buf[18] = {0};
-	size_t installed_rules = 0;
 	size_t batchsize = 4000;
-	size_t max_rules = 49144;
 	int runtime_s = 30;
 	size_t num_intervals = (max_rules / batchsize);
 	duration durations[num_intervals];
@@ -310,6 +316,7 @@ main(int argc, char **argv)
 	rte_ether_unformat_addr("00:00:00:00:00:00", &dest_mac);
 	rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
 
+	alarm(stat_interval_s); // start stat printing
 	printf("Starting measurement.\n");
 	start_timer();
 	while (installed_rules < max_rules) {
@@ -339,8 +346,6 @@ main(int argc, char **argv)
 		}
 		auto duration = take_time();
 		durations[installed_rules / batchsize] = duration;
-		// double duration_sec = std::chrono::duration<double>(duration).count();
-		// printf("%zu, %zu, %f\n", (installed_rules / batchsize) - 1, installed_rules, duration_sec);
 		// if (duration > std::chrono::seconds(runtime_s)) {
 		// 	break;
 		// }
@@ -350,6 +355,7 @@ main(int argc, char **argv)
 	}
 	auto end = take_time();
 	printf("Stopped measurement.\n");
+	alarm(0); // stop stat printing
 
 	printf("Begin CSV:\n");
 
