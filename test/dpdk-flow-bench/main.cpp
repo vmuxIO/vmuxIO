@@ -30,7 +30,6 @@
 
 static volatile bool force_quit;
 
-static int runtime_s = 30;
 static uint16_t port_id;
 static uint16_t nr_queues = 5;
 static uint8_t selected_queue = 1;
@@ -296,6 +295,7 @@ main(int argc, char **argv)
 	size_t installed_rules = 0;
 	size_t batchsize = 10000;
 	size_t max_rules = 49144;
+	int runtime_s = 30;
 	struct rte_ether_addr src_mac;
 	struct rte_ether_addr src_mask;
 	struct rte_ether_addr dest_mac;
@@ -332,16 +332,17 @@ main(int argc, char **argv)
 				break;
 			}
 		}
-		auto duration = take_time();
-		if (duration > std::chrono::seconds(runtime_s)) {
-			break;
-		}
+		// auto duration = take_time();
+		// if (duration > std::chrono::seconds(runtime_s)) {
+		// 	break;
+		// }
 	}
-	auto duration = take_time();
+	auto diff = take_time();
 	printf("Stopped measurement.\n");
-	double a = std::chrono::duration<double>(duration).count();
-	printf("DurationSec: %f\n", a);
+	double duration_sec = std::chrono::duration<double>(diff).count();
+	printf("DurationSec: %f\n", duration_sec);
 	printf("InstalledRules: %zu\n", installed_rules);
+	printf("Rules/sec: %f\n", installed_rules / duration_sec);
 
 	/* Launching main_loop(). 8< */
 	// ret = main_loop(); # we dont main loop, we just install flows
