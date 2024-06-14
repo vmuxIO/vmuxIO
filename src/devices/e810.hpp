@@ -55,7 +55,7 @@ private:
 public:
   std::shared_ptr<i40e::e810_bm> model;
 
-  E810EmulatedDevice(std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(driver) {
+  E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(device_id, driver) {
     this->driver = driver;
     memcpy((void*)this->mac_addr, mac_addr, 6);
 
@@ -119,7 +119,7 @@ public:
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
     for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
       this_->vfu_ctx_mutex.lock();
-      this_->model->EthRx(0, this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
+      this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
       this_->vfu_ctx_mutex.unlock();
       this_->processAllPollTimers();
     }

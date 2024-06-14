@@ -178,6 +178,8 @@ class InterruptThrottlerSimbricks: public InterruptThrottler {
       if (errno == ENOENT) {
         // Libvfio-user may not have an eventfd to trigger the irq if the guest PCI driver never set up irq routing.
         if_log_level(LOG_DEBUG, printf("Suppressing interrupt %d because guest didnt set up interrupt routing.\n", this->irq_idx));
+        // mask interrupt without the driver knowing
+        this->guest_unmasked_irq = false;
       } else {
         die("Cannot trigger MSIX interrupt %d", this->irq_idx);
       }

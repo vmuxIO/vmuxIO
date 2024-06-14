@@ -731,7 +731,7 @@ class lan {
   void qena_updated(uint16_t idx, bool rx);
   void tail_updated(uint16_t idx, bool rx);
   void rss_key_updated();
-  void packet_received(const void *data, size_t len);
+  void packet_received(const void *data, size_t len, std::optional<uint16_t> queue_hint);
 };
 
 
@@ -767,8 +767,11 @@ class shadow_ram {
 
 class e810_switch {
   std::map<uint64_t, uint16_t> mac_rules; // dst mac address (odd alignment/byte order...) -> dst queue idx
+  e810_bm &dev;
 
   public:
+
+  e810_switch(e810_bm &dev_) : dev(dev_) {};
 
   bool add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
 
@@ -789,6 +792,7 @@ class e810_bm : public nicbm::Runner::Device {
   friend class lan_queue_rx;
   friend class lan_queue_tx;
   friend class shadow_ram;
+  friend class e810_switch;
 
   static const unsigned BAR_REGS = 0;
   static const unsigned BAR_IO = 2;
@@ -969,7 +973,7 @@ class e810_bm : public nicbm::Runner::Device {
                 size_t len) override;
   virtual void RegWrite32(uint8_t bar, uint64_t addr, uint32_t val);
   void DmaComplete(nicbm::DMAOp &op) override;
-  void EthRx(uint8_t port, const void *data, size_t len) override;
+  void EthRx(uint8_t port, std::optional<uint16_t> queue, const void *data, size_t len) override;
   void Timed(nicbm::TimedEvent &ev) override;
 
   virtual void SignalInterrupt(uint16_t vector, uint8_t itr);

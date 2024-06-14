@@ -18,12 +18,14 @@ We can:
 - emluate registers
 - do passthrough (e1000, E810)
 - emulate an e1000 and E810
+- emulate multiple queues for e810
+- partial rte_flow mediation for e810
 
 We cannot yet: 
 
-- Emulate multiple queues for E810
-- Mediate rte_flow onto hardware
 - Minimize data plane overheads with mediated queue passthrough
+- Emulate of default switch recipes completely; Accept new recepies
+- Multi-VM rte_flow mediation
 
 ## Usage
 

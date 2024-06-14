@@ -43,7 +43,8 @@ e810_bm::e810_bm()
       cqp(*this, regs.reg_PFPE_CCQPHIGH, regs.reg_PFPE_CCQPLOW, regs.pf_atqh, regs.pf_atqt),
       shram(*this),
       lanmgr(*this, NUM_QUEUES),
-      cem(*this, NUM_QUEUES) {
+      cem(*this, NUM_QUEUES),
+      bcam(*this) {
   reset(false);
 }
 
@@ -82,11 +83,11 @@ void e810_bm::DmaComplete(nicbm::DMAOp &op) {
   dma.done();
 }
 
-void e810_bm::EthRx(uint8_t port, const void *data, size_t len) {
+void e810_bm::EthRx(uint8_t port, std::optional<uint16_t> queue, const void *data, size_t len) {
 #ifdef DEBUG_DEV
   std::cout << "i40e: received packet len=" << len << logger::endl;
 #endif
-  lanmgr.packet_received(data, len);
+  lanmgr.packet_received(data, len, queue);
 }
 
 void e810_bm::RegRead(uint8_t bar, uint64_t addr, void *dest, size_t len) {

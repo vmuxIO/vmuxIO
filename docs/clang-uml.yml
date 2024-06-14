@@ -8,25 +8,74 @@ diagrams:
       - ../src/*.hpp
       - ../src/*.cpp
       - ../src/*.cc
-    using_namespace: i40e
+      - ../src/*.h
     include:
       namespaces:
         - i40e
     exclude:
       elements:
-        - i40e::e810_bm::i40e_regs
-  # vmux:
-  #   type: class
-  #   glob:
-  #     - ../src/*.hpp
-  #     - ../src/*.cpp
-  #     - ../src/*.cc
-  #   # using_namespace: i40e
-  #   include:
-  #     context:
-  #       - E810EmulatedDevice
-  #   #   element:
-  #   #     - E810EmulatedDevice
-  #   exclude:
-  #     namespaces:
-  #       - myproject::detail
+        - r: ".*i40e_regs.*"
+  vmux:
+    type: class
+    glob:
+      - ../src/*.hpp
+      - ../src/*.cpp
+      - ../src/*.cc
+      - ../src/*.h
+    include:
+      context:
+        - VmuxDevice
+        - E810EmulatedDevice
+        - InterruptThrottlerSimbricks
+        - VfioConsumer
+        - VfioServer
+        - Dpdk
+      subclasses:
+        - VmuxDevice
+        - VmuxRunner
+        - InterruptThrottler
+        - VfioConsumer
+        - VfioServer
+        - Driver
+  vmux_simbricks:
+    type: class
+    glob:
+      - ../src/*.hpp
+      - ../src/*.cpp
+      - ../src/*.cc
+      - ../src/*.h
+    include:
+      context:
+        - E810EmulatedDevice
+        - InterruptThrottlerSimbricks
+        - VfioConsumer
+        - VfioServer
+        - Dpdk
+        - i40e::e810_bm
+        - r: ".*nicbm::Runner::Device.*"
+    exclude:
+      elements:
+        - r: ".*i40e_regs.*"
+        - r: "i40e::(?!(e810)).*"
+  rx_sequence: # broken
+    type: sequence
+    glob:
+      - ../src/*.hpp
+      - ../src/*.cpp
+      - ../src/*.cc
+      - ../src/*.h
+    include:
+      context:
+        - E810EmulatedDevice
+        - InterruptThrottlerSimbricks
+        - VfioConsumer
+        - VfioServer
+        - Dpdk
+        - i40e::e810_bm
+        - r: ".*nicbm::Runner::Device.*"
+      namespaces:
+        - r: ".*"
+    from:
+      # - function: "Dpdk::recv"
+      # - function: "E810EmulatedDevice::driver_cb()"
+      - function: "main()"

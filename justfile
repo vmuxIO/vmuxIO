@@ -24,7 +24,7 @@ autoformat:
   clang-format -i src/* devices/* || true
 
 uml:
-  nix shell github:bkryza/clang-uml --command clang-uml-wrapped -g mermaid -c ./design/clang-uml.yml
+  nix shell github:bkryza/clang-uml --command clang-uml-wrapped -g mermaid -c ./docs/clang-uml.yml
   echo You may view the result .mmd files with https://marmaid.live
 
 # vmux passthrough (uses config: hosts/yourhostname.yaml)
@@ -74,6 +74,9 @@ vmuxDpdkE1000:
 vmuxDpdkE810:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
 
+vmuxMed:
+  sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1
+
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true
   sudo ip tuntap add mode tap {{vmuxTap}}
@@ -114,6 +117,16 @@ vm EXTRA_CMDLINE="" PASSTHROUGH=`yq -r '.devices[] | select(.name=="ethDut") | .
         -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
         -device vfio-pci,host={{PASSTHROUGH}} \
         -nographic
+
+
+# uses host kernel and initrd for host-extkern
+prepare-direct-boot HOST="guest":
+    mkdir -p {{proot}}/nix/results
+    nix build .#nixosConfigurations.{{HOST}}.config.boot.kernelPackages.kernel --out-link {{proot}}/nix/results/{{HOST}}-kernel
+    nix build .#nixosConfigurations.{{HOST}}.config.system.build.initialRamdisk --out-link {{proot}}/nix/results/{{HOST}}-initrd
+    rm {{proot}}/nix/results/{{HOST}}-kernelParams || true
+    nix eval --write-to {{proot}}/nix/results/{{HOST}}-kernelParams .#nixosConfigurations.{{HOST}}.config.boot.kernelParams --apply 'builtins.concatStringsSep " "'
+
 
 vm-libvfio-user:
     sudo rm {{qemuMem}} || true
@@ -189,6 +202,64 @@ vm-e1000:
         -s \
         -nographic
       sudo ip link del tap0
+
+vm-strace-nonet EXTRA_CMDLINE="":
+    sudo strace -o /tmp/strace-nonet qemu-system-x86_64 \
+        -cpu host \
+        -smp 4 \
+        -enable-kvm \
+        -m 16G \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
+        -nographic
+
+vm-strace-vmux:
+    sudo rm {{qemuMem}} || true
+    sudo strace -o /tmp/strace-vmux qemu/bin/qemu-system-x86_64 \
+        -cpu host \
+        -enable-kvm \
+        -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
+        -device vfio-user-pci,socket={{vmuxSock}} \
+        -nographic
+
+vm-strace-allnet:
+    sudo ip link delete {{vmuxTap}} || true
+    sudo ip tuntap add mode tap {{vmuxTap}}
+    sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
+    sudo ip link set dev {{vmuxTap}} up
+    sudo rm {{qemuMem}} || true
+    sudo strace -o /tmp/strace-allnet qemu/bin/qemu-system-x86_64 \
+        -cpu host \
+        -smp 8 \
+        -enable-kvm \
+        -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
+        -machine q35,accel=kvm,kernel-irqchip=split \
+        -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on \
+        -device virtio-serial \
+        -fsdev local,id=myid,path={{proot}},security_model=none \
+        -device virtio-9p-pci,fsdev=myid,mount_tag=home,disable-modern=on,disable-legacy=off \
+        -fsdev local,id=myNixStore,path=/nix/store,security_model=none \
+        -device virtio-9p-pci,fsdev=myNixStore,mount_tag=myNixStore,disable-modern=on,disable-legacy=off \
+        -drive file={{proot}}/VMs/nesting-host-image.qcow2 \
+        -net nic,netdev=user.0,model=virtio \
+        -netdev user,id=user.0,hostfwd=tcp:127.0.0.1:{{qemu_ssh_port}}-:22 \
+        -netdev tap,id=admin1,ifname={{vmuxTap}},script=no,downscript=no \
+        -device e1000,netdev=admin1,mac=02:34:56:78:9a:bc \
+        -nographic
 
 prepare-guest:
     modprobe vfio-pci
@@ -393,6 +464,7 @@ build:
   nix build -o {{proot}}/xdp .#xdp-reflector
   nix build -o {{proot}}/qemu-ioregionfd .#qemu-ioregionfd
   nix build -o {{proot}}/ycsb .#ycsb
+  nix build -o {{proot}}/fastclick .#fastclick
   nix build -o {{proot}}/vmux-nixbuild .#vmux
   [[ -z $(git submodule status | grep "^-") ]] || echo WARN: git submodules status: not in sync
 
@@ -440,7 +512,7 @@ vm-init:
     network_config = f"""
   version: 2
   ethernets:
-    eth0:
+    admin0:
       addresses:
         - {ip}/255.255.248.0
       gateway4: 192.168.1.254
@@ -470,7 +542,8 @@ vm-overwrite NUM="35": vm-init
   set -x
   set -e
   mkdir -p {{proot}}/VMs
-  nix build -o {{proot}}/VMs/kernel nixpkgs#linux
+  just prepare-direct-boot test-guest
+  just prepare-direct-boot host
 
   # build images fast
 
@@ -485,11 +558,11 @@ vm-overwrite NUM="35": vm-init
   overwrite nesting-host-extkern-image
   overwrite nesting-guest-image
   overwrite nesting-guest-image-noiommu
-  overwrite guest-image
+  overwrite test-guest-image
   for i in $(seq 1 {{NUM}}); do
-    # overwrite guest-image$i
-    install -D -m644 {{proot}}/VMs/ro-guest-image1/nixos.qcow2 {{proot}}/VMs/guest-image$i.qcow2
-    qemu-img resize {{proot}}/VMs/guest-image$i.qcow2 +16g
+    # roughly, but not quite overwrite test-guest-extkern-image$i
+    install -D -m644 {{proot}}/VMs/ro-test-guest-image/nixos.qcow2 {{proot}}/VMs/test-guest-image$i.qcow2
+    qemu-img resize {{proot}}/VMs/test-guest-image$i.qcow2 +16g
   done
 
 dpdk-setup:
@@ -532,7 +605,7 @@ dpdk_helloworld: dpdk-setup
   meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
 
 fastclick: 
-  sudo ./result/bin/click --dpdk "-l 2-10" -- ./test/fastclick/dpdk-flow-parser.click
+  sudo ./fastclick/bin/click --dpdk "-l 2-10" -- ./test/fastclick/dpdk-flow-parser.click
 
 pktgen: 
   nix shell .#pktgen

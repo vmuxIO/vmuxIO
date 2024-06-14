@@ -314,13 +314,22 @@ static void lcore_init_checks() {
 
 class Dpdk : public Driver {
 private:
+	const static uint16_t max_queues_per_vm = 4;
+
 	struct rte_mempool *mbuf_pool;
-	struct rte_mbuf *bufs[BURST_SIZE];
+	struct rte_mbuf *bufs[BURST_SIZE * max_queues_per_vm];
 	uint16_t port_id;
+	std::vector<bool> mediate; // per VM
+
+
+	uint16_t get_queue_id(int vm, int queue) {
+		return vm * this->max_queues_per_vm + queue;
+	}
 
 public:
 	Dpdk(int num_vms, const uint8_t (*mac_addr)[6], int argc, char *argv[]) {
-		this->alloc_rx_lists(BURST_SIZE);
+		this->alloc_rx_lists(BURST_SIZE * this->max_queues_per_vm);
+		this->mediate = std::vector<bool>(num_vms, false);
 
 		/*
  	 	 * The main function, which does initialization and calls the per-lcore
@@ -356,7 +365,7 @@ public:
 			rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
 		static uint16_t port_id = 0;
-		static uint16_t nr_queues = num_vms;
+		static uint16_t nr_queues = num_vms * this->max_queues_per_vm;
 		struct rte_flow *flow;
 		struct rte_flow_error error;
 		this->port_id = port_id;
@@ -370,6 +379,14 @@ public:
 		/* >8 End of initializing all ports. */
 
 		/* Create flow for send packet with. 8< */
+		/* closing and releasing resources */
+		ret = rte_flow_flush(this->port_id, &error);
+		if (ret != 0) {
+			printf("Flow can't be flushed %d message: %s\n",
+				error.type,
+				error.message ? error.message : "(no stated reason)");
+			rte_exit(EXIT_FAILURE, "error in flushing flows");
+		}
 
 #define SRC_IP ((0<<24) + (0<<16) + (0<<8) + 0) /* src ip = 0.0.0.0 */
 #define DEST_IP ((192<<24) + (168<<16) + (1<<8) + 1) /* dest ip = 192.168.1.1 */
@@ -407,6 +424,7 @@ public:
 	}
 
 	virtual ~Dpdk() {
+		// TODO (peter) dealloc rxBufs etc...
 		struct rte_flow_error error;
 		int ret;
 
@@ -467,19 +485,19 @@ public:
 	 	 * Receive packets on a port and forward them on the same
 	 	 * port. 
 	 	 */
-		// for (int queue_id = 0; queue_id < 2; queue_id++) {
-		int queue_id = vm_id;
+		for (int q_idx = 0; q_idx < this->max_queues_per_vm; q_idx++) {
+			int queue_id = this->get_queue_id(vm_id, q_idx);
 
 			/* Get burst of RX packets, from first port of pair. */
 			const uint16_t nb_rx = rte_eth_rx_burst(port, queue_id,
-					this->bufs, BURST_SIZE);
+					&(this->bufs[this->nb_bufs_used]), BURST_SIZE);
 
 			if (unlikely(nb_rx == 0))
-				return;
+				continue;
 				// continue;
 
 			// pass pointers to packet buffers via rxBufs to behavioral model
-			for (uint16_t i = 0; i < nb_rx; i++) {
+			for (uint16_t i = this->nb_bufs_used; i < (this->nb_bufs_used + nb_rx); i++) {
 				struct rte_mbuf* buf = this->bufs[i]; // we checked before that there is at least one packet
 				char* pkt = rte_pktmbuf_mtod(buf, char*);
 				if (buf->nb_segs != 1)
@@ -489,11 +507,17 @@ public:
 				// rte_memcpy(this->rxBufs[i], pkt, buf->pkt_len);
 				this->rxBufs[i] = pkt;
 				this->rxBuf_used[i] = buf->pkt_len;
+				if (this->mediate[vm_id]) {
+					this->rxBuf_queue[i] = q_idx;
+				} else {
+					// make the behavioral model emulate the switching
+					this->rxBuf_queue[i] = {};
+				}
 				if_log_level(LOG_DEBUG, printf("queue %d: ", queue_id));
 				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}
-			this->nb_bufs_used = nb_rx;
-		// }
+			this->nb_bufs_used += nb_rx;
+		}
   }
 
   virtual void recv_consumed(int vm_id) {
@@ -502,5 +526,54 @@ public:
 			rte_pktmbuf_free(this->bufs[buf]);
 		
     this->nb_bufs_used = 0;
+  }
+
+  virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
+  	if (!this->mediate[vm_id]) {
+  		// for emulation we ignore switch rules.
+  		// Because we don't send queue hints to the behavioral model, it emulates the switch then.
+  		return true;
+  	}
+
+  	printf("dpdk add switch rule\n");
+
+		struct rte_flow_error error;
+  	struct rte_flow* flow;
+		struct rte_ether_addr src_mac;
+		struct rte_ether_addr src_mask;
+		struct rte_ether_addr dest_mac;
+		struct rte_ether_addr dest_mask;
+		char fmt[20];
+		uint16_t queue_id = this->get_queue_id(vm_id, dst_queue);
+
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);
+		// rte_ether_unformat_addr("52:54:00:fa:00:60", &dest_mac);
+		rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
+
+		memcpy(dest_mac.addr_bytes, dst_addr, 6);
+		flow = generate_eth_flow(port_id, queue_id,
+					&src_mac, &src_mask,
+					&dest_mac, &dest_mask, &error);
+		if (!flow) {
+			printf("Flow can't be created %d message: %s\n",
+				error.type,
+				error.message ? error.message : "(no stated reason)");
+			return false;
+		}
+		rte_ether_format_addr(fmt, sizeof(fmt), &dest_mac);
+  	printf("added rule dst_mac %s -> queue %d\n", fmt, queue_id);
+
+  	return true;
+  }
+
+  virtual bool mediation_enable(int vm_id) {
+		this->mediate[vm_id] = true;
+		return true;
+  }
+
+  virtual bool mediation_disable(int vm_id) {
+		// die("unimplemented: you need to flush switch rules from the emulator to the device");
+		return false;
   }
 };

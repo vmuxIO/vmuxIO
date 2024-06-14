@@ -148,7 +148,7 @@ Result<void> _main(int argc, char **argv) {
              "as backend for emulation (or \"none\" if not applicable)\n"
           << "-s /tmp/vmux.sock                      Path of the socket\n"
           << "-m passthrough                         vMux mode: "
-             "passthrough, emulation, e1000-emu\n";
+             "passthrough, emulation, mediation, e1000-emu\n";
       return outcome::success();
     default:
       break;
@@ -252,17 +252,21 @@ Result<void> _main(int argc, char **argv) {
 
     // create device
     if (modes[i] == "passthrough") {
-      device = std::make_shared<PassthroughDevice>(vfioc[i], pciAddresses[i]);
+      device = std::make_shared<PassthroughDevice>(i, vfioc[i], pciAddresses[i]);
     }
     if (modes[i] == "stub") {
       device = std::make_shared<StubDevice>();
     }
     if (modes[i] == "emulation") {
-      device = std::make_shared<E810EmulatedDevice>(drivers[i], efd, &mac_addr, globalIrq);
+      device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq);
+    }
+    if (modes[i] == "mediation") {
+      device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq);
+      device->driver->mediation_enable(i);
     }
     if (modes[i] == "e1000-emu") {
 #ifdef BUILD_E1000_EMU
-      device = std::make_shared<E1000EmulatedDevice>(drivers[i], efd, true,
+      device = std::make_shared<E1000EmulatedDevice>(i, drivers[i], efd, true,
                                                      globalIrq, &mac_addr);
 #else
       die("E1000 emulation support was disabled for this build.");

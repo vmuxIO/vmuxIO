@@ -1,0 +1,546 @@
+classDiagram
+    class C_0000159384585232022465["std::basic_string&lt;char&gt;"]
+    class C_0000159384585232022465 {
+    }
+    class C_0001153561525776166210["std::vector&lt;int&gt;"]
+    class C_0001153561525776166210 {
+    }
+    class C_0000817513665081818287["std::vector&lt;vfio_region_info&gt;"]
+    class C_0000817513665081818287 {
+    }
+    class C_0001426916056678973706["std::vector&lt;vfio_irq_info&gt;"]
+    class C_0001426916056678973706 {
+    }
+    class C_0000882888851728517853["std::map&lt;int,void *&gt;"]
+    class C_0000882888851728517853 {
+    }
+    class C_0000537172775809735998["std::optional&lt;uint16_t&gt;"]
+    class C_0000537172775809735998 {
+    }
+    class C_0001166363642678166101["std::shared_ptr&lt;VfioUserServer&gt;"]
+    class C_0001166363642678166101 {
+    }
+    class C_0000502874287095223506["std::shared_ptr&lt;Driver&gt;"]
+    class C_0000502874287095223506 {
+    }
+    class C_0001971126231936469896["std::shared_ptr&lt;VfioConsumer&gt;"]
+    class C_0001971126231936469896 {
+    }
+    class C_0001598371225436193130["std::shared_ptr&lt;GlobalInterrupts&gt;"]
+    class C_0001598371225436193130 {
+    }
+    class C_0000538562716212317677["std::atomic&lt;bool&gt;"]
+    class C_0000538562716212317677 {
+    }
+    class C_0001648059833109594900["std::shared_ptr&lt;nicbm::Runner::CallbackAdaptor&gt;"]
+    class C_0001648059833109594900 {
+    }
+    class C_0000687675254791031051["std::shared_ptr&lt;InterruptThrottlerSimbricks&gt;"]
+    class C_0000687675254791031051 {
+    }
+    class C_0000465012928585661657["std::vector&lt;std::shared_ptr&lt;InterruptThrottlerSimbricks&gt;&gt;"]
+    class C_0000465012928585661657 {
+    }
+    class C_0002116988694602162816["std::shared_ptr&lt;nicbm::Runner::Device&gt;"]
+    class C_0002116988694602162816 {
+    }
+    class C_0000137788463817956023["std::map&lt;int,struct ice_aqc_txsched_elem_data *&gt;"]
+    class C_0000137788463817956023 {
+    }
+    class C_0000839121551068282508["std::shared_ptr&lt;i40e::e810_bm&gt;"]
+    class C_0000839121551068282508 {
+    }
+    class C_0001492703530391184707["std::enable_shared_from_this&lt;E810EmulatedDevice&gt;"]
+    class C_0001492703530391184707 {
+    }
+    class C_0001892230395131685611["vfu_reset_type"]
+    class C_0001892230395131685611 {
+        <<enumeration>>
+        VFU_RESET_DEVICE
+        VFU_RESET_LOST_CONN
+        VFU_RESET_PCI_FLR
+    }
+    class C_0000603863169292284121["vfu_dma_info"]
+    class C_0000603863169292284121 {
+        +iova : struct iovec
+        +mapping : struct iovec
+        +page_size : size_t
+        +prot : uint32_t
+        +vaddr : void *
+    }
+    class C_0000296937369614603999["SimbricksProtoPcieDevIntro"]
+    class C_0000296937369614603999 {
+        +bars : &lpar;anonymous_foobar&rpar;
+        +pci_class : uint8_t
+        +pci_device_id : uint16_t
+        +pci_msi_nvecs : uint8_t
+        +pci_msix_nvecs : uint16_t
+        +pci_msix_pba_bar : uint8_t
+        +pci_msix_pba_offset : uint32_t
+        +pci_msix_table_bar : uint8_t
+        +pci_msix_table_offset : uint32_t
+        +pci_progif : uint8_t
+        +pci_revision : uint8_t
+        +pci_subclass : uint8_t
+        +pci_vendor_id : uint16_t
+        +psi_msix_cap_offset : uint16_t
+    }
+    class C_0000911527249059602515["epoll_callback"]
+    class C_0000911527249059602515 {
+        +callback : callback_fn
+        +ctx : void *
+        +fd : int
+    }
+    class C_0000718620442673026706["VfioConsumer"]
+    class C_0000718620442673026706 {
+        +VfioConsumer(std::string group_str, std::string device_name) : void
+        +VfioConsumer(std::string device_name) : void
+        +~VfioConsumer() : void
+        +init() : int
+        +init_legacy_irqs() : void
+        +init_mmio() : int
+        +init_msix() : void
+        +map_dma(vfio_iommu_type1_dma_map * dma_map) : void
+        +mask_irqs(uint32_t irq_type, uint32_t start, uint32_t count, bool mask) : void
+        +reset_device() : void
+        +unmap_dma(vfio_iommu_type1_dma_unmap * dma_unmap) : void
+        +vfio_set_irqs(const int irq_type, const size_t count, std::vector<int> * irqfds, int device_fd) : void$
+        +container : int
+        +device : int
+        +device_name : std::string
+        +dma_map : struct vfio_iommu_type1_dma_map
+        +group : int
+        +group_str : std::string
+        +interrupts : std::vector&lt;struct vfio_irq_info&gt;
+        +irqfd_err : int
+        +irqfd_intx : int
+        +irqfd_msi : int
+        +irqfd_req : int
+        +irqfds : std::vector&lt;int&gt;
+        +is_pcie : bool
+        +mmio : std::map&lt;int,void *&gt;
+        +regions : std::vector&lt;struct vfio_region_info&gt;
+        +use_msix : bool
+    }
+    class C_0000837666778161234265["Driver"]
+    class C_0000837666778161234265 {
+        <<abstract>>
+        +add_switch_rule(int vm_id, uint64_t mac_addr, uint16_t dst_queue) : bool
+        +alloc_rx_bufs() : void
+        +alloc_rx_lists(size_t nb_bufs) : void
+        +recv(int vm_id) : void*
+        +recv_consumed(int vm_id) : void*
+        +send(const char * buf, const size_t len) : void*
+        +MAX_BUF : const int
+        +fd : int
+        +nb_bufs : size_t
+        +nb_bufs_used : size_t
+        +rxBuf_queue : std::optional&lt;uint16_t&gt; *
+        +rxBuf_used : size_t *
+        +rxBufs : char **
+        +txFrame : char[9000]
+    }
+    class C_0001852164528390828229["VmuxDevice"]
+    class C_0001852164528390828229 {
+        <<abstract>>
+        +VmuxDevice(int device_id, std::shared_ptr<Driver> driver) : void
+        +~VmuxDevice() : [default] void
+        +setup_vfu(std::shared_ptr<VfioUserServer> vfu) : void*
+        +device_id : int
+        +driver : std::shared_ptr&lt;Driver&gt;
+        +info : DeviceInfo
+        +rx_callback : callback_fn
+        +vfioc : std::shared_ptr&lt;VfioConsumer&gt;
+        +vfuServer : std::shared_ptr&lt;VfioUserServer&gt;
+        +vfu_ctx_mutex : std::mutex
+    }
+    class C_0001667427656144715961["VfioUserServer"]
+    class C_0001667427656144715961 {
+        +VfioUserServer(std::string sock, int efd, std::shared_ptr<VmuxDevice> device) : void
+        +~VfioUserServer() : void
+        +add_irqs(const std::vector<struct vfio_irq_info> irqs) : int
+        +add_legacy_irq_pollfds(const int intx, const int msi, const int err, const int req) : void
+        +add_msix_pollfds(const std::vector<int> eventfds) : void
+        -add_region(struct vfio_region_info * region, int device_fd) : int
+        +add_regions(std::vector<struct vfio_region_info> regions, int device_fd) : int
+        +dma_local_addr(uintptr_t dma_address, size_t len) : void *
+        -dma_register_cb(vfu_ctx_t * vfu_ctx, vfu_dma_info_t * info) : void$
+        -dma_unregister_cb(vfu_ctx_t * vfu_ctx, vfu_dma_info_t * info) : void$
+        +err_callback(int fd, void * vfu_) : void$
+        +get_run_ctx_poll_fd() : struct pollfd *
+        +intx_callback(int fd, void * vfu_) : void$
+        -intx_state_cb(vfu_ctx_t * vfu_ctx, uint32_t start, uint32_t count, bool mask) : void$
+        -irq_state_unimplemented_cb(vfu_ctx_t * vfu_ctx, uint32_t start, uint32_t count, bool mask) : void$
+        +map_dma_here(vfu_ctx_t * vfu_ctx, VfioUserServer * vfu, vfu_dma_info_t * info, uint32_t * flags_) : bool$
+        +msi_callback(int fd, void * vfu_) : void$
+        +msix_callback(int fd, void * vfu_) : void$
+        -msix_state_cb(vfu_ctx_t * vfu_ctx, uint32_t start, uint32_t count, bool mask) : void$
+        -quiesce_cb(vfu_ctx_t * vfu_ctx) : int$
+        +req_callback(int fd, void * vfu_) : void$
+        -reset_device_cb(vfu_ctx_t * vfu_ctx, vfu_reset_type_t type) : int$
+        +reset_run_ctx_poll_fd() : void
+        +setup_passthrough_callbacks(std::shared_ptr<VfioConsumer> callback_context) : void
+        -unexpected_access_callback(vfu_ctx_t * vfu_ctx, char *const buf, size_t count, __loff_t offset, const bool is_write) : ssize_t$
+        +unmap_dma_here(vfu_ctx_t * vfu_ctx, VfioUserServer * vfu, vfu_dma_info_t * info) : bool$
+        +IC_MAX : const size_t
+        +callback_context : std::shared_ptr&lt;VfioConsumer&gt;
+        +efd : int
+        +ic : epoll_callback[2052]
+        +ic_used : size_t
+        +irq_err_pollfd_idx : size_t
+        +irq_intx_pollfd_idx : size_t
+        +irq_msi_pollfd_idx : size_t
+        +irq_msix_pollfd_count : size_t
+        +irq_msix_pollfd_idx : size_t
+        +irq_req_pollfd_idx : size_t
+        +mapped : std::set&lt;void *&gt;
+        +mappings : std::map&lt;void *,iovec *&gt;
+        +pollfds : std::vector&lt;struct pollfd&gt;
+        +run_ctx_pollfd_idx : std::optional&lt;size_t&gt;
+        +sgs : std::map&lt;void *,dma_sg_t *&gt;
+        +sock : std::string
+        +vfu_ctx : vfu_ctx_t *
+        +vfu_pvt_anker : std::shared_ptr&lt;VmuxDevice&gt;
+    }
+    class C_0001021367579141565458["GlobalInterrupts"]
+    class C_0001021367579141565458 {
+        +GlobalInterrupts(int nr_threads) : void
+        +add(std::shared_ptr<InterruptThrottler> throttler) : void
+        +update() : void
+        -cpu_time : boost::timer::cpu_times
+        +cpu_usage : float
+        -nr_threads : int
+        +slow_down : float
+        +spacing_avg : ulong
+        +spacing_max : ulong
+        +spacing_min : ulong
+        -spacings : std::vector&lt;std::atomic&lt;ulong&gt; *&gt;
+        -throttlers : std::vector&lt;std::shared_ptr&lt;InterruptThrottler&gt;&gt;
+        -timer : boost::timer::cpu_timer
+    }
+    class C_0001772413391237938865["InterruptThrottler"]
+    class C_0001772413391237938865 {
+        <<abstract>>
+        +~InterruptThrottler() : [default] void
+        +try_interrupt(ulong interrupt_spacing, bool int_pending) : ulong*
+        +globalIrq : std::shared_ptr&lt;GlobalInterrupts&gt;
+        +spacing : std::atomic&lt;ulong&gt;
+        +vfuServer : std::shared_ptr&lt;VfioUserServer&gt;
+    }
+    class C_0001353799884409950168["InterruptThrottlerSimbricks"]
+    class C_0001353799884409950168 {
+        +InterruptThrottlerSimbricks(int efd, int irq_idx, std::shared_ptr<GlobalInterrupts> irq_glob) : void
+        +defer_interrupt(int duration_ns) : void
+        +defer_interrupt_abs(struct timespec * ts) : void
+        +defer_interrupt_abs_polling(struct timespec * ts) : void
+        +poll_timer_cb(ulong _inaccuracy) : void
+        +processPollTimer() : ulong
+        +registerEpoll(int efd) : void
+        +send_interrupt() : void
+        +timer_cb(int fd, void * this__) : void$
+        +try_interrupt(ulong mindelay, bool int_pending) : ulong
+        +armed : std::atomic&lt;bool&gt;
+        +efd : int
+        +factor : ulong
+        +guest_unmasked_irq : bool
+        +irq_idx : int
+        +poll_timer : struct timespec
+        +time_ : struct timespec
+        +timer_callback : epoll_callback
+        +timer_fd : int
+        +vfuServer : std::shared_ptr&lt;VfioUserServer&gt;
+    }
+    class C_0001878551739810376760["nicbm::DMAOp"]
+    class C_0001878551739810376760 {
+        +~DMAOp() : [default,constexpr] void
+        +data_ : void *
+        +dma_addr_ : uint64_t
+        +len_ : size_t
+        +write_ : bool
+    }
+    class C_0001920574941481658413["nicbm::TimedEvent"]
+    class C_0001920574941481658413 {
+        +TimedEvent() : void
+        +~TimedEvent() : [default,constexpr] void
+        +priority_ : int
+        +time_ : uint64_t
+    }
+    class C_0002181626121696420323["nicbm::Runner::CallbackAdaptor"]
+    class C_0002181626121696420323 {
+        +CallbackAdaptor(std::shared_ptr<VmuxDevice> device, const uint8_t (*)[6] mac_addr, std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle) : void
+        +EthSend(const void * data, size_t len) : void
+        +EventCancel(nicbm::TimedEvent & evt) : void
+        +EventSchedule(nicbm::TimedEvent & evt) : void
+        +GetMacAddr() : [const] uint64_t
+        +IntXIssue(bool level) : void
+        +IssueDma(nicbm::DMAOp & op) : void
+        +MsiIssue(uint8_t vec) : void
+        +MsiXIssue(uint8_t vec, uint64_t mindelay) : void
+        +TimePs() : [const] uint64_t
+        +device : std::shared_ptr&lt;VmuxDevice&gt;
+        +irqThrottle : std::vector&lt;std::shared_ptr&lt;InterruptThrottlerSimbricks&gt;&gt;
+        -mac_addr : const uint8_t &lpar;*&rpar;[6]
+        +model : std::shared_ptr&lt;Device&gt;
+        +vfu : std::shared_ptr&lt;VfioUserServer&gt;
+    }
+    class C_0002012808611615821688["ice_aqc_get_topo_elem"]
+    class C_0002012808611615821688 {
+        +generic : struct ice_aqc_txsched_elem_data[9]
+        +hdr : struct ice_aqc_txsched_topo_grp_info_hdr
+    }
+    class C_0001686106494396747874["i40e::e810_switch"]
+    class C_0001686106494396747874 {
+        +e810_switch(e810_bm & dev_) : void
+        +add_rule(struct ice_aqc_sw_rules_elem * add_sw_rules) : bool
+        +print_sw_rule(struct ice_aqc_sw_rules_elem * add_sw_rules) : void$
+        +select_queue(const void * data, size_t len, uint16_t * queue) : void
+        -dev : e810_bm &
+        -mac_rules : std::map&lt;uint64_t,uint16_t&gt;
+    }
+    class C_0000379814251055047434["i40e::e810_bm"]
+    class C_0000379814251055047434 {
+        +e810_bm() : void
+        +~e810_bm() : void
+        +DmaComplete(nicbm::DMAOp & op) : void
+        +EthRx(uint8_t port, std::optional<uint16_t> queue, const void * data, size_t len) : void
+        +RegRead(uint8_t bar, uint64_t addr, void * dest, size_t len) : void
+        +RegRead32(uint8_t bar, uint64_t addr) : uint32_t
+        +RegWrite(uint8_t bar, uint64_t addr, const void * src, size_t len) : void
+        +RegWrite32(uint8_t bar, uint64_t addr, uint32_t val) : void
+        +SetupIntro(struct SimbricksProtoPcieDevIntro & di) : void
+        +SignalInterrupt(uint16_t vector, uint8_t itr) : void
+        +Timed(nicbm::TimedEvent & ev) : void
+        #reg_io_read(uint64_t addr) : uint32_t
+        #reg_io_write(uint64_t addr, uint32_t val) : void
+        #reg_mem_read32(uint64_t addr) : uint32_t
+        #reg_mem_write32(uint64_t addr, uint32_t val) : void
+        #reset(bool indicate_done) : void
+        #BAR_IO : const unsigned int
+        #BAR_MSIX : const unsigned int
+        #BAR_REGS : const unsigned int
+        #MAX_MTU : const uint16_t
+        #NUM_FD_BEST_EFFORT : const uint16_t
+        #NUM_FD_GUAR : const uint16_t
+        #NUM_ITR : const uint8_t
+        #NUM_PFINTS : const uint32_t
+        #NUM_QUEUES : const uint32_t
+        #NUM_RXDID : const uint32_t
+        #NUM_VSIS : const uint32_t
+        #bcam : e810_switch
+        #cem : completion_event_manager
+        #cqp : control_queue_pair
+        #ctx_addr : u8[2048][22]
+        #hmc : host_mem_cache
+        #intevs : int_ev[2048]
+        #lanmgr : lan
+        #last_returned_node : int
+        #last_used_parent_node : int
+        #log : logger
+        #node1 : bool
+        #node3 : bool
+        #node4 : bool
+        #node5 : bool
+        #node6 : bool
+        #pf_atq : queue_admin_tx
+        #pf_mbx_atq : queue_admin_tx
+        #regs : i40e_regs
+        #sched_nodes : std::map&lt;int,struct ice_aqc_txsched_elem_data *&gt;
+        #shram : shadow_ram
+        #topo_elem : struct ice_aqc_get_topo_elem
+        #vsi0_first_queue : size_t
+    }
+    class C_0000791033687829459498["VmuxRunner"]
+    class C_0000791033687829459498 {
+        +VmuxRunner(std::string socket, std::shared_ptr<VmuxDevice> device, int efd, std::shared_ptr<VfioUserServer> vfu) : void
+        -_log(vfu_ctx_t * vfu_ctx, int level, const char * msg) : void$
+        -add_caps(std::shared_ptr<VfioConsumer> vfioc) : void
+        -initilize() : void
+        +is_connected() : bool
+        +is_initialized() : bool
+        +join() : boost::outcome_v2::basic_result&lt;void&gt;
+        -run() : void
+        -set_failed(std::string error) : void
+        +start() : void
+        +stop() : void
+        +caps : std::shared_ptr&lt;Capabilities&gt;
+        +device : std::shared_ptr&lt;VmuxDevice&gt;
+        +runner : std::thread
+        +running : std::atomic_bool
+        +socket : std::string
+        +state : std::atomic_int
+        +termination_error : std::string
+        +vfu : std::shared_ptr&lt;VfioUserServer&gt;
+    }
+    class C_0001904152156171249337["E810EmulatedDevice"]
+    class C_0001904152156171249337 {
+        +E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*)[6] mac_addr, std::shared_ptr<GlobalInterrupts> irq_glob) : void
+        -dma_register_cb(vfu_ctx_t * vfu_ctx, vfu_dma_info_t * info) : void$
+        -dma_unregister_cb(vfu_ctx_t * vfu_ctx, vfu_dma_info_t * info) : void$
+        +driver_cb(int vm_number, void * this__) : void$
+        -expected_access_callback(vfu_ctx_t * vfu_ctx, char *const buf, size_t count, __loff_t offset, const bool is_write) : ssize_t$
+        -init_bar_callbacks(VfioUserServer & vfu) : void
+        -init_general_callbacks(VfioUserServer & vfu) : void
+        -init_irqs(VfioUserServer & vfu) : void
+        +init_pci_ids() : void
+        -irq_state_cb(vfu_ctx_t * vfu_ctx, uint32_t start, uint32_t count, bool mask) : void$
+        +processAllPollTimers() : void
+        -registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) : void
+        -reset_device_cb(vfu_ctx_t * vfu_ctx, vfu_reset_type_t type) : int$
+        +setup_vfu(std::shared_ptr<VfioUserServer> vfu) : void
+        -unexpected_access_callback(vfu_ctx_t * vfu_ctx, char *const buf, size_t count, __loff_t offset, const bool is_write) : ssize_t$
+        -BAR_REGS : const unsigned int
+        -callbacks : std::shared_ptr&lt;nicbm::Runner::CallbackAdaptor&gt;
+        -deviceIntro : SimbricksProtoPcieDevIntro
+        -efd : int
+        -irqThrottle : std::vector&lt;std::shared_ptr&lt;InterruptThrottlerSimbricks&gt;&gt;
+        -mac_addr : const uint8_t[6]
+        +model : std::shared_ptr&lt;i40e::e810_bm&gt;
+        -tapCallback : epoll_callback
+    }
+    class C_0000671319619940290584["PassthroughDevice"]
+    class C_0000671319619940290584 {
+        +PassthroughDevice(int device_id, std::shared_ptr<VfioConsumer> vfioc, std::string pci_address) : void
+        -init_pci_ids(std::string device) : void
+        +setup_vfu(std::shared_ptr<VfioUserServer> vfu) : void
+    }
+    class C_0000551166128640177691["Dpdk"]
+    class C_0000551166128640177691 {
+        +Dpdk(int num_vms, const uint8_t (*)[6] mac_addr, int argc, char ** argv) : void
+        +~Dpdk() : void
+        +add_switch_rule(int vm_id, uint64_t dst_addr, uint16_t dst_queue) : bool
+        -get_queue_id(int vm, int queue) : uint16_t
+        +poll_once() : void
+        +recv(int vm_id) : void
+        +recv_consumed(int vm_id) : void
+        +send(const char * buf, const size_t len) : void
+        -bufs : struct rte_mbuf *[32]
+        -max_queues_per_vm : const uint16_t
+        -mbuf_pool : struct rte_mempool *
+        -port_id : uint16_t
+    }
+    class C_0000101772139743444757["vfu_ctx"]
+    class C_0000101772139743444757 {
+        +client_max_data_xfer_size : size_t
+        +client_max_fds : int
+        +dev_type : vfu_dev_type_t
+        +dma : struct dma_controller *
+        +dma_register : vfu_dma_register_cb_t *
+        +dma_unregister : vfu_dma_unregister_cb_t *
+        +flags : uint64_t
+        +in_cb : enum cb_type
+        +irq_count : uint32_t[5]
+        +irq_state_cbs : vfu_dev_irq_state_cb_t *[5]
+        +irqs : vfu_irqs_t *
+        +log : vfu_log_fn_t *
+        +log_level : int
+        +migration : struct migration *
+        +nr_regions : size_t
+        +pci : struct pci_dev
+        +pci_cap_exp_off : ssize_t
+        +pending : struct vfu_ctx_pending_info
+        +pvt : void *
+        +quiesce : vfu_device_quiesce_cb_t *
+        +quiesced : bool
+        +realized : bool
+        +reg_info : vfu_reg_info_t *
+        +reset : vfu_reset_cb_t *
+        +tran : struct transport_ops *
+        +tran_data : void *
+        +uuid : char *
+    }
+    C_0001166363642678166101 ..> C_0001667427656144715961 : 
+    C_0000502874287095223506 ..> C_0000837666778161234265 : 
+    C_0001971126231936469896 ..> C_0000718620442673026706 : 
+    C_0001598371225436193130 ..> C_0001021367579141565458 : 
+    C_0000687675254791031051 ..> C_0001353799884409950168 : 
+    C_0000465012928585661657 ..> C_0000687675254791031051 : 
+    C_0000839121551068282508 ..> C_0000379814251055047434 : 
+    C_0001492703530391184707 ..> C_0001904152156171249337 : 
+    C_0000718620442673026706 o-- C_0000817513665081818287 : +regions
+    C_0000718620442673026706 o-- C_0001426916056678973706 : +interrupts
+    C_0000718620442673026706 o-- C_0001153561525776166210 : +irqfds
+    C_0000718620442673026706 o-- C_0000882888851728517853 : +mmio
+    C_0000718620442673026706 o-- C_0000159384585232022465 : +group_str
+    C_0000718620442673026706 o-- C_0000159384585232022465 : +device_name
+    C_0000837666778161234265 --> C_0000537172775809735998 : +rxBuf_queue
+    C_0001852164528390828229 --> C_0000718620442673026706 : +vfioc
+    C_0001852164528390828229 --> C_0001971126231936469896 : +vfioc
+    C_0001852164528390828229 --> C_0001667427656144715961 : +vfuServer
+    C_0001852164528390828229 --> C_0001166363642678166101 : +vfuServer
+    C_0001852164528390828229 --> C_0000837666778161234265 : +driver
+    C_0001852164528390828229 --> C_0000502874287095223506 : +driver
+    C_0001667427656144715961 ..> C_0000817513665081818287 : 
+    C_0001667427656144715961 ..> C_0001426916056678973706 : 
+    C_0001667427656144715961 ..> C_0001153561525776166210 : 
+    C_0001667427656144715961 ..> C_0000603863169292284121 : 
+    C_0001667427656144715961 ..> C_0001892230395131685611 : 
+    C_0001667427656144715961 --> C_0000101772139743444757 : +vfu_ctx
+    C_0001667427656144715961 o-- C_0000159384585232022465 : +sock
+    C_0001667427656144715961 --> C_0000718620442673026706 : +callback_context
+    C_0001667427656144715961 --> C_0001971126231936469896 : +callback_context
+    C_0001667427656144715961 --> C_0001852164528390828229 : +vfu_pvt_anker
+    C_0001667427656144715961 o-- C_0000911527249059602515 : +ic
+    C_0001021367579141565458 ..> C_0001772413391237938865 : 
+    C_0001772413391237938865 --> C_0001667427656144715961 : +vfuServer
+    C_0001772413391237938865 --> C_0001166363642678166101 : +vfuServer
+    C_0001772413391237938865 --> C_0001021367579141565458 : +globalIrq
+    C_0001772413391237938865 --> C_0001598371225436193130 : +globalIrq
+    C_0001353799884409950168 ..> C_0001598371225436193130 : 
+    C_0001353799884409950168 ..> C_0001021367579141565458 : 
+    C_0001353799884409950168 o-- C_0000538562716212317677 : +armed
+    C_0001353799884409950168 o-- C_0000911527249059602515 : +timer_callback
+    C_0001353799884409950168 --> C_0001667427656144715961 : +vfuServer
+    C_0001353799884409950168 --> C_0001166363642678166101 : +vfuServer
+    C_0001772413391237938865 <|-- C_0001353799884409950168
+    C_0002181626121696420323 ..> C_0001353799884409950168 : 
+    C_0002181626121696420323 ..> C_0001878551739810376760 : 
+    C_0002181626121696420323 ..> C_0001920574941481658413 : 
+    C_0002181626121696420323 --> C_0001667427656144715961 : +vfu
+    C_0002181626121696420323 --> C_0001166363642678166101 : +vfu
+    C_0002181626121696420323 --> C_0002116988694602162816 : +model
+    C_0002181626121696420323 --> C_0001852164528390828229 : +device
+    C_0002181626121696420323 o-- C_0000465012928585661657 : +irqThrottle
+    C_0001686106494396747874 --> C_0000379814251055047434 : -dev
+    C_0000379814251055047434 ..> C_0000296937369614603999 : 
+    C_0000379814251055047434 ..> C_0001878551739810376760 : 
+    C_0000379814251055047434 ..> C_0000537172775809735998 : 
+    C_0000379814251055047434 ..> C_0001920574941481658413 : 
+    C_0000379814251055047434 o-- C_0001686106494396747874 : #bcam
+    C_0000379814251055047434 o-- C_0000137788463817956023 : #sched_nodes
+    C_0000379814251055047434 o-- C_0002012808611615821688 : #topo_elem
+    C_0000791033687829459498 ..> C_0000101772139743444757 : 
+    C_0000791033687829459498 ..> C_0001971126231936469896 : 
+    C_0000791033687829459498 ..> C_0000718620442673026706 : 
+    C_0000791033687829459498 --> C_0001667427656144715961 : +vfu
+    C_0000791033687829459498 --> C_0001166363642678166101 : +vfu
+    C_0000791033687829459498 --> C_0001852164528390828229 : +device
+    C_0000791033687829459498 o-- C_0000538562716212317677 : +running
+    C_0000791033687829459498 o-- C_0000159384585232022465 : +socket
+    C_0000791033687829459498 o-- C_0000159384585232022465 : +termination_error
+    C_0001904152156171249337 ..> C_0000502874287095223506 : 
+    C_0001904152156171249337 ..> C_0000837666778161234265 : 
+    C_0001904152156171249337 ..> C_0001598371225436193130 : 
+    C_0001904152156171249337 ..> C_0001021367579141565458 : 
+    C_0001904152156171249337 ..> C_0001166363642678166101 : 
+    C_0001904152156171249337 ..> C_0001667427656144715961 : 
+    C_0001904152156171249337 ..> C_0000101772139743444757 : 
+    C_0001904152156171249337 ..> C_0001892230395131685611 : 
+    C_0001904152156171249337 ..> C_0000603863169292284121 : 
+    C_0001904152156171249337 --> C_0001648059833109594900 : -callbacks
+    C_0001904152156171249337 o-- C_0000296937369614603999 : -deviceIntro
+    C_0001904152156171249337 o-- C_0000911527249059602515 : -tapCallback
+    C_0001904152156171249337 o-- C_0000465012928585661657 : -irqThrottle
+    C_0001904152156171249337 --> C_0000379814251055047434 : +model
+    C_0001904152156171249337 --> C_0000839121551068282508 : +model
+    C_0001852164528390828229 <|-- C_0001904152156171249337
+    C_0001492703530391184707 <|-- C_0001904152156171249337
+    C_0000671319619940290584 ..> C_0001971126231936469896 : 
+    C_0000671319619940290584 ..> C_0000718620442673026706 : 
+    C_0000671319619940290584 ..> C_0000159384585232022465 : 
+    C_0000671319619940290584 ..> C_0001166363642678166101 : 
+    C_0000671319619940290584 ..> C_0001667427656144715961 : 
+    C_0001852164528390828229 <|-- C_0000671319619940290584
+    C_0000837666778161234265 <|-- C_0000551166128640177691
+
+%% Generated with clang-uml, version 0.0.0-unknown
+%% LLVM version clang version 17.0.6

@@ -26,7 +26,9 @@ bool e810_switch::add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
   struct ethhdr *hdr = (struct ethhdr*)(add_sw_rules->pdata.lkup_tx_rx.hdr);
   uint64_t dst_mac = 0xFFFFFFFFFFFF & *(uint64_t*)(hdr->h_dest);
   this->mac_rules[dst_mac] = queue_id;
-  printf("added rule dst_mac 0x%lx -> queue %d\n", dst_mac, queue_id);
+  auto driver = this->dev.vmux->device->driver;
+  auto device_id = this->dev.vmux->device->device_id;
+  bool result = driver->add_switch_rule(device_id, hdr->h_dest, queue_id - this->dev.vsi0_first_queue);
 
   return true;
 }
