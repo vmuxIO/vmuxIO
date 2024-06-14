@@ -41,7 +41,7 @@ struct rte_flow *flow;
 #define FULL_MASK 0xffffffff /* full mask */
 #define EMPTY_MASK 0x0 /* empty mask */
 
-#include "flow_blocks.c"
+#include "../../src/drivers/flow_blocks.hpp"
 
 static inline void
 print_ether_addr(const char *what, struct rte_ether_addr *eth_addr)

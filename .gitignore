@@ -11,3 +11,6 @@ linux-*/
 test/kni-latency/kni-latency
 .bash_history
 .vscode
+build/
+build_release/
+test/dpdk-flow-bench/build/
