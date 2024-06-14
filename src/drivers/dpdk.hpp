@@ -535,7 +535,7 @@ public:
   		return true;
   	}
 
-  	printf("dpdk add switch rule\n");
+  	if_log_level(LOG_DEBUG, printf("dpdk add switch rule\n"));
 
 		struct rte_flow_error error;
   	struct rte_flow* flow;
@@ -562,7 +562,7 @@ public:
 			return false;
 		}
 		rte_ether_format_addr(fmt, sizeof(fmt), &dest_mac);
-  	printf("added rule dst_mac %s -> queue %d\n", fmt, queue_id);
+  	if_log_level(LOG_DEBUG, printf("added rule dst_mac %s -> queue %d\n", fmt, queue_id));
 
   	return true;
   }

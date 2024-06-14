@@ -268,7 +268,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_get_link_status_data link_status_data;
     // link_status_data.topo_media_conflict = BIT(3);
     link_status_data.phy_type_low = ICE_PHY_TYPE_LOW_40GBASE_CR4;
-    // link_status_data.phy_type_high = 
+    // link_status_data.phy_type_high =
     link_status_data.link_speed = ICE_AQ_LINK_SPEED_40GB;
     link_status_data.link_info = ICE_AQ_LINK_UP | ICE_AQ_LINK_UP_PORT |
                      ICE_AQ_MEDIA_AVAILABLE | ICE_AQ_SIGNAL_DETECT;
@@ -367,7 +367,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_get_set_rss_key *v =
         reinterpret_cast<struct ice_aqc_get_set_rss_key *>(
                 d->params.raw);
-    
+
     desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_set_rss_lut) {
     struct ice_aqc_get_set_rss_lut *v =
@@ -466,19 +466,21 @@ void queue_admin_tx::admin_desc_ctx::process() {
 //     desc_complete(0);
   } else if (d->opcode == ice_aqc_opc_get_recipe) {
     struct ice_aqc_add_get_recipe *get_recipe_cmd = reinterpret_cast<struct ice_aqc_add_get_recipe*>(d->params.raw);
-    struct ice_aqc_recipe_data_elem *get_recipe = reinterpret_cast<struct ice_aqc_recipe_data_elem*>(data);
+    // struct ice_aqc_recipe_data_elem *get_recipe = reinterpret_cast<struct ice_aqc_recipe_data_elem*>(data);
+#ifdef DEBUG_ADMINQ_SWITCH
     cout << "get recipe: reject/ignore" << logger::endl;
-    __builtin_dump_struct(get_recipe, &printf);
+#endif
+    // __builtin_dump_struct(get_recipe, &printf);
     desc_complete(0); // TODO this prints, but rejects the command
   } else if (d->opcode == ice_aqc_opc_remove_sw_rules) {
     struct ice_aqc_sw_rules_elem *rules_elem = reinterpret_cast<struct ice_aqc_sw_rules_elem*>(data);
     struct ice_aqc_sw_rules *add_sw_rules_cmd = reinterpret_cast<ice_aqc_sw_rules *> (d->params.raw);
 
     // assume add_sw_rules_cmd->num_rules_fltr_entry_index == 1
-    
+
     cout <<  "AQ remove sw rule" << logger::endl;
 
-    
+
     if (rules_elem->type == ICE_AQC_SW_RULES_T_LKUP_RX || rules_elem->type == ICE_AQC_SW_RULES_T_LKUP_TX) {
       rules_elem->pdata.lkup_tx_rx.index = 0; // null, since now deleted
     } else {
@@ -505,13 +507,13 @@ void queue_admin_tx::admin_desc_ctx::process() {
     }
     dev.topo_elem.generic[0].parent_teid = 0xFFFFFFFF;
     dev.topo_elem.generic[0].data.elem_type = ICE_AQC_ELEM_TYPE_ROOT_PORT;
-    
+
     dev.topo_elem.generic[1].parent_teid = 0;
     dev.topo_elem.generic[1].data.elem_type = ICE_AQC_ELEM_TYPE_ENTRY_POINT; ;
 
     dev.topo_elem.generic[2].parent_teid = 0;
     dev.topo_elem.generic[2].data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
-    
+
     dev.topo_elem.generic[3].parent_teid = 1;
     dev.topo_elem.generic[3].data.elem_type = ICE_AQC_ELEM_TYPE_TC;
 
@@ -568,7 +570,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     case 38:
       get_elem->parent_teid = 5;
       get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
-    case 54: // id 54 
+    case 54: // id 54
       get_elem->parent_teid = 5;
       get_elem->data.elem_type = ICE_AQC_ELEM_TYPE_SE_GENERIC;
       break;
@@ -596,7 +598,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
       }
       break;
     }
-    
+
     desc_complete_indir(0, get_elem, sizeof(*get_elem));
   } else if (d->opcode == ice_aqc_opc_add_sched_elems) {
     struct ice_aqc_sched_elem_cmd *get_elem_cmd = reinterpret_cast<ice_aqc_sched_elem_cmd *> (d->params.raw);
@@ -626,15 +628,15 @@ void queue_admin_tx::admin_desc_ctx::process() {
     query_res.sched_props.logical_levels = 4;
     query_res.sched_props.phys_levels = 3;
     query_res.layer_props[0].max_sibl_grp_sz = 1;
-    
+
     query_res.layer_props[1].max_sibl_grp_sz = 2;
 
     query_res.layer_props[2].max_sibl_grp_sz = 32;
     query_res.layer_props[3].max_sibl_grp_sz = 8;
-    
+
     desc_complete_indir(0, &query_res, sizeof(query_res));
   } else if (d->opcode == ice_aqc_opc_add_txqs) {
-    
+
     struct ice_aqc_add_txqs *add_txqs_cmd = reinterpret_cast<ice_aqc_add_txqs *> (d->params.raw);
     // add_txqs_cmd->num_qgrps = 1;
     struct ice_aqc_add_tx_qgrp *add_txqs = reinterpret_cast<ice_aqc_add_tx_qgrp *> (data);
@@ -673,7 +675,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
   //   add_txqs->num_qsets = 1;
   //   add_txqs->rdma_qsets[0].qset_teid = 0;
   //   add_txqs->rdma_qsets[0].tx_qset_id = 0;
-    
+
   //   memcpy(dev.ctx_addr[add_txqs->rdma_qsets[0].qset_teid], add_txqs->rdma_qsets[0].info, sizeof(u8)*22);
 
   //   dev.last_used_parent_node = dev.last_returned_node+1;
@@ -691,13 +693,20 @@ void queue_admin_tx::admin_desc_ctx::process() {
     download_pkg_resp->error_info = ICE_AQ_RC_OK;
     download_pkg_resp->error_offset = 0;
     desc_complete_indir(0, data, d->datalen);
+  } else if (d->opcode == ice_aqc_opc_recipe_to_profile) {
+    // ignore. We assume profiles never change.
+    desc_complete(0);
+  } else if (d->opcode == ice_aqc_opc_get_recipe_to_profile) {
+    // ignore. We assume profiles never change.
+    desc_complete(0);
   } else if (d->opcode == ice_aqc_opc_add_sw_rules) {
     struct ice_aqc_sw_rules *add_sw_rules_cmd = reinterpret_cast<ice_aqc_sw_rules *> (d->params.raw);
     struct ice_aqc_sw_rules_elem *add_sw_rules = reinterpret_cast<ice_aqc_sw_rules_elem*>(data);
+#ifdef DEBUG_ADMINQ_SWITCH
     cout <<  "  set switch config" << logger::endl;
-    
     e810_switch::print_sw_rule(add_sw_rules);
     __builtin_dump_struct(add_sw_rules, &printf);
+#endif
 
     bool success = dev.bcam.add_rule(add_sw_rules);
 
@@ -746,10 +755,10 @@ void queue_admin_tx::admin_desc_ctx::process() {
       desc_complete_indir(0, &return_data, sizeof(return_data));
 
     // default value to return for other accesses. This value seems to work.
-    } else if (offset < 0xc00000 ) { 
+    } else if (offset < 0xc00000 ) {
       char return_data = 1 << ICE_SR_CTRL_WORD_1_S ;
       desc_complete_indir(0, &return_data, sizeof(return_data));
-    
+
     // Simulate out of bounds access: Our physical card reports this size at most. Dpdk probes this size.
     } else {
       char return_data = 1 << ICE_SR_CTRL_WORD_1_S ;
@@ -760,7 +769,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
   }
   else {
     cout <<  "  unknown opcode=0x" << std::hex << d->opcode << logger::endl;
-    
+
 #ifdef DEBUG_ADMINQ
     cout <<  "  unknown opcode=" << d->opcode << logger::endl;
 #endif
