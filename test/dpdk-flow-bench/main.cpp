@@ -42,6 +42,7 @@ struct rte_flow *flow;
 #define EMPTY_MASK 0x0 /* empty mask */
 
 #include "../../src/drivers/flow_blocks.hpp"
+#include "../../src/util.hpp"
 
 static inline void
 print_ether_addr(const char *what, struct rte_ether_addr *eth_addr)
@@ -266,20 +267,36 @@ main(int argc, char **argv)
 	/* >8 End of Initializing the ports using user defined init_port(). */
 
 	/* Create flow for send packet with. 8< */
-	flow = generate_ipv4_flow(port_id, selected_queue,
-				SRC_IP, EMPTY_MASK,
-				DEST_IP, FULL_MASK, &error);
-	/* >8 End of create flow and the flow rule. */
-	if (!flow) {
-		printf("Flow can't be created %d message: %s\n",
-			error.type,
-			error.message ? error.message : "(no stated reason)");
-		rte_exit(EXIT_FAILURE, "error in creating flow");
+	char string_buf[18] = {0};
+	struct rte_ether_addr src_mac;
+	struct rte_ether_addr src_mask;
+	struct rte_ether_addr dest_mac;
+	struct rte_ether_addr dest_mask;
+	rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
+	rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);
+	rte_ether_unformat_addr("00:00:00:00:00:00", &dest_mac);
+	rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
+
+	for (size_t i = 0; i < 1000; i++) {
+		Util::intcrement_mac(dest_mac.addr_bytes, 1);
+
+		flow = generate_eth_flow(port_id, 1,
+					&src_mac, &src_mask,
+					&dest_mac, &dest_mask, &error);
+		/* >8 End of create flow and the flow rule. */
+		if (!flow) {
+			printf("Flow can't be created %d message: %s\n",
+				error.type,
+				error.message ? error.message : "(no stated reason)");
+			rte_exit(EXIT_FAILURE, "error in creating flow");
+		}
+		rte_ether_format_addr(string_buf, sizeof(string_buf), &dest_mac);
+		printf("installed %s\n", string_buf);
+		/* >8 End of creating flow for send packet with. */
 	}
-	/* >8 End of creating flow for send packet with. */
 
 	/* Launching main_loop(). 8< */
-	ret = main_loop();
+	// ret = main_loop(); # we dont main loop, we just install flows
 	/* >8 End of launching main_loop(). */
 
 	/* clean up the EAL */

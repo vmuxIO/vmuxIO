@@ -1,7 +1,5 @@
 #pragma once
 
-#include "libvfio-user.h"
-#include "src/libsimbricks/simbricks/pcie/proto.h"
 #include <cstring>
 #include <dirent.h>
 #include <err.h>
@@ -58,8 +56,9 @@ inline auto Ok() {
   return outcome::success();
 }
 
-inline auto Ok(auto value) {
-  return outcome::success(value);
+template <typename T>
+inline auto Ok(T value) {
+  return outcome::success<T>(value);
 }
 
 typedef void (*callback_fn)(int, void *);
@@ -142,18 +141,7 @@ public:
     return result;
   }
 
-  /* convert simbricks bar flags (SIMBRICKS_PROTO_PCIE_BAR_*) to vfio-user flags
-   * (VFU_REGION_FLAG_*) */
-  static int convert_flags(int bricks) {
-    int vfu = 0;
-
-    // if BAR_IO (port io) is not set, it is FLAG_MEM (MMIO)
-    if (!(bricks & SIMBRICKS_PROTO_PCIE_BAR_IO)) {
-      vfu |= VFU_REGION_FLAG_MEM;
-    }
-
-    return vfu;
-  }
+  static int convert_flags(int bricks);
 
   // dump an ethernet packet
   static void dump_pkt(void *buffer, size_t len) {
