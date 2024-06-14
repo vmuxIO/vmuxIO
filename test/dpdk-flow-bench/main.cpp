@@ -229,18 +229,20 @@ signal_handler(int signum)
 	}
 }
 
-struct timespec timer = {0, 0};
+struct timespec start = {0, 0};
 
 void start_timer() {
-	int ret = clock_gettime(CLOCK_MONOTONIC_RAW, &timer);
+	int ret = clock_gettime(CLOCK_MONOTONIC_RAW, &start);
 	if (ret != 0) {
 		rte_exit(EXIT_FAILURE, "error in taking time");
 	}
 }
 
-auto take_time() {
-	auto start = std::chrono::seconds{timer.tv_sec}
-       + std::chrono::nanoseconds{timer.tv_nsec};
+typedef std::chrono::duration<long, std::ratio<1, 1000000000>> duration;
+
+ duration take_time() {
+	auto start_ = std::chrono::seconds{start.tv_sec}
+       + std::chrono::nanoseconds{start.tv_nsec};
   struct timespec clock = {0, 0};
 	int ret = clock_gettime(CLOCK_MONOTONIC_RAW, &clock);
 	if (ret != 0) {
@@ -249,7 +251,7 @@ auto take_time() {
 	auto now = std::chrono::seconds{clock.tv_sec}
        + std::chrono::nanoseconds{clock.tv_nsec};
 
-  auto duration = now - start;
+	auto duration = now - start_;
   return duration;
 }
 
@@ -293,9 +295,12 @@ main(int argc, char **argv)
 	/* Create flow for send packet with. 8< */
 	char string_buf[18] = {0};
 	size_t installed_rules = 0;
-	size_t batchsize = 10000;
+	size_t batchsize = 4000;
 	size_t max_rules = 49144;
 	int runtime_s = 30;
+	size_t num_intervals = (max_rules / batchsize);
+	duration durations[num_intervals];
+	durations[0] = std::chrono::seconds(0);
 	struct rte_ether_addr src_mac;
 	struct rte_ether_addr src_mask;
 	struct rte_ether_addr dest_mac;
@@ -332,17 +337,43 @@ main(int argc, char **argv)
 				break;
 			}
 		}
-		// auto duration = take_time();
+		auto duration = take_time();
+		durations[installed_rules / batchsize] = duration;
+		// double duration_sec = std::chrono::duration<double>(duration).count();
+		// printf("%zu, %zu, %f\n", (installed_rules / batchsize) - 1, installed_rules, duration_sec);
 		// if (duration > std::chrono::seconds(runtime_s)) {
 		// 	break;
 		// }
+		if (force_quit) {
+			rte_exit(EXIT_FAILURE, "Received signal to force quit.");
+		}
 	}
-	auto diff = take_time();
+	auto end = take_time();
 	printf("Stopped measurement.\n");
-	double duration_sec = std::chrono::duration<double>(diff).count();
-	printf("DurationSec: %f\n", duration_sec);
-	printf("InstalledRules: %zu\n", installed_rules);
-	printf("Rules/sec: %f\n", installed_rules / duration_sec);
+
+	printf("Begin CSV:\n");
+
+	// print interval statistics
+	printf("RowType\tInterval\tIntervalDurationSec\tTotalRules\tRules/Sec\n");
+	for (size_t i = 1; i < num_intervals; i++) {
+		double duration_sec_prev = std::chrono::duration<double>(durations[i - 1]).count();
+		double duration_sec = std::chrono::duration<double>(durations[i]).count() - duration_sec_prev;
+		size_t num_rules = batchsize;
+		if (i == num_intervals - 1) {
+			// last interval
+			num_rules = installed_rules % batchsize;
+		}
+		size_t sum_rules = i * batchsize; // sum of installed rules at the start of this interval
+		// printf("IntervalSec(%zu/%zu): %f, %zu\n", i, num_intervals - 1, duration_sec, num_rules);
+		printf("Interval\t%zu\t%f\t%zu\t%f\n", i, duration_sec, sum_rules, num_rules / duration_sec);
+	}
+
+	// total statistics
+	double duration_sec = std::chrono::duration<double>(end).count();
+	printf("Total\tsum\t%f\t%zu\t%f\n", duration_sec, installed_rules, installed_rules / duration_sec);
+	// printf("DurationSec: %f\n", duration_sec);
+	// printf("InstalledRules: %zu\n", installed_rules);
+	// printf("Rules/sec: %f\n", installed_rules / duration_sec);
 
 	/* Launching main_loop(). 8< */
 	// ret = main_loop(); # we dont main loop, we just install flows
