@@ -30,6 +30,7 @@
 
 static volatile bool force_quit;
 
+static int runtime_s = 30;
 static uint16_t port_id;
 static uint16_t nr_queues = 5;
 static uint8_t selected_queue = 1;
@@ -229,6 +230,30 @@ signal_handler(int signum)
 	}
 }
 
+struct timespec timer = {0, 0};
+
+void start_timer() {
+	int ret = clock_gettime(CLOCK_MONOTONIC_RAW, &timer);
+	if (ret != 0) {
+		rte_exit(EXIT_FAILURE, "error in taking time");
+	}
+}
+
+auto take_time() {
+	auto start = std::chrono::seconds{timer.tv_sec}
+       + std::chrono::nanoseconds{timer.tv_nsec};
+  struct timespec clock = {0, 0};
+	int ret = clock_gettime(CLOCK_MONOTONIC_RAW, &clock);
+	if (ret != 0) {
+		rte_exit(EXIT_FAILURE, "error in taking time");
+	}
+	auto now = std::chrono::seconds{clock.tv_sec}
+       + std::chrono::nanoseconds{clock.tv_nsec};
+
+  auto duration = now - start;
+  return duration;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -268,6 +293,9 @@ main(int argc, char **argv)
 
 	/* Create flow for send packet with. 8< */
 	char string_buf[18] = {0};
+	size_t installed_rules = 0;
+	size_t batchsize = 10000;
+	size_t max_rules = 49144;
 	struct rte_ether_addr src_mac;
 	struct rte_ether_addr src_mask;
 	struct rte_ether_addr dest_mac;
@@ -277,23 +305,43 @@ main(int argc, char **argv)
 	rte_ether_unformat_addr("00:00:00:00:00:00", &dest_mac);
 	rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
 
-	for (size_t i = 0; i < 1000; i++) {
-		Util::intcrement_mac(dest_mac.addr_bytes, 1);
+	printf("Starting measurement.\n");
+	start_timer();
+	while (installed_rules < max_rules) {
+		for (size_t i = 0; i < batchsize; i++) {
+			installed_rules += 1;
+			Util::intcrement_mac(dest_mac.addr_bytes, 1);
 
-		flow = generate_eth_flow(port_id, 1,
-					&src_mac, &src_mask,
-					&dest_mac, &dest_mask, &error);
-		/* >8 End of create flow and the flow rule. */
-		if (!flow) {
-			printf("Flow can't be created %d message: %s\n",
-				error.type,
-				error.message ? error.message : "(no stated reason)");
-			rte_exit(EXIT_FAILURE, "error in creating flow");
+			flow = generate_eth_flow(port_id, 1,
+						&src_mac, &src_mask,
+						&dest_mac, &dest_mask, &error);
+			/* >8 End of create flow and the flow rule. */
+			if (!flow) {
+				rte_ether_format_addr(string_buf, sizeof(string_buf), &dest_mac);
+				printf("Flow for %s (#%zu) can't be created %d message: %s\n",
+					string_buf,
+					installed_rules,
+					error.type,
+					error.message ? error.message : "(no stated reason)");
+				rte_exit(EXIT_FAILURE, "error in creating flow");
+			}
+			// rte_ether_format_addr(string_buf, sizeof(string_buf), &dest_mac);
+			// printf("installed %s (#%zu)\n", string_buf, installed_rules);
+			/* >8 End of creating flow for send packet with. */
+			if (installed_rules >= max_rules) {
+				break;
+			}
 		}
-		rte_ether_format_addr(string_buf, sizeof(string_buf), &dest_mac);
-		printf("installed %s\n", string_buf);
-		/* >8 End of creating flow for send packet with. */
+		auto duration = take_time();
+		if (duration > std::chrono::seconds(runtime_s)) {
+			break;
+		}
 	}
+	auto duration = take_time();
+	printf("Stopped measurement.\n");
+	double a = std::chrono::duration<double>(duration).count();
+	printf("DurationSec: %f\n", a);
+	printf("InstalledRules: %zu\n", installed_rules);
 
 	/* Launching main_loop(). 8< */
 	// ret = main_loop(); # we dont main loop, we just install flows
