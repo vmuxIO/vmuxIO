@@ -38,6 +38,7 @@ extern "C" {
 
 // #define DEBUG_DEV
 // #define DEBUG_ADMINQ
+// #define DEBUG_ADMINQ_SWITCH
 // #define DEBUG_QUEUES
 // #define DEBUG_LAN
 // #define DEBUG_HMC

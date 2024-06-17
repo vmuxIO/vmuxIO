@@ -242,7 +242,7 @@ vm-strace-allnet:
     sudo ip addr add 10.2.0.1/24 dev {{vmuxTap}}
     sudo ip link set dev {{vmuxTap}} up
     sudo rm {{qemuMem}} || true
-    sudo strace -o /tmp/strace-allnet qemu/bin/qemu-system-x86_64 \
+    sudo strace -f -c qemu/bin/qemu-system-x86_64 \
         -cpu host \
         -smp 8 \
         -enable-kvm \
