@@ -13,6 +13,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <ctime>
 
 #define NUM_MSIX_IRQs 16 // choose small to avoid unneccessary polling in processAllPollTimers
 
@@ -31,7 +32,7 @@ private:
 
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
-               //
+               
   std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle;
 
   void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
@@ -141,6 +142,20 @@ public:
     __builtin_dump_struct(&this->deviceIntro, &printf);
     this->model->SetupIntro(this->deviceIntro);
   }
+
+struct timespec getNextTimestamp() {
+  struct timespec ts;
+
+  if(this->driver->getHWTimestamp(&ts)) {
+    
+    if(!clock_gettime(CLOCK_MONOTONIC, &ts)) {
+      printf("Error: Could not get unix timestamp!\n");
+      return {0, 0};
+    }
+  }
+  
+  return ts;
+}
 
 private:
   void init_general_callbacks(VfioUserServer &vfu) {

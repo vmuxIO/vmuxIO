@@ -5,6 +5,10 @@
 #ifndef I40E_BASE_WRAPPER_H_
 #define I40E_BASE_WRAPPER_H_
 
+#pragma once
+
+#include "sims/nic/e810_bm/e810_ptp.h"
+
 #include <linux/types.h>
 #include <stdint.h>
 #include <byteswap.h>
@@ -136,23 +140,23 @@ typedef uint64_t __le64;
 
 
 // PTP Registers
-#define GLTSYN_ENA(_i) (0x00088808 + ((_i) * 0x4))
-#define GLTSYN_CMD (0x00088810)
-#define GLTSYN_CMD_SYNC (0x00088814)
-#define GLTSYN_SYNC_DLAY (0x00088818)
-#define GLTSYN_HH_DLAY (0x0008881C)
+#define PTP_GLTSYN_ENA(_i) (0x00088808 + ((_i) * 0x4))
+#define PTP_GLTSYN_CMD (0x00088810)
+#define PTP_GLTSYN_CMD_SYNC (0x00088814)
+#define PTP_GLTSYN_SYNC_DLAY (0x00088818)
+#define PTP_GLTSYN_HH_DLAY (0x0008881C)
 #define PFTSYN_SEM (0x00088880)
-#define GLTSYN_STAT(_i) (0x000888C0 + ((_i) * 0x4))
-#define GLTSYN_TIME(_i) (0x000888C8 + ((_i) * 0x4))
-#define GLTSYN_SHTIME(_i) (0x000888E0 + ((_i) * 0x4))
-#define GLTSYN_HHTIME(_i) (0x000888F8 + ((_i) * 0x4))
-#define GLTSYN_SHADJ(_i) (0x00088908 + ((_i) * 0x4))
-#define GLTSYN_INCVAL(_i) (0x00088918 + ((_i) * 0x4))
-#define GLTSYN_TGT(_i) (0x00088928 + ((_i) * 0x4))
-#define GLTSYN_EVNT(_i) (0x00088968 + ((_i) * 0x4))
-#define GLTSYN_AUX_OUT(_i) (0x00088998 + ((_i) * 0x4))
-#define GLTSYN_CLKO(_i) (0x000889B8 + ((_i) * 0x4))
-#define GLTSYN_AUX_IN(_i) (0x000889D8 + ((_i) * 0x4))
+#define PTP_GLTSYN_STAT(_i) (0x000888C0 + ((_i) * 0x4))
+#define PTP_GLTSYN_TIME(_i) (0x000888C8 + ((_i) * 0x4))
+#define PTP_GLTSYN_SHTIME(_i) (0x000888E0 + ((_i) * 0x4))
+#define PTP_GLTSYN_HHTIME(_i) (0x000888F8 + ((_i) * 0x4))
+#define PTP_GLTSYN_SHADJ(_i) (0x00088908 + ((_i) * 0x4))
+#define PTP_GLTSYN_INCVAL(_i) (0x00088918 + ((_i) * 0x4))
+#define PTP_GLTSYN_TGT(_i) (0x00088928 + ((_i) * 0x4))
+#define PTP_GLTSYN_EVNT(_i) (0x00088968 + ((_i) * 0x4))
+#define PTP_GLTSYN_AUX_OUT(_i) (0x00088998 + ((_i) * 0x4))
+#define PTP_GLTSYN_CLKO(_i) (0x000889B8 + ((_i) * 0x4))
+#define PTP_GLTSYN_AUX_IN(_i) (0x000889D8 + ((_i) * 0x4))
 #define GLHH_ART_CTL (0x000A41D4)
 #define GLHH_ART_TIME(_i) (0x000A41D8 + ((_i) * 0x4))
 #define GLHH_ART_DATA (0x000A41E0)

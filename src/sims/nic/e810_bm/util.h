@@ -5,7 +5,7 @@
 #endif
 
 #ifdef DEBUG_PTP
-#define DEBUG_LOG_PTP(args) std::cout << args << logger::endl;
+#define DEBUG_LOG_PTP(args) std::cout << args << std::endl;
 #else
 #define DEBUG_LOG_PTP(args)
 #endif

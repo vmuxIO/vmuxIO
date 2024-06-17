@@ -22,7 +22,6 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "sims/nic/e810_bm/base/ice_adminq_cmd.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

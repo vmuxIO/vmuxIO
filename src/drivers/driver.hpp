@@ -41,6 +41,7 @@ public:
   virtual void send(const char *buf, const size_t len) = 0;
   virtual void recv(int vm_id) = 0;
   virtual void recv_consumed(int vm_id) = 0;
+  virtual int getHWTimestamp(struct timespec *ts) { return -1; };
 
   // return false if rule cant be allocated
   virtual bool add_switch_rule(int vm_id, uint8_t mac_addr[6], uint16_t dst_queue) {

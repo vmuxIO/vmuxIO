@@ -1,12 +1,28 @@
 #pragma once
 
-#include "src/sims/nic/e810_bm/e810_base_wrapper.h"
-
+#include <stdint.h>
 
 namespace i40e {
 
+
+typedef union {
+ struct {
+  uint8_t resv[4];
+  uint64_t time;
+  uint32_t time_0;
+ };
+ struct {
+  uint8_t resv2[11];
+  uint16_t ts_h_1;
+  uint16_t ts_h_0;
+  uint8_t ts_l;
+ };
+ __int128 value;
+}__attribute__((packed)) gltsyn_ts_t;
+
+
 #define PTP_GLTSYN_ENA(i) ((i) & 1)
-#define PTP_GLTSYN_CMD(i) ((i) & 0xff)
+#define PTP_GLTSYN_GET_CMD(i) ((i) & 0xff)
 #define PTP_GLTSYN_CMD_SEL_MASTER(i) (((i) & 0x100) >> 0x8)
 
 #define PTP_GLTSYN_CMD_INIT_TIME 0x01 // init TIME registers
@@ -27,7 +43,6 @@ namespace i40e {
 #define PTP_ATQBAL_INDEX(i) (((i) >> 24) & 0b1111)
 #define PTP_ATQBAL_SET_TS(i, ts) (((i) & 0xff00ffff) | (((ts) & 0xff00000000) >> 16))
 #define PTP_ATQBAH_SET_TS(ts) ((ts) & 0xffffffff)
-
 
 // PTP capabilities
 //#define CAP_TIME_SYNC_ENA 0b1
@@ -50,21 +65,6 @@ namespace i40e {
 #define CAP_1588_FLAGS ((uint32_t) CAP_PF_TIMER_0_OWNED | CAP_PF_TIMER_0_ENA | CAP_PF_TIMESYNC_ENA | CAP_PF_LL_TX_SUPPORTED | \
                         CAP_GPIO_TIME_SYNC )
 
-
-typedef union {
- struct {
-  uint8_t resv[4];
-  uint64_t time;
-  uint32_t time_0;
- };
- struct {
-  uint8_t resv2[11];
-  uint16_t ts_h_1;
-  uint16_t ts_h_0;
-  uint8_t ts_l;
- };
- __int128 value;
-}__attribute__((packed)) gltsyn_ts_t;
 
 
 class e810_bm;
@@ -96,6 +96,8 @@ class ptpmgr {
   void adj_set(uint64_t val);
 
   void inc_set(uint64_t inc);
+  
+  uint64_t inc_get();
 };
 
 

@@ -323,7 +323,6 @@ void lan_queue_rx::initialize() {
 
   base = ((*base_p) & ((1ULL << 57) - 1)) * 128;
   len = (*qlen_p >> 1) & ((1 << 13) - 1);
-  printf("rx_init this 0x%p len %d (0x%p)\n", this, len, &len);
 
   dbuff_size = (((*dbsz_p) >> 6) & ((1 << 7) - 1)) * 128;
   hbuff_size = (((*hbsz_p) >> 5) & ((1 << 5) - 1)) * 64;
