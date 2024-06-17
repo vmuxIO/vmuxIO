@@ -239,14 +239,16 @@ class LoadLatencyTestGenerator(object):
             host.delete_nic_ip_addresses(host.test_iface)
             host.bind_device(host.test_iface_addr, host.test_iface_vfio_driv)
 
-    def start_reflector(self, server: Server, reflector: Reflector,
-                        iface: str = None):
+    def start_reflector(self, server: Server, reflector: Reflector, interface: Interface,
+                        iface_name: str = None):
         if reflector == Reflector.MOONGEN:
             server.bind_test_iface()
             server.setup_hugetlbfs()
             server.start_moongen_reflector()
         else:
-            server.start_xdp_reflector(iface)
+            # bind linux kernel driver for xdp
+            server.modprobe_test_iface_drivers(interface=interface)
+            server.start_xdp_reflector(iface_name)
         sleep(5)
 
     def stop_reflector(self, server: Server, reflector: Reflector,
@@ -255,7 +257,7 @@ class LoadLatencyTestGenerator(object):
             server.stop_moongen_reflector()
             driver = interface.guest_driver()
             server.unbind_device(server.test_iface_addr)
-            server.bind_device(server.test_iface_addr, driver)
+            # server.bind_device(server.test_iface_addr, driver) # fails because ice is not loaded. Would also fail on mediation device
             # if unknown driver: server.release_test_iface()
         else:
             server.stop_xdp_reflector(iface)
@@ -497,7 +499,7 @@ class LoadLatencyTestGenerator(object):
 
                             for reflector, rtree in ftree.items():
                                 debug(f"Starting reflector {reflector.value}")
-                                self.start_reflector(dut, reflector)
+                                self.start_reflector(dut, reflector, interface)
 
                                 for rate, atree in rtree.items():
                                     for size, stree in atree.items():

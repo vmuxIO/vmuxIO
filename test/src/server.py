@@ -2037,9 +2037,9 @@ class LoadGen(Server):
                             runtime: int = 60,
                             size: int = 60,
                             nr_macs: int = 0,
-                            histfile: str = 'histogram.csv',
-                            statsfile: str = 'throughput.csv',
-                            outfile: str = 'output.log'
+                            histfile: str = '/tmp/histogram.csv',
+                            statsfile: str = '/tmp/throughput.csv',
+                            outfile: str = '/tmp/output.log'
                             ):
         """
         Run the MoonGen L2 load latency test.
