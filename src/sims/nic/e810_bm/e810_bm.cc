@@ -50,8 +50,8 @@ e810_bm::e810_bm()
       shram(*this),
       lanmgr(*this, NUM_QUEUES),
       cem(*this, NUM_QUEUES),
+      ptp(*this),
       bcam(*this) {
-      ptp(*this) {
   reset(false);
 }
 
