@@ -20,4 +20,6 @@ xdp
 ycsb
 vmux-nixbuild
 .nix-defexpr/*
+.nix-channels
+.direnv
 
