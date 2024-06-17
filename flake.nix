@@ -274,6 +274,7 @@
           ps.colorlog
           ps.netaddr
           ps.pandas
+          ps.tqdm
 
           # dependencies for hosts/prepare.py
           ps.pyyaml

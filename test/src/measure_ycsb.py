@@ -9,9 +9,8 @@ import time
 from pathlib import Path
 import pandas as pd
 from pandas import DataFrame
+from conf import G
 
-OUT_DIR: str
-BRIEF: bool
 DURATION_S: int
 
 @dataclass
@@ -23,7 +22,7 @@ class YcsbTest(AbstractBenchTest):
         return f"ycsb_{self.num_vms}vms_{self.interface}_{self.rps}rps"
 
     def output_path_per_vm(self, repetition: int, vm_number: int) -> str:
-        return str(Path(OUT_DIR) / f"ycsbVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
+        return str(Path(G.OUT_DIR) / f"ycsbVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
     def estimated_runtime(self) -> float:
         """
@@ -68,7 +67,7 @@ class YcsbTest(AbstractBenchTest):
             lines = file.readlines()
             data = []
             test_spec = {
-                **asdict(self),
+                **asdict(self), # put selfs member variables and values into this dict
                 "repetition": repetition,
                 "vm_number": vm_number,
             }
@@ -89,7 +88,7 @@ class YcsbTest(AbstractBenchTest):
                 "ops": int(find(lines, "[UPDATE], Operations,"))
             }]
             data += [{
-                **test_spec,
+                **test_spec, # merge test_spec dict with this dict
                 "op": "overall",
                 "runtime": float(find(lines, "[OVERALL], RunTime(ms),")),
                 "ops_per_sec": float(find(lines, "[OVERALL], Throughput(ops/sec),"))
@@ -159,24 +158,23 @@ class Ycsb():
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
     host, loadgen = measurement.hosts()
-    from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
-    global OUT_DIR
-    global BRIEF
     global DURATION_S
-    OUT_DIR = M_OUT_DIR
-    BRIEF = M_BRIEF
 
-    interfaces = [ Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.BRIDGE_E1000, Interface.BRIDGE ]
+    interfaces = [
+        Interface.VMUX_EMU,
+        # Interface.VMUX_DPDK, # multi-vm broken right now
+        Interface.BRIDGE_E1000,
+        Interface.BRIDGE ]
     rpsList = [ 10, 100, 500, 1000, 5000, 10000, 50000, 1000000 ]
     vm_nums = [ 1, 2, 4 ]
     repetitions = 3
-    DURATION_S = 61 if not BRIEF else 11
-    if BRIEF:
-        # interfaces = [ Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_DPDK ]
+    DURATION_S = 61 if not G.BRIEF else 11
+    if G.BRIEF:
+        interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
         rpsList = [ 10 ]
         repetitions = 1
-        vm_nums = [ 4 ]
+        vm_nums = [ 1 ]
 
     # test = YcsbTest(
     #         repetitions=1,
@@ -232,6 +230,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 loadgen.setup_test_iface_ip_net()
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                    guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
                 
@@ -250,7 +249,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         info(f"skipping {test}")
 
 
-    YcsbTest.find_errors(OUT_DIR, ["READ-ERROR", "WRITE-ERROR"])
+    YcsbTest.find_errors(G.OUT_DIR, ["READ-ERROR", "WRITE-ERROR"])
 
 
 if __name__ == "__main__":

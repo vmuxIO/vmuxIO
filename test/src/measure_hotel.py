@@ -5,8 +5,8 @@ from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
 from argcomplete import autocomplete
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
-from server import Host, Guest, LoadGen, MultiHost
-from enums import Machine, Interface, Reflector
+from server import Host, Guest, LoadGen
+from enums import Machine, Interface, Reflector, MultiHost
 from measure import AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
@@ -17,9 +17,8 @@ import json
 from root import *
 from dataclasses import dataclass, field
 import subprocess
+from conf import G
 
-OUT_DIR: str
-BRIEF: bool
 DURATION_S: int
 
 
@@ -221,19 +220,14 @@ class DeathStarBench:
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
     host, loadgen = measurement.hosts()
-    from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
-    global OUT_DIR
-    global BRIEF
     global DURATION_S
-    OUT_DIR = M_OUT_DIR
-    BRIEF = M_BRIEF
 
     interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
     rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
     repetitions = 4
-    DURATION_S = 61 if not BRIEF else 11
-    if BRIEF:
+    DURATION_S = 61 if not G.BRIEF else 11
+    if G.BRIEF:
         interfaces = [ Interface.BRIDGE_E1000 ]
         # interfaces = [ Interface.VMUX_EMU ]
         rpsList = [ 10 ]
@@ -293,6 +287,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 loadgen.setup_test_iface_ip_net()
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                    guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
                 
@@ -311,7 +306,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     else:
                         info(f"skipping {test}")
 
-    DeathStarBench.find_errors(OUT_DIR)
+    DeathStarBench.find_errors(G.OUT_DIR)
 
 if __name__ == "__main__":
     measurement = Measurement()

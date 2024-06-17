@@ -3,14 +3,14 @@ from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 from os.path import isfile, join as path_join
 from abc import ABC, abstractmethod
-from server import Host, Guest, LoadGen, MultiHost
+from server import Host, Guest, LoadGen
 import autotest as autotest
 from configparser import ConfigParser
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from typing import Tuple, Iterator, Any, Dict, Callable
 from contextlib import contextmanager
-from enums import Machine, Interface, Reflector
+from enums import Machine, Interface, Reflector, MultiHost
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from util import safe_cast
@@ -20,12 +20,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 import subprocess
 from root import QEMU_BUILD_DIR
+from conf import G
 
-
-OUT_DIR: str = "/tmp/out1"
-BRIEF: bool = False
-NUM_WORKERS: int = 8 # with 16, it already starts failing on rose
-
+NUM_WORKERS = 8 # with 16, it already starts failing on rose
 
 def setup_parser() -> ArgumentParser:
     """
@@ -48,7 +45,7 @@ def setup_parser() -> ArgumentParser:
                         )
     parser.add_argument('-o',
                         '--outdir',
-                        default=OUT_DIR,
+                        default='/tmp/out1',
                         help='Directory to expect old results in and write new ones to',
                         )
     parser.add_argument('-b',
@@ -113,13 +110,11 @@ class Measurement:
 
         self.guests = dict()
 
-        global BRIEF
-        global OUT_DIR
-        BRIEF = self.args.brief
-        OUT_DIR = self.args.outdir
+        G.OUT_DIR = self.args.outdir
+        G.BRIEF = self.args.brief
 
-        if BRIEF:
-            subprocess.run(["sudo", "rm", "-r", OUT_DIR])
+        if G.BRIEF:
+            subprocess.run(["sudo", "rm", "-r", G.OUT_DIR])
 
 
     def hosts(self) -> Tuple[Host, LoadGen]:
@@ -131,12 +126,14 @@ class Measurement:
         """
         estimated time to boot this system in seconds
         """
-        vm_boot = (num_vms / 32) * 60 * 2 # time taken to boot a batch of VMs
+        # time taken to boot a batch of VMs (2min each)
+        # min(factor for 1 VM, factor for more VMs)
+        vm_boot = max(0.3, (num_vms / 32)) * 60 * 2
         return vm_boot
 
 
     @contextmanager
-    def virtual_machine(self, interface: Interface) -> Iterator[Guest]:
+    def virtual_machine(self, interface: Interface, run_guest_args = dict()) -> Iterator[Guest]:
         """
         Creates a guest virtual machine
         """
@@ -167,7 +164,8 @@ class Measurement:
         self.host.run_guest(
                 net_type=interface,
                 machine_type='pc',
-                qemu_build_dir=QEMU_BUILD_DIR
+                qemu_build_dir=QEMU_BUILD_DIR,
+                **run_guest_args
                 )
 
         debug("Waiting for guest connectivity")
@@ -268,7 +266,10 @@ class Measurement:
 
 @dataclass
 class AbstractBenchTest(ABC):
-    repetitions: int
+    # magic parameter: repetitions
+    # Feature matrixes for other parameters take lists of values to iterate over. 
+    # Wile repetitions is also a list in the feature matrix, even single value (e.g. 3) still means that this test will be run 3 times.
+    repetitions: int 
     num_vms: int
 
     @abstractmethod
@@ -283,8 +284,8 @@ class AbstractBenchTest(ABC):
         """
         raise -1
 
-    def output_filepath(self, repetition: int):
-        return path_join(OUT_DIR, f"{self.test_infix()}_rep{repetition}.log")
+    def output_filepath(self, repetition: int, extension: str = "log"):
+        return path_join(G.OUT_DIR, f"{self.test_infix()}_rep{repetition}.{extension}")
 
     def test_done(self, repetition: int):
         output_file = self.output_filepath(repetition)
@@ -297,12 +298,24 @@ class AbstractBenchTest(ABC):
         return False
 
     @classmethod
+    def list_tests(cls, test_matrix: Dict[str, List[Any]]) -> List[Any]:
+        """
+        test_matrix:
+        dict where every key corresponds to a constructor parameter/field for this cls/BenchTest (same list as test_parameters() returns).
+        Each value is a list of values to be tested.
+        """
+        ret = []
+        for test_args in product_dict(test_matrix):
+            test = cls(**test_args)
+            ret += [ test ]
+        return ret
+
+    @classmethod
     def any_needed(cls, test_matrix: Dict[str, List[Any]]) -> bool:
         """
         Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
         """
-        for test_args in product_dict(test_matrix):
-            test = cls(**test_args)
+        for test in cls.list_tests(test_matrix):
             if test.needed():
                 debug(f"any_needed: needs {test}")
                 return True
@@ -356,7 +369,10 @@ class AbstractBenchTest(ABC):
         for test_args in product_dict(reboot_matrix):
             test_args = {**test_args, **kwargs_no_reboot}
             test = cls(**test_args)
-            needed_s += Measurement.estimated_boottime(test.num_vms)
+            duration_s = Measurement.estimated_boottime(test.num_vms)
+            if "repetitions" in args_reboot:
+                duration_s *= test.repetitions
+            needed_s += duration_s
 
         if unknown_runtime:
             info(f"Test not cached yet: {needed}/{total}. Time to completion not known.")
@@ -365,9 +381,19 @@ class AbstractBenchTest(ABC):
 
         return needed_s
 
+    @classmethod
+    def test_parameters(cls) -> List[str]:
+        """
+        return the list of names of input parameters for this test
+        """
+        return [i for i in cls.__match_args__]
+
+
 import measure_vnf
 import measure_hotel
 import measure_ycsb
+import measure_iperf
+import measure_mediation
 
 def main():
     measurement = Measurement()
@@ -380,12 +406,18 @@ def main():
     info("")
     measure_ycsb.main(measurement, plan_only=True)
     info("")
+    measure_iperf.main(measurement, plan_only=True)
+    info("")
+    measure_mediation.main(measurement, plan_only=True)
+    info("")
 
     info("Running benchmarks ...")
     info("")
-    measure_vnf.main(measurement)
+    # measure_vnf.main(measurement)
+    measure_mediation.main(measurement)
     measure_hotel.main(measurement)
     measure_ycsb.main(measurement)
+    measure_iperf.main(measurement)
 
 if __name__ == "__main__":
     main()

@@ -5,9 +5,9 @@ from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
 from argcomplete import autocomplete
 from logging import (info, debug, error, warning, getLogger,
                      DEBUG, INFO, WARN, ERROR)
-from server import Host, Guest, LoadGen, MultiHost
-from enums import Machine, Interface, Reflector
-from measure import AbstractBenchTest, Measurement, end_foreach, BRIEF, OUT_DIR
+from server import Host, Guest, LoadGen
+from enums import Machine, Interface, Reflector, MultiHost
+from measure import AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
@@ -15,18 +15,21 @@ from os.path import isfile, join as path_join
 import yaml
 import json
 from root import *
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 import subprocess
 import os
+from pandas import DataFrame
+import traceback
+from conf import G
 
 
 
 @dataclass
 class IPerfTest(AbstractBenchTest):
-    
+
     # test options
     direction: str # can be: forward | reverse | bidirectional
-    output_json = False # sets / unsets -J flag on iperf client 
+    output_json = True # sets / unsets -J flag on iperf client
 
     interface: str # network interface used
 
@@ -37,7 +40,8 @@ class IPerfTest(AbstractBenchTest):
         """
         estimate time needed to run this benchmark excluding boot time in seconds
         """
-        return self.repetitions * (DURATION_S + 2)
+        overheads = 35
+        return (self.repetitions * (DURATION_S + 2) ) + overheads
 
     def find_error(self, repetition: int) -> bool:
         failure = False
@@ -48,6 +52,31 @@ class IPerfTest(AbstractBenchTest):
                 failure = True
         return failure
 
+    def summarize(self, repetition: int) -> DataFrame:
+        with open(self.output_filepath(repetition), 'r') as f:
+            data = json.load(f)
+
+        # Extract important values
+        start = data['start']
+        end = data['end']
+        intervals = data['intervals']
+
+        duration_secs = end['sum_sent']['seconds']
+        sent_bytes = end['sum_sent']['bytes']
+        sent_bits_per_second = end['sum_sent']['bits_per_second']
+        received_bytes = end['sum_received']['bytes']
+        received_bits_per_second = end['sum_received']['bits_per_second']
+
+        gbitps = received_bits_per_second / 1024 / 1024 / 1024
+
+        data = [{
+            **asdict(self), # put selfs member variables and values into this dict
+            "repetition": repetition,
+            # "vm_number": vm_number,
+            "GBit/s": gbitps,
+        }]
+        return DataFrame(data=data)
+
 
 
 def strip_subnet_mask(ip_addr: str):
@@ -56,27 +85,26 @@ def strip_subnet_mask(ip_addr: str):
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
-    from measure import OUT_DIR as M_OUT_DIR, BRIEF as M_BRIEF
-    global OUT_DIR
-    global BRIEF
     global DURATION_S
-    OUT_DIR = M_OUT_DIR
-    BRIEF = M_BRIEF
 
     # set up test plan
-    interfaces = [ 
-          Interface.VFIO, 
-          Interface.VMUX_PT, 
-          Interface.VMUX_EMU, 
+    interfaces = [
+          Interface.VFIO,
+          Interface.BRIDGE,
+          Interface.BRIDGE_VHOST,
+          Interface.BRIDGE_E1000,
+          Interface.VMUX_PT,
+          Interface.VMUX_EMU,
           # Interface.VMUX_EMU_E810, # tap backend not implemented for e810 (see #127)
-          Interface.VMUX_DPDK, 
-          Interface.VMUX_DPDK_E810 
+          Interface.VMUX_DPDK,
+          Interface.VMUX_DPDK_E810,
+          Interface.VMUX_MED
           ]
-    directions = [ "forward" ]
+    directions = [ "forward", "backward" ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
     repetitions = 3
-    DURATION_S = 61 if not BRIEF else 11
-    if BRIEF:
+    DURATION_S = 61 if not G.BRIEF else 11
+    if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
         interfaces = [ Interface.VMUX_DPDK_E810 ]
         directions = [ "forward" ]
@@ -89,13 +117,13 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         interface=[ interface.value for interface in interfaces],
         num_vms=vm_nums
     )
-    
+
     info(f"Iperf Test execution plan:")
     IPerfTest.estimate_time(test_matrix, ["interface", "num_vms"])
 
     if plan_only:
         return
-    
+
     all_tests = []
 
     for num_vms in vm_nums:
@@ -114,12 +142,12 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
             for direction in directions:
                 info(f"Testing configuration iface: {interface} direction: {direction} vm_num: {num_vms}")
-                
+
                 # build test object
                 ipt = IPerfTest(
                         interface=interface.value,
-                        repetitions=repetitions, 
-                        direction=direction, 
+                        repetitions=repetitions,
+                        direction=direction,
                         num_vms=num_vms)
                 all_tests += [ ipt ]
 
@@ -132,16 +160,21 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     info('Binding loadgen interface')
                     loadgen.modprobe_test_iface_drivers()
                     loadgen.release_test_iface() # bind linux driver
-                    
+
                     try:
                         loadgen.delete_nic_ip_addresses(loadgen.test_iface)
                     except Exception:
                         pass
 
+                    guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
                     loadgen.setup_test_iface_ip_net()
 
                     for repetition in range(repetitions):
+                        #cleanup
+                        guest.stop_iperf_server()
+                        loadgen.stop_iperf_client()
+
                         remote_output_file = "/tmp/iperf_result.json"
                         tmp_remote_output_file = "/tmp/tmp_iperf_result.json"
                         local_output_file = ipt.output_filepath(repetition)
@@ -152,7 +185,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
                         loadgen.run_iperf_client(ipt, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file, tmp_remote_output_file)
                         time.sleep(DURATION_S)
-                        
+
                         try:
                             loadgen.wait_for_success(f'[[ -e {remote_output_file} ]]')
                         except TimeoutError:
@@ -162,6 +195,16 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         # teardown
                         guest.stop_iperf_server()
                         loadgen.stop_iperf_client()
+
+                        # summarize results of VM
+                        local_summary = ipt.output_filepath(repetition, extension = "summary")
+                        with open(local_summary, 'w') as file:
+                            try:
+                                # to_string preserves all cols
+                                summary = ipt.summarize(repetition).to_string()
+                            except Exception as e:
+                                summary = traceback.format_exc()
+                            file.write(summary)
 
 
     for ipt in all_tests:

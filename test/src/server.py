@@ -9,90 +9,13 @@ from os import listdir, remove
 from os.path import join as path_join
 from os.path import dirname as path_dirname
 from typing import Optional
-from enums import Interface
-import netaddr
+from enums import Interface, MultiHost
 from pathlib import Path
 import copy
-import ipaddress
 import base64
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
 MAX_VMS: int = 35; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
-
-class MultiHost:
-    """
-    Starts from vm_number 1. Vm_number 0 leads to legacy outputs without numbers. -1 returns string matching all numbers.
-    """
-    @staticmethod
-    def range(num_vms: int) -> range:
-        return range(1, num_vms + 1)
-
-    @staticmethod
-    def ssh_hostname(ssh_hostname: str, vm_number: int):
-        if vm_number == 0: return ssh_hostname
-        fqdn = ssh_hostname.split(".")
-        fqdn[0] = f"{fqdn[0]}{vm_number}"
-        return ".".join(fqdn)
-
-    @staticmethod
-    def mac(base_mac: str, vm_number: int) -> str:
-        if vm_number == 0: return base_mac
-        base = netaddr.EUI(base_mac)
-        value = base.value + vm_number
-        fmt = netaddr.mac_unix
-        fmt.word_fmt = "%.2x"
-        return str(netaddr.EUI(value).format(fmt))
-
-    @staticmethod
-    def ip(base_ip: str, vm_number: int) -> str:
-        """
-        Increment ips with or without subnets
-        """
-        ip = base_ip.split("/") # split subnet mask
-        start = ipaddress.IPv4Address(ip[0])
-        if len(ip) == 1:
-            return f"{start + vm_number - 1}"
-        else:
-            # re-attach subnet
-            return f"{start + vm_number - 1}/{ip[1]}"
-
-    @staticmethod
-    def generic_path(path_: str, vm_number: int) -> str:
-        if vm_number == 0: return path_
-        path = Path(path_)
-        path = path.with_name(path.stem + str(vm_number) + path.suffix)
-        return str(path)
-
-    @staticmethod
-    def disk_path(root_disk_file: str, vm_number: int) -> str:
-        return MultiHost.generic_path(root_disk_file, vm_number)
-
-    @staticmethod
-    def vfu_path(vfio_user_socket_path: str, vm_number: int) -> str:
-        return MultiHost.generic_path(vfio_user_socket_path, vm_number)
-
-    @staticmethod
-    def cloud_init(disk_path: str, vm_number: int) -> str:
-        init_disk = Path(disk_path).resolve()
-        init_disk = init_disk.parent / f"cloud-init/vm{vm_number}.img"
-        return str(init_disk)
-
-    @staticmethod
-    def iface_name(tap_name: str, vm_number: int):
-        """
-        kernel interface name
-        """
-        if vm_number == 0: return tap_name
-        max_len = 15
-        length = max_len - len("-999")
-        if vm_number == -1: return f"{tap_name[:length]}-"
-        return f"{tap_name[:length]}-{vm_number}"
-
-
-    @staticmethod
-    def enumerate(enumeratable: str, vm_number: int) -> str:
-        if vm_number == 0: return enumeratable
-        return f"{enumeratable}-vm{vm_number}"
 
 
 @dataclass
@@ -847,6 +770,7 @@ class Server(ABC):
             return
 
         # bind test interface to DPDK
+        self.exec(f'sudo modprobe {self.test_iface_dpdk_driv}')
         self.bind_device(self.test_iface_addr, self.test_iface_dpdk_driv)
 
         # get the test interface id
@@ -1158,6 +1082,27 @@ class Server(ABC):
         self.tmux_kill("ycsb")
 
 
+    def start_fastclick(self, program: str, outfile: str, script_args: dict = dict()):
+        """
+        program: path to .click file relative to project root
+        outfile: path to remote log file
+        script_args: arguements to override click scripts define() directive variables
+        """
+        project_root = f"{self.moonprogs_dir}/../../"
+        fastclick_bin = f"{project_root}/fastclick/bin/click"
+        fastclick_program = f"{project_root}{program}"
+        args = ' '.join([f'{key}={value}' for key, value in script_args.items()])
+        self.tmux_new('fastclick', f'{fastclick_bin} --dpdk \'-l 0\' -- {fastclick_program} {args} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
+
+
+    def stop_fastclick(self):
+        self.exec("pkill click")
+
+
+    def kill_fastclick(self):
+        self.tmux_kill("fastclick")
+
+
     def upload_moonprogs(self: 'Server', source_dir: str):
         """
         Upload the MoonGen programs to the server.
@@ -1174,17 +1119,22 @@ class Server(ABC):
         for file in listdir(source_dir):
             self.copy_to(path_join(source_dir, file), self.moonprogs_dir)
 
-    def modprobe_test_iface_drivers(self):
+    def modprobe_test_iface_drivers(self, interface: Optional[Interface] = None):
         """
         Modprobe the test interface drivers.
 
         Parameters
         ----------
+        interface: may be given e.g. for guests that have NICs diverging from what is set in the config
 
         Returns
         -------
         """
-        self.exec(f'sudo modprobe {self.test_iface_driv}')
+        if interface is None:
+            self.exec(f'sudo modprobe {self.test_iface_driv}')
+        else:
+            self.exec(f'sudo modprobe {interface.guest_driver()}')
+
 
     def update_extra_hosts(self, extra_hosts: str):
         self.write(extra_hosts, "/tmp/extra_hosts")
@@ -1571,10 +1521,11 @@ class Host(Server):
                   debug_qemu: bool = False,
                   ioregionfd: bool = False,
                   qemu_build_dir: str = None,
-                  vhost: bool = True,
+                  vhost: bool = False,
                   rx_queue_size: int = 256,
                   tx_queue_size: int = 256,
                   vm_number: int = 0,
+                  extkern: Optional[str] = None,
                   ) -> None:
         # TODO this function should get a Guest object as argument
         """
@@ -1610,6 +1561,9 @@ class Host(Server):
             Size of the transmit queue for the test interface.
         vm_number: int
             If not set to 0, will start VM in a way that other VMs with different vm_number can be started at the same time.
+        extkern: Optional[str]
+            If not None, another root_disk will be booted with an external kernel which allows us to append str to the kernel command line.
+
 
         Returns
         -------
@@ -1647,13 +1601,16 @@ class Host(Server):
         # Build test network parameters
 
         test_net_config = ''
-        if net_type == Interface.BRIDGE:
+        if net_type == Interface.BRIDGE or net_type == Interface.BRIDGE_VHOST:
             if BRIDGE_QUEUES == 0:
                 queues = ""
                 multi_queue = ""
             else:
                 queues = f",queues={BRIDGE_QUEUES}"
                 multi_queue = ",mq=on"
+            if net_type == Interface.BRIDGE_VHOST:
+                vhost = True
+
             test_net_config = (
                 f" -netdev tap,vhost={'on' if vhost else 'off'}," +
                 f'id=test0,ifname={MultiHost.iface_name(self.test_tap, vm_number)},script=no,' +
@@ -1703,6 +1660,13 @@ class Host(Server):
         memory_backend = f' -object memory-backend-file,mem-path={memory_path},prealloc=yes,id=bm,size={mem}M,share=on'
 
         # Actually start qemu in tmux
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        extkern_options = ""
+        if extkern is not None:
+            extkern_options = ("" +
+                f' -kernel {project_root}/nix/results/test-guest-kernel/bzImage' +
+                f' -initrd {project_root}/nix/results/test-guest-initrd/initrd' +
+                f' -append \\"root=/dev/vda console=ttyS0 init=/init $(cat {project_root}/nix/results/test-guest-kernelParams) {extkern}\\"')
 
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
@@ -1717,6 +1681,9 @@ class Host(Server):
             f' -m {mem}' +
             memory_backend +
             ' -numa node,memdev=bm' +
+
+            # optionally a linux kernel
+            extkern_options +
 
             ' -display none' + # avoid opening all the vnc ports
             ' -enable-kvm' +
@@ -1776,12 +1743,14 @@ class Host(Server):
         vmux_socket = f"{self.vmux_socket_path}"
         if interface.is_passthrough():
             args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
-        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810 ]:
+        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]:
             dpdk_args += " -u -- -l 1 -n 1"
         if interface.guest_driver() == "ice":
             vmux_mode = "emulation"
         elif interface.guest_driver() == "e1000":
             vmux_mode = "e1000-emu"
+        if interface == Interface.VMUX_MED:
+            vmux_mode = "mediation"
         if not interface.is_passthrough():
             if num_vms == 0:
                 args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'
@@ -1960,6 +1929,7 @@ class Guest(Server):
         """
         # sometimes the VM needs a bit of extra time until it can assign an IP
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
+        self.exec(f'sudo ip link set {self.test_iface} up')
 
 
     def start_iperf_server(self, server_hostname: str):
@@ -2066,8 +2036,10 @@ class LoadGen(Server):
                             rate: int = 10000,
                             runtime: int = 60,
                             size: int = 60,
-                            histfile: str = 'histogram.csv',
-                            outfile: str = 'output.log'
+                            nr_macs: int = 0,
+                            histfile: str = '/tmp/histogram.csv',
+                            statsfile: str = '/tmp/throughput.csv',
+                            outfile: str = '/tmp/output.log'
                             ):
         """
         Run the MoonGen L2 load latency test.
@@ -2084,8 +2056,10 @@ class LoadGen(Server):
             The size of the packets in bytes.
         histfile : str
             The path of the histogram file.
+        statsfile: str
+            The path of the csv file with a throughput time series.
         outfile : str
-            The path of the output file.
+            The path of the log output file.
 
         Returns
         -------
@@ -2101,6 +2075,7 @@ class LoadGen(Server):
                       'sudo bin/MoonGen '
                       f'{server.moonprogs_dir}/l2-load-latency.lua ' +
                       f'-r {rate} -f {histfile} -T {runtime} -s {size} ' +
+                      f' -c {statsfile} -m {nr_macs} ' +
                       f'{server._test_iface_id} {mac} ' +
                       f'2>&1 | tee {outfile}')
 
