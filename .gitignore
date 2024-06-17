@@ -3,6 +3,7 @@ result
 VMs/*
 __pycache__/
 outputs*/
+out*/
 out_*/
 nix/results/
 .cache/
