@@ -24,6 +24,9 @@ class YcsbTest(AbstractBenchTest):
     def output_path_per_vm(self, repetition: int, vm_number: int) -> str:
         return str(Path(G.OUT_DIR) / f"ycsbVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
+    def output_path_dataframe(self, repetition: int) -> str:
+        return self.output_filepath(repetition, extension="csv")
+
     def estimated_runtime(self) -> float:
         """
         estimate time needed to run this benchmark excluding boottime in seconds
@@ -149,7 +152,15 @@ class Ycsb():
                     summary = test.summarize(repetition).to_string()
                 except Exception as e:
                     summary = str(e)
-                file.write(summary) 
+                file.write(summary)
+            local_csv_file = test.output_path_dataframe(repetition)
+            with open(local_csv_file, 'w') as file:
+                try:
+                    raw_data = test.parse_results(repetition).to_csv()
+                except Exception as e:
+                    raw_data = str(e)
+                file.write(raw_data)
+
 
         loadgen.stop_redis()
         pass
