@@ -100,7 +100,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_DPDK_E810,
           Interface.VMUX_MED
           ]
-    directions = [ "forward" ]
+    directions = [ "forward", "backward" ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
     repetitions = 3
     DURATION_S = 61 if not G.BRIEF else 11

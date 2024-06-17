@@ -160,17 +160,21 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
     global DURATION_S
 
-    interfaces = [ Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.BRIDGE_E1000, Interface.BRIDGE ]
+    interfaces = [
+        Interface.VMUX_EMU,
+        # Interface.VMUX_DPDK, # multi-vm broken right now
+        Interface.BRIDGE_E1000,
+        Interface.BRIDGE ]
     rpsList = [ 10, 100, 500, 1000, 5000, 10000, 50000, 1000000 ]
     vm_nums = [ 1, 2, 4 ]
     repetitions = 3
-        # interfaces = [ Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_DPDK ]
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
+        interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
         rpsList = [ 10 ]
         repetitions = 1
-        vm_nums = [ 4 ]
+        vm_nums = [ 1 ]
 
     # test = YcsbTest(
     #         repetitions=1,
