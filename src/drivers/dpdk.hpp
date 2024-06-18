@@ -322,6 +322,7 @@ private:
 	std::vector<bool> mediate; // per VM
 
 
+	// get queue id of native queue
 	uint16_t get_queue_id(int vm, int queue) {
 		return vm * this->max_queues_per_vm + queue;
 	}
@@ -405,7 +406,8 @@ public:
 		for (int queue_nb = 0; queue_nb < num_vms; queue_nb++) {
 			memcpy(&dest_mac, mac_addr, 6);
 			Util::intcrement_mac((uint8_t*)&dest_mac, queue_nb);
-			flow = generate_eth_flow(port_id, queue_nb,
+			// send all VM traffic to the first queue of each VM by default
+			flow = generate_eth_flow(port_id, this->get_queue_id(queue_nb, 0),
 						&src_mac, &src_mask,
 						&dest_mac, &dest_mask, &error);
 			/* >8 End of create flow and the flow rule. */
