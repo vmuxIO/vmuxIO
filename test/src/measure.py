@@ -298,7 +298,7 @@ class AbstractBenchTest(ABC):
         return False
 
     @classmethod
-    def list_tests(cls, test_matrix: Dict[str, List[Any]]) -> List[Any]:
+    def list_tests(cls, test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> List[Any]:
         """
         test_matrix:
         dict where every key corresponds to a constructor parameter/field for this cls/BenchTest (same list as test_parameters() returns).
@@ -307,15 +307,16 @@ class AbstractBenchTest(ABC):
         ret = []
         for test_args in product_dict(test_matrix):
             test = cls(**test_args)
-            ret += [ test ]
+            if not exclude_test(test):
+                ret += [ test ]
         return ret
 
     @classmethod
-    def any_needed(cls, test_matrix: Dict[str, List[Any]]) -> bool:
+    def any_needed(cls, test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> bool:
         """
         Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
         """
-        for test in cls.list_tests(test_matrix):
+        for test in cls.list_tests(test_matrix, exclude_test=exclude_test):
             if test.needed():
                 debug(f"any_needed: needs {test}")
                 return True
@@ -349,6 +350,7 @@ class AbstractBenchTest(ABC):
         needed = 0
         needed_s = 0.0
         unknown_runtime = False
+        # TODO use list_tests here and incorporate exclude_test
         for test_args in product_dict(test_matrix):
             test = cls(**test_args)
             total += 1

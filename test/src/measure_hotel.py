@@ -222,7 +222,14 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
     global DURATION_S
 
-    interfaces = [ Interface.VMUX_EMU, Interface.BRIDGE_E1000, Interface.BRIDGE ]
+    interfaces = [
+        Interface.VMUX_EMU,
+        # Interface.VMUX_DPDK, # multi-vm broken right now
+        Interface.BRIDGE_E1000,
+        Interface.BRIDGE,
+        Interface.BRIDGE_VHOST,
+        # Interface.VMUX_DPDK_E810,
+        ]
     rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
     repetitions = 4
