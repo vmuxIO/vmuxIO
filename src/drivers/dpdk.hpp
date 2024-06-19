@@ -24,7 +24,7 @@
 #define RX_RING_SIZE 1024
 #define TX_RING_SIZE 1024
 
-#define NUM_MBUFS 8191
+#define NUM_MBUFS 256 // queue size
 #define MBUF_CACHE_SIZE 250
 #define BURST_SIZE 32
 
@@ -110,7 +110,7 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 
 	/* Configuring number of RX and TX queues connected to single port. 8< */
 	for (i = 0; i < nr_queues; i++) {
-		ret = rte_eth_rx_queue_setup(port_id, i, 512,
+		ret = rte_eth_rx_queue_setup(port_id, i, NUM_MBUFS,
 				     rte_eth_dev_socket_id(port_id),
 				     &rxq_conf,
 				     mbuf_pool);
@@ -125,7 +125,7 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 	txq_conf.offloads = port_conf.txmode.offloads;
 
 	for (i = 0; i < nr_queues; i++) {
-		ret = rte_eth_tx_queue_setup(port_id, i, 512,
+		ret = rte_eth_tx_queue_setup(port_id, i, NUM_MBUFS,
 				rte_eth_dev_socket_id(port_id),
 				&txq_conf);
 		if (ret < 0) {
@@ -357,7 +357,9 @@ public:
 		/* Creates a new mempool in memory to hold the mbufs. */
 
 		/* Allocates mempool to hold the mbufs. 8< */
-		mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", NUM_MBUFS * nb_ports,
+		size_t rx_buffers = NUM_MBUFS * nb_ports * num_vms * this->max_queues_per_vm;
+		size_t tx_buffers = rx_buffers;
+		mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", rx_buffers + tx_buffers ,
 			MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
 		this->mbuf_pool = mbuf_pool;
 		/* >8 End of allocating mempool to hold mbuf. */
@@ -459,6 +461,7 @@ public:
 			struct rte_mbuf *pkt;
 			pkt = rte_pktmbuf_alloc(this->mbuf_pool);
 			if (pkt == NULL) {
+				printf("WARN: Dpdk::send: alloc failed\n");
 				return; // drop packet
 			}
 			pkt->data_len = len;
@@ -472,6 +475,8 @@ public:
 			if (nb_tx != 1) {
 				printf("\nWARNING: Sending packet failed. \n");
 			}
+			if_log_level(LOG_DEBUG, printf("send: "));
+			if_log_level(LOG_DEBUG, Util::dump_pkt((void*)buf, len));
 
 			/* Free packets. */
 			rte_pktmbuf_free(pkt);
@@ -515,7 +520,7 @@ public:
 					// make the behavioral model emulate the switching
 					this->rxBuf_queue[i] = {};
 				}
-				if_log_level(LOG_DEBUG, printf("queue %d: ", queue_id));
+				if_log_level(LOG_DEBUG, printf("recv queue %d: ", queue_id));
 				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
 			}
 			this->nb_bufs_used += nb_rx;
