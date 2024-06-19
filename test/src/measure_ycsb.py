@@ -164,7 +164,10 @@ class Ycsb():
 
         loadgen.stop_redis()
         pass
-        
+
+
+def exclude_test(test: YcsbTest) -> bool:
+    return Interface(test.interface).is_passthrough() and test.num_vms > 1
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
@@ -172,16 +175,23 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     global DURATION_S
 
     interfaces = [
+        Interface.VFIO,
+        Interface.VMUX_PT,
         Interface.VMUX_EMU,
         # Interface.VMUX_DPDK, # multi-vm broken right now
         Interface.BRIDGE_E1000,
-        Interface.BRIDGE ]
-    rpsList = [ 10, 100, 500, 1000, 5000, 10000, 50000, 1000000 ]
-    vm_nums = [ 1, 2, 4 ]
-    repetitions = 3
+        Interface.BRIDGE,
+        Interface.BRIDGE_VHOST,
+        Interface.VMUX_DPDK_E810,
+        ]
+    rpsList = [ 10, 1000 ]
+    vm_nums = [ 1, 2, 4, 8 , 16, 32 ]
+    repetitions = 2
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.BRIDGE_E1000 ]
+        interfaces = [ Interface.VMUX_DPDK_E810 ]
+        # interfaces = [ Interface.VFIO ]
         # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
         rpsList = [ 10 ]
         repetitions = 1
@@ -223,7 +233,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 repetitions=[ repetitions ],
                 num_vms=[ num_vms ]
                 )
-            if not YcsbTest.any_needed(test_matrix):
+            if not YcsbTest.any_needed(test_matrix, exclude_test=exclude_test):
                 warning(f"Skipping num_vms {num_vms}: All measurements done already.")
                 continue
 
