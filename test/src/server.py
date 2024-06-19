@@ -1059,6 +1059,7 @@ class Server(ABC):
 
     def start_ycsb(self, fqdn: str, rate: int = 100, runtime: int = 8, threads: int = 8, outfile: str = "/tmp/outfile.log", load: bool = False):
         """
+        rate: target requests rate per second. -1 to request at max rate
         runtime: in secs
         load: load test data instead of running a test. Ignores many arguments.
         """
@@ -1068,9 +1069,15 @@ class Server(ABC):
         ycsb_path = f"{self.moonprogs_dir}/../../ycsb"
         workloads_path = f"{ycsb_path}/share/workloads"
         if not load:
-            ops = rate * runtime
-            core_properties = f"-p operationcount={ops}"
-            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 {core_properties} -threads {threads} -target {rate}'
+            ops = 429496729 # MAX_INT
+            core_properties = f"-p operationcount={ops}" \
+                    f" -p maxexecutiontime={runtime}"
+            if rate is None:
+                target_rate = f"-target {rate}"
+            else:
+                target_rate = ""
+
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 {core_properties} -threads {threads} {target_rate}'
         else:
             ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped load redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 -threads {threads}'
         self.tmux_new('ycsb', f'{ycsb_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
