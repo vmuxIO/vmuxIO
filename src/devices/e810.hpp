@@ -5,6 +5,7 @@
 #include "libsimbricks/simbricks/nicbm/nicbm.h"
 #include "libvfio-user.h"
 #include "sims/nic/e810_bm/e810_bm.h"
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/devices/vmux-device.hpp"
 #include "util.hpp"
 #include "vfio-consumer.hpp"
@@ -143,7 +144,7 @@ public:
     this->model->SetupIntro(this->deviceIntro);
   }
 
-struct timespec read_global_time() {
+i40e::e810_timestamp_t read_global_time() {
   struct timespec ts;
 
   if(this->driver->readCurrentTimestamp(&ts)) {
@@ -151,12 +152,13 @@ struct timespec read_global_time() {
     // fallback
     if(!clock_gettime(CLOCK_MONOTONIC, &ts)) {
       printf("Error: Could not get unix timestamp!\n");
-      return {0, 0};
+      return { .value=0};
     }
   }
   
   printf("Debug: Read Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
-  return ts;
+  uint64_t nanos = TIMESPEC_TO_NANOS(ts);
+  return { .time = nanos, .time_0 = 0};
 }
 
 
@@ -165,7 +167,7 @@ struct timespec read_rx_timestamp(uint16_t portid) {
 
   if(this->driver->readRxTimestamp(portid, &ts)) {
     // fallback
-    return read_global_time();
+    return ts;
   }
 
   printf("Debug: Read RX Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
@@ -178,7 +180,7 @@ struct timespec read_tx_timestamp(uint16_t portid) {
   if(this->driver->readTxTimestamp(portid, &ts)) {
     
     // fallback
-    return read_global_time();
+    return ts;
   }
   
   printf("Debug: Read TX Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);

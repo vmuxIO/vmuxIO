@@ -426,7 +426,7 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
     return;
   }
 
-  gltsyn_ts_t timestamp = { .value=0 };
+  e810_timestamp_t timestamp = { .value=0 };
 
   if (ptp_should_sample_rx(data, pktlen)) {
     if (!PTP_GLTSYN_SEM_BUSY(dev.regs.REG_PFTSYN_SEM)) {
@@ -468,7 +468,7 @@ void lan_queue_rx::rx_desc_ctx::process() {
 }
 
 void lan_queue_rx::rx_desc_ctx::packet_received(const void *data, size_t pktlen,
-                                                gltsyn_ts_t timestamp, bool last) {
+                                                e810_timestamp_t timestamp, bool last) {
   union ice_32byte_rx_desc *rxd =
       reinterpret_cast<union ice_32byte_rx_desc *>(desc);
   union ice_32b_rx_flex_desc *flex_rxd =

@@ -1,24 +1,27 @@
 #pragma once
 
 #include <stdint.h>
+#include "sims/nic/e810_bm/util.h"
 
 namespace i40e {
 
-
 typedef union {
+ 
  struct {
   uint8_t resv[4];
   uint64_t time;
   uint32_t time_0;
  };
+
  struct {
   uint8_t resv2[11];
   uint16_t ts_h_1;
   uint16_t ts_h_0;
   uint8_t ts_l;
- };
+ }; 
  __int128 value;
-}__attribute__((packed)) gltsyn_ts_t;
+
+} __attribute__((packed)) e810_timestamp_t;
 
 
 #define PTP_GLTSYN_ENA(i) ((i) & 1)
@@ -67,7 +70,7 @@ typedef union {
 #define CAP_1588_FLAGS ((uint32_t) CAP_PF_TIMER_0_OWNED | CAP_PF_TIMER_0_ENA | CAP_PF_TIMESYNC_ENA | CAP_PF_LL_TX_SUPPORTED | \
                         CAP_GPIO_TIME_SYNC )
 
-
+#define TIMESPEC_TO_NANOS(ts) ((uint64_t) (ts.tv_sec) * 1'000'000'000ULL) + (ts.tv_nsec);
 
 class e810_bm;
 
@@ -78,8 +81,8 @@ class ptpmgr {
   e810_bm &dev;
 
   uint64_t last_updated;
-  gltsyn_ts_t last_val;
-  gltsyn_ts_t offset;
+  e810_timestamp_t last_val;
+  e810_timestamp_t offset;
   uint64_t inc_val;
   bool adj_neg;
   uint64_t adj_val;
@@ -87,11 +90,11 @@ class ptpmgr {
  public:
   ptpmgr(e810_bm &dev);
 
-  gltsyn_ts_t update_clock();
+  e810_timestamp_t update_clock();
 
-  gltsyn_ts_t phc_read();
+  e810_timestamp_t phc_read();
 
-  void phc_write(gltsyn_ts_t val);
+  void phc_write(e810_timestamp_t val);
 
   uint64_t adj_get();
 
