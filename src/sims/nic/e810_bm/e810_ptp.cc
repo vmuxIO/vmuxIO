@@ -9,7 +9,7 @@
 #include "sims/nic/e810_bm/e810_bm.h"
 
 
-namespace i40e {
+namespace e810 {
 
 ptpmgr::ptpmgr(e810_bm &dev_)
   : dev(dev_), last_updated(0), last_val({ .value=0 }), offset({ .value=0 }), inc_val( 0x100000000 ),

@@ -38,11 +38,11 @@
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/util.h"
 
-namespace i40e {
+namespace e810 {
 
 
 e810_bm::e810_bm()
-    : log("i40e", runner_),
+    : log("e810", runner_),
       pf_atq(*this, regs.pf_atqba, regs.pf_atqlen, regs.pf_atqh, regs.pf_atqt),
       pf_mbx_atq(*this, regs.pf_mbx_atqba, regs.pf_mbx_atqlen, regs.pf_mbx_atqh, regs.pf_mbx_atqt),
       hmc(*this),
@@ -1299,12 +1299,12 @@ int_ev::int_ev() {
   time_ = 0;
 }
 
-}  // namespace i40e
+}  // namespace e810
 
 class i40e_factory : public nicbm::MultiNicRunner::DeviceFactory {
   public:
     virtual nicbm::Runner::Device &create() override {
-      return *new i40e::e810_bm;
+      return *new e810::e810_bm;
     }
 };
 

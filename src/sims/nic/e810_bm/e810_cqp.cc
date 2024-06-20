@@ -8,7 +8,7 @@ using namespace std;
 #include "sims/nic/e810_bm/e810_bm.h"
 
 #include <bits/stdc++.h>
-namespace i40e {
+namespace e810 {
 
 control_queue_pair::control_queue_pair(e810_bm &dev_, uint32_t &reg_high_,
                                uint32_t &reg_low_, uint32_t &reg_head_,
@@ -162,7 +162,7 @@ void control_queue_pair::trigger_process() {
 
 control_queue_pair::admin_desc_ctx::admin_desc_ctx(control_queue_pair &queue_,
                                                e810_bm &dev_)
-    : i40e::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
+    : e810::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
   d = reinterpret_cast<__le64 *>(desc);
 }
 
@@ -532,4 +532,4 @@ void control_queue_pair::dma_data_wb::done() {
   delete this;
 }
 
-}  // namespace i40e
+}  // namespace e810

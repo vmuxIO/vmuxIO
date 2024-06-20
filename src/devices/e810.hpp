@@ -55,7 +55,7 @@ private:
   }
 
 public:
-  std::shared_ptr<i40e::e810_bm> model;
+  std::shared_ptr<e810::e810_bm> model;
 
   E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(device_id, driver) {
     this->driver = driver;
@@ -68,8 +68,8 @@ public:
     }
 
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
-    // i40e::i40e_bm* model = new i40e::i40e_bm();
-    this->model = std::make_shared<i40e::e810_bm>();
+    // e810::e810_bm* model = new e810::e810_bm();
+    this->model = std::make_shared<e810::e810_bm>();
 
     this->init_pci_ids();
     this->registerDriverEpoll(driver, efd);
@@ -144,7 +144,7 @@ public:
     this->model->SetupIntro(this->deviceIntro);
   }
 
-i40e::e810_timestamp_t read_global_time() {
+e810::e810_timestamp_t read_global_time() {
   struct timespec ts;
 
   if(this->driver->readCurrentTimestamp(&ts)) {

@@ -15,7 +15,7 @@
 
 #include "sims/nic/e810_bm/e810_bm.h"
 
-namespace i40e {
+namespace e810 {
 
 /* from dpdk/lib/librte_net/rte_tcp.h */
 struct rte_tcp_hdr {
@@ -161,4 +161,4 @@ void tso_postupdate_header(void *iphdr, uint8_t iplen, uint8_t l4len,
   ih->packet_id = htons(ntohs(ih->packet_id) + 1);
 }
 
-}  // namespace i40e
+}  // namespace e810

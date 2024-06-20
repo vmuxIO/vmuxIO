@@ -9,7 +9,7 @@ using namespace std;
 #include "sims/nic/e810_bm/e810_bm.h"
 #include "sims/nic/e810_bm/headers.h"
 
-namespace i40e {
+namespace e810 {
 
 bool e810_switch::add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
   uint32_t action_type = (add_sw_rules->pdata.lkup_tx_rx.act & ICE_SINGLE_ACT_TYPE_M) >> ICE_SINGLE_ACT_TYPE_S;

@@ -47,9 +47,9 @@ extern "C" {
 // #define DEBUG_NICBM
 
 struct ice_aq_desc;
-struct i40e_tx_desc;
+struct e810_tx_desc;
 
-namespace i40e {
+namespace e810 {
 
 class e810_bm;
 class lan;
@@ -808,7 +808,7 @@ class e810_bm : public nicbm::Runner::Device {
   static const uint16_t NUM_FD_BEST_EFFORT = 8192;
   
 
-  struct i40e_regs {
+  struct e810_regs {
     uint32_t glgen_rstctl;
     uint32_t glgen_stat;
     uint32_t gllan_rctl_0;
@@ -1010,7 +1010,7 @@ class e810_bm : public nicbm::Runner::Device {
 
  protected:
   logger log;
-  i40e_regs regs;
+  e810_regs regs;
   queue_admin_tx pf_atq;
   queue_admin_tx pf_mbx_atq;
   host_mem_cache hmc;
@@ -1065,4 +1065,4 @@ void xsum_tcpip_tso(void *iphdr, uint8_t iplen, uint8_t l4len, uint16_t paylen);
 void tso_postupdate_header(void *iphdr, uint8_t iplen, uint8_t l4len,
                            uint16_t paylen);
 
-}  // namespace i40e
+}  // namespace e810
