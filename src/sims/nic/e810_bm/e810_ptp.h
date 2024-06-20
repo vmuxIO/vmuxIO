@@ -23,6 +23,7 @@ typedef union {
 
 } __attribute__((packed)) e810_timestamp_t;
 
+#define E810_TIMESTAMP_MASK (((__int128)0xFFFF'FFFF << 64) | 0xFFFF'FFFF'FFFF'FFFF) // lower 96 bits
 
 #define PTP_GLTSYN_ENA(i) ((i) & 1)
 #define PTP_GLTSYN_GET_CMD(i) ((i) & 0xff)
@@ -60,8 +61,6 @@ typedef union {
 #define CAP_PF_TIMER_0_OWNED (0b1 << 3)
 #define CAP_PF_TIMER_1_OWNED (0b1 << 7)
 
-
-
 #define CAP_PF_TIMESYNC_ENA (1 << 24)
 #define CAP_PF_TIMER_0_ENA (1 << 25)
 #define CAP_PF_TIMER_1_ENA (1 << 26)
@@ -70,7 +69,7 @@ typedef union {
 #define CAP_1588_FLAGS ((uint32_t) CAP_PF_TIMER_0_OWNED | CAP_PF_TIMER_0_ENA | CAP_PF_TIMESYNC_ENA | CAP_PF_LL_TX_SUPPORTED | \
                         CAP_GPIO_TIME_SYNC )
 
-#define TIMESPEC_TO_NANOS(ts) ((uint64_t) (ts.tv_sec) * 1'000'000'000ULL) + (ts.tv_nsec);
+#define TIMESPEC_TO_NANOS(ts) ((uint64_t) (ts.tv_sec) * 1'000'000'000ULL) + (ts.tv_nsec)
 
 class e810_bm;
 
@@ -84,25 +83,23 @@ class ptpmgr {
   e810_timestamp_t last_val;
   e810_timestamp_t offset;
   uint64_t inc_val;
-  bool adj_neg;
-  uint64_t adj_val;
 
  public:
   ptpmgr(e810_bm &dev);
 
-  e810_timestamp_t update_clock();
-
   e810_timestamp_t phc_read();
+  
+  e810_timestamp_t phc_sample_rx(uint16_t portid);
+  
+  e810_timestamp_t phc_sample_tx(uint16_t portid);
 
   void phc_write(e810_timestamp_t val);
 
-  uint64_t adj_get();
+  void adjust(int64_t val);
 
-  void adj_set(uint64_t val);
-
-  void inc_set(uint64_t inc);
+  void set_incval(uint64_t inc);
   
-  uint64_t inc_get();
+  uint64_t get_incval();
 };
 
 

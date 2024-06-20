@@ -585,17 +585,14 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case GLGEN_RSTAT:
         val = 0;
         break;
-      // e810
 
-      case PF_SB_ATQBAL: {
+      case PF_SB_ATQBAL: 
         val = regs.REG_PF_SB_ATQBAL; break;
-      }
 
-      case PF_SB_ATQBAH: {
+      case PF_SB_ATQBAH:
         val = regs.REG_PF_SB_ATQBAH; break;
-      }
 
-      // timesync (PTP)      
+      // PTP      
       case PTP_GLTSYN_CMD:
         val = regs.REG_GLTSYN_CMD; break;
       
@@ -612,13 +609,13 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
         val = regs.REG_PFTSYN_SEM; break;
 
       case PTP_GLTSYN_ENA(0):
-       val = regs.REG_GLTSYN_ENA[0];
+        val = regs.REG_GLTSYN_ENA[0];
       
       case PTP_GLTSYN_ENA(1):
-       val = regs.REG_GLTSYN_ENA[1];
+        val = regs.REG_GLTSYN_ENA[1];
 
       CASE_6(PTP_GLTSYN_TIME, 0, {
-        e810_timestamp_t ts = this->ReadCurrentTimestamp();
+        e810_timestamp_t ts = ptp.phc_read();
 
         if (INDEX == 0 || INDEX == 1) {
             val = ts.time_0;
@@ -632,23 +629,11 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       })
 
       CASE_6(PTP_GLTSYN_SHTIME, 0, {
-        e810_timestamp_t timestamp = ptp.phc_read();
-        val = (uint32_t) (timestamp.value >> (32 * (INDEX / 2))) & (__int128) 0xffffffff;
-
-      })
-
-      CASE_4(PTP_GLTSYN_SHADJ, 0, {
-
-        if (INDEX < 2) {
-          // lower register
-          val = (uint32_t) (ptp.adj_get() & 0xffffffff);
-        } else {
-          val = (uint32_t) (ptp.adj_get() >> 32);
-        }
+        val = regs.REG_GLTSYN_SHTIME[INDEX];
       })
 
       case PTP_GLTSYN_INCVAL(0):
-        val = (uint32_t) ptp.inc_get(); break;
+        val = (uint32_t) ptp.get_incval(); break;
 
       default:
 
@@ -1024,10 +1009,10 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
           
           uint32_t reg_index = PTP_ATQBAL_REG_INDEX(val);  
           // write timestamp back to AQTBA registers
-          struct timespec ts = (dynamic_pointer_cast<E810EmulatedDevice>(this->vmux->device))->read_tx_timestamp(0);
+          e810_timestamp_t ts = ptp.phc_sample_tx(reg_index);
 
-          regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, ts.tv_nsec);
-          regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(ts.tv_nsec);
+          regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, ts.time);
+          regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(ts.time);
         }
 
         break;
@@ -1035,7 +1020,7 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
       case PF_SB_ATQBAH: {
         // there is no documentation about what writing to this register is supposed to do but it's marked as RW
-        DEBUG_LOG_PTP("Tried to write PF_SB_ATQBAH"); 
+        DEBUG_LOG_PTP("Warning: Tried to write PF_SB_ATQBAH"); 
         regs.REG_PF_SB_ATQBAH = val;
         break;
       }
@@ -1070,11 +1055,11 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
                   regs.REG_GLTSYN_INCVAL[i] = regs.REG_GLTSYN_SHADJ[i];
                 
                 uint64_t new_incval = (uint64_t) regs.REG_GLTSYN_SHADJ[0] | ((uint64_t) regs.REG_GLTSYN_SHADJ[1] << 32);
-                ptp.inc_set(new_incval);
+                ptp.set_incval(new_incval);
 
                 uint64_t adj = ((uint64_t) regs.REG_GLTSYN_SHADJ[2 * sel_master] << 32)
                   | regs.REG_GLTSYN_SHADJ[2 * sel_master + 1];
-                ptp.adj_set(adj);
+                ptp.adjust(adj);
                 break;
               }
 
@@ -1082,7 +1067,7 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
                 uint64_t adj = ((uint64_t) regs.REG_GLTSYN_SHADJ[2 * sel_master] << 32)
                   | regs.REG_GLTSYN_SHADJ[2 * sel_master + 1];
-                ptp.adj_set(adj);
+                ptp.adjust(adj);
                 break;
               }
               
@@ -1128,10 +1113,6 @@ void e810_bm::Timed(nicbm::TimedEvent &ev) {
   } else {
     runner_->MsiIssue(0);
   }
-}
-
-e810_timestamp_t e810_bm::ReadCurrentTimestamp() {
-  return (dynamic_pointer_cast<E810EmulatedDevice>(this->vmux->device))->read_global_time();
 }
 
 /*

@@ -43,9 +43,9 @@ public:
   virtual void recv_consumed(int vm_id) = 0;
   
   // ptp
-  virtual int readCurrentTimestamp(struct timespec *ts) { return -1; };
-  virtual int readTxTimestamp(uint16_t portid, struct timespec *ts) { return -1; };
-  virtual int readRxTimestamp(uint16_t portid, struct timespec *ts) { return -1; };
+  virtual struct timespec readCurrentTimestamp() {           return { .tv_sec=0, .tv_nsec=0 }; };
+  virtual struct timespec readTxTimestamp(uint16_t portid) { return { .tv_sec=0, .tv_nsec=0 }; };
+  virtual struct timespec readRxTimestamp(uint16_t portid) { return { .tv_sec=0, .tv_nsec=0 }; };
 
   // return false if rule cant be allocated
   virtual bool add_switch_rule(int vm_id, uint8_t mac_addr[6], uint16_t dst_queue) {

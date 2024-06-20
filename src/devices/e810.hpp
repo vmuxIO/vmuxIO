@@ -144,48 +144,6 @@ public:
     this->model->SetupIntro(this->deviceIntro);
   }
 
-e810::e810_timestamp_t read_global_time() {
-  struct timespec ts;
-
-  if(this->driver->readCurrentTimestamp(&ts)) {
-    
-    // fallback
-    if(!clock_gettime(CLOCK_MONOTONIC, &ts)) {
-      printf("Error: Could not get unix timestamp!\n");
-      return { .value=0};
-    }
-  }
-  
-  printf("Debug: Read Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
-  uint64_t nanos = TIMESPEC_TO_NANOS(ts);
-  return { .time = nanos, .time_0 = 0};
-}
-
-
-struct timespec read_rx_timestamp(uint16_t portid) {
-  struct timespec ts;
-
-  if(this->driver->readRxTimestamp(portid, &ts)) {
-    // fallback
-    return ts;
-  }
-
-  printf("Debug: Read RX Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
-  return ts;
-}
-
-struct timespec read_tx_timestamp(uint16_t portid) {
-  struct timespec ts;
-
-  if(this->driver->readTxTimestamp(portid, &ts)) {
-    
-    // fallback
-    return ts;
-  }
-  
-  printf("Debug: Read TX Ts: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
-  return ts;
-}
 
 private:
   void init_general_callbacks(VfioUserServer &vfu) {
