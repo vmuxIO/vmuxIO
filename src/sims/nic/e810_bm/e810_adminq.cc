@@ -35,7 +35,7 @@ using namespace std;
 #include <bits/stdc++.h>
 #include <algorithm>
 
-namespace i40e {
+namespace e810 {
 
 queue_admin_tx::queue_admin_tx(e810_bm &dev_, uint64_t &reg_base_,
                                uint32_t &reg_len_, uint32_t &reg_head_,
@@ -72,7 +72,7 @@ void queue_admin_tx::reg_updated() {
 
 queue_admin_tx::admin_desc_ctx::admin_desc_ctx(queue_admin_tx &queue_,
                                                e810_bm &dev_)
-    : i40e::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
+    : e810::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
   d = reinterpret_cast<struct ice_aq_desc *>(desc);
 }
 
@@ -290,7 +290,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
         reinterpret_cast<struct ice_aqc_get_sw_cfg *>(d->params.raw);
     struct ice_aqc_get_sw_cfg_resp_elem hr;
     /* Not sure why dpdk doesn't like this?
-    struct i40e_aqc_switch_config_element_resp els[] = {
+    struct e810_aqc_switch_config_element_resp els[] = {
         // EMC
         { I40E_AQ_SW_ELEM_TYPE_EMP, I40E_AQ_SW_ELEM_REV_1, 1, 513, 0, {},
             I40E_AQ_CONN_TYPE_REGULAR, 0, 0},
@@ -769,4 +769,4 @@ void queue_admin_tx::admin_desc_ctx::process() {
     desc_complete(0);
   }
 }
-}  // namespace i40e
+}  // namespace e810

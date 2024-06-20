@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include "sims/nic/e810_bm/util.h"
 
-namespace i40e {
+namespace e810 {
 
 typedef union {
  

@@ -26,7 +26,7 @@
 
 #include "src/sims/nic/e810_bm/e810_bm.h"
 
-namespace i40e {
+namespace e810 {
 
 logger::logger(const std::string &label_, nicbm::Runner *runner_) :
     label(label_), runner(runner_) {
@@ -84,4 +84,4 @@ logger &logger::operator<<(void *ptr) {
   ss << ptr;
   return *this;
 }
-}  // namespace i40e
+}  // namespace e810

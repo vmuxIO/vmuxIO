@@ -34,7 +34,7 @@
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
 
-namespace i40e {
+namespace e810 {
 
 lan::lan(e810_bm &dev_, size_t num_qs_)
     : dev(dev_), log("lan", dev_.runner_), rss_kc(dev_.regs.pfqf_hkey),
@@ -828,4 +828,4 @@ void lan_queue_tx::dma_hwb::done() {
   queue.trigger();
   delete this;
 }
-}  // namespace i40e
+}  // namespace e810

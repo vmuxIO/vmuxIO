@@ -56,12 +56,6 @@ typedef uint64_t __le64;
 #define E810_INTEL_VENDOR_ID		0x8086
 
 
-
-
-
-
-
-
 /* from i40e_types.h */
 
 /* Checksum and Shadow RAM pointers */
