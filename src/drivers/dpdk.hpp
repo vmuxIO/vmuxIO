@@ -560,31 +560,31 @@ public:
   }
   
   /* Get timestamp from NIC (global clock 0) */
-  int readCurrentTimestamp(struct timespec *ts) {
-    if(rte_eth_timesync_read_time(0, ts)) {
+  struct timespec readCurrentTimestamp() {
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+    if(rte_eth_timesync_read_time(0, &ts)) {
 		perror("Dpdk current time failed!");
-		return -1;
 	}
     
-	return 0;
+	return ts;
   }
 
-  int readTxTimestamp(uint16_t portid, struct timespec *ts) {
-	if(rte_eth_timesync_read_tx_timestamp(portid, ts)) {
+  struct timespec readTxTimestamp(uint16_t portid) {
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+	if(rte_eth_timesync_read_tx_timestamp(portid, &ts)) {
 		perror("Dpdk TX timestamp failed!");
-		return -1;
 	}
 
-	return 0;
+	return ts;
   };
   
-  int readRxTimestamp(uint16_t portid, struct timespec *ts) { 
-	if(rte_eth_timesync_read_rx_timestamp(portid, ts, 0)) {
+  struct timespec readRxTimestamp(uint16_t portid) { 
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+	if(rte_eth_timesync_read_rx_timestamp(portid, &ts, 0)) {
 		perror("Dpdk RX timestamp failed!");
-		return -1;
 	}
 
-	return 0;
+	return ts;
   };
 
 
