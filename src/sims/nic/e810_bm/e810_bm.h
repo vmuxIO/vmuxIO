@@ -668,7 +668,7 @@ class lan_queue_rx : public lan_queue_base {
    public:
     explicit rx_desc_ctx(lan_queue_rx &queue_);
     virtual void process();
-    void packet_received(const void *data, size_t len, gltsyn_ts_t timestamp, bool last);
+    void packet_received(const void *data, size_t len, e810_timestamp_t timestamp, bool last);
 
  };
 
@@ -1004,6 +1004,7 @@ class e810_bm : public nicbm::Runner::Device {
   void DmaComplete(nicbm::DMAOp &op) override;
   void EthRx(uint8_t port, std::optional<uint16_t> queue, const void *data, size_t len) override;
   void Timed(nicbm::TimedEvent &ev) override;
+  e810_timestamp_t ReadCurrentTimestamp();
 
   virtual void SignalInterrupt(uint16_t vector, uint8_t itr);
 

@@ -618,18 +618,21 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
        val = regs.REG_GLTSYN_ENA[1];
 
       CASE_6(PTP_GLTSYN_TIME, 0, {
-        struct timespec ts = (dynamic_pointer_cast<E810EmulatedDevice>(this->vmux->device))->read_global_time();
+        e810_timestamp_t ts = this->ReadCurrentTimestamp();
 
-        if (INDEX == 0)
-            val = (uint32_t) ts.tv_nsec;
-        else if (INDEX == 1)
-            val = (uint32_t) ((ts.tv_nsec >> 32) & 0xffffffff);
-        else 
-            val = (uint32_t) (ts.tv_sec & 0xffffffff);
+        if (INDEX == 0 || INDEX == 1) {
+            val = ts.time_0;
+            printf("Error: Tried to read internal TIME_0 register\n");
+
+        } else if (INDEX == 2 || INDEX == 3) {
+            val = (uint32_t) (ts.time & 0xffffffff);
+        } else  {
+            val = (uint32_t) ((ts.time >> 32) & 0xffffffff);
+        }
       })
 
       CASE_6(PTP_GLTSYN_SHTIME, 0, {
-        gltsyn_ts_t timestamp = ptp.phc_read();
+        e810_timestamp_t timestamp = ptp.phc_read();
         val = (uint32_t) (timestamp.value >> (32 * (INDEX / 2))) & (__int128) 0xffffffff;
 
       })
@@ -1055,7 +1058,7 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
             switch(cmd) {
               case PTP_GLTSYN_CMD_INIT_TIME_INCVAL: {
                 // only emulate timer 0
-                gltsyn_ts_t new_time = {
+                e810_timestamp_t new_time = {
                     .value = (__int128) regs.REG_GLTSYN_SHTIME[0]
                         | ((__int128) regs.REG_GLTSYN_SHTIME << 32) 
                         | ((__int128) regs.REG_GLTSYN_SHTIME << 64) 
@@ -1125,6 +1128,10 @@ void e810_bm::Timed(nicbm::TimedEvent &ev) {
   } else {
     runner_->MsiIssue(0);
   }
+}
+
+e810_timestamp_t e810_bm::ReadCurrentTimestamp() {
+  return (dynamic_pointer_cast<E810EmulatedDevice>(this->vmux->device))->read_global_time();
 }
 
 /*
