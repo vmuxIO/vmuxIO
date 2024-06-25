@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <format>
 #include <fcntl.h>
 #include <rte_mbuf_ptype.h>
 #include <rte_memcpy.h>
@@ -68,7 +69,7 @@ copy_buf_to_pkt(void *buf, unsigned len, struct rte_mbuf *pkt, unsigned offset)
 
 /* Port initialization used in flow filtering. 8< */
 static void
-filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mbuf_pool)
+filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mbuf_pool, std::vector<struct rte_mempool*> &tx_mbuf_pools)
 {
 	int ret;
 	uint16_t i;
@@ -124,7 +125,16 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 	txq_conf = dev_info.default_txconf;
 	txq_conf.offloads = port_conf.txmode.offloads;
 
+	struct rte_mempool *tx_pool;
 	for (i = 0; i < nr_queues; i++) {
+		size_t tx_buffers = NUM_MBUFS; // TODO
+		// TODO allocate these elsewhere
+		tx_pool = rte_pktmbuf_pool_create(std::format("TX_MBUF_POOL_{}", i).c_str(), tx_buffers ,
+			64, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id()); // TODO constant for cache
+		if (tx_pool == NULL)
+			rte_exit(EXIT_FAILURE, "Cannot create tx mbuf pool %d\n", i);
+		tx_mbuf_pools.push_back(tx_pool);
+
 		ret = rte_eth_tx_queue_setup(port_id, i, NUM_MBUFS,
 				rte_eth_dev_socket_id(port_id),
 				&txq_conf);
@@ -253,7 +263,7 @@ lcore_poll_once(void) {
 
 	/*
 	 * Receive packets on a port and forward them on the same
-	 * port. 
+	 * port.
 	 */
 	RTE_ETH_FOREACH_DEV(port) {
 
@@ -265,7 +275,7 @@ lcore_poll_once(void) {
 		if (unlikely(nb_rx == 0))
 			continue;
 
-		if_log_level(LOG_DEBUG, 
+		if_log_level(LOG_DEBUG,
 			for (int i = 0; i < nb_rx; i++) {
 				struct rte_mbuf* buf = bufs[i];
 				if (buf->l2_type == RTE_PTYPE_L2_ETHER) {
@@ -317,6 +327,7 @@ private:
 	const static uint16_t max_queues_per_vm = 4;
 
 	struct rte_mempool *mbuf_pool;
+	std::vector<struct rte_mempool*> tx_mbuf_pools;
 	struct rte_mbuf *bufs[BURST_SIZE * max_queues_per_vm];
 	uint16_t port_id;
 	std::vector<bool> mediate; // per VM
@@ -362,7 +373,7 @@ public:
 
 		/* Allocates mempool to hold the mbufs. 8< */
 		size_t rx_buffers = NUM_MBUFS * nb_ports * num_vms * this->max_queues_per_vm;
-		size_t tx_buffers = rx_buffers;
+		size_t tx_buffers = rx_buffers; // TODO remove
 		mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", rx_buffers + tx_buffers ,
 			MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
 		this->mbuf_pool = mbuf_pool;
@@ -378,7 +389,7 @@ public:
 		this->port_id = port_id;
 
 		/* Initializing all ports. 8< */
-		filtering_init_port(port_id, nr_queues, mbuf_pool);
+		filtering_init_port(port_id, nr_queues, mbuf_pool, this->tx_mbuf_pools);
 		// RTE_ETH_FOREACH_DEV(portid)
 		// 	if (port_init(portid, mbuf_pool) != 0)
 		// 		rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
@@ -462,8 +473,9 @@ public:
 		uint16_t port;
 		RTE_ETH_FOREACH_DEV(port) {
 			// prepare packet buffer
+			uint16_t queue = this->get_tx_queue_id(vm_id, 0);
 			struct rte_mbuf *pkt;
-			pkt = rte_pktmbuf_alloc(this->mbuf_pool);
+			pkt = rte_pktmbuf_alloc(this->tx_mbuf_pools[queue]);
 			if (pkt == NULL) {
 				printf("WARN: Dpdk::send: alloc failed\n");
 				return; // drop packet
@@ -474,7 +486,7 @@ public:
 			copy_buf_to_pkt((void*)buf, len, pkt, 0);
 
 			/* Send burst of TX packets. */
-			const uint16_t nb_tx = rte_eth_tx_burst(port, this->get_tx_queue_id(vm_id, 0),
+			const uint16_t nb_tx = rte_eth_tx_burst(port, queue,
 					&pkt, 1);
 			if (nb_tx != 1) {
 				printf("\nWARNING: Sending packet failed. \n");
