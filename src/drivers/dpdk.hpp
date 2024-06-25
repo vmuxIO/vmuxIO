@@ -323,7 +323,11 @@ private:
 
 
 	// get queue id of native queue
-	uint16_t get_queue_id(int vm, int queue) {
+	uint16_t get_rx_queue_id(int vm, int queue) {
+		return vm * this->max_queues_per_vm + queue;
+	}
+
+	uint16_t get_tx_queue_id(int vm, int queue) {
 		return vm * this->max_queues_per_vm + queue;
 	}
 
@@ -409,7 +413,7 @@ public:
 			memcpy(&dest_mac, mac_addr, 6);
 			Util::intcrement_mac((uint8_t*)&dest_mac, queue_nb);
 			// send all VM traffic to the first queue of each VM by default
-			flow = generate_eth_flow(port_id, this->get_queue_id(queue_nb, 0),
+			flow = generate_eth_flow(port_id, this->get_rx_queue_id(queue_nb, 0),
 						&src_mac, &src_mask,
 						&dest_mac, &dest_mask, &error);
 			/* >8 End of create flow and the flow rule. */
@@ -453,7 +457,7 @@ public:
 		/* >8 End of called on single lcore. */
 	}
 
-	virtual void send(const char *buf, const size_t len) {
+	virtual void send(int vm_id, const char *buf, const size_t len) {
 		// lcore_init_checks(); ignore cpu locality for now
 		uint16_t port;
 		RTE_ETH_FOREACH_DEV(port) {
@@ -470,7 +474,7 @@ public:
 			copy_buf_to_pkt((void*)buf, len, pkt, 0);
 
 			/* Send burst of TX packets. */
-			const uint16_t nb_tx = rte_eth_tx_burst(port, 0,
+			const uint16_t nb_tx = rte_eth_tx_burst(port, this->get_tx_queue_id(vm_id, 0),
 					&pkt, 1);
 			if (nb_tx != 1) {
 				printf("\nWARNING: Sending packet failed. \n");
@@ -493,7 +497,7 @@ public:
 	 	 * port. 
 	 	 */
 		for (int q_idx = 0; q_idx < this->max_queues_per_vm; q_idx++) {
-			int queue_id = this->get_queue_id(vm_id, q_idx);
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
 
 			/* Get burst of RX packets, from first port of pair. */
 			const uint16_t nb_rx = rte_eth_rx_burst(port, queue_id,
@@ -551,7 +555,7 @@ public:
 		struct rte_ether_addr dest_mac;
 		struct rte_ether_addr dest_mask;
 		char fmt[20];
-		uint16_t queue_id = this->get_queue_id(vm_id, dst_queue);
+		uint16_t queue_id = this->get_rx_queue_id(vm_id, dst_queue);
 
 		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
 		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);

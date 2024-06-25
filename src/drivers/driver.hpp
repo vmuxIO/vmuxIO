@@ -38,7 +38,7 @@ public:
   }
 
   // vm_id can be used to serve multiple VMs with one single driver
-  virtual void send(const char *buf, const size_t len) = 0;
+  virtual void send(int vm_id, const char *buf, const size_t len) = 0;
   virtual void recv(int vm_id) = 0;
   virtual void recv_consumed(int vm_id) = 0;
 

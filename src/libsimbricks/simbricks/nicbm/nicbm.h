@@ -241,7 +241,7 @@ class CallbackAdaptor {
       if_log_level(LOG_DEBUG, 
         printf("CallbackAdaptor::EthSend(len=%zu)\n", len)
       );
-      this->device->driver->send((char*)data, len);
+      this->device->driver->send(this->device->device_id, (char*)data, len);
     }
 
     void EventSchedule(nicbm::TimedEvent &evt) {
