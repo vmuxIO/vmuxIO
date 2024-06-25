@@ -254,6 +254,7 @@
         boost
         gdb
         bpftrace
+        numactl
         (writeScriptBin "devmem" ''
           ${busybox}/bin/devmem $@
         '')
