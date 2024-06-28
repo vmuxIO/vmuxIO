@@ -677,7 +677,9 @@ autotest-ssh *ARGS:
   sudo = ""
   if conf["host"]["ssh_as_root"]:
     sudo = "sudo "
-  os.system(f"{sudo}ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}")
+  cmd = f"{sudo}ssh -F {conf['host']['ssh_config']} {conf['guest']['fqdn']} {{ARGS}}"
+  print(f"$ {cmd}")
+  os.system(cmd)
 
 # read list of hexvalues from stdin and find between which consecutive pairs arg1 lies
 rangefinder *ARGS:
