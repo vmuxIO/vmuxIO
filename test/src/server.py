@@ -112,7 +112,7 @@ class Server(ABC):
         __init__ : Initialize the object.
         """
         self.nixos = True # all hosts are nixos actually
-        return 
+        return
         self.localhost = self.fqdn == 'localhost' or self.fqdn == getfqdn()
         try:
             self.nixos = self.isfile('/etc/NIXOS')
@@ -219,7 +219,7 @@ class Server(ABC):
         if self.ssh_as_root == True:
             sudo = "sudo "
 
-        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'" 
+        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'"
                             # + " 2>&1 | tee /tmp/foo"
                             , stderr=STDOUT, shell=True).decode('utf-8')
 
@@ -959,14 +959,14 @@ class Server(ABC):
 
         result = self.exec(f'ip addr show dev {iface}' +
                          ' | grep inet | awk "{print \\$2}"')
-        
-        if "does not exist" in result: 
+
+        if "does not exist" in result:
             debug("Interface {iface} does not exist!")
             return []
-        
+
         else:
             return result.splitlines()
-        
+
 
     def delete_nic_ip_addresses(self: 'Server', iface: str) -> None:
         """
@@ -1152,7 +1152,7 @@ class Server(ABC):
 
 class BatchExec:
     """
-    Execution through ssh brings overheads of authentication etc. 
+    Execution through ssh brings overheads of authentication etc.
     As a mitigation, this class helps to batch commands into a single ssh command to reduce ssh-based overheads.
     """
     server: Server
@@ -1320,7 +1320,7 @@ class Host(Server):
         super().__init__(fqdn, test_iface, test_iface_addr, test_iface_mac,
                          test_iface_driv, test_iface_dpdk_driv,
                          tmux_socket, moongen_dir, moonprogs_dir,
-                         xdp_reflector_dir, localhost, ssh_config=ssh_config, 
+                         xdp_reflector_dir, localhost, ssh_config=ssh_config,
                          ssh_as_root=ssh_as_root)
         self.admin_bridge = admin_bridge
         self.admin_bridge_ip_net = admin_bridge_ip_net
@@ -1381,7 +1381,7 @@ class Host(Server):
                       f'master {self.admin_bridge}; true)')
             buffer.exec(f'sudo ip link set {admin_tap} up')
 
-        if len(vm_range) == 0: 
+        if len(vm_range) == 0:
             setup(MultiHost.iface_name(self.admin_tap, 0))
             buffer.flush()
             return
@@ -1457,7 +1457,7 @@ class Host(Server):
                       f'&& sudo ip link set {self.test_bridge} up ' +
                       f'&& sudo ip link set {test_tap} up')
 
-        if len(vm_range) == 0: 
+        if len(vm_range) == 0:
             setup(MultiHost.iface_name(self.test_tap, 0))
             buffer.flush()
             return
@@ -1749,7 +1749,9 @@ class Host(Server):
         vmux_mode = ""
         vmux_socket = f"{self.vmux_socket_path}"
         if interface.is_passthrough():
-            args = f' -s {self.vmux_socket_path} -d {self.test_iface_addr}'
+            # num_vms is also vm_number, because with passthrough there is only one
+            vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, num_vms)}"
+            args = f' -s {vmux_socket} -d {self.test_iface_addr}'
         if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]:
             dpdk_args += " -u -- -l 1 -n 1"
         if interface.guest_driver() == "ice":
@@ -1767,9 +1769,13 @@ class Host(Server):
                     args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode}'
 
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        nix_shell = f"nix shell --inputs-from {project_root} nixpkgs#numactl --command"
+        # numactl = "numactl -C 1-5 "
+        numactl = ""
         self.tmux_new(
             'vmux',
-            f'ulimit -n 4096; sudo {self.vmux_path} -q -b {base_mac}'
+            f'ulimit -n 4096; sudo {nix_shell} {numactl} {self.vmux_path} -q -b {base_mac}'
             f'{args}'
             f'{dpdk_args}'
             # f' -d none -t tap-okelmann02 -m e1000-emu -s /tmp/vmux-okelmann.sock2'
@@ -1945,7 +1951,7 @@ class Guest(Server):
         """
 
         self.tmux_new("iperf3-server", f"iperf3 -s --bind {server_hostname}")
-    
+
 
     def stop_iperf_server(self):
         """
@@ -2140,7 +2146,7 @@ class LoadGen(Server):
         """
 
         options = ""
-        
+
         if ipt.output_json:
             options += "-J"
 
@@ -2149,7 +2155,7 @@ class LoadGen(Server):
 
         elif ipt.direction == "bidirectional":
             options += " --bidir"
-        
+
         elif ipt.direction != "forward":
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
 

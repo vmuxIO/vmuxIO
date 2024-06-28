@@ -50,7 +50,7 @@ class DeathStarBenchTest(AbstractBenchTest):
 class DeathStarBench:
     app: str
     docker_image_tar: str
-    docker_compose: Dict[int, str] # vm id -> strings of content of docker-compose.yamls    
+    docker_compose: Dict[int, str] # vm id -> strings of content of docker-compose.yamls
     service_map: Dict[int, str] # vm id -> service name
     extra_hosts: str = "" # /etc/hosts format
     frontend: str # service name of frontend
@@ -58,7 +58,7 @@ class DeathStarBench:
     script: str # path to wrk2 lua script
 
     def __init__(self, app: str, moonprogs_dir: str):
-        assert app in [ 
+        assert app in [
             "hotelReservation",
             "socialNetwork",
             "mediaMicroservices",
@@ -70,7 +70,7 @@ class DeathStarBench:
         self.docker_compose = {}
         self.service_map = {}
         self.parse_docker_compose()
-        
+
         if self.app == "hotelReservation":
             self.frontend = "frontend"
             frontend_ip = MultiHost.ip("10.1.0.20", self.vm_number_of(self.frontend))
@@ -228,9 +228,11 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.BRIDGE_E1000,
         Interface.BRIDGE,
         Interface.BRIDGE_VHOST,
-        # Interface.VMUX_DPDK_E810,
+        Interface.VMUX_DPDK_E810,
+        Interface.VMUX_MED,
         ]
-    rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
+    rpsList = [ 1, 2, 4, 8, 10, 20, 40, 80, 120 ]
+    # rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
     repetitions = 4
     DURATION_S = 61 if not G.BRIEF else 11
@@ -262,7 +264,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         return
 
     for app in apps:
-        
+
         deathstar = deathstarbenches[app]
         num_vms = len(deathstar.docker_compose)
 
@@ -297,7 +299,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
-                
+
                 for rps in rpsList:
                     # the actual test
                     test = DeathStarBenchTest(

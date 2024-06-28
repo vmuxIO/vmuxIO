@@ -33,8 +33,8 @@ class YcsbTest(AbstractBenchTest):
         """
         app_setup = 3 # diff "running YcsbTest" "Running wrk2 x times"
 
-        # repetition contains 
-        # DURATION_S 
+        # repetition contains
+        # DURATION_S
         # + wait_for_results(0 in underload, 10s in overload)
         # + 3s other overhead
         measurements = self.repetitions * ( DURATION_S + 13 )
@@ -183,8 +183,9 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.BRIDGE,
         Interface.BRIDGE_VHOST,
         Interface.VMUX_DPDK_E810,
+        Interface.VMUX_MED,
         ]
-    rpsList = [ 10, 1000 ]
+    rpsList = [ -1 ]
     vm_nums = [ 1, 2, 4, 8 , 16, 32 ]
     repetitions = 2
     DURATION_S = 61 if not G.BRIEF else 11
@@ -193,9 +194,9 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VFIO ]
         # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
-        rpsList = [ 10 ]
+        rpsList = [ 1 ]
         repetitions = 1
-        vm_nums = [ 1 ]
+        vm_nums = [ 2, 4, 8, 16, 32 ]
 
     # test = YcsbTest(
     #         repetitions=1,
@@ -220,7 +221,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         return
 
     for num_vms in vm_nums:
-        
+
         moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
         ycsb = Ycsb(moonprogs_dir)
 
@@ -254,7 +255,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
-                
+
                 for rps in rpsList:
                     # the actual test
                     test = YcsbTest(
