@@ -9,7 +9,7 @@ from configparser import ConfigParser
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from typing import Tuple, Iterator, Any, Dict, Callable
-from contextlib import contextmanager
+from contextlib import contextmanager, ContextDecorator
 from enums import Machine, Interface, Reflector, MultiHost
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
@@ -21,6 +21,8 @@ from concurrent.futures import ThreadPoolExecutor
 import subprocess
 from root import QEMU_BUILD_DIR
 from conf import G
+from tqdm import tqdm
+from tqdm.contrib.telegram import tqdm as tqdm_telegram
 
 NUM_WORKERS = 8 # with 16, it already starts failing on rose
 
@@ -408,15 +410,23 @@ class AbstractBenchTest(ABC):
         return [i for i in cls.__match_args__]
 
 
-class Bench:
+class Bench(ContextDecorator):
 
-    def __init__(self, tqdm, tests: List[AbstractBenchTest], args_reboot: List[str] = []):
-        self.tqdm = tqdm
+    def __init__(self, tests: List[AbstractBenchTest], args_reboot: List[str] = []):
         self.args_reboot = args_reboot
         assert len(tests) > 0
-        self.remaining_tests = tests
+        self.remaining_tests = [ test for test in tests if test.needed()]
         self.time_remaining_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
-        print(f"init time {self.time_remaining_s}")
+
+    def __enter__(self):
+        self.tqdm = tqdm(total=self.time_remaining_s+0.1, # +0.1 to avoid float summing errors
+              unit="s",
+              bar_format="{l_bar}{bar}| {n:.0f}/{total:.0f}sec [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+              )
+        return self, self.remaining_tests
+
+    def __exit__(self, *exc):
+        self.tqdm.close()
 
     def iterator(self, tests: List[AbstractBenchTest], test_parameter: str):
         """
@@ -434,7 +444,6 @@ class Bench:
         time_remaining_new_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
         time_progress_s = self.time_remaining_s - time_remaining_new_s
         self.time_remaining_s = time_remaining_new_s
-        print(time_progress_s)
         self.tqdm.update(time_progress_s)
 
 

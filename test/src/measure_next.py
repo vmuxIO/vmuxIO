@@ -18,7 +18,6 @@ from root import *
 from dataclasses import dataclass, field
 import subprocess
 from conf import G
-from tqdm import tqdm
 
 DURATION_S: int
 
@@ -264,11 +263,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         time_needed_s += DeathStarBenchTest.estimate_time(test_matrix, args_reboot = ["app", "interface", "num_vms"])
         tests += DeathStarBenchTest.list_tests(test_matrix)
 
-    tests_needed = [ test for test in tests if test.needed()]
-
-    with tqdm(total=time_needed_s+0.1) as progressbar:
-        bench = Bench(progressbar, tests = tests_needed, args_reboot = ["app", "interface", "num_vms"])
-        for app, app_tests in bench.iterator(tests_needed, "app"):
+    with Bench(tests = tests, args_reboot = ["app", "interface", "num_vms"]) as (bench, bench_tests):
+        for app, app_tests in bench.iterator(bench_tests, "app"):
             print(f"- Doing app {app}")
             for interface, interface_tests in bench.iterator(app_tests, "interface"):
                 print(f"-- Doing interface {interface}")
