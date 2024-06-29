@@ -7,7 +7,7 @@ from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
 from enums import Machine, Interface, Reflector, MultiHost
-from measure import AbstractBenchTest, Measurement, end_foreach
+from measure import Bench, AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
@@ -18,6 +18,7 @@ from root import *
 from dataclasses import dataclass, field
 import subprocess
 from conf import G
+from tqdm import tqdm
 
 DURATION_S: int
 
@@ -50,7 +51,7 @@ class DeathStarBenchTest(AbstractBenchTest):
 class DeathStarBench:
     app: str
     docker_image_tar: str
-    docker_compose: Dict[int, str] # vm id -> strings of content of docker-compose.yamls    
+    docker_compose: Dict[int, str] # vm id -> strings of content of docker-compose.yamls
     service_map: Dict[int, str] # vm id -> service name
     extra_hosts: str = "" # /etc/hosts format
     frontend: str # service name of frontend
@@ -58,7 +59,7 @@ class DeathStarBench:
     script: str # path to wrk2 lua script
 
     def __init__(self, app: str, moonprogs_dir: str):
-        assert app in [ 
+        assert app in [
             "hotelReservation",
             "socialNetwork",
             "mediaMicroservices",
@@ -70,7 +71,7 @@ class DeathStarBench:
         self.docker_compose = {}
         self.service_map = {}
         self.parse_docker_compose()
-        
+
         if self.app == "hotelReservation":
             self.frontend = "frontend"
             frontend_ip = MultiHost.ip("10.1.0.20", self.vm_number_of(self.frontend))
@@ -219,7 +220,7 @@ class DeathStarBench:
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
-    host, loadgen = measurement.hosts()
+    # host, loadgen = measurement.hosts()
     global DURATION_S
 
     interfaces = [
@@ -244,25 +245,44 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         repetitions = 1
 
     # plan the measurement
-    moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
-    deathstarbenches = {app: DeathStarBench(app, moonprogs_dir) for app in apps}
+    # moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
+    moonprogs_dir = "/tmp/none"
+    # deathstarbenches = {app: DeathStarBench(app, moonprogs_dir) for app in apps}
+    deathstarbenches = {app: len(app) for app in apps}
+    tests = []
+    time_needed_s = 0
     for app in apps:
-        bench = deathstarbenches[app]
+        bench_app = deathstarbenches[app]
         test_matrix = dict(
             interface=[ interface.value for interface in interfaces],
             rps=rpsList,
             app=[ app ],
             repetitions=[ repetitions ],
-            num_vms=[ len(bench.docker_compose) ]
+            num_vms=[ bench_app ]
             )
         info(f"DeathStarBench execution plan {app}:")
-        DeathStarBenchTest.estimate_time(test_matrix, ["app", "interface", "num_vms"])
+        time_needed_s += DeathStarBenchTest.estimate_time(test_matrix, args_reboot = ["app", "interface", "num_vms"])
+        tests += DeathStarBenchTest.list_tests(test_matrix)
 
+    tests_needed = [ test for test in tests if test.needed()]
+
+    with tqdm(total=time_needed_s+0.1) as progressbar:
+        bench = Bench(progressbar, tests = tests_needed, args_reboot = ["app", "interface", "num_vms"])
+        for app, app_tests in bench.iterator(tests_needed, "app"):
+            print(f"- Doing app {app}")
+            for interface, interface_tests in bench.iterator(app_tests, "interface"):
+                print(f"-- Doing interface {interface}")
+                for test in interface_tests:
+                    print(f"--- Doing test {test}")
+                    time.sleep(.1)
+                    bench.done(test)
+
+    exit(0)
     if plan_only:
         return
 
     for app in apps:
-        
+
         deathstar = deathstarbenches[app]
         num_vms = len(deathstar.docker_compose)
 
@@ -297,7 +317,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
-                
+
                 for rps in rpsList:
                     # the actual test
                     test = DeathStarBenchTest(
@@ -316,5 +336,6 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     DeathStarBench.find_errors(G.OUT_DIR)
 
 if __name__ == "__main__":
-    measurement = Measurement()
+    # measurement = Measurement()
+    measurement = None
     main(measurement)
