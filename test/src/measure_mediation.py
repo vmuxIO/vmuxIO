@@ -181,11 +181,12 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
         # interfaces = [ Interface.BRIDGE ] # doesnt work with click (RSS init fails)
         # interfaces = [ Interface.VMUX_MED ]
-        interfaces = [ Interface.VFIO ]
+        interfaces = [ Interface.VMUX_EMU_E810 ]
+        # interfaces = [ Interface.VFIO ]
         fastclicks = [ "hardware" ]
         vm_nums = [ 1 ]
         repetitions = 1
-        rates = [ 1000 ]
+        rates = [ 40000 ]
 
     test_matrix = dict(
         repetitions=[ repetitions ],

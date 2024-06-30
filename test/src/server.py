@@ -1771,8 +1771,8 @@ class Host(Server):
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
         nix_shell = f"nix shell --inputs-from {project_root} nixpkgs#numactl --command"
-        # numactl = "numactl -C 1-5 "
-        numactl = ""
+        numactl = "numactl -C 1-5 "
+        # numactl = ""
         self.tmux_new(
             'vmux',
             f'ulimit -n 4096; sudo {nix_shell} {numactl} {self.vmux_path} -q -b {base_mac}'
