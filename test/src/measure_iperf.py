@@ -7,7 +7,7 @@ from logging import (info, debug, error, warning, getLogger,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
 from enums import Machine, Interface, Reflector, MultiHost
-from measure import AbstractBenchTest, Measurement, end_foreach
+from measure import Bench, AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
@@ -100,7 +100,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_DPDK_E810,
           Interface.VMUX_MED
           ]
-    directions = [ "forward", "backward" ]
+    directions = [ "forward" ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
     repetitions = 3
     DURATION_S = 61 if not G.BRIEF else 11
@@ -120,92 +120,82 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     info(f"Iperf Test execution plan:")
     IPerfTest.estimate_time(test_matrix, ["interface", "num_vms"])
+    tests = IPerfTest.list_tests(test_matrix)
 
     if plan_only:
         return
 
     all_tests = []
 
-    for num_vms in vm_nums:
-        for interface in interfaces:
+    with Bench(
+            tests = tests,
+            args_reboot = ["interface", "num_vms", "direction"],
+            brief = G.BRIEF
+            ) as (bench, bench_tests):
+        for num_vms, num_vms_tests in bench.iterator(bench_tests, "num_vms"):
+            for interface, interface_tests in bench.iterator(num_vms_tests, "interface"):
+                interface = Interface(interface)
+                for direction, direction_tests in bench.iterator(interface_tests, "direction"):
+                    assert len(direction_tests) == 1 # we have looped through all variables now, right?
+                    test = direction_tests[0]
 
-            # skip VM boots if possible
-            test_matrix = dict(
-                repetitions=[ repetitions ],
-                interface=[ interface.value ],
-                num_vms=[ num_vms ],
-                direction=directions
-                )
-            if not IPerfTest.any_needed(test_matrix):
-                warning(f"Skipping {interface}@{num_vms}VMs: All measurements done already.")
-                continue
+                    info(f"Running {test}")
+                    info("Booting VM")
 
-            for direction in directions:
-                info(f"Testing configuration iface: {interface} direction: {direction} vm_num: {num_vms}")
+                    # boot VMs
+                    with measurement.virtual_machine(interface) as guest:
+                        # loadgen: set up interfaces and networking
 
-                # build test object
-                ipt = IPerfTest(
-                        interface=interface.value,
-                        repetitions=repetitions,
-                        direction=direction,
-                        num_vms=num_vms)
-                all_tests += [ ipt ]
-
-                info("Booting VM")
-
-                # boot VMs
-                with measurement.virtual_machine(interface) as guest:
-                    # loadgen: set up interfaces and networking
-
-                    info('Binding loadgen interface')
-                    loadgen.modprobe_test_iface_drivers()
-                    loadgen.release_test_iface() # bind linux driver
-
-                    try:
-                        loadgen.delete_nic_ip_addresses(loadgen.test_iface)
-                    except Exception:
-                        pass
-
-                    guest.modprobe_test_iface_drivers(interface=interface)
-                    guest.setup_test_iface_ip_net()
-                    loadgen.setup_test_iface_ip_net()
-
-                    for repetition in range(repetitions):
-                        #cleanup
-                        guest.stop_iperf_server()
-                        loadgen.stop_iperf_client()
-
-                        remote_output_file = "/tmp/iperf_result.json"
-                        tmp_remote_output_file = "/tmp/tmp_iperf_result.json"
-                        local_output_file = ipt.output_filepath(repetition)
-                        loadgen.exec(f"sudo rm {remote_output_file} || true")
-                        loadgen.exec(f"sudo rm {tmp_remote_output_file} || true")
-
-                        info("Starting iperf")
-                        guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
-                        loadgen.run_iperf_client(ipt, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file, tmp_remote_output_file)
-                        time.sleep(DURATION_S)
+                        info('Binding loadgen interface')
+                        loadgen.modprobe_test_iface_drivers()
+                        loadgen.release_test_iface() # bind linux driver
 
                         try:
-                            loadgen.wait_for_success(f'[[ -e {remote_output_file} ]]')
-                        except TimeoutError:
-                            error('Waiting for output file timed out.')
-                        loadgen.copy_from(remote_output_file, local_output_file)
+                            loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+                        except Exception:
+                            pass
 
-                        # teardown
-                        guest.stop_iperf_server()
-                        loadgen.stop_iperf_client()
+                        guest.modprobe_test_iface_drivers(interface=interface)
+                        guest.setup_test_iface_ip_net()
+                        loadgen.setup_test_iface_ip_net()
 
-                        # summarize results of VM
-                        local_summary = ipt.output_filepath(repetition, extension = "summary")
-                        with open(local_summary, 'w') as file:
+                        for repetition in range(repetitions):
+                            #cleanup
+                            guest.stop_iperf_server()
+                            loadgen.stop_iperf_client()
+
+                            remote_output_file = "/tmp/iperf_result.json"
+                            tmp_remote_output_file = "/tmp/tmp_iperf_result.json"
+                            local_output_file = test.output_filepath(repetition)
+                            loadgen.exec(f"sudo rm {remote_output_file} || true")
+                            loadgen.exec(f"sudo rm {tmp_remote_output_file} || true")
+
+                            info("Starting iperf")
+                            guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
+                            loadgen.run_iperf_client(test, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file, tmp_remote_output_file)
+                            time.sleep(DURATION_S)
+
                             try:
-                                # to_string preserves all cols
-                                summary = ipt.summarize(repetition).to_string()
-                            except Exception as e:
-                                summary = traceback.format_exc()
-                            file.write(summary)
+                                loadgen.wait_for_success(f'[[ -e {remote_output_file} ]]')
+                            except TimeoutError:
+                                error('Waiting for output file timed out.')
+                            loadgen.copy_from(remote_output_file, local_output_file)
 
+                            # teardown
+                            guest.stop_iperf_server()
+                            loadgen.stop_iperf_client()
+
+                            # summarize results of VM
+                            local_summary = test.output_filepath(repetition, extension = "summary")
+                            with open(local_summary, 'w') as file:
+                                try:
+                                    # to_string preserves all cols
+                                    summary = test.summarize(repetition).to_string()
+                                except Exception as e:
+                                    summary = traceback.format_exc()
+                                file.write(summary)
+                    # end VM
+                    bench.done(test)
 
     for ipt in all_tests:
         for repetition in range(repetitions):
