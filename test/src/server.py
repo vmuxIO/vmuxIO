@@ -2140,7 +2140,7 @@ class LoadGen(Server):
         self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
 
 
-    def run_iperf_client(self, ipt: "IPerfTest", runtime: int, server_hostname: str, output_path: str, tmp_out_path: str):
+    def run_iperf_client(self, ipt: "IPerfTest", runtime: int, server_hostname: str, output_path: str, tmp_out_path: str, vm_num = ""):
         """
         Starts iperf client
         """
@@ -2160,8 +2160,8 @@ class LoadGen(Server):
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
 
         info("Starting iperf client on " + server_hostname)
-        self.tmux_new("iperf3-client", f"iperf3 -c {server_hostname} -t {runtime} {options} | tee {tmp_out_path}; cp {tmp_out_path} {output_path}; sleep 999")
+        self.tmux_new(f"iperf3-client{vm_num}", f"iperf3 -c {server_hostname} -t {runtime} {options} | tee {tmp_out_path}; cp {tmp_out_path} {output_path}; sleep 999")
 
 
-    def stop_iperf_client(self):
-        self.tmux_kill("iperf3-client")
+    def stop_iperf_client(self, vm_num = ""):
+        self.tmux_kill(f"iperf3-client{vm_num}")
