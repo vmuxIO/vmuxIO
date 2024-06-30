@@ -50,7 +50,7 @@ public:
     return 0;
   }
 
-  void send(const char *buf, const size_t len) {
+  void send(int vm_id, const char *buf, const size_t len) {
     if (len > Tap::MAX_BUF)
       die("Attempting to send a packet too large for vmux (%zu)", len);
     memcpy(&(this->txFrame), (void *)buf, len);
