@@ -10,7 +10,7 @@ typedef union {
  struct {
   uint8_t resv[4];
   uint64_t time;
-  uint32_t time_0;
+  uint32_t time_0; // internal time
  };
 
  struct {
@@ -18,6 +18,7 @@ typedef union {
   uint16_t ts_h_1;
   uint16_t ts_h_0;
   uint8_t ts_l;
+  uint32_t resv3;
  }; 
  __int128 value;
 
@@ -47,7 +48,7 @@ typedef union {
 #define PTP_ATQBAL_REG_INDEX(i) (((i) >> 24) & 0b1111)
 
 // bit 31 must be zero and bits 16:23 must contain upper 8 bits of the TS
-#define PTP_ATQBAL_SET_TS(i, ts) (((i) & 0x70ff'0000) | ((uint32_t) ((ts) & 0xff'0000'0000) >> 16)) 
+#define PTP_ATQBAL_SET_TS(ts) ((uint32_t) (((ts) & 0xff'0000'0000) >> 16)) 
 #define PTP_ATQBAH_SET_TS(ts) ((ts) & 0xffff'ffff)
 
 // PTP capabilities

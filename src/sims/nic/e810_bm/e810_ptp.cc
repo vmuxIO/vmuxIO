@@ -26,21 +26,18 @@ e810_timestamp_t ptpmgr::phc_read() {
   // Emulation: use current unix time
   } else {
     struct timespec ts;
-    if(!clock_gettime(CLOCK_MONOTONIC, &ts)) {
+    if(clock_gettime(CLOCK_MONOTONIC, &ts)) {
       printf("Error: Could not get unix timestamp. \n");
       return { .value=0 };
 
     } else {
 
-      /* when emulating, we use an internal timer based on the deltas between time stamps 
-         and the current INC_VAL */
-      constexpr uint64_t ps_per_cycle = 1'000'000'000'000ULL / CLOCK_HZ;
-
-      uint64_t cycle_now = TIMESPEC_TO_NANOS(ts) / ps_per_cycle;
-      uint64_t cycles_passed = last_updated - cycle_now;
+      uint64_t cycle_now = TIMESPEC_TO_NANOS(ts); // (uint64_t) (((__int128) TIMESPEC_TO_NANOS(ts) *  (__int128) 1'000'000'000'000ULL) / CLOCK_HZ);
+      uint64_t cycles_passed = cycle_now - last_updated;
 
       this->last_updated = cycle_now;
-      this->last_val.value += (__int128) this->inc_val * cycles_passed;
+      this->last_val.time += (uint64_t) ((double) cycles_passed);
+
     } 
   }
 
@@ -54,22 +51,27 @@ e810_timestamp_t ptpmgr::phc_read() {
 
   return this->last_val;
 }
-  
+
+/* Returns the global time and places the 40 bit RX timestamp in tstamp
+*/
 e810_timestamp_t ptpmgr::phc_sample_rx(uint16_t portid) {
 
   if (auto e810_dev = dynamic_pointer_cast<E810EmulatedDevice>(this->dev.vmux->device)) {
-    struct timespec timespec = e810_dev->driver->readRxTimestamp(portid);
-    return { .time=TIMESPEC_TO_NANOS(timespec), .time_0=0 };
+    uint64_t timestamp = e810_dev->driver->readRxTimestamp(portid);
+    return { .time=timestamp, .time_0=0 };
 
   } else {
     return this->phc_read();
   }
 }
 
+/* Returns the global time and places the 40 bit TX timestamp in tstamp
+*/
 e810_timestamp_t ptpmgr::phc_sample_tx(uint16_t portid) {
+
   if (auto e810_dev = dynamic_pointer_cast<E810EmulatedDevice>(this->dev.vmux->device)) {
-    struct timespec timespec = e810_dev->driver->readTxTimestamp(portid);
-    return { .time=TIMESPEC_TO_NANOS(timespec), .time_0=0 };
+    uint64_t timestamp = e810_dev->driver->readTxTimestamp(portid);
+    return { .time=timestamp, .time_0=0 };
 
   } else {
     return this->phc_read();

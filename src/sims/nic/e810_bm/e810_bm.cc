@@ -38,6 +38,8 @@
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/util.h"
 
+#include <rte_io.h>
+
 namespace e810 {
 
 
@@ -609,28 +611,31 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
         val = regs.REG_PFTSYN_SEM; break;
 
       case PTP_GLTSYN_ENA(0):
-        val = regs.REG_GLTSYN_ENA[0];
+        val = regs.REG_GLTSYN_ENA[0]; break;
       
       case PTP_GLTSYN_ENA(1):
-        val = regs.REG_GLTSYN_ENA[1];
+        val = regs.REG_GLTSYN_ENA[1]; break;
 
-      CASE_6(PTP_GLTSYN_TIME, 0, {
+      case PTP_GLTSYN_TIME(0) ... PTP_GLTSYN_TIME(5): {
+        const uint64_t index = addr - PTP_GLTSYN_TIME(0);
         e810_timestamp_t ts = ptp.phc_read();
 
-        if (INDEX == 0 || INDEX == 1) {
+        if (index <= 1) {
             val = ts.time_0;
-            printf("Error: Tried to read internal TIME_0 register\n");
+            printf("Warning: Tried to read internal TIME_0 register\n");
 
-        } else if (INDEX == 2 || INDEX == 3) {
+        } else if (index <= 3) {
+            // time low
             val = (uint32_t) (ts.time & 0xffffffff);
+        
         } else  {
+            // time high
             val = (uint32_t) ((ts.time >> 32) & 0xffffffff);
         }
-      })
+      }
 
-      CASE_6(PTP_GLTSYN_SHTIME, 0, {
-        val = regs.REG_GLTSYN_SHTIME[INDEX];
-      })
+      case PTP_GLTSYN_SHTIME(0) ... PTP_GLTSYN_SHTIME(5):
+        val = regs.REG_GLTSYN_SHTIME[addr - PTP_GLTSYN_SHTIME(0)]; break;
 
       case PTP_GLTSYN_INCVAL(0):
         val = (uint32_t) ptp.get_incval(); break;
@@ -1007,12 +1012,14 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         // If bit 31 is set to 1b, read timestamp
         if(PTP_ATQBAL_IS_ACTIVE(val)) {
           
-          uint32_t reg_index = PTP_ATQBAL_REG_INDEX(val);  
+          uint32_t reg_index = PTP_ATQBAL_REG_INDEX(val);
+
           // write timestamp back to AQTBA registers
           e810_timestamp_t ts = ptp.phc_sample_tx(reg_index);
 
-          regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(regs.REG_PF_SB_ATQBAL, ts.time);
-          regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(ts.time);
+	        // dpdk shifts the tx timestamp down eight bits
+          regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(ts.time << 8);
+          regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(ts.time << 8);
         }
 
         break;
@@ -1030,6 +1037,8 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
       case PTP_GLTSYN_CMD_SYNC: {
 
+          DEBUG_LOG_PTP("CMD sync")
+          
           if(val == PTP_GLTSYN_CMD_SYNC_INC) {
             DEBUG_LOG_PTP("Warning: HW Command GLTSYN_CMD_SYNC_INC not implemented!");
 
@@ -1081,13 +1090,18 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         break;
       }
 
-      CASE_6(PTP_GLTSYN_SHTIME, 0, regs.REG_GLTSYN_SHTIME[INDEX] = val)
-      CASE_4(PTP_GLTSYN_SHADJ, 0, regs.REG_GLTSYN_SHADJ[INDEX] = val)
+      case PTP_GLTSYN_SHTIME(0) ... PTP_GLTSYN_SHTIME(5):
+        regs.REG_GLTSYN_SHTIME[addr - PTP_GLTSYN_SHTIME(0)] = val; break;
+
+      case PTP_GLTSYN_SHADJ(0) ... PTP_GLTSYN_SHADJ(3):
+        regs.REG_GLTSYN_SHADJ[addr - PTP_GLTSYN_SHADJ(0)] = val; break;
       
       case PTP_GLTSYN_ENA(0):
+        DEBUG_LOG_PTP("Enabled PTP for clock 0")
         regs.REG_GLTSYN_ENA[0] = (val & 1); break;
     
       case PTP_GLTSYN_ENA(1):
+        DEBUG_LOG_PTP("Enabled PTP for clock 1")
         regs.REG_GLTSYN_ENA[1] = (val & 1); break;
 
       default:

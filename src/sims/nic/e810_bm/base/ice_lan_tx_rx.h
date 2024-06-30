@@ -478,8 +478,10 @@ union ice_32b_rx_flex_desc {
 				__le16 flex_meta4;
 				__le16 flex_meta5;
 			} flex;
-			__le16 ts_high_0;
-			__le16 ts_high_1;
+			struct {
+				__le16 ts_high_0;
+				__le16 ts_high_1;
+			};
 		} flex_ts;
 	} wb; /* writeback */
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <optional>
 #include "util.hpp"
@@ -44,8 +45,8 @@ public:
   
   // ptp
   virtual struct timespec readCurrentTimestamp() {           return { .tv_sec=0, .tv_nsec=0 }; };
-  virtual struct timespec readTxTimestamp(uint16_t portid) { return { .tv_sec=0, .tv_nsec=0 }; };
-  virtual struct timespec readRxTimestamp(uint16_t portid) { return { .tv_sec=0, .tv_nsec=0 }; };
+  virtual uint64_t readTxTimestamp(uint16_t portid) { return 0; };
+  virtual uint64_t readRxTimestamp(uint16_t portid) { return 0; };
 
   // return false if rule cant be allocated
   virtual bool add_switch_rule(int vm_id, uint8_t mac_addr[6], uint16_t dst_queue) {

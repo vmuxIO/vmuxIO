@@ -23,6 +23,7 @@
  */
 
 #include <arpa/inet.h>
+#include <cstdint>
 #include <stdlib.h>
 #include <string.h>
 
@@ -379,32 +380,15 @@ bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
 
   if (udp->eth.type == htons(ETH_TYPE_IP) && udp->ip.proto == IP_PROTO_UDP) {
 
+    // check UDP port
     uint16_t port = ntohs(udp->udp.dest);
-    if (port != PTP_UDP_1 && port != PTP_UDP_2)
-      return false;
-
-    ptp_start = udp + 1;
-
-  } else if (udp->eth.type == htons(ETH_TYPE_PTP)) {
-    ptp_start = &udp->ip;
+    return port == PTP_UDP_1 || port == PTP_UDP_2;
 
   } else {
-    return false;
+
+    // return true iff ethertype is PTP
+    return udp->eth.type == htons(ETH_TYPE_PTP);
   }
-
-  const headers::ptp_v1_hdr *v1 =
-      reinterpret_cast<const headers::ptp_v1_hdr *>(ptp_start);
-  const headers::ptp_v2_hdr *v2 =
-      reinterpret_cast<const headers::ptp_v2_hdr *>(ptp_start);
-
-  if (v1->version_ptp == 1) {
-    return true;
-
-  } else if (v2->version_ptp == 2) {
-    return true;
-  }
-
-  return false;
 }
 
 void lan_queue_rx::packet_received(const void *data, size_t pktlen,
@@ -429,9 +413,7 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
   e810_timestamp_t timestamp = { .value=0 };
 
   if (ptp_should_sample_rx(data, pktlen)) {
-    if (!PTP_GLTSYN_SEM_BUSY(dev.regs.REG_PFTSYN_SEM)) {
-        printf("DEBUG: Should sample RX\n");
-    }
+    timestamp = dev.ptp.phc_sample_rx(0);
   }
 
   for (size_t i = 0; i < num_descs; i++) {
@@ -479,17 +461,16 @@ void lan_queue_rx::rx_desc_ctx::packet_received(const void *data, size_t pktlen,
   rxd->wb.qword1.status_error_len |= (pktlen << 38);
 
   // write to TS registers of flex context
-  flex_rxd->wb.flex_ts.ts_high_0 = timestamp.ts_h_0;
-  flex_rxd->wb.flex_ts.ts_high_1 = timestamp.ts_h_1;
-  flex_rxd->wb.ts_low = timestamp.ts_l;
+  flex_rxd->wb.flex_ts.ts_high_0 = (uint16_t) timestamp.time & 0xFFFF;
+  flex_rxd->wb.flex_ts.ts_high_1 = (uint16_t) ((timestamp.time >> 16) & 0xFFFF);
+  flex_rxd->wb.ts_low = 0x1; // set the LSB to 1 to indicate validity
 
   if (last) {
     rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_EOF_S);
-    // TODO(antoinek): only if checksums are correct
     rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_L3L4P_S);
-  } 
-  data_write(addr, pktlen, data);
-  
+  }
+
+  data_write(addr, pktlen, data); 
 }
 
 lan_queue_tx::lan_queue_tx(lan &lanmgr_, uint32_t &reg_tail_, size_t idx_,
@@ -560,7 +541,8 @@ bool lan_queue_tx::trigger_tx_packet() {
   uint64_t d1;
   uint32_t iipt, l4t, pkt_len, total_len = 0, data_limit;
   bool tso = false;
-  uint32_t tso_mss = 0, tso_paylen = 0;
+  bool tsync = false;
+  uint32_t tso_mss = 0, tso_paylen = 0, tsync_reg = 0;
   uint16_t maclen = 0, iplen = 0, l4len = 0;
 
   // abort if no queued up descriptors
@@ -583,9 +565,17 @@ bool lan_queue_tx::trigger_tx_packet() {
 
     uint16_t cmd =
         ((d1 & ICE_TXD_CTX_QW1_CMD_M) >> ICE_TXD_CTX_QW1_CMD_S);
+    
     tso = !!(cmd & ICE_TX_CTX_DESC_TSO);
-    tso_mss = ((d1 ) >> ICE_TXD_CTX_QW1_MSS_S) & 0x3FFFULL;
+    tso_mss = (d1 & ICE_TXD_CTX_QW1_MSS_M) >> ICE_TXD_CTX_QW1_MSS_S;
 
+    tsync = !!(cmd & ICE_TX_CTX_DESC_TSYN);
+    tsync_reg = (d1 & ICE_TXD_CTX_QW1_TSYN_M) >> ICE_TXD_CTX_QW1_TSYN_S; 
+
+    if (tso && tsync) {
+      std::cout << "Error: Tried to transmit packet with tsync and tso enabled!" << logger::endl;
+    }
+    
 #ifdef DEBUG_LAN
     std::cout << "  tso=" << (int)tso << " mss=" << tso_mss << logger::endl;
 #endif
@@ -758,6 +748,7 @@ bool lan_queue_tx::trigger_tx_packet() {
 void lan_queue_tx::trigger_tx() {
   while (trigger_tx_packet()) {
   }
+
 }
 
 lan_queue_tx::tx_desc_ctx::tx_desc_ctx(lan_queue_tx &queue_)

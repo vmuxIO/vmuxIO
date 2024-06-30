@@ -17,9 +17,11 @@
 #include <rte_cycles.h>
 #include <rte_lcore.h>
 #include <rte_mbuf.h>
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/util.hpp"
 #include "src/drivers/driver.hpp"
 #include "src/drivers/flow_blocks.hpp"
+#include <unistd.h>
 
 #define RX_RING_SIZE 1024
 #define TX_RING_SIZE 1024
@@ -85,7 +87,8 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 				RTE_ETH_TX_OFFLOAD_UDP_CKSUM   |
 				RTE_ETH_TX_OFFLOAD_TCP_CKSUM   |
 				RTE_ETH_TX_OFFLOAD_SCTP_CKSUM  |
-				RTE_ETH_TX_OFFLOAD_TCP_TSO,
+				RTE_ETH_TX_OFFLOAD_TCP_TSO	   |
+				RTE_ETH_TX_OFFLOAD_MULTI_SEGS, 
 		},
 
 
@@ -100,7 +103,7 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 			"Error during getting device (port %u) info: %s\n",
 			port_id, strerror(-ret));
 
-	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
+	//ort_conf.txmode.offloads &= dev_info.tx_offload_capa;
 	printf(":: initializing port: %d\n", port_id);
 	ret = rte_eth_dev_configure(port_id,
 				nr_queues, nr_queues, &port_conf);
@@ -266,8 +269,7 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 	/* End of setting RX port in promiscuous mode. */
 	if (retval != 0)
 		return retval;
-	struct timespec ts;
-	rte_eth_timesync_read_time((uint16_t)0, &ts);
+	
 	return 0;
 }
 /* >8 End of main functional part of port initialization. */
@@ -492,8 +494,10 @@ public:
 			pkt->data_len = len;
 			pkt->pkt_len = len;
 			pkt->nb_segs = 1;
+			pkt->ol_flags |= RTE_MBUF_F_TX_IEEE1588_TMST; 
+			
 			copy_buf_to_pkt((void*)buf, len, pkt, 0);
-
+			
 			/* Send burst of TX packets. */
 			const uint16_t nb_tx = rte_eth_tx_burst(port, 0,
 					&pkt, 1);
@@ -561,32 +565,40 @@ public:
   
   /* Get timestamp from NIC (global clock 0) */
   struct timespec readCurrentTimestamp() {
+
 	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
     if(rte_eth_timesync_read_time(0, &ts)) {
 		perror("Dpdk current time failed!");
 	}
     
+	//printf("DPDK TS: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
 	return ts;
   }
 
-  struct timespec readTxTimestamp(uint16_t portid) {
+  uint64_t readTxTimestamp(uint16_t portid) {
 	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+
 	if(rte_eth_timesync_read_tx_timestamp(portid, &ts)) {
 		perror("Dpdk TX timestamp failed!");
 	}
 
-	return ts;
+	uint64_t tstamp = (TIMESPEC_TO_NANOS(ts) & 0xFFFFFFFFFF);
+	
+	return tstamp;
   };
   
-  struct timespec readRxTimestamp(uint16_t portid) { 
+  uint64_t readRxTimestamp(uint16_t portid) {
 	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+
 	if(rte_eth_timesync_read_rx_timestamp(portid, &ts, 0)) {
 		perror("Dpdk RX timestamp failed!");
 	}
 
-	return ts;
-  };
+	// dpdk adds the timestamp and the global time together, so we split up the timestamp
+	uint64_t tstamp = (TIMESPEC_TO_NANOS(ts) & 0xFFFFFFFFFF);
 
+	return tstamp;
+  };
 
   virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
   	if (!this->mediate[vm_id]) {
