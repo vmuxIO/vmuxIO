@@ -19,6 +19,7 @@ from dataclasses import dataclass, field, asdict
 import subprocess
 import os
 from pandas import DataFrame
+import pandas as pd
 import traceback
 from conf import G
 
@@ -36,6 +37,9 @@ class IPerfTest(AbstractBenchTest):
     def test_infix(self):
         return f"iperf3_{self.num_vms}vms_{self.interface}_{self.direction}"
 
+    def output_path_per_vm(self, repetition: int, vm_number: int) -> str:
+        return str(Path(G.OUT_DIR) / f"iperf3VMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.json")
+
     def estimated_runtime(self) -> float:
         """
         estimate time needed to run this benchmark excluding boot time in seconds
@@ -52,8 +56,8 @@ class IPerfTest(AbstractBenchTest):
                 failure = True
         return failure
 
-    def summarize(self, repetition: int) -> DataFrame:
-        with open(self.output_filepath(repetition), 'r') as f:
+    def summarize(self, repetition: int, vm_num: int) -> DataFrame:
+        with open(self.output_path_per_vm(repetition, vm_num), 'r') as f:
             data = json.load(f)
 
         # Extract important values
@@ -72,7 +76,7 @@ class IPerfTest(AbstractBenchTest):
         data = [{
             **asdict(self), # put selfs member variables and values into this dict
             "repetition": repetition,
-            # "vm_number": vm_number,
+            "vm_num": vm_num,
             "GBit/s": gbitps,
         }]
         return DataFrame(data=data)
@@ -105,10 +109,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     repetitions = 3
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        # interfaces = [ Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_DPDK_E810 ]
+        interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.VMUX_DPDK_E810 ]
         directions = [ "forward" ]
-        vm_nums = [ 1 ]
+        vm_nums = [ 2 ]
         repetitions = 1
 
     test_matrix = dict(
@@ -119,7 +123,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     )
 
     info(f"Iperf Test execution plan:")
-    IPerfTest.estimate_time(test_matrix, ["interface", "num_vms"])
+    args_reboot = ["interface", "num_vms", "direction"]
+    IPerfTest.estimate_time(test_matrix, args_reboot)
     tests = IPerfTest.list_tests(test_matrix)
 
     if plan_only:
@@ -129,7 +134,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     with Bench(
             tests = tests,
-            args_reboot = ["interface", "num_vms", "direction"],
+            args_reboot = args_reboot,
             brief = G.BRIEF
             ) as (bench, bench_tests):
         for num_vms, num_vms_tests in bench.iterator(bench_tests, "num_vms"):
@@ -143,7 +148,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     info("Booting VM")
 
                     # boot VMs
-                    with measurement.virtual_machine(interface) as guest:
+                    with measurement.virtual_machines(interface, num_vms) as guests:
                         # loadgen: set up interfaces and networking
 
                         info('Binding loadgen interface')
@@ -154,45 +159,66 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                             loadgen.delete_nic_ip_addresses(loadgen.test_iface)
                         except Exception:
                             pass
-
-                        guest.modprobe_test_iface_drivers(interface=interface)
-                        guest.setup_test_iface_ip_net()
                         loadgen.setup_test_iface_ip_net()
+
+                        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                            guest.modprobe_test_iface_drivers(interface=interface)
+                            guest.setup_test_iface_ip_net()
+                        end_foreach(guests, foreach_parallel)
 
                         for repetition in range(repetitions):
                             #cleanup
-                            guest.stop_iperf_server()
-                            loadgen.stop_iperf_client()
+                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                                guest.stop_iperf_server()
+                                loadgen.stop_iperf_client(vm_num=i)
+                            end_foreach(guests, foreach_parallel)
 
-                            remote_output_file = "/tmp/iperf_result.json"
-                            tmp_remote_output_file = "/tmp/tmp_iperf_result.json"
+                            def remote_output_file(vm_num):
+                                return f"/tmp/iperf_result_vm{vm_num}.json"
+                            def tmp_remote_output_file(vm_num):
+                                return f"/tmp/tmp_iperf_result_vm{vm_num}.json"
                             local_output_file = test.output_filepath(repetition)
-                            loadgen.exec(f"sudo rm {remote_output_file} || true")
-                            loadgen.exec(f"sudo rm {tmp_remote_output_file} || true")
+                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                                loadgen.exec(f"sudo rm {remote_output_file(i)} || true")
+                                loadgen.exec(f"sudo rm {tmp_remote_output_file(i)} || true")
+                            end_foreach(guests, foreach_parallel)
 
                             info("Starting iperf")
-                            guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
-                            loadgen.run_iperf_client(test, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file, tmp_remote_output_file)
+                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                                guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
+                            end_foreach(guests, foreach_parallel)
+                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                                loadgen.run_iperf_client(test, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file(i), tmp_remote_output_file(i), vm_num=i)
+                            end_foreach(guests, foreach_parallel)
                             time.sleep(DURATION_S)
 
                             try:
-                                loadgen.wait_for_success(f'[[ -e {remote_output_file} ]]')
+                                for i, guest in guests.items():
+                                    loadgen.wait_for_success(f'[[ -e {remote_output_file(i)} ]]')
                             except TimeoutError:
                                 error('Waiting for output file timed out.')
-                            loadgen.copy_from(remote_output_file, local_output_file)
+
+                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                                loadgen.copy_from(remote_output_file(i), test.output_path_per_vm(repetition, i))
+                            end_foreach(guests, foreach_parallel)
 
                             # teardown
-                            guest.stop_iperf_server()
-                            loadgen.stop_iperf_client()
+                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                                guest.stop_iperf_server()
+                                loadgen.stop_iperf_client(vm_num=i)
+                            end_foreach(guests, foreach_parallel)
 
                             # summarize results of VM
-                            local_summary = test.output_filepath(repetition, extension = "summary")
-                            with open(local_summary, 'w') as file:
-                                try:
-                                    # to_string preserves all cols
-                                    summary = test.summarize(repetition).to_string()
-                                except Exception as e:
-                                    summary = traceback.format_exc()
+                            with open(local_output_file, 'w') as file:
+                                dfs = []
+                                for i, guest in guests.items():
+                                    try:
+                                        dfs += [ test.summarize(repetition, i) ]
+                                    except Exception as e:
+                                        warning(f"Can't process result of VM {i} repetition {repetition}. Did the benchmark fail?")
+                                        _ignore = traceback.format_exc()
+                                # to_string preserves all cols
+                                summary = pd.concat(dfs).to_string()
                                 file.write(summary)
                     # end VM
                     bench.done(test)
