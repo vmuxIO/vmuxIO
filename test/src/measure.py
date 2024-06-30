@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from util import safe_cast, product_dict
-from typing import Iterator, cast, List, Dict, Callable, Tuple, Any, Self
+from typing import Iterator, cast, List, Dict, Callable, Tuple, Any, Self, TypeVar, Iterable, Type, Generic
 from os.path import isfile, join as path_join
 import os
 from abc import ABC, abstractmethod
@@ -268,6 +268,8 @@ class Measurement:
         self.host.cleanup_network()
 
 
+A = TypeVar("A", bound='AbstractBenchTest')
+
 @dataclass
 class AbstractBenchTest(ABC):
     # magic parameter: repetitions
@@ -302,7 +304,7 @@ class AbstractBenchTest(ABC):
         return False
 
     @classmethod
-    def list_tests(cls, test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> List[Any]:
+    def list_tests(cls: Type[A], test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> List[A]:
         """
         test_matrix:
         dict where every key corresponds to a constructor parameter/field for this cls/BenchTest (same list as test_parameters() returns).
@@ -411,11 +413,12 @@ class AbstractBenchTest(ABC):
         """
         return [i for i in cls.__match_args__]
 
+T = TypeVar("T", bound=AbstractBenchTest)
 
-class Bench(ContextDecorator):
+class Bench(Generic[T], ContextDecorator):
     tqdm: Any
 
-    def __init__(self, tests: List[AbstractBenchTest], args_reboot: List[str] = [], brief: bool = False):
+    def __init__(self, tests: List[T], args_reboot: List[str] = [], brief: bool = False):
         self.args_reboot = args_reboot
         assert len(tests) > 0
         self.remaining_tests = [ test for test in tests if test.needed()]
@@ -446,9 +449,9 @@ class Bench(ContextDecorator):
     def __exit__(self, *exc):
         self.tqdm.close()
 
-    def iterator(self, tests: List[AbstractBenchTest], test_parameter: str):
+    def iterator(self, tests: List[T], test_parameter: str) -> Iterable[Tuple[Any, List[T]]]:
         """
-        Iterate over all values of test_parameter of tests.
+        Return an iterator over all values of test_parameter of tests.
         test_parameter: name of the parameter (AbstractBenchTest member variable name) to iterate over
         """
         parameter_values = [ test.__dict__[test_parameter] for test in tests ]
@@ -457,7 +460,7 @@ class Bench(ContextDecorator):
             parameter_tests = [ test for test in tests if test.__dict__[test_parameter] == parameter_value]
             yield (parameter_value, parameter_tests)
 
-    def done(self, done: AbstractBenchTest):
+    def done(self, done: T):
         self.remaining_tests.remove(done)
         time_remaining_new_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
         time_progress_s = self.time_remaining_s - time_remaining_new_s
