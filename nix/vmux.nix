@@ -81,7 +81,7 @@ pkgs.clangStdenv.mkDerivation {
   hardeningDisable = [ "all" ];
 
   configurePhase = ''
-    meson build -Ddont_build_libnic_emu=true -Dbuildtype=release
+    meson build -Ddont_build_libnic_emu=true -Dbuildtype=debug
   '';
   buildPhase = ''
     meson compile -C build

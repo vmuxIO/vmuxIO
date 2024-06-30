@@ -31,7 +31,7 @@
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
 
-namespace i40e {
+namespace e810 {
 
 host_mem_cache::host_mem_cache(e810_bm &dev_) : dev(dev_) {
   reset();

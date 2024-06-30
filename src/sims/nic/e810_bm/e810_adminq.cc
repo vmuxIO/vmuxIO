@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include <cassert>
 #include <iostream>
 using namespace std;
@@ -34,7 +35,7 @@ using namespace std;
 #include <bits/stdc++.h>
 #include <algorithm>
 
-namespace i40e {
+namespace e810 {
 
 queue_admin_tx::queue_admin_tx(e810_bm &dev_, uint64_t &reg_base_,
                                uint32_t &reg_len_, uint32_t &reg_head_,
@@ -71,7 +72,7 @@ void queue_admin_tx::reg_updated() {
 
 queue_admin_tx::admin_desc_ctx::admin_desc_ctx(queue_admin_tx &queue_,
                                                e810_bm &dev_)
-    : i40e::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
+    : e810::queue_base::desc_ctx(queue_), aq(queue_), dev(dev_) {
   d = reinterpret_cast<struct ice_aq_desc *>(desc);
 }
 
@@ -145,7 +146,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
         reinterpret_cast<struct ice_aqc_get_ver *>(d->params.raw);
     gv->rom_ver = 0;
     gv->fw_build = 0;
-    gv->fw_major = 0;
+    gv->fw_major = 6;
     gv->fw_minor = 0;
     gv->api_major = EXP_FW_API_VER_MAJOR;
     gv->api_minor = EXP_FW_API_VER_MINOR;
@@ -198,6 +199,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
         {ICE_AQC_CAPS_DCB, 1, 0, 1, 4, 1, {}, {}},
         {ICE_AQC_CAPS_IWARP, 1, 0, 1, 1, 1, {}, {}},
         {ICE_AQC_CAPS_FD, 1, 0, dev.NUM_FD_GUAR, dev.NUM_FD_BEST_EFFORT, 0, {}, {}},
+        {ICE_AQC_CAPS_1588, 1, 1, CAP_1588_FLAGS, 1, 1, {}, {} }
     };
     size_t num_caps = sizeof(caps) / sizeof(caps[0]);
 
@@ -268,7 +270,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_get_link_status_data link_status_data;
     // link_status_data.topo_media_conflict = BIT(3);
     link_status_data.phy_type_low = ICE_PHY_TYPE_LOW_40GBASE_CR4;
-    // link_status_data.phy_type_high = 
+    // link_status_data.phy_type_high =
     link_status_data.link_speed = ICE_AQ_LINK_SPEED_40GB;
     link_status_data.link_info = ICE_AQ_LINK_UP | ICE_AQ_LINK_UP_PORT |
                      ICE_AQ_MEDIA_AVAILABLE | ICE_AQ_SIGNAL_DETECT;
@@ -288,7 +290,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
         reinterpret_cast<struct ice_aqc_get_sw_cfg *>(d->params.raw);
     struct ice_aqc_get_sw_cfg_resp_elem hr;
     /* Not sure why dpdk doesn't like this?
-    struct i40e_aqc_switch_config_element_resp els[] = {
+    struct e810_aqc_switch_config_element_resp els[] = {
         // EMC
         { I40E_AQ_SW_ELEM_TYPE_EMP, I40E_AQ_SW_ELEM_REV_1, 1, 513, 0, {},
             I40E_AQ_CONN_TYPE_REGULAR, 0, 0},
@@ -367,7 +369,7 @@ void queue_admin_tx::admin_desc_ctx::process() {
     struct ice_aqc_get_set_rss_key *v =
         reinterpret_cast<struct ice_aqc_get_set_rss_key *>(
                 d->params.raw);
-    
+
     desc_complete_indir(0, data, d->datalen);
   } else if (d->opcode == ice_aqc_opc_set_rss_lut) {
     struct ice_aqc_get_set_rss_lut *v =
@@ -711,7 +713,6 @@ void queue_admin_tx::admin_desc_ctx::process() {
     uint32_t offset = 0;
     offset |= nvm_read_cmd->offset_low;
     offset |= (nvm_read_cmd->offset_high) << 16;
-    printf("nvm read at 0x%x\n", offset);
 
     // copy responses observed on real hardware.
     if (offset == 0x0) { // some control register defining nvm layout
@@ -768,4 +769,4 @@ void queue_admin_tx::admin_desc_ctx::process() {
     desc_complete(0);
   }
 }
-}  // namespace i40e
+}  // namespace e810

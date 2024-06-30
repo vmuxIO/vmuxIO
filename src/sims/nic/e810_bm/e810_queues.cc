@@ -32,7 +32,7 @@
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
 
-namespace i40e {
+namespace e810 {
 
 queue_base::queue_base(const std::string &qname_, uint32_t &reg_head_,
                        uint32_t &reg_tail_, e810_bm &dev_)
@@ -449,4 +449,4 @@ void queue_base::dma_data_wb::done() {
   ctx.queue.trigger();
   delete this;
 }
-}  // namespace i40e
+}  // namespace e810

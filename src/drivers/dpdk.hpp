@@ -75,6 +75,10 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 	uint16_t i;
 	/* Ethernet port configured with default settings. 8< */
 	struct rte_eth_conf port_conf = {
+		.rxmode = {
+			.offloads = 
+				RTE_ETH_RX_OFFLOAD_TIMESTAMP
+		},
 		.txmode = {
 			.offloads =
 				RTE_ETH_TX_OFFLOAD_VLAN_INSERT |
@@ -84,6 +88,8 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 				RTE_ETH_TX_OFFLOAD_SCTP_CKSUM  |
 				RTE_ETH_TX_OFFLOAD_TCP_TSO,
 		},
+
+
 	};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
@@ -162,6 +168,13 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 			ret, port_id);
 	}
 	/* >8 End of starting the port. */
+  	
+	
+	/* Intialize TimeSync / PTP */
+  	int retval = rte_eth_timesync_enable(port_id);
+	if (retval < 0) {
+		perror("Timesync enable failed!");
+	}
 
 	printf(":: initializing port: %d done\n", port_id);
 }
@@ -187,6 +200,8 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 	uint16_t q;
 	struct rte_eth_dev_info dev_info;
 	struct rte_eth_txconf txconf;
+	
+	die("DIE 1");
 
 	if (!rte_eth_dev_is_valid_port(port))
 		return -1;
@@ -247,12 +262,22 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 			   " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 "\n",
 			port, RTE_ETHER_ADDR_BYTES(&addr));
 
-	/* Enable RX in promiscuous mode for the Ethernet device. */
+
+  	/* Intialize TimeSync / PTP */
+  	retval = rte_eth_timesync_enable(port);
+	if (retval < 0) {
+		printf("Timesync enable failed: %d\n", retval);
+		return retval;
+	}
+  
+  	/* Enable RX in promiscuous mode for the Ethernet device. */
 	retval = rte_eth_promiscuous_enable(port);
+	
 	/* End of setting RX port in promiscuous mode. */
 	if (retval != 0)
 		return retval;
-
+	struct timespec ts;
+	rte_eth_timesync_read_time((uint16_t)0, &ts);
 	return 0;
 }
 /* >8 End of main functional part of port initialization. */
@@ -449,14 +474,19 @@ public:
 
 		/* closing and releasing resources */
 		rte_flow_flush(this->port_id, &error);
-		ret = rte_eth_dev_stop(this->port_id);
-		if (ret < 0)
+    	rte_eth_timesync_disable(this->port_id);   
+		
+    	ret = rte_eth_dev_stop(this->port_id);
+	
+  		if (ret < 0) {
 			printf("Failed to stop port %u: %s",
 		       	 this->port_id, rte_strerror(-ret));
+    	}
+
 		rte_eth_dev_close(this->port_id);
-			/* clean up the EAL */
-			rte_eal_cleanup();
-		}
+		/* clean up the EAL */
+		rte_eal_cleanup();
+	}
 
 	// blocks, busy waiting!
 	void poll_once() {
@@ -545,11 +575,41 @@ public:
 
   virtual void recv_consumed(int vm_id) {
     // free pkt
-		for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++)
-			rte_pktmbuf_free(this->bufs[buf]);
+	for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++) 
+		rte_pktmbuf_free(this->bufs[buf]);
 		
     this->nb_bufs_used = 0;
+  
   }
+  
+  /* Get timestamp from NIC (global clock 0) */
+  struct timespec readCurrentTimestamp() {
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+    if(rte_eth_timesync_read_time(0, &ts)) {
+		perror("Dpdk current time failed!");
+	}
+    
+	return ts;
+  }
+
+  struct timespec readTxTimestamp(uint16_t portid) {
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+	if(rte_eth_timesync_read_tx_timestamp(portid, &ts)) {
+		perror("Dpdk TX timestamp failed!");
+	}
+
+	return ts;
+  };
+  
+  struct timespec readRxTimestamp(uint16_t portid) { 
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+	if(rte_eth_timesync_read_rx_timestamp(portid, &ts, 0)) {
+		perror("Dpdk RX timestamp failed!");
+	}
+
+	return ts;
+  };
+
 
   virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
   	if (!this->mediate[vm_id]) {
@@ -561,7 +621,7 @@ public:
   	printf("dpdk add switch rule\n");
 
 		struct rte_flow_error error;
-  	struct rte_flow* flow;
+  		struct rte_flow* flow;
 		struct rte_ether_addr src_mac;
 		struct rte_ether_addr src_mask;
 		struct rte_ether_addr dest_mac;

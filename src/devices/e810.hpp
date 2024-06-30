@@ -5,6 +5,7 @@
 #include "libsimbricks/simbricks/nicbm/nicbm.h"
 #include "libvfio-user.h"
 #include "sims/nic/e810_bm/e810_bm.h"
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/devices/vmux-device.hpp"
 #include "util.hpp"
 #include "vfio-consumer.hpp"
@@ -13,6 +14,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <ctime>
 
 #define NUM_MSIX_IRQs 16 // choose small to avoid unneccessary polling in processAllPollTimers
 
@@ -31,7 +33,7 @@ private:
 
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
-               //
+               
   std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle;
 
   void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
@@ -53,7 +55,7 @@ private:
   }
 
 public:
-  std::shared_ptr<i40e::e810_bm> model;
+  std::shared_ptr<e810::e810_bm> model;
 
   E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(device_id, driver) {
     this->driver = driver;
@@ -66,8 +68,8 @@ public:
     }
 
     // printf("foobar %zu\n", nicbm::kMaxDmaLen);
-    // i40e::i40e_bm* model = new i40e::i40e_bm();
-    this->model = std::make_shared<i40e::e810_bm>();
+    // e810::e810_bm* model = new e810::e810_bm();
+    this->model = std::make_shared<e810::e810_bm>();
 
     this->init_pci_ids();
     this->registerDriverEpoll(driver, efd);
@@ -141,6 +143,7 @@ public:
     __builtin_dump_struct(&this->deviceIntro, &printf);
     this->model->SetupIntro(this->deviceIntro);
   }
+
 
 private:
   void init_general_callbacks(VfioUserServer &vfu) {

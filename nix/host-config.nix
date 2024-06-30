@@ -132,6 +132,7 @@ lib.attrsets.recursiveUpdate ({
       ${busybox}/bin/devmem $@
     '')
     ethtool
+    linuxptp
     bpftrace
     flakepkgs.devShellGcRoot
   ] ++ extraEnvPackages;

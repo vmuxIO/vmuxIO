@@ -10,7 +10,7 @@ using namespace std;
 
 #include <bits/stdc++.h>
 
-namespace i40e {
+namespace e810 {
 
 completion_event_manager::completion_event_manager(e810_bm &dev_, size_t num_qs_)
     : dev(dev_), log("cem", dev_.runner_),num_qs(num_qs_){
@@ -140,4 +140,4 @@ void completion_event_queue::dma_data_wb::done() {
   delete this;
 }
 
-}  // namespace i40e
+}  // namespace e810
