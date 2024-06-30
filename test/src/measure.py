@@ -188,6 +188,7 @@ class Measurement:
         # host: inital cleanup
 
         debug('Initial cleanup')
+        self.guests = dict()
 
         try:
             self.host.kill_guest()
@@ -205,10 +206,10 @@ class Measurement:
 
         self.host.detect_test_iface()
 
-        unbatched_interfaces = [ 
-            interface for interface in Interface.__members__.values() if 
+        unbatched_interfaces = [
+            interface for interface in Interface.__members__.values() if
                                 interface.needs_vfio() or (interface.needs_br_tap() and interface.needs_vmux()) ]
-        
+
         if interface in unbatched_interfaces:
             # vmux taps need to be there all from the start (no batching)
             debug(f"Setting up interface {interface.value} for {num} VMs")
@@ -226,7 +227,7 @@ class Measurement:
             range_ = range_[batch:]
 
             info(f"Starting VM {vm_range.start}-{vm_range.stop - 1}")
-   
+
             if interface not in unbatched_interfaces:
                 debug(f"Setting up interface {interface.value} for {num} VMs")
                 setup_host_interface(self.host, interface, vm_range=vm_range)
@@ -246,14 +247,14 @@ class Measurement:
 
                 self.guests[i] = self.guest.multihost_clone(i)
 
-                # giving each qemu instance time to allocate its memory can help starting more intances. 
-                # If multiple qemus allocate at the same time, both will fail even though one could have successfully started if it was the only one doing allocations. 
-                time.sleep(1) 
+                # giving each qemu instance time to allocate its memory can help starting more intances.
+                # If multiple qemus allocate at the same time, both will fail even though one could have successfully started if it was the only one doing allocations.
+                time.sleep(1)
 
             info(f"Waiting for connectivity of guests")
             for i in vm_range:
                 self.guests[i].wait_for_connection(timeout=120)
-            
+
         yield self.guests
 
         # teardown
@@ -267,9 +268,9 @@ class Measurement:
 @dataclass
 class AbstractBenchTest(ABC):
     # magic parameter: repetitions
-    # Feature matrixes for other parameters take lists of values to iterate over. 
+    # Feature matrixes for other parameters take lists of values to iterate over.
     # Wile repetitions is also a list in the feature matrix, even single value (e.g. 3) still means that this test will be run 3 times.
-    repetitions: int 
+    repetitions: int
     num_vms: int
 
     @abstractmethod
@@ -298,7 +299,7 @@ class AbstractBenchTest(ABC):
         return False
 
     @classmethod
-    def list_tests(cls, test_matrix: Dict[str, List[Any]]) -> List[Any]:
+    def list_tests(cls, test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> List[Any]:
         """
         test_matrix:
         dict where every key corresponds to a constructor parameter/field for this cls/BenchTest (same list as test_parameters() returns).
@@ -307,15 +308,16 @@ class AbstractBenchTest(ABC):
         ret = []
         for test_args in product_dict(test_matrix):
             test = cls(**test_args)
-            ret += [ test ]
+            if not exclude_test(test):
+                ret += [ test ]
         return ret
 
     @classmethod
-    def any_needed(cls, test_matrix: Dict[str, List[Any]]) -> bool:
+    def any_needed(cls, test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> bool:
         """
         Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
         """
-        for test in cls.list_tests(test_matrix):
+        for test in cls.list_tests(test_matrix, exclude_test=exclude_test):
             if test.needed():
                 debug(f"any_needed: needs {test}")
                 return True
@@ -340,7 +342,7 @@ class AbstractBenchTest(ABC):
         return errors_found
 
     @classmethod
-    def estimate_time(cls, test_matrix: Dict[str, List[Any]], args_reboot: List[str]) -> float:
+    def estimate_time(cls, test_matrix: Dict[str, List[Any]], args_reboot: List[str] = []) -> float:
         """
         Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
         kwargs_reboot: test_matrix keys. Changing these parameters requires a reboot.
@@ -349,6 +351,7 @@ class AbstractBenchTest(ABC):
         needed = 0
         needed_s = 0.0
         unknown_runtime = False
+        # TODO use list_tests here and incorporate exclude_test
         for test_args in product_dict(test_matrix):
             test = cls(**test_args)
             total += 1
@@ -406,7 +409,7 @@ def main():
     info("")
     measure_ycsb.main(measurement, plan_only=True)
     info("")
-    measure_iperf.main(measurement, plan_only=True)
+    # measure_iperf.main(measurement, plan_only=True)
     info("")
     measure_mediation.main(measurement, plan_only=True)
     info("")
@@ -417,7 +420,7 @@ def main():
     measure_mediation.main(measurement)
     measure_hotel.main(measurement)
     measure_ycsb.main(measurement)
-    measure_iperf.main(measurement)
+    # measure_iperf.main(measurement)
 
 if __name__ == "__main__":
     main()

@@ -59,11 +59,18 @@ class LoadLatencyTest(object):
             f"histogram_{self.test_infix()}_rep{repetition}.csv"
         )
 
+    def stats_filepath(self, repetition: int):
+        return path_join(
+            self.outputdir,
+            f"moongen_{self.test_infix()}_rep{repetition}.csv"
+        )
+
     def test_done(self, repetition: int):
         output_file = self.output_filepath(repetition)
         histogram_file = self.histogram_filepath(repetition)
+        stats_file = self.stats_filepath(repetition)
 
-        return isfile(output_file) and isfile(histogram_file)
+        return isfile(output_file) and isfile(histogram_file) and isfile(stats_file)
 
     def needed(self):
         for repetition in range(self.repetitions):
@@ -91,6 +98,7 @@ class LoadLatencyTest(object):
 
         remote_output_file = "/tmp/output.log"
         remote_histogram_file = '/tmp/histogram.csv'
+        remote_stats_file = "/tmp/moongen.csv"
 
         if self.warmup:
             # warm-up
@@ -120,7 +128,8 @@ class LoadLatencyTest(object):
                 LoadGen.run_l2_load_latency(loadgen, self.mac, self.rate,
                                             self.runtime, self.size,
                                             histfile=remote_histogram_file,
-                                            outfile=remote_output_file)
+                                            outfile=remote_output_file,
+                                            statsfile=remote_stats_file)
             except Exception as e:
                 error(f'Failed to run test due to exception: {e}')
                 continue
@@ -143,6 +152,8 @@ class LoadLatencyTest(object):
                               self.output_filepath(repetition))
             loadgen.copy_from(remote_histogram_file,
                               self.histogram_filepath(repetition))
+            loadgen.copy_from(remote_stats_file,
+                              self.stats_filepath(repetition))
 
     def accumulate(self, force: bool = False):
         assert self.repetitions > 0, 'Reps must be greater than 0.'

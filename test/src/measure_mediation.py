@@ -29,9 +29,10 @@ class MediationTest(AbstractBenchTest):
     # test options
     interface: str # network interface used
     fastclick: str # one of: software | hardware
+    rate: int # offered load, kpps
 
     def test_infix(self):
-        return f"mediation_{self.fastclick}_{self.num_vms}vms_{self.interface}"
+        return f"mediation_{self.fastclick}_{self.num_vms}vms_{self.interface}_{self.rate}kpps"
 
     def output_filepath_histogram(self, repetition: int) -> str:
         return self.output_filepath(repetition, extension = "histogram.csv")
@@ -124,7 +125,7 @@ def run_test(host: Host, loadgen: LoadGen, guest: Guest, test: MediationTest, re
     guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=fastclick_args)
     time.sleep(10) # fastclick takes roughly as long as moongen to start, be we give it some slack nevertheless
     info("Starting MoonGen")
-    loadgen.run_l2_load_latency(loadgen, "00:00:00:00:00:00", 1000,
+    loadgen.run_l2_load_latency(loadgen, "00:00:00:00:00:00", test.rate,
             runtime = DURATION_S,
             size = 60,
             nr_macs = 3,
@@ -164,33 +165,40 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [
           Interface.VMUX_MED,
-          Interface.VMUX_DPDK_E810
+          Interface.VMUX_DPDK_E810,
+          Interface.VFIO,
+          Interface.VMUX_PT,
           ]
     fastclicks = [
             "hardware",
             "software",
             ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
+    rates = [ 1000, 40000 ]
     repetitions = 9
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        # interfaces = [ Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_MED ]
+        # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
+        # interfaces = [ Interface.BRIDGE ] # doesnt work with click (RSS init fails)
+        # interfaces = [ Interface.VMUX_MED ]
+        interfaces = [ Interface.VMUX_EMU_E810 ]
         # interfaces = [ Interface.VFIO ]
-        # fastclicks = [ "software" ]
+        fastclicks = [ "hardware" ]
         vm_nums = [ 1 ]
         repetitions = 1
+        rates = [ 40000 ]
 
     test_matrix = dict(
         repetitions=[ repetitions ],
         interface=[ interface.value for interface in interfaces],
         fastclick = fastclicks,
-        num_vms=vm_nums
+        num_vms=vm_nums,
+        rate=rates
     )
     all_tests = MediationTest.list_tests(test_matrix)
 
     info(f"Mediation test execution plan:")
-    MediationTest.estimate_time(test_matrix, ["interface", "num_vms", "repetitions", "fastclick"])
+    MediationTest.estimate_time(test_matrix, args_reboot = ["interface", "num_vms", "repetitions", "fastclick"])
 
     if plan_only:
         return
@@ -207,49 +215,54 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         interface=[ interface.value ],
                         fastclick=[ fastclick ],
                         num_vms=[ num_vms ],
+                        rate=rates,
                         )
                     if not MediationTest.any_needed(test_matrix):
                         warning(f"Skipping {fastclick}@{interface}: All measurements done already.")
                         continue
 
-                    # build test object
-                    test = MediationTest(
-                            interface=interface.value,
-                            repetitions=repetitions,
-                            fastclick=fastclick,
-                            num_vms=num_vms)
-                    tests_run += [ test ]
-                    info(f"Testing repetition {repetition}: {test}")
-
                     info("Booting VM")
                     # with measurement.virtual_machine(interface, run_guest_args = { 'extkern': "foobar"}) as guest:
                     with measurement.virtual_machine(interface) as guest:
-                        # loadgen: set up interfaces and networking
+                        for rate in rates:
+                            # build test object
+                            test = MediationTest(
+                                    interface=interface.value,
+                                    repetitions=repetitions,
+                                    fastclick=fastclick,
+                                    num_vms=num_vms,
+                                    rate=rate)
+                            if not test.needed():
+                                continue
+                            tests_run += [ test ]
+                            info(f"Testing repetition {repetition}: {test}")
 
-                        info('Binding loadgen interface')
-                        try:
-                            loadgen.delete_nic_ip_addresses(loadgen.test_iface)
-                        except Exception:
-                            pass
-                        loadgen.modprobe_test_iface_drivers()
-                        loadgen.bind_test_iface() # bind vfio driver
+                            # loadgen: set up interfaces and networking
 
-                        # guest.modprobe_test_iface_drivers()
-                        guest.bind_test_iface() # bind vfio driver
-
-                        # run test
-                        run_test(host, loadgen, guest, test, repetition)
-
-                        # summarize results
-                        local_summary_file = test.output_filepath(repetition)
-                        with open(local_summary_file, 'w') as file:
+                            info('Binding loadgen interface')
                             try:
-                                # to_string preserves all cols
-                                summary = test.summarize(repetition)
-                                summary = summary.to_string()
-                            except Exception as e:
-                                summary = str(e)
-                            file.write(summary)
+                                loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+                            except Exception:
+                                pass
+                            loadgen.modprobe_test_iface_drivers()
+                            loadgen.bind_test_iface() # bind vfio driver
+
+                            # guest.modprobe_test_iface_drivers()
+                            guest.bind_test_iface() # bind vfio driver
+
+                            # run test
+                            run_test(host, loadgen, guest, test, repetition)
+
+                            # summarize results
+                            local_summary_file = test.output_filepath(repetition)
+                            with open(local_summary_file, 'w') as file:
+                                try:
+                                    # to_string preserves all cols
+                                    summary = test.summarize(repetition)
+                                    summary = summary.to_string()
+                                except Exception as e:
+                                    summary = str(e)
+                                file.write(summary)
 
 
     # summarize all summaries

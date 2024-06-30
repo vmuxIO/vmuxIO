@@ -24,14 +24,17 @@ class YcsbTest(AbstractBenchTest):
     def output_path_per_vm(self, repetition: int, vm_number: int) -> str:
         return str(Path(G.OUT_DIR) / f"ycsbVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
+    def output_path_dataframe(self, repetition: int) -> str:
+        return self.output_filepath(repetition, extension="csv")
+
     def estimated_runtime(self) -> float:
         """
         estimate time needed to run this benchmark excluding boottime in seconds
         """
         app_setup = 3 # diff "running YcsbTest" "Running wrk2 x times"
 
-        # repetition contains 
-        # DURATION_S 
+        # repetition contains
+        # DURATION_S
         # + wait_for_results(0 in underload, 10s in overload)
         # + 3s other overhead
         measurements = self.repetitions * ( DURATION_S + 13 )
@@ -149,11 +152,22 @@ class Ycsb():
                     summary = test.summarize(repetition).to_string()
                 except Exception as e:
                     summary = str(e)
-                file.write(summary) 
+                file.write(summary)
+            local_csv_file = test.output_path_dataframe(repetition)
+            with open(local_csv_file, 'w') as file:
+                try:
+                    raw_data = test.parse_results(repetition).to_csv()
+                except Exception as e:
+                    raw_data = str(e)
+                file.write(raw_data)
+
 
         loadgen.stop_redis()
         pass
-        
+
+
+def exclude_test(test: YcsbTest) -> bool:
+    return Interface(test.interface).is_passthrough() and test.num_vms > 1
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
@@ -161,20 +175,28 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     global DURATION_S
 
     interfaces = [
+        Interface.VFIO,
+        Interface.VMUX_PT,
         Interface.VMUX_EMU,
         # Interface.VMUX_DPDK, # multi-vm broken right now
         Interface.BRIDGE_E1000,
-        Interface.BRIDGE ]
-    rpsList = [ 10, 100, 500, 1000, 5000, 10000, 50000, 1000000 ]
-    vm_nums = [ 1, 2, 4 ]
-    repetitions = 3
+        Interface.BRIDGE,
+        Interface.BRIDGE_VHOST,
+        Interface.VMUX_DPDK_E810,
+        Interface.VMUX_MED,
+        ]
+    rpsList = [ -1 ]
+    vm_nums = [ 1, 2, 4, 8 , 16, 32 ]
+    repetitions = 2
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.BRIDGE_E1000 ]
+        interfaces = [ Interface.VMUX_DPDK_E810 ]
+        # interfaces = [ Interface.VFIO ]
         # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
-        rpsList = [ 10 ]
+        rpsList = [ 1 ]
         repetitions = 1
-        vm_nums = [ 1 ]
+        vm_nums = [ 2, 4, 8, 16, 32 ]
 
     # test = YcsbTest(
     #         repetitions=1,
@@ -199,7 +221,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         return
 
     for num_vms in vm_nums:
-        
+
         moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
         ycsb = Ycsb(moonprogs_dir)
 
@@ -212,7 +234,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 repetitions=[ repetitions ],
                 num_vms=[ num_vms ]
                 )
-            if not YcsbTest.any_needed(test_matrix):
+            if not YcsbTest.any_needed(test_matrix, exclude_test=exclude_test):
                 warning(f"Skipping num_vms {num_vms}: All measurements done already.")
                 continue
 
@@ -233,7 +255,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
-                
+
                 for rps in rpsList:
                     # the actual test
                     test = YcsbTest(
