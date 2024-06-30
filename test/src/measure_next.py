@@ -263,7 +263,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         time_needed_s += DeathStarBenchTest.estimate_time(test_matrix, args_reboot = ["app", "interface", "num_vms"])
         tests += DeathStarBenchTest.list_tests(test_matrix)
 
-    with Bench(tests = tests, args_reboot = ["app", "interface", "num_vms"]) as (bench, bench_tests):
+    with Bench(tests = tests, args_reboot = ["app", "interface", "num_vms"], brief = G.BRIEF) as (bench, bench_tests):
         for app, app_tests in bench.iterator(bench_tests, "app"):
             print(f"- Doing app {app}")
             for interface, interface_tests in bench.iterator(app_tests, "interface"):

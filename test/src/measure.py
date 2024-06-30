@@ -414,24 +414,26 @@ class AbstractBenchTest(ABC):
 class Bench(ContextDecorator):
     tqdm: Any
 
-    def __init__(self, tests: List[AbstractBenchTest], args_reboot: List[str] = []):
+    def __init__(self, tests: List[AbstractBenchTest], args_reboot: List[str] = [], brief: bool = False):
         self.args_reboot = args_reboot
         assert len(tests) > 0
         self.remaining_tests = [ test for test in tests if test.needed()]
         self.time_remaining_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
         self.tqdm_constructor = tqdm
+        self.brief = brief
         self.probe_peter()
 
     def probe_peter(self):
-        try:
-            runtime_dir = os.environ["XDG_RUNTIME_DIR"]
-            with open(f"{runtime_dir}/telegram_bot_token", 'r') as file:
-                data = file.read().strip()
-            def my_tqdm(*args, **kwargs):
-                return tqdm_telegram(*args, chat_id="272730663", token=data, **kwargs)
-            self.tqdm_constructor = my_tqdm
-        except Exception:
-            pass # leave default tqdm_constructor
+        if not self.brief:
+            try:
+                runtime_dir = os.environ["XDG_RUNTIME_DIR"]
+                with open(f"{runtime_dir}/telegram_bot_token", 'r') as file:
+                    data = file.read().strip()
+                def my_tqdm(*args, **kwargs):
+                    return tqdm_telegram(*args, chat_id="272730663", token=data, **kwargs)
+                self.tqdm_constructor = my_tqdm
+            except Exception:
+                pass # leave default tqdm_constructor
 
     def __enter__(self):
         self.tqdm = self.tqdm_constructor(total=self.time_remaining_s+0.1, # +0.1 to avoid float summing errors
