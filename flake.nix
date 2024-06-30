@@ -276,6 +276,7 @@
           ps.netaddr
           ps.pandas
           ps.tqdm
+          ps.requests
 
           # dependencies for hosts/prepare.py
           ps.pyyaml

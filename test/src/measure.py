@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from util import safe_cast, product_dict
-from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
+from typing import Iterator, cast, List, Dict, Callable, Tuple, Any, Self
 from os.path import isfile, join as path_join
+import os
 from abc import ABC, abstractmethod
 from server import Host, Guest, LoadGen
 import autotest as autotest
@@ -9,7 +10,7 @@ from configparser import ConfigParser
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from typing import Tuple, Iterator, Any, Dict, Callable
-from contextlib import contextmanager
+from contextlib import contextmanager, ContextDecorator
 from enums import Machine, Interface, Reflector, MultiHost
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
@@ -21,6 +22,8 @@ from concurrent.futures import ThreadPoolExecutor
 import subprocess
 from root import QEMU_BUILD_DIR
 from conf import G
+from tqdm import tqdm
+from tqdm.contrib.telegram import tqdm as tqdm_telegram
 
 NUM_WORKERS = 8 # with 16, it already starts failing on rose
 
@@ -271,7 +274,7 @@ class AbstractBenchTest(ABC):
     # Feature matrixes for other parameters take lists of values to iterate over.
     # Wile repetitions is also a list in the feature matrix, even single value (e.g. 3) still means that this test will be run 3 times.
     repetitions: int
-    num_vms: int
+    num_vms: int # assumed to always be in args_reboot
 
     @abstractmethod
     def test_infix(self) -> str:
@@ -347,13 +350,22 @@ class AbstractBenchTest(ABC):
         Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
         kwargs_reboot: test_matrix keys. Changing these parameters requires a reboot.
         """
+        tests = cls.list_tests(test_matrix)
+        return cls.estimate_time2(tests, args_reboot=args_reboot, prints=True)
+
+    @classmethod
+    def estimate_time2(cls, tests: List[Self], args_reboot: List[str], prints: bool = True) -> float:
+        """
+        Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
+        kwargs_reboot: test_matrix keys. Changing these parameters requires a reboot.
+        tests: if not None, ignore test_matrix
+        """
         total = 0
         needed = 0
         needed_s = 0.0
         unknown_runtime = False
-        # TODO use list_tests here and incorporate exclude_test
-        for test_args in product_dict(test_matrix):
-            test = cls(**test_args)
+        tests_needed = []
+        for test in tests:
             total += 1
             if test.needed():
                 needed += 1
@@ -361,28 +373,36 @@ class AbstractBenchTest(ABC):
                 if estimated_runtime == -1:
                     unknown_runtime = True
                 needed_s += estimated_runtime
+                tests_needed += [ test ]
 
-        # args not relevant for reboots
-        args_no_reboot = [ key for key in test_matrix.keys() if key not in args_reboot ]
-        # example (1st) test parameters not relevant for reboots
-        kwargs_no_reboot = {key: test_matrix[key][0] for key in args_no_reboot }
-        # test parameters relevant for reboots:
-        reboot_matrix = {key: value for key, value in test_matrix.items() if key in args_reboot}
-        # loop over all reboots
-        for test_args in product_dict(reboot_matrix):
-            test_args = {**test_args, **kwargs_no_reboot}
-            test = cls(**test_args)
+        # find test parameters that trigger reboots
+        reboot_triggers = []
+        reboot_tests = []
+        for test in tests_needed:
+            # only test parameters relevant for reboots
+            test_parameters = dict()
+            for key in args_reboot:
+                test_parameters[key] = test.__dict__[key]
+            # append only the first test that triggeres a reboot
+            if test_parameters not in reboot_triggers:
+                reboot_triggers += [ test_parameters ]
+                reboot_tests += [ test ]
+
+        # estimate time needed for reboots
+        for trigger, test in zip(reboot_triggers, reboot_tests):
             duration_s = Measurement.estimated_boottime(test.num_vms)
             if "repetitions" in args_reboot:
                 duration_s *= test.repetitions
             needed_s += duration_s
 
-        if unknown_runtime:
-            info(f"Test not cached yet: {needed}/{total}. Time to completion not known.")
-        else:
-            info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
+        if prints:
+            if unknown_runtime:
+                info(f"Test not cached yet: {needed}/{total}. Time to completion not known.")
+            else:
+                info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
 
         return needed_s
+
 
     @classmethod
     def test_parameters(cls) -> List[str]:
@@ -390,6 +410,59 @@ class AbstractBenchTest(ABC):
         return the list of names of input parameters for this test
         """
         return [i for i in cls.__match_args__]
+
+
+class Bench(ContextDecorator):
+    tqdm: Any
+
+    def __init__(self, tests: List[AbstractBenchTest], args_reboot: List[str] = [], brief: bool = False):
+        self.args_reboot = args_reboot
+        assert len(tests) > 0
+        self.remaining_tests = [ test for test in tests if test.needed()]
+        self.time_remaining_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
+        self.tqdm_constructor = tqdm
+        self.brief = brief
+        self.probe_peter()
+
+    def probe_peter(self):
+        if not self.brief:
+            try:
+                runtime_dir = os.environ["XDG_RUNTIME_DIR"]
+                with open(f"{runtime_dir}/telegram_bot_token", 'r') as file:
+                    data = file.read().strip()
+                def my_tqdm(*args, **kwargs):
+                    return tqdm_telegram(*args, chat_id="272730663", token=data, **kwargs)
+                self.tqdm_constructor = my_tqdm
+            except Exception:
+                pass # leave default tqdm_constructor
+
+    def __enter__(self):
+        self.tqdm = self.tqdm_constructor(total=self.time_remaining_s+0.1, # +0.1 to avoid float summing errors
+              unit="s",
+              bar_format="{l_bar}{bar}| {n:.0f}/{total:.0f}sec [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+              )
+        return self, self.remaining_tests
+
+    def __exit__(self, *exc):
+        self.tqdm.close()
+
+    def iterator(self, tests: List[AbstractBenchTest], test_parameter: str):
+        """
+        Iterate over all values of test_parameter of tests.
+        test_parameter: name of the parameter (AbstractBenchTest member variable name) to iterate over
+        """
+        parameter_values = [ test.__dict__[test_parameter] for test in tests ]
+        parameter_values = list(dict.fromkeys(parameter_values)) # remove duplicates
+        for parameter_value in parameter_values:
+            parameter_tests = [ test for test in tests if test.__dict__[test_parameter] == parameter_value]
+            yield (parameter_value, parameter_tests)
+
+    def done(self, done: AbstractBenchTest):
+        self.remaining_tests.remove(done)
+        time_remaining_new_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
+        time_progress_s = self.time_remaining_s - time_remaining_new_s
+        self.time_remaining_s = time_remaining_new_s
+        self.tqdm.update(time_progress_s)
 
 
 import measure_vnf
