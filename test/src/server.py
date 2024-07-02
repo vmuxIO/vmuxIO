@@ -2140,9 +2140,10 @@ class LoadGen(Server):
         self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
 
 
-    def run_iperf_client(self, ipt: "IPerfTest", runtime: int, server_hostname: str, output_path: str, tmp_out_path: str, vm_num = ""):
+    def run_iperf_client(self, ipt: "IPerfTest", runtime: int, server_hostname: str, output_path: str, tmp_out_path: str, proto: str = "tcp", length: int = -1, vm_num = ""):
         """
         Starts iperf client
+        length: default if -1
         """
 
         options = ""
@@ -2152,12 +2153,18 @@ class LoadGen(Server):
 
         if ipt.direction  == "reverse":
             options += " -R"
-
         elif ipt.direction == "bidirectional":
             options += " --bidir"
-
         elif ipt.direction != "forward":
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
+
+        if length != "-1":
+            options += " -l {length}"
+
+        if proto == "udp":
+            options += " -u"
+        elif proto != "tcp":
+            warning(f"Unknown protocol {proto}. Using tcp.")
 
         info("Starting iperf client on " + server_hostname)
         self.tmux_new(f"iperf3-client{vm_num}", f"iperf3 -c {server_hostname} -t {runtime} {options} | tee {tmp_out_path}; cp {tmp_out_path} {output_path}; sleep 999")
