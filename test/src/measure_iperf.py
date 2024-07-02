@@ -8,7 +8,7 @@ from logging import (info, debug, error, warning, getLogger,
 from server import Host, Guest, LoadGen
 from enums import Machine, Interface, Reflector, MultiHost
 from measure import Bench, AbstractBenchTest, Measurement, end_foreach
-from util import safe_cast, product_dict
+from util import safe_cast, product_dict, strip_subnet_mask
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
 from os.path import isfile, join as path_join
@@ -83,10 +83,6 @@ class IPerfTest(AbstractBenchTest):
 
 
 
-def strip_subnet_mask(ip_addr: str):
-    return ip_addr[ : ip_addr.index("/")]
-
-
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
     global DURATION_S
@@ -105,12 +101,12 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_MED
           ]
     directions = [ "forward" ]
-    vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
+    vm_nums = [ 1, 2, 4, 8, 16, 32 ]
     repetitions = 3
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        interfaces = [ Interface.BRIDGE_E1000 ]
-        # interfaces = [ Interface.VMUX_DPDK_E810 ]
+        # interfaces = [ Interface.BRIDGE_E1000 ]
+        interfaces = [ Interface.VMUX_DPDK_E810 ]
         directions = [ "forward" ]
         vm_nums = [ 2 ]
         repetitions = 1
@@ -124,8 +120,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     info(f"Iperf Test execution plan:")
     args_reboot = ["interface", "num_vms", "direction"]
-    IPerfTest.estimate_time(test_matrix, args_reboot)
-    tests = IPerfTest.list_tests(test_matrix)
+    def exclude(test):
+        return Interface(test.interface).is_passthrough() and test.num_vms > 1
+    tests = IPerfTest.list_tests(test_matrix, exclude_test=exclude)
+    IPerfTest.estimate_time2(tests, args_reboot)
 
     if plan_only:
         return
@@ -185,6 +183,9 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
                             info("Starting iperf")
                             def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                                # workaround for ARP being broken in vMux: ping the loadgen once
+                                guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
+
                                 guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
                             end_foreach(guests, foreach_parallel)
                             def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
@@ -218,7 +219,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                                         warning(f"Can't process result of VM {i} repetition {repetition}. Did the benchmark fail?")
                                         _ignore = traceback.format_exc()
                                 # to_string preserves all cols
-                                summary = pd.concat(dfs).to_string()
+                                if len(dfs) > 0:
+                                    summary = pd.concat(dfs).to_string()
+                                else:
+                                    summary = "no results"
                                 file.write(summary)
                     # end VM
                     bench.done(test)
