@@ -491,7 +491,9 @@ class Bench(Generic[T], ContextDecorator):
 
     def multi_iterator(self, tests: List[T], test_parameters: List[str]) -> Iterable[Tuple[List[Any], List[T]]]:
         """
-        Loke multi_iterator(), but can be used like:
+        Loops over test_parameters (member variables in tests[] objects).
+
+        Like multi_iterator(), but can be used like:
         for [a_param, b_param], tests_ in bench.multi_iterator(tests, ["a", "b"]):
             ...
         """
