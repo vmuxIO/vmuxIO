@@ -42,3 +42,6 @@ def _product_dict(input_dict: Dict[str, List[Any]], current: Dict[str, Any], res
     return result
 
 
+def strip_subnet_mask(ip_addr: str):
+    return ip_addr[ : ip_addr.index("/")]
+
