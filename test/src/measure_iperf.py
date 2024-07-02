@@ -158,7 +158,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             ) as (bench, bench_tests):
         for [num_vms, interface, direction], a_tests in bench.multi_iterator(bench_tests, ["num_vms", "interface", "direction"]):
             interface = Interface(interface)
-            info("Booting VM for test matrix:")
+            info("Booting VM for this test matrix:")
             info(IPerfTest.test_matrix_string(a_tests))
 
             # boot VMs

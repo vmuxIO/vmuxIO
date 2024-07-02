@@ -319,6 +319,11 @@ class AbstractBenchTest(ABC):
 
     @classmethod
     def test_matrix(cls: Type[A], tests: List[A]):
+        """
+        Generalizes a list of tests into a test matrix.
+        Note, that this matrix can be a superset of the original list of tests.
+        This can happen for example, if the list is a filtered version of list_tests(), because this sparseness cannot be represented by a test_matrix.
+        """
         if len(tests) == 0:
             return dict()
 
@@ -335,8 +340,28 @@ class AbstractBenchTest(ABC):
 
     @classmethod
     def test_matrix_string(cls: Type[A], tests: List[A]) -> str:
+        """
+        Calls test_matrix() and formats the output nicely.
+        """
         test_matrix = cls.test_matrix(tests)
-        ret = "{ "
+
+        # calculate sparseness (how many entries in the test matrix are actually in tests)
+        num_tests_matrix = 0
+        for values in test_matrix.values():
+            if num_tests_matrix == 0:
+                num_tests_matrix = len(values)
+            else:
+                num_tests_matrix *= len(values)
+        matrix_usage = len(tests) / num_tests_matrix
+        sparseness = f"{(1 - matrix_usage)*100:.0f}%"
+
+        dimensions = len(test_matrix.keys())
+        if matrix_usage == 1:
+            description = f"{dimensions} dimensional feature matrix: "
+        else:
+            description = f"{dimensions} dimensional feature matrix ({sparseness} sparse): "
+
+        ret = description + "{ \n"
         for key, values in test_matrix.items():
             values = ", ".join([ str(v) for v in values])
             ret += f"  {key}: {values}\n"
