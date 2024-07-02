@@ -155,10 +155,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             args_reboot = args_reboot,
             brief = G.BRIEF
             ) as (bench, bench_tests):
-        for num_vms, num_vms_tests in bench.iterator(bench_tests, "num_vms"):
-            for interface, interface_tests in bench.iterator(num_vms_tests, "interface"):
+        for [num_vms, interface], a_tests in bench.multi_iterator(bench_tests, ["num_vms", "interface"]):
+            # for interface, interface_tests in bench.iterator(num_vms_tests, "interface"):
                 interface = Interface(interface)
-                for direction, direction_tests in bench.iterator(interface_tests, "direction"):
+                for direction, direction_tests in bench.iterator(a_tests, "direction"):
                     info("Booting VM for test matrix:")
                     info(IPerfTest.test_matrix_string(direction_tests))
 
