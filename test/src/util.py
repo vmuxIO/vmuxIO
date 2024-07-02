@@ -11,11 +11,27 @@ def safe_cast(typ: type[T], o: Any) -> T:
 
     return cast(typ, o)
 
+
+A = TypeVar("A")
+
+def deduplicate(l: List[A]) -> List[A]:
+    """
+    deduplicate based on equality while maintaining order
+    """
+    # return list(dict.fromkeys(l)) # this only works on __hash__()ables (so not on dataclasses)
+    ret = []
+    for i in l:
+        if i not in ret:
+            ret += [ i ]
+    return ret
+
+
 def product_dict(input_dict: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
     current = dict()
     ret = _product_dict(input_dict, current)
     assert ret is not None
     return ret
+
 
 def _product_dict(input_dict: Dict[str, List[Any]], current: Dict[str, Any], result=None, keys: List[str] | None = None, index=0) -> List[Dict[str, Any]] | None:
     """
