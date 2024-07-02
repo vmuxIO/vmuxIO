@@ -617,7 +617,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
         val = regs.REG_GLTSYN_ENA[1]; break;
 
       case PTP_GLTSYN_TIME(0) ... PTP_GLTSYN_TIME(5): {
-        const uint64_t index = addr - PTP_GLTSYN_TIME(0);
+        const uint64_t index = (addr - PTP_GLTSYN_TIME(0)) >> 2;
         e810_timestamp_t ts = ptp.phc_read();
 
         if (index <= 1) {
@@ -632,6 +632,8 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
             // time high
             val = (uint32_t) ((ts.time >> 32) & 0xffffffff);
         }
+
+        break;
       }
 
       case PTP_GLTSYN_SHTIME(0) ... PTP_GLTSYN_SHTIME(5):
@@ -1090,12 +1092,16 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         break;
       }
 
-      case PTP_GLTSYN_SHTIME(0) ... PTP_GLTSYN_SHTIME(5):
-        regs.REG_GLTSYN_SHTIME[addr - PTP_GLTSYN_SHTIME(0)] = val; break;
+      case PTP_GLTSYN_SHTIME(0) ... PTP_GLTSYN_SHTIME(5): {
+        const uint64_t index = (addr - PTP_GLTSYN_SHTIME(0)) >> 2;
+        regs.REG_GLTSYN_SHTIME[index] = val; break;
+      }
 
-      case PTP_GLTSYN_SHADJ(0) ... PTP_GLTSYN_SHADJ(3):
-        regs.REG_GLTSYN_SHADJ[addr - PTP_GLTSYN_SHADJ(0)] = val; break;
-      
+      case PTP_GLTSYN_SHADJ(0) ... PTP_GLTSYN_SHADJ(3): {
+        const uint64_t index = (addr - PTP_GLTSYN_SHADJ(0)) >> 2;
+        regs.REG_GLTSYN_SHADJ[index] = val; break;
+      }
+
       case PTP_GLTSYN_ENA(0):
         DEBUG_LOG_PTP("Enabled PTP for clock 0")
         regs.REG_GLTSYN_ENA[0] = (val & 1); break;

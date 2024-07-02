@@ -11,12 +11,12 @@
 
 namespace e810 {
 
-ptpmgr::ptpmgr(e810_bm &dev_)
+PTPManager::PTPManager(e810_bm &dev_)
   : dev(dev_), last_updated(0), last_val({ .value=0 }), offset({ .value = 0 }), inc_val( 0x100000000 ) {
 }
 
 
-e810_timestamp_t ptpmgr::phc_read() {
+e810_timestamp_t PTPManager::phc_read() {
   // Mediation: if device is emulated, use hw timestamp
   if (auto e810_dev = dynamic_pointer_cast<E810EmulatedDevice>(this->dev.vmux->device)) {
     struct timespec ts = e810_dev->driver->readCurrentTimestamp();
@@ -54,7 +54,7 @@ e810_timestamp_t ptpmgr::phc_read() {
 
 /* Returns the global time and places the 40 bit RX timestamp in tstamp
 */
-e810_timestamp_t ptpmgr::phc_sample_rx(uint16_t portid) {
+e810_timestamp_t PTPManager::phc_sample_rx(uint16_t portid) {
 
   if (auto e810_dev = dynamic_pointer_cast<E810EmulatedDevice>(this->dev.vmux->device)) {
     uint64_t timestamp = e810_dev->driver->readRxTimestamp(portid);
@@ -67,7 +67,7 @@ e810_timestamp_t ptpmgr::phc_sample_rx(uint16_t portid) {
 
 /* Returns the global time and places the 40 bit TX timestamp in tstamp
 */
-e810_timestamp_t ptpmgr::phc_sample_tx(uint16_t portid) {
+e810_timestamp_t PTPManager::phc_sample_tx(uint16_t portid) {
 
   if (auto e810_dev = dynamic_pointer_cast<E810EmulatedDevice>(this->dev.vmux->device)) {
     uint64_t timestamp = e810_dev->driver->readTxTimestamp(portid);
@@ -79,19 +79,19 @@ e810_timestamp_t ptpmgr::phc_sample_tx(uint16_t portid) {
 }
 
 
-void ptpmgr::phc_write(e810_timestamp_t val) {
+void PTPManager::phc_write(e810_timestamp_t val) {
   this->offset.value += (val.value - this->last_val.value);
 }
 
-uint64_t ptpmgr::get_incval() {
+uint64_t PTPManager::get_incval() {
   return this->inc_val;
 }
 
-void ptpmgr::adjust(int64_t val) {
+void PTPManager::adjust(int64_t val) {
   this->offset.value += (__int128) val;
 }
 
-void ptpmgr::set_incval(uint64_t inc) {
+void PTPManager::set_incval(uint64_t inc) {
   this->inc_val = inc;
 }
 

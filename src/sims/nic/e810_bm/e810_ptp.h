@@ -70,11 +70,11 @@ typedef union {
 #define CAP_1588_FLAGS ((uint32_t) CAP_PF_TIMER_0_OWNED | CAP_PF_TIMER_0_ENA | CAP_PF_TIMESYNC_ENA | CAP_PF_LL_TX_SUPPORTED | \
                         CAP_GPIO_TIME_SYNC )
 
-#define TIMESPEC_TO_NANOS(ts) ((uint64_t) (ts.tv_sec) * 1'000'000'000ULL) + (ts.tv_nsec)
+#define TIMESPEC_TO_NANOS(ts) (((uint64_t) (ts.tv_sec) * 1'000'000'000ULL) + (ts.tv_nsec))
 
 class e810_bm;
 
-class ptpmgr {
+class PTPManager {
  protected:
   static const uint64_t CLOCK_HZ = 812500000;
 
@@ -86,7 +86,7 @@ class ptpmgr {
   uint64_t inc_val;
 
  public:
-  ptpmgr(e810_bm &dev);
+  PTPManager(e810_bm &dev);
 
   e810_timestamp_t phc_read();
   

@@ -494,8 +494,10 @@ public:
 			pkt->data_len = len;
 			pkt->pkt_len = len;
 			pkt->nb_segs = 1;
+
+			// TODO	
 			pkt->ol_flags |= RTE_MBUF_F_TX_IEEE1588_TMST; 
-			
+		
 			copy_buf_to_pkt((void*)buf, len, pkt, 0);
 			
 			/* Send burst of TX packets. */

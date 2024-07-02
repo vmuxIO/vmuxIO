@@ -133,7 +133,3 @@ void *Capabilities::vpd() {
   return this->capa("vital product data", PCI_CAP_ID_VPD, PCI_CAP_VPD_SIZEOF,
                     false);
 };
-
-void *Capabilities::ptm() {
-  return this->capa("ptm", PCI_EXT_CAP_ID_PTM, PCI_CAP_SIZEOF, true);
-}

@@ -1018,7 +1018,7 @@ class e810_bm : public nicbm::Runner::Device {
   shadow_ram shram;
   lan lanmgr;
   completion_event_manager cem;
-  ptpmgr ptp;
+  PTPManager ptp;
   e810_switch bcam; // binary content addressable memory aka switch
 
   u8 ctx_addr[2048][22]; // 22 byte descriptors for each tx queue

@@ -159,14 +159,6 @@ private:
       die("add cap error");
     free(cap_data);
 
-    cap_data = caps->ptm();
-    ret = vfu_pci_add_capability(vfu->vfu_ctx, 0,
-                                 VFU_CAP_FLAG_READONLY | VFU_CAP_FLAG_EXTENDED,
-                                 cap_data);
-    if (ret < 0)
-      die("add cap error");
-    free(cap_data);
-
     // see lspci about which fields mean what
     // https://github.com/pciutils/pciutils/blob/42e6a803bda392e98276b71994db0b0dd285cab1/ls-caps.c#L1469
     // struct msixcap data;
