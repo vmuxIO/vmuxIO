@@ -14,7 +14,7 @@ from contextlib import contextmanager, ContextDecorator
 from enums import Machine, Interface, Reflector, MultiHost
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
-from util import safe_cast
+from util import safe_cast, deduplicate
 from pathlib import Path
 import copy
 import time
@@ -318,6 +318,31 @@ class AbstractBenchTest(ABC):
         return ret
 
     @classmethod
+    def test_matrix(cls: Type[A], tests: List[A]):
+        if len(tests) == 0:
+            return dict()
+
+        ret = dict()
+        for key in tests[0].__dict__.keys():
+            values = []
+            for test in tests:
+                value = test.__dict__[key]
+                if value not in values:
+                    values += [ value ]
+            ret[key] = values
+
+        return ret
+
+    @classmethod
+    def test_matrix_string(cls: Type[A], tests: List[A]) -> str:
+        test_matrix = cls.test_matrix(tests)
+        ret = "{ "
+        for key, values in test_matrix.items():
+            values = ", ".join([ str(v) for v in values])
+            ret += f"  {key}: {values}\n"
+        return ret + "}"
+
+    @classmethod
     def any_needed(cls, test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> bool:
         """
         Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
@@ -362,6 +387,9 @@ class AbstractBenchTest(ABC):
         kwargs_reboot: test_matrix keys. Changing these parameters requires a reboot.
         tests: if not None, ignore test_matrix
         """
+        # usually we check if a test has already been run. Hence we never run the same test twice.
+        tests = deduplicate(tests)
+
         total = 0
         needed = 0
         needed_s = 0.0
@@ -455,7 +483,7 @@ class Bench(Generic[T], ContextDecorator):
         test_parameter: name of the parameter (AbstractBenchTest member variable name) to iterate over
         """
         parameter_values = [ test.__dict__[test_parameter] for test in tests ]
-        parameter_values = list(dict.fromkeys(parameter_values)) # remove duplicates
+        parameter_values = deduplicate(parameter_values)
         for parameter_value in parameter_values:
             parameter_tests = [ test for test in tests if test.__dict__[test_parameter] == parameter_value]
             yield (parameter_value, parameter_tests)
