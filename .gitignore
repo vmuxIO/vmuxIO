@@ -22,4 +22,5 @@ vmux-nixbuild
 .nix-defexpr/*
 .nix-channels
 .direnv
+test/ptptest/build
 
