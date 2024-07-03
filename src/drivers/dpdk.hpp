@@ -103,7 +103,7 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 			"Error during getting device (port %u) info: %s\n",
 			port_id, strerror(-ret));
 
-	//ort_conf.txmode.offloads &= dev_info.tx_offload_capa;
+	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
 	printf(":: initializing port: %d\n", port_id);
 	ret = rte_eth_dev_configure(port_id,
 				nr_queues, nr_queues, &port_conf);
@@ -162,13 +162,6 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 	}
 	/* >8 End of starting the port. */
   	
-	
-	/* Intialize TimeSync / PTP */
-  	int retval = rte_eth_timesync_enable(port_id);
-	if (retval < 0) {
-		perror("Timesync enable failed!");
-	}
-
 	printf(":: initializing port: %d done\n", port_id);
 }
 /* >8 End of Port initialization used in flow filtering. */
@@ -194,8 +187,6 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 	struct rte_eth_dev_info dev_info;
 	struct rte_eth_txconf txconf;
 	
-	die("DIE 1");
-
 	if (!rte_eth_dev_is_valid_port(port))
 		return -1;
 
@@ -255,14 +246,7 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 			   " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 "\n",
 			port, RTE_ETHER_ADDR_BYTES(&addr));
 
-
-  	/* Intialize TimeSync / PTP */
-  	retval = rte_eth_timesync_enable(port);
-	if (retval < 0) {
-		printf("Timesync enable failed: %d\n", retval);
-		return retval;
-	}
-  
+ 
   	/* Enable RX in promiscuous mode for the Ethernet device. */
 	retval = rte_eth_promiscuous_enable(port);
 	
@@ -273,6 +257,7 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 	return 0;
 }
 /* >8 End of main functional part of port initialization. */
+
 
 static void
 lcore_poll_once(void) {
@@ -564,6 +549,14 @@ public:
     this->nb_bufs_used = 0;
   
   }
+ 
+  /* Enables Timesync / PTP */
+  virtual void enableTimesync(uint16_t port) {
+	uint32_t retval = rte_eth_timesync_enable(port);
+	if (retval < 0) {
+		perror("Could not enable Timesync");
+	}
+  } 
   
   /* Get timestamp from NIC (global clock 0) */
   struct timespec readCurrentTimestamp() {
@@ -573,7 +566,6 @@ public:
 		perror("Dpdk current time failed!");
 	}
     
-	//printf("DPDK TS: %lu %lu \n", ts.tv_sec, ts.tv_nsec);
 	return ts;
   }
 
@@ -649,5 +641,9 @@ public:
   virtual bool mediation_disable(int vm_id) {
 		// die("unimplemented: you need to flush switch rules from the emulator to the device");
 		return false;
+  }
+
+  virtual bool is_mediating(int vm_id) {
+	return this->mediate[vm_id];
   }
 };

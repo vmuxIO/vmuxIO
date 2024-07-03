@@ -1018,7 +1018,8 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
           // write timestamp back to AQTBA registers
           e810_timestamp_t ts = ptp.phc_sample_tx(reg_index);
-
+          printf("TXX: %lu \n", ts.time);
+          
 	        // dpdk shifts the tx timestamp down eight bits
           regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(ts.time << 8);
           regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(ts.time << 8);
@@ -1039,8 +1040,6 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
       case PTP_GLTSYN_CMD_SYNC: {
 
-          DEBUG_LOG_PTP("CMD sync")
-          
           if(val == PTP_GLTSYN_CMD_SYNC_INC) {
             DEBUG_LOG_PTP("Warning: HW Command GLTSYN_CMD_SYNC_INC not implemented!");
 
@@ -1104,11 +1103,13 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
 
       case PTP_GLTSYN_ENA(0):
         DEBUG_LOG_PTP("Enabled PTP for clock 0")
-        regs.REG_GLTSYN_ENA[0] = (val & 1); break;
-    
+        regs.REG_GLTSYN_ENA[0] = (val & 1);
+        this->ptp.set_enabled(0); break;
+
       case PTP_GLTSYN_ENA(1):
         DEBUG_LOG_PTP("Enabled PTP for clock 1")
-        regs.REG_GLTSYN_ENA[1] = (val & 1); break;
+        regs.REG_GLTSYN_ENA[1] = (val & 1);
+        this->ptp.set_enabled(1); break;
 
       default:
         DEBUG_LOG_DEV("unhandled mem write addr=" << addr << " val=" << val)

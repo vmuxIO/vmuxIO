@@ -43,8 +43,9 @@ public:
   virtual void recv(int vm_id) = 0;
   virtual void recv_consumed(int vm_id) = 0;
   
-  // ptp
-  virtual struct timespec readCurrentTimestamp() {           return { .tv_sec=0, .tv_nsec=0 }; };
+  // PTP
+  virtual void enableTimesync(uint16_t port) {};
+  virtual struct timespec readCurrentTimestamp() { return { .tv_sec=0, .tv_nsec=0 }; };
   virtual uint64_t readTxTimestamp(uint16_t portid) { return 0; };
   virtual uint64_t readRxTimestamp(uint16_t portid) { return 0; };
 
@@ -60,5 +61,8 @@ public:
   virtual bool mediation_disable(int vm_id) {
     return false;
   }
-
+  
+  virtual bool is_mediating(int vm_id) {
+    return false;
+  }
 };

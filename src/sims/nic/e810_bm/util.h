@@ -15,3 +15,6 @@
 #else
 #define DEBUG_LOG_DEV(args)
 #endif
+
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)  
+#define LIKELY(x) __builtin_expect(!!(x), 1)

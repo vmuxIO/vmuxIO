@@ -52,23 +52,21 @@ typedef union {
 #define PTP_ATQBAH_SET_TS(ts) ((ts) & 0xffff'ffff)
 
 // PTP capabilities
-//#define CAP_TIME_SYNC_ENA 0b1
-//#define CAP_TIMER_OWNED 0b10
-//#define CAP_TIMER_ENA 0b100
-//#define CAP_SDP_TIME_SYNC 0b111100000000
+#define CAP_VF_TIMESYNC_ENA (1 << 0)
+#define CAP_VF_TIMER_OWNED (1 << 1)
+#define CAP_VF_TIMER_ENA (1 << 2)
+#define CAP_VF_TS_LL_READ (1 << 28)
 
-#define CAP_GPIO_TIME_SYNC (1 << 13)
-
-#define CAP_PF_TIMER_0_OWNED (0b1 << 3)
-#define CAP_PF_TIMER_1_OWNED (0b1 << 7)
-
-#define CAP_PF_TIMESYNC_ENA (1 << 24)
 #define CAP_PF_TIMER_0_ENA (1 << 25)
 #define CAP_PF_TIMER_1_ENA (1 << 26)
-#define CAP_PF_LL_TX_SUPPORTED (1 << 28)
 
-#define CAP_1588_FLAGS ((uint32_t) CAP_PF_TIMER_0_OWNED | CAP_PF_TIMER_0_ENA | CAP_PF_TIMESYNC_ENA | CAP_PF_LL_TX_SUPPORTED | \
-                        CAP_GPIO_TIME_SYNC )
+#define CAP_PF_TIMER_0_OWNED (1 << 3)
+#define CAP_PF_TIMER_1_OWNED (1 << 7)
+
+#define CAP_1588_FLAGS (uint32_t) (CAP_VF_TIMESYNC_ENA | CAP_VF_TIMER_OWNED | \
+          CAP_VF_TIMER_ENA | CAP_VF_TS_LL_READ | \
+          CAP_PF_TIMER_0_ENA | CAP_PF_TIMER_0_OWNED | \
+          CAP_PF_TIMER_1_ENA | CAP_PF_TIMER_1_OWNED )
 
 #define TIMESPEC_TO_NANOS(ts) (((uint64_t) (ts.tv_sec) * 1'000'000'000ULL) + (ts.tv_nsec))
 
@@ -87,6 +85,8 @@ class PTPManager {
 
  public:
   PTPManager(e810_bm &dev);
+  
+  void set_enabled(uint32_t clock);
 
   e810_timestamp_t phc_read();
   
@@ -103,6 +103,4 @@ class PTPManager {
   uint64_t get_incval();
 };
 
-
 }
-

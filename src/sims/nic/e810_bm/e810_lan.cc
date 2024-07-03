@@ -542,7 +542,7 @@ bool lan_queue_tx::trigger_tx_packet() {
   uint32_t iipt, l4t, pkt_len, total_len = 0, data_limit;
   bool tso = false;
   bool tsync = false;
-  uint32_t tso_mss = 0, tso_paylen = 0, tsync_reg = 0;
+  uint32_t tso_mss = 0, tso_paylen = 0;
   uint16_t maclen = 0, iplen = 0, l4len = 0;
 
   // abort if no queued up descriptors
@@ -570,7 +570,6 @@ bool lan_queue_tx::trigger_tx_packet() {
     tso_mss = (d1 & ICE_TXD_CTX_QW1_MSS_M) >> ICE_TXD_CTX_QW1_MSS_S;
 
     tsync = !!(cmd & ICE_TX_CTX_DESC_TSYN);
-    tsync_reg = (d1 & ICE_TXD_CTX_QW1_TSYN_M) >> ICE_TXD_CTX_QW1_TSYN_S; 
 
     if (tso && tsync) {
       std::cout << "Error: Tried to transmit packet with tsync and tso enabled!" << logger::endl;
