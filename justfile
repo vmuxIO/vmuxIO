@@ -469,6 +469,7 @@ build:
   nix build -o {{proot}}/ycsb .#ycsb
   nix build -o {{proot}}/fastclick .#fastclick
   nix build -o {{proot}}/vmux-nixbuild .#vmux
+  pushd ./test/ptptest; make; popd
   [[ -z $(git submodule status | grep "^-") ]] || echo WARN: git submodules status: not in sync
 
 update:
