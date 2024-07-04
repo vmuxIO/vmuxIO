@@ -5,6 +5,7 @@ from logging import (info, debug, error, warning,
 from server import Host, Guest, LoadGen, MultiHost
 from enums import Machine, Interface, Reflector
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
+from util import safe_cast, product_dict, strip_subnet_mask
 import time
 from pathlib import Path
 import pandas as pd
@@ -254,6 +255,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
+                    # workaround for ARP being broken in vMux: ping the loadgen once
+                    guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
                 end_foreach(guests, foreach_parallel)
 
                 for rps in rpsList:

@@ -8,9 +8,10 @@ from abc import ABC
 from os import listdir, remove
 from os.path import join as path_join
 from os.path import dirname as path_dirname
-from typing import Optional
+from typing import Optional, List, Dict
 from enums import Interface, MultiHost
 from pathlib import Path
+from util import strip_subnet_mask
 import copy
 import base64
 
@@ -1013,6 +1014,30 @@ class Server(ABC):
         """
         self.tmux_kill('reflector')
 
+    def start_xdp_pure_reflector(self: 'Server', iface: str = None):
+        if not iface:
+            iface = self.test_iface
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        xdgDir = f"{project_root}/xdp-pure"
+        xdgProgram = f"{xdgDir}/lib/pure_reflector.o"
+
+        # compile xdp program for the Servers MAC address
+        LOCAL_MAC = f"{{ 0xb4, 0x96, 0x91, 0xb3, 0x8b, 0x04 }}" # TODO
+        flakeUrl = f"git+file:///{project_root}?rev=$(cd {project_root}; git rev-parse HEAD)"
+        nixExpr = f'(builtins.getFlake {flakeUrl}).packages.x86_64-linux.xdp-reflector.overrideAttrs (_: _: {{ LOCAL_MAC = \\"{LOCAL_MAC}\\"; }})'
+        self.exec(f'nix build --expr "{nixExpr}" -o {xdgDir}')
+
+        self.exec(f'sudo ip link set {iface} promisc on')
+        self.exec(f'sudo ip link set {iface} xdpgeneric obj ' +
+                  f'{xdgProgram} sec xdp')
+        self.exec(f'sudo ip link set {iface} up')
+
+    def stop_xdp_pure_reflector(self: 'Server', iface: str = None):
+        if not iface:
+            iface = self.test_iface
+        self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
+        self.exec(f'sudo ip link set {iface} promisc off || true')
+
     def start_xdp_reflector(self: 'Server', iface: str = None):
         """
         Start the xdp reflector.
@@ -1944,6 +1969,12 @@ class Guest(Server):
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
         self.exec(f'sudo ip link set {self.test_iface} up')
 
+    def add_arp_entries(self: 'Guest', others: Dict[int, 'Server']):
+        for vm_num, other_vm in others.items():
+            ip = MultiHost.ip(strip_subnet_mask(other_vm.test_iface_ip_net), vm_num)
+            mac = MultiHost.mac(other_vm.test_iface_mac, vm_num)
+            dev = other_vm.test_iface
+            self.exec(f"sudo ip neighbour add {ip} dev {dev} lladdr {mac}")
 
     def start_iperf_server(self, server_hostname: str):
         """

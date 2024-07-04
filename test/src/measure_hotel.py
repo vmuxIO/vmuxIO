@@ -8,7 +8,7 @@ from logging import (info, debug, error, warning,
 from server import Host, Guest, LoadGen
 from enums import Machine, Interface, Reflector, MultiHost
 from measure import AbstractBenchTest, Measurement, end_foreach
-from util import safe_cast, product_dict
+from util import safe_cast, product_dict, strip_subnet_mask
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
 from os.path import isfile, join as path_join
@@ -294,10 +294,16 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 except Exception:
                     pass
                 loadgen.setup_test_iface_ip_net()
+                loadgen.stop_xdp_pure_reflector()
+                loadgen.start_xdp_pure_reflector()
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
+                    # install inter-VM ARP rules (except the host i that we install it on)
+                    guest.add_arp_entries({ i_:guest_ for i_, guest_ in guests.items() if i_ != i })
+                    # workaround for ARP being broken in vMux: ping the loadgen once
+                    guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
                 end_foreach(guests, foreach_parallel)
 
                 for rps in rpsList:
@@ -314,6 +320,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         deathstar.run(host, loadgen, guests, test)
                     else:
                         info(f"skipping {test}")
+
+                loadgen.stop_xdp_pure_reflector()
 
     DeathStarBench.find_errors(G.OUT_DIR)
 
