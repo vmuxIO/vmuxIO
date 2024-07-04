@@ -495,7 +495,9 @@ class Bench(Generic[T], ContextDecorator):
     def __enter__(self):
         self.tqdm = self.tqdm_constructor(total=self.time_remaining_s+0.1, # +0.1 to avoid float summing errors
               unit="s",
-              bar_format="{l_bar}{bar}| {n:.0f}/{total:.0f}sec [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+              # - cut off float decimals
+              # - append newline to print every update to new line (to avoid garbled newlines when we print between progress updates)
+              bar_format="{l_bar}{bar}| {n:.0f}/{total:.0f}sec [{elapsed}<{remaining}, {rate_fmt}{postfix}]\n",
               )
         return self, self.remaining_tests
 
