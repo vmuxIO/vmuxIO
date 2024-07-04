@@ -95,7 +95,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.BRIDGE,
           Interface.BRIDGE_VHOST,
           Interface.BRIDGE_E1000,
-          Interface.VMUX_PT,
+          # Interface.VMUX_PT, # interrupts dont work
           Interface.VMUX_EMU,
           # Interface.VMUX_EMU_E810, # tap backend not implemented for e810 (see #127)
           Interface.VMUX_DPDK,
@@ -174,6 +174,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 except Exception:
                     pass
                 loadgen.setup_test_iface_ip_net()
+                loadgen.stop_xdp_pure_reflector()
+                loadgen.start_xdp_pure_reflector()
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
@@ -246,6 +248,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                                     summary = "no results"
                                 file.write(summary)
                         bench.done(test)
+                loadgen.stop_xdp_pure_reflector()
             # end VM
 
     for ipt in tests:
