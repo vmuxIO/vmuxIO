@@ -7,7 +7,7 @@ from logging import (info, debug, error, warning, getLogger,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
 from enums import Machine, Interface, Reflector, MultiHost
-from measure import AbstractBenchTest, Measurement, end_foreach
+from measure import Bench, AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
@@ -170,9 +170,13 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [
           Interface.VMUX_MED,
-          Interface.VMUX_DPDK_E810,
-          Interface.VFIO,
-          Interface.VMUX_PT,
+          # Interface.VMUX_DPDK_E810,
+          # Interface.VFIO,
+          # Interface.VMUX_PT,
+          ]
+    tap_interfaces = [
+          Interface.BRIDGE_E1000,
+          # Interface.BRIDGE,
           ]
     fastclicks = [
             "hardware",
@@ -184,7 +188,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
-        # interfaces = [ Interface.BRIDGE ] # doesnt work with click (RSS init fails)
+        # interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
         # interfaces = [ Interface.VMUX_MED ]
         # interfaces = [ Interface.VMUX_EMU_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
@@ -194,6 +198,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         repetitions = 1
         rates = [ 40000 ]
 
+    tests = []
     test_matrix = dict(
         repetitions=[ repetitions ],
         interface=[ interface.value for interface in interfaces],
@@ -201,85 +206,82 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         num_vms=vm_nums,
         rate=rates
     )
-    all_tests = MediationTest.list_tests(test_matrix)
+    tests += MediationTest.list_tests(test_matrix)
+
+    # software-tap benchmarks
+    test_matrix = dict(
+        repetitions=[ repetitions ],
+        interface=[ interface.value for interface in tap_interfaces ],
+        fastclick = [ "software-tap" ],
+        num_vms=vm_nums,
+        rate=rates
+    )
+    if not G.BRIEF:
+        tests += MediationTest.list_tests(test_matrix)
 
     info(f"Mediation test execution plan:")
-    MediationTest.estimate_time(test_matrix, args_reboot = ["interface", "num_vms", "repetitions", "fastclick"])
+    args_reboot = ["interface", "num_vms", "repetitions", "fastclick"]
+    MediationTest.estimate_time2(tests, args_reboot = args_reboot)
+
 
     if plan_only:
         return
 
-    tests_run = []
+    with Bench(
+            tests = tests,
+            args_reboot = args_reboot,
+            brief = G.BRIEF
+            ) as (bench, bench_tests):
+        for [num_vms, interface, fastclick], a_tests in bench.multi_iterator(bench_tests, ["num_vms", "interface", "fastclick"]):
+            for repetition in range(repetitions):
+                interface = Interface(interface)
+                info("Booting VM for this test matrix:")
+                info(MediationTest.test_matrix_string(a_tests))
+                with measurement.virtual_machine(interface) as guest:
+                    for rate, rate_tests in bench.iterator(a_tests, "rate"):
+                        assert len(rate_tests) == 1 # we have looped through all variables now, right?
+                        test = rate_tests[0]
 
-    for num_vms in vm_nums:
-        for interface in interfaces:
-            for fastclick in fastclicks:
-                for repetition in range(repetitions):
-                    # skip VM boots if possible
-                    test_matrix = dict(
-                        repetitions=[ repetitions ],
-                        interface=[ interface.value ],
-                        fastclick=[ fastclick ],
-                        num_vms=[ num_vms ],
-                        rate=rates,
-                        )
-                    if not MediationTest.any_needed(test_matrix):
-                        warning(f"Skipping {fastclick}@{interface}: All measurements done already.")
-                        continue
+                        info(f"Testing repetition {repetition}: {test}")
 
-                    info("Booting VM")
-                    # with measurement.virtual_machine(interface, run_guest_args = { 'extkern': "foobar"}) as guest:
-                    with measurement.virtual_machine(interface) as guest:
-                        for rate in rates:
-                            # build test object
-                            test = MediationTest(
-                                    interface=interface.value,
-                                    repetitions=repetitions,
-                                    fastclick=fastclick,
-                                    num_vms=num_vms,
-                                    rate=rate)
-                            if not test.needed():
-                                continue
-                            tests_run += [ test ]
-                            info(f"Testing repetition {repetition}: {test}")
+                        # loadgen: set up interfaces and networking
 
-                            # loadgen: set up interfaces and networking
+                        info('Binding loadgen interface')
+                        try:
+                            loadgen.delete_nic_ip_addresses(loadgen.test_iface)
+                        except Exception:
+                            pass
+                        loadgen.modprobe_test_iface_drivers()
+                        loadgen.bind_test_iface() # bind vfio driver
 
-                            info('Binding loadgen interface')
+                        # guest: set up networking
+
+                        if interface.is_passthrough():
+                            guest.modprobe_test_iface_drivers(interface=interface)
+                            guest.bind_test_iface() # bind vfio driver
+                        else:
+                            guest.modprobe_test_iface_drivers(interface=interface)
+                            guest.setup_test_iface_ip_net()
+
+                        # run test
+                        run_test(host, loadgen, guest, test, repetition)
+
+                        # summarize results
+                        local_summary_file = test.output_filepath(repetition)
+                        with open(local_summary_file, 'w') as file:
                             try:
-                                loadgen.delete_nic_ip_addresses(loadgen.test_iface)
-                            except Exception:
-                                pass
-                            loadgen.modprobe_test_iface_drivers()
-                            loadgen.bind_test_iface() # bind vfio driver
-
-                            # guest: set up networking
-
-                            if interface.is_passthrough():
-                                guest.modprobe_test_iface_drivers(interface=interface)
-                                guest.bind_test_iface() # bind vfio driver
-                            else:
-                                guest.modprobe_test_iface_drivers(interface=interface)
-                                guest.setup_test_iface_ip_net()
-
-                            # run test
-                            run_test(host, loadgen, guest, test, repetition)
-
-                            # summarize results
-                            local_summary_file = test.output_filepath(repetition)
-                            with open(local_summary_file, 'w') as file:
-                                try:
-                                    # to_string preserves all cols
-                                    summary = test.summarize(repetition)
-                                    summary = summary.to_string()
-                                except Exception as e:
-                                    summary = str(e)
-                                file.write(summary)
+                                # to_string preserves all cols
+                                summary = test.summarize(repetition)
+                                summary = summary.to_string()
+                            except Exception as e:
+                                summary = str(e)
+                            file.write(summary)
+                        bench.done(test)
 
 
     # summarize all summaries
     all_summaries = []
-    for test in all_tests:
+    for test in tests:
         for repetition in range(test.repetitions):
             all_summaries += [ read_csv(test.output_filepath(repetition), sep='\\s+') ]
     df = concat(all_summaries).groupby(MediationTest.test_parameters())['rxMppsCalc'].describe()
