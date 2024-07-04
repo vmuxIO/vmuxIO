@@ -1114,7 +1114,7 @@ class Server(ABC):
         self.tmux_kill("ycsb")
 
 
-    def start_fastclick(self, program: str, outfile: str, script_args: dict = dict()):
+    def start_fastclick(self, program: str, outfile: str, script_args: dict = dict(), dpdk: bool = True):
         """
         program: path to .click file relative to project root
         outfile: path to remote log file
@@ -1124,7 +1124,10 @@ class Server(ABC):
         fastclick_bin = f"{project_root}/fastclick/bin/click"
         fastclick_program = f"{project_root}{program}"
         args = ' '.join([f'{key}={value}' for key, value in script_args.items()])
-        self.tmux_new('fastclick', f'{fastclick_bin} --dpdk \'-l 0\' -- {fastclick_program} {args} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
+        dpdk_args = ""
+        if dpdk:
+            dpdk_args = f'--dpdk \'-l 0\' --'
+        self.tmux_new('fastclick', f'{fastclick_bin} {dpdk_args} {fastclick_program} {args} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
 
 
     def stop_fastclick(self):
