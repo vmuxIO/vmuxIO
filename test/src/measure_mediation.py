@@ -119,6 +119,11 @@ def run_test(host: Host, loadgen: LoadGen, guest: Guest, test: MediationTest, re
             'ifacePCI0': guest.test_iface_addr,
             'rules': fastclick_rules
         }
+    elif test.fastclick == "software-tap":
+        fastclick_program = "test/fastclick/mac-switch-software-tap.click"
+        fastclick_args = {
+            'if': guest.test_iface,
+        }
     else:
         raise Exception("Unknown fastclick program type")
 
@@ -178,12 +183,13 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     repetitions = 9
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
+        interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
         # interfaces = [ Interface.BRIDGE ] # doesnt work with click (RSS init fails)
         # interfaces = [ Interface.VMUX_MED ]
-        interfaces = [ Interface.VMUX_EMU_E810 ]
-        # interfaces = [ Interface.VFIO ]
-        fastclicks = [ "hardware" ]
+        # interfaces = [ Interface.VMUX_EMU_E810 ]
+        # interfaces = [ Interface.VMUX_PT ]
+        # fastclicks = [ "hardware" ]
+        fastclicks = [ "software-tap" ]
         vm_nums = [ 1 ]
         repetitions = 1
         rates = [ 40000 ]
@@ -247,8 +253,14 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                             loadgen.modprobe_test_iface_drivers()
                             loadgen.bind_test_iface() # bind vfio driver
 
-                            # guest.modprobe_test_iface_drivers()
-                            guest.bind_test_iface() # bind vfio driver
+                            # guest: set up networking
+
+                            if interface.is_passthrough():
+                                guest.modprobe_test_iface_drivers(interface=interface)
+                                guest.bind_test_iface() # bind vfio driver
+                            else:
+                                guest.modprobe_test_iface_drivers(interface=interface)
+                                guest.setup_test_iface_ip_net()
 
                             # run test
                             run_test(host, loadgen, guest, test, repetition)
