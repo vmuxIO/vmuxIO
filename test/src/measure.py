@@ -559,6 +559,7 @@ class Bench(Generic[T], ContextDecorator):
             yield (iteration_parameters, iteration_tests)
 
     def done(self, done: T):
+        # TODO make this obsolete: integrate it into iterators and __exit__ or so
         self.remaining_tests.remove(done)
         time_remaining_new_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
         time_progress_s = self.time_remaining_s - time_remaining_new_s
