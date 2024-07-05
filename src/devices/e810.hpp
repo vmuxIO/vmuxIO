@@ -126,7 +126,6 @@ public:
         this_->vfu_ctx_mutex.lock();
         this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
         this_->vfu_ctx_mutex.unlock();
-        this_->processAllPollTimers();
 			}
 		}
     this_->driver->recv_consumed(vm_number);
