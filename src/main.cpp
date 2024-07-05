@@ -310,8 +310,8 @@ Result<void> _main(int argc, char **argv) {
     }
   }
 
-  for (size_t i = 0; i < pciAddresses.size(); i++) {
-    pollingThreads[i]->start();
+  for (auto &pollingThread : pollingThreads) {
+    pollingThread->start();
   }
 
   // printf("pfd->revents & POLLIN: %d\n",
