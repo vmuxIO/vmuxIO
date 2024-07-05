@@ -62,6 +62,7 @@ inline auto Ok(auto value) {
   return outcome::success(value);
 }
 
+// TODO remove device id int. It is in the device!
 typedef void (*callback_fn)(int, void *);
 
 struct epoll_callback {

@@ -14,6 +14,7 @@
     return;                                                                    \
   } while (0)
 
+// TODO rename to VfioUserThread
 class VmuxRunner {
 public:
   std::shared_ptr<VfioUserServer> vfu;
@@ -21,7 +22,7 @@ public:
   std::thread runner;
   std::shared_ptr<Capabilities> caps;
   std::atomic_int state;
-  std::atomic_bool running;
+  std::atomic_bool running; // set to false to terminate this thread
   std::string socket;
   std::string termination_error; // non-null if Runner terminated with error
 
@@ -41,7 +42,11 @@ public:
     this->socket = socket;
   }
 
-  void start() { runner = std::thread(&VmuxRunner::run, this); }
+  void start() {
+    runner = std::thread(&VmuxRunner::run, this);
+    std::string name = std::string("vmux-VmuxRunner") + std::to_string(device->device_id);
+    pthread_setname_np(runner.native_handle(), name.c_str());
+  }
 
   void stop() { running.store(0); }
 

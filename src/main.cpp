@@ -41,6 +41,7 @@
 #include "src/devices/vmux-device.hpp"
 #include "src/drivers/dpdk.hpp"
 #include "src/drivers/tap.hpp"
+#include "src/rx-thread.hpp"
 
 extern "C" {
 #include "libvfio-user.h"
@@ -97,9 +98,10 @@ Result<void> _main(int argc, char **argv) {
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices; // all devices
   std::vector<std::shared_ptr<VmuxDevice>>
-      pollingDevices; // devices backed by poll based drivers
+      mainThreadPolling; // devices backed by poll based drivers
   std::vector<std::shared_ptr<VfioUserServer>> vfuServers;
   std::vector<std::shared_ptr<Driver>> drivers; // network backend for emulation
+  std::vector<std::unique_ptr<RxThread>> pollingThreads;
   std::string group_arg;
   // int HARDWARE_REVISION; // could be set by vfu_pci_set_class:
   // vfu_ctx->pci.config_space->hdr.rid = 0x02;
@@ -108,6 +110,7 @@ Result<void> _main(int argc, char **argv) {
   std::vector<std::string> sockets;
   std::vector<std::string> modes;
   bool useDpdk = false;
+  bool pollInMainThread = false;
   uint8_t mac_addr[6];
   while ((ch = getopt(argc, argv, "hd:t:s:m:b:qu")) != -1) {
     switch (ch) {
@@ -275,8 +278,11 @@ Result<void> _main(int argc, char **argv) {
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
     devices.push_back(device);
-    if (useDpdk)
-      pollingDevices.push_back(device);
+    if (useDpdk && pollInMainThread)
+      mainThreadPolling.push_back(device);
+    if (useDpdk && !pollInMainThread) {
+      pollingThreads.push_back(std::make_unique<RxThread>(device));
+    }
   }
 
   for (size_t i = 0; i < pciAddresses.size(); i++) {
@@ -303,6 +309,11 @@ Result<void> _main(int argc, char **argv) {
       usleep(10000);
     }
   }
+
+  for (size_t i = 0; i < pciAddresses.size(); i++) {
+    pollingThreads[i]->start();
+  }
+
   // printf("pfd->revents & POLLIN: %d\n",
   //        runner[0]->get_interrupts().pollfds[
   //            runner[0]->get_interrupts().irq_intx_pollfd_idx
@@ -310,7 +321,7 @@ Result<void> _main(int argc, char **argv) {
 
   // runtime loop
   int poll_timeout;
-  if (useDpdk) {
+  if (useDpdk && pollInMainThread) {
     poll_timeout = 0; // dpdk: busy polling
   } else {
     poll_timeout = 500; // default: event based
@@ -329,7 +340,7 @@ Result<void> _main(int argc, char **argv) {
         foobar = false;
       }
 #endif
-      for (size_t j = 0; j < pollingDevices.size(); j++) {
+      for (size_t j = 0; j < mainThreadPolling.size(); j++) {
         // dpdk: do busy polling
         devices[j]->rx_callback(j, devices[j].get());
       }
@@ -345,12 +356,17 @@ Result<void> _main(int argc, char **argv) {
 
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     runner[i]->stop();
+    pollingThreads[i]->stop();
   }
 
   Result<void> res = Ok();
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     if (Result<void> e = runner[i]->join()) {} else {
-      printf("Thread %zu failed: %s\n", i, e.error().c_str());
+      printf("Runner thread %zu failed: %s\n", i, e.error().c_str());
+      res = Err("Terminating because a thread failed.");
+    }
+    if (Result<void> e = pollingThreads[i]->join()) {} else {
+      printf("Poling rx thread %zu failed: %s\n", i, e.error().c_str());
       res = Err("Terminating because a thread failed.");
     }
   }

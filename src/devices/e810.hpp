@@ -119,12 +119,16 @@ public:
     E810EmulatedDevice *this_ = (E810EmulatedDevice*) this__;
     this_->processAllPollTimers();
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
-    for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
-      this_->vfu_ctx_mutex.lock();
-      this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
-      this_->vfu_ctx_mutex.unlock();
-      this_->processAllPollTimers();
-    }
+    // for (uint16_t ) {}
+		for (int q_idx = 0; q_idx < 4; q_idx++) { // TODO hardcoded max_queues_per_vm
+			int queue_id = vm_number * 4 + q_idx;// TODO this_->get_rx_queue_id(vm_id, q_idx);
+			for (uint16_t i = queue_id * 32; i < (queue_id * 32+ this_->driver->nb_bufs_used[queue_id]); i++) { // TODO 32 = BURST_SIZE
+        this_->vfu_ctx_mutex.lock();
+        this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
+        this_->vfu_ctx_mutex.unlock();
+        this_->processAllPollTimers();
+			}
+		}
     this_->driver->recv_consumed(vm_number);
   }
 
@@ -300,7 +304,7 @@ private:
       [[maybe_unused]] vfu_ctx_t *vfu_ctx, [[maybe_unused]] char *const buf,
       [[maybe_unused]] size_t count, [[maybe_unused]] __loff_t offset,
       [[maybe_unused]] const bool is_write) {
-    if_log_level(LOG_DEBUG, 
+    if_log_level(LOG_DEBUG,
         printf("a vfio register/DMA access callback was triggered (at 0x%lx, is write %d).\n",
            offset, is_write);
         );
