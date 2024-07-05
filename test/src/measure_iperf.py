@@ -216,15 +216,15 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                             end_foreach(guests, foreach_parallel)
                             time.sleep(DURATION_S)
 
-                            try:
-                                for i, guest in guests.items():
-                                    loadgen.wait_for_success(f'[[ -e {remote_output_file(i)} ]]')
-                            except TimeoutError:
-                                error('Waiting for output file timed out.')
-
                             def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                                loadgen.copy_from(remote_output_file(i), test.output_path_per_vm(repetition, i))
+                                try:
+                                    loadgen.wait_for_success(f'[[ -e {remote_output_file(i)} ]]', timeout=20)
+                                except TimeoutError:
+                                    error('Waiting for output file timed out.')
+                                finally:
+                                    loadgen.copy_from(remote_output_file(i), test.output_path_per_vm(repetition, i))
                             end_foreach(guests, foreach_parallel)
+
 
                             # teardown
                             def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
