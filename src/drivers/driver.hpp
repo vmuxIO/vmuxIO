@@ -4,6 +4,12 @@
 #include <optional>
 #include "util.hpp"
 
+struct vmux_descriptor {
+  char *buf;
+  size_t len; // used size of buffer
+  std::optional<uint16_t> dst_queue;
+};
+
 // Abstract class for Driver backends
 class Driver {
 public:
@@ -11,13 +17,17 @@ public:
 
   int fd = 0; // may be a non-null fd to poll on
   size_t nb_bufs = 0; // rxBufs allocated
-  size_t nb_bufs_used = 0; // rxBufs filled with data
-  char **rxBufs;
-  size_t *rxBuf_used; // how much each rxBuf is actually filled with data
-  std::optional<uint16_t> *rxBuf_queue; // optional hints to destination queues
+  // struct vmux_descriptor **bufs; //
+  // TODO revise this: !!!
+  size_t *nb_bufs_used; // rxBufs filled with data (per queue, value must be <= BURST_SIZE) (size=global queues)
+  char **rxBufs; // size=global_queues * BUSRT_SIZE
+  size_t *rxBuf_used; // how much each rxBuf is actually filled with data (size=global_queues * BURST_SIZE)
+  std::optional<uint16_t> *rxBuf_queue; // optional hints to destination queues (size=global_queues * BURST_SIZE)
   char txFrame[MAX_BUF];
 
-  void alloc_rx_lists(size_t nb_bufs) {
+  void alloc_rx_lists(size_t global_queues, size_t per_queue_bursts) {
+    this->nb_bufs_used = (size_t*) calloc(global_queues, sizeof(size_t));
+    size_t nb_bufs = global_queues * per_queue_bursts;
     this->nb_bufs = nb_bufs;
     this->rxBufs = (char**) malloc(nb_bufs * sizeof(char*));
     this->rxBuf_used = (size_t*) calloc(nb_bufs, sizeof(size_t));
