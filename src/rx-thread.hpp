@@ -20,8 +20,26 @@ class RxThread {
     void start() {
       running.store(1);
       runner = std::thread(&RxThread::run, this);
-      std::string name = std::string("vmux-RxThread") + std::to_string(device->device_id);
-      pthread_setname_np(runner.native_handle(), name.c_str());
+      pthread_t thread = runner.native_handle();
+
+      // set name
+      char name[16] = { 0 };
+      snprintf(name, 16, "vmuxRx%u", device->device_id);
+      int ret = pthread_setname_np(thread, name);
+      if (ret != 0) {
+        die("cant rename thread");
+      }
+
+      // set cpu affinity
+      size_t num_cores = sysconf(_SC_NPROCESSORS_ONLN); // Get the number of available cores
+      cpu_set_t cpuset;
+      CPU_ZERO(&cpuset);
+      CPU_SET(((device->device_id * 6) + 7) % num_cores, &cpuset);
+      // for (size_t j = 0; j < num_cores; j++)
+      //     CPU_SET(j, &cpuset);
+      ret = pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
+      if (ret != 0)
+          die("failed to set pthread cpu affinity");
     }
 
     void stop() { running.store(0); }
