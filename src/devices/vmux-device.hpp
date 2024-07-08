@@ -78,6 +78,10 @@ public:
   VmuxDevice(int device_id, std::shared_ptr<Driver> driver) : driver(driver), device_id(device_id), rx_callback(NULL) {};
 
   virtual ~VmuxDevice() = default;
+
+  inline bool isMediating() {
+    return this->driver->is_mediating(this->device_id);
+  }
 };
 
 class StubDevice : public VmuxDevice {

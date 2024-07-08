@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
@@ -433,6 +434,13 @@ public:
         size_t offset = dma_address - iova_start;
         return (void *)(vaddr_start + offset);
       }
+    }
+
+    printf("No mapping for iova: %lu %lu \n", dma_address, len);
+
+    for (const auto &[iova_start_, segment] : this->mappings) {
+    
+    printf("mappings: %lu %p %lu \n", (uintptr_t) iova_start_, segment->iov_base, segment->iov_len);
     }
     return NULL;
   }

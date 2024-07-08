@@ -12,3 +12,16 @@ linux-*/
 test/kni-latency/kni-latency
 .bash_history
 .vscode
+mg
+mg21
+mgln
+qemu
+qemu-ioregionfd
+xdp
+ycsb
+vmux-nixbuild
+.nix-defexpr/*
+.nix-channels
+.direnv
+test/ptptest/build
+

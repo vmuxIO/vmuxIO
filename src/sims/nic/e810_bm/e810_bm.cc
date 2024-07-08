@@ -24,19 +24,27 @@
 
 #include "src/sims/nic/e810_bm/e810_bm.h"
 
+#include <cstdint>
 #include <stdlib.h>
 #include <string.h>
 
 #include <cassert>
 #include <iostream>
 
+#include "devices/e810.hpp"
+#include "sims/nic/e810_bm/base/ice_hw_autogen.h"
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/libsimbricks/simbricks/nicbm/multinic.h"
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
+#include "sims/nic/e810_bm/util.h"
 
-namespace i40e {
+#include <rte_io.h>
+
+namespace e810 {
+
 
 e810_bm::e810_bm()
-    : log("i40e", runner_),
+    : log("e810", runner_),
       pf_atq(*this, regs.pf_atqba, regs.pf_atqlen, regs.pf_atqh, regs.pf_atqt),
       pf_mbx_atq(*this, regs.pf_mbx_atqba, regs.pf_mbx_atqlen, regs.pf_mbx_atqh, regs.pf_mbx_atqt),
       hmc(*this),
@@ -44,6 +52,7 @@ e810_bm::e810_bm()
       shram(*this),
       lanmgr(*this, NUM_QUEUES),
       cem(*this, NUM_QUEUES),
+      ptp(*this),
       bcam(*this) {
   reset(false);
 }
@@ -85,7 +94,7 @@ void e810_bm::DmaComplete(nicbm::DMAOp &op) {
 
 void e810_bm::EthRx(uint8_t port, std::optional<uint16_t> queue, const void *data, size_t len) {
 #ifdef DEBUG_DEV
-  std::cout << "i40e: received packet len=" << len << logger::endl;
+  std::cout << "e810: received packet len=" << len << logger::endl;
 #endif
   lanmgr.packet_received(data, len, queue);
 }
@@ -159,7 +168,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
   if (addr >= GLINT_DYN_CTL(0) &&
       addr < GLINT_DYN_CTL(NUM_PFINTS - 1)) {
     val = regs.pfint_dyn_ctln[(addr - GLINT_DYN_CTL(0)) / 4];
-  }else if (addr >= QTX_COMM_HEAD(0) &&
+  } else if (addr >= QTX_COMM_HEAD(0) &&
              addr <= QTX_COMM_HEAD(16383)) {
     val = regs.qtx_comm_head[(addr - QTX_COMM_HEAD(0)) / 4];
   } else if (addr >= PF0INT_ITR_0(0) &&
@@ -185,7 +194,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
              addr <= QRX_TAIL(2048 - 1)) {
     val = regs.qrx_tail[(addr - QRX_TAIL(0)) / 4];
   } else if (addr >= GLINT_ITR(0, 0) && addr <= GLINT_ITR(0, 2047)) {
-    val = regs.GLINT_ITR0[(addr - GLINT_ITR(0,0)) / 4]; 
+    val = regs.GLINT_ITR0[(addr - GLINT_ITR(0,0)) / 4];
   } else if (addr >= GLINT_ITR(1, 0) && addr <= GLINT_ITR(1, 2047)) {
     val = regs.GLINT_ITR1[(addr - GLINT_ITR(1,0)) / 4];
   } else if (addr >= GLINT_ITR(2, 0) && addr <= GLINT_ITR(2, 2047)) {
@@ -379,9 +388,6 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
     val = regs.GLV_UPTCL[idx];
   }
   else {
-    #ifdef DEBUG_DEV
-      std::cout << "read others " << addr << logger::endl;
-    #endif
     switch (addr) {
       case GLINT_CTL:
         val = ((ICE_ITR_GRAN_US << GLINT_CTL_ITR_GRAN_200_S) &
@@ -417,11 +423,11 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case GLPE_CPUSTATUS0:
         val = 0x80;
         break;
-      
+
       case GLPE_CPUSTATUS1:
         val = 0x80;
         break;
-      
+
       case GLPE_CPUSTATUS2:
         val = 0x80;
         break;
@@ -461,7 +467,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case GLGEN_RSTCTL:
         val = regs.glgen_rstctl;
         break;
-        
+
       case GLGEN_STAT:
         val = regs.glgen_stat;
         break;
@@ -573,7 +579,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case PF_MBX_ARQT:
         val = regs.pf_mbx_arqt;
         break;
-      
+
       case PF_FUNC_RID:
         val = 0;
         break;
@@ -581,11 +587,65 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
       case GLGEN_RSTAT:
         val = 0;
         break;
-      // e810
+
+      case PF_SB_ATQBAL: 
+        val = regs.REG_PF_SB_ATQBAL; break;
+
+      case PF_SB_ATQBAH:
+        val = regs.REG_PF_SB_ATQBAH; break;
+
+      // PTP      
+      case PTP_GLTSYN_CMD:
+        val = regs.REG_GLTSYN_CMD; break;
+      
+      case PTP_GLTSYN_CMD_SYNC:
+        val = regs.REG_GLTSYN_CMD_SYNC; break;
+
+      case PTP_GLTSYN_SYNC_DLAY:
+        val = regs.REG_GLTSYN_SYNC_DLAY; break;
+
+      case PTP_GLTSYN_HH_DLAY:
+        val = regs.REG_GLTSYN_HH_DLAY; break;
+        
+      case PFTSYN_SEM:
+        val = regs.REG_PFTSYN_SEM; break;
+
+      case PTP_GLTSYN_ENA(0):
+        val = regs.REG_GLTSYN_ENA[0]; break;
+      
+      case PTP_GLTSYN_ENA(1):
+        val = regs.REG_GLTSYN_ENA[1]; break;
+
+      case PTP_GLTSYN_TIME(0) ... PTP_GLTSYN_TIME(5): {
+        const uint64_t index = (addr - PTP_GLTSYN_TIME(0)) >> 2;
+        e810_timestamp_t ts = ptp.phc_read();
+
+        if (index <= 1) {
+            val = ts.time_0;
+            printf("Warning: Tried to read internal TIME_0 register\n");
+
+        } else if (index <= 3) {
+            // time low
+            val = (uint32_t) (ts.time & 0xffffffff);
+        
+        } else  {
+            // time high
+            val = (uint32_t) ((ts.time >> 32) & 0xffffffff);
+        }
+
+        break;
+      }
+
+      case PTP_GLTSYN_SHTIME(0) ... PTP_GLTSYN_SHTIME(5):
+        val = regs.REG_GLTSYN_SHTIME[addr - PTP_GLTSYN_SHTIME(0)]; break;
+
+      case PTP_GLTSYN_INCVAL(0):
+        val = (uint32_t) ptp.get_incval(); break;
 
       default:
+
 #ifdef DEBUG_DEV
-        std::cout << "unhandled mem read addr=" << addr << logger::endl;
+        printf("Unhandled mem read at: %lx\n", addr);
 #endif
         break;
     }
@@ -595,7 +655,7 @@ uint32_t e810_bm::reg_mem_read32(uint64_t addr) {
 
 void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
   if (addr >= GLINT_DYN_CTL(0) &&
-      addr <= GLINT_DYN_CTL(NUM_PFINTS - 1)) {
+    addr <= GLINT_DYN_CTL(NUM_PFINTS - 1)) {
     regs.pfint_dyn_ctln[(addr - GLINT_DYN_CTL(0)) / 4] = val;
   } else if (addr >= QTX_COMM_DBELL(0) && addr <= QTX_COMM_DBELL(2047)){
       size_t idx = (addr - QTX_COMM_DBELL(0))/4;
@@ -619,17 +679,17 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
   } else if (addr >= PF0INT_ITR_1(0) &&
              addr <= PF0INT_ITR_1(2047)) {
     regs.pfint_itrn[1][(addr - PF0INT_ITR_1(0)) / 4096] = val;
-  }else if (addr >= PF0INT_ITR_2(0) &&
+  } else if (addr >= PF0INT_ITR_2(0) &&
              addr <= PF0INT_ITR_2(2047)) {
     regs.pfint_itrn[2][(addr - PF0INT_ITR_2(0)) / 4096] = val;
-  }else if (addr >= QINT_TQCTL(0) &&
+  } else if (addr >= QINT_TQCTL(0) &&
              addr <= QINT_TQCTL(16383)) {
     size_t idx = (addr - QINT_TQCTL(0)) / 4;
     regs.qint_tqctl[idx] = val;
     lanmgr.qena_updated(idx, false);
   } else if (addr >= QINT_RQCTL(0) &&
              addr <= QINT_RQCTL(2048 - 1)) {
-    size_t idx = (addr - QINT_RQCTL(0)) / 4;          
+    size_t idx = (addr - QINT_RQCTL(0)) / 4;
     regs.qint_rqctl[idx] = val;
   } else if (addr >= GLINT_CEQCTL(0) && addr <= GLINT_CEQCTL(2018-1)) {
     uint16_t idx = (addr - GLINT_CEQCTL(0)) / 4;
@@ -826,16 +886,16 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         if ((0x3ff & val) > regs.reg_PFPE_CQPTAIL){
           cqp.reg_updated();
         }
-        
+
         break;
 
       case PFPE_CCQPHIGH:
         regs.reg_PFPE_CCQPHIGH = val;
         break;
-      
+
       case PFPE_CCQPLOW:
         regs.reg_PFPE_CCQPLOW = val;
-        
+
         cqp.create_cqp();
         break;
 
@@ -947,12 +1007,112 @@ void e810_bm::reg_mem_write32(uint64_t addr, uint32_t val) {
         regs.pf_mbx_arqt = val;
         break;
 
+     case PF_SB_ATQBAL: {
+
+        regs.REG_PF_SB_ATQBAL = val;
+        
+        // If bit 31 is set to 1b, read timestamp
+        if(PTP_ATQBAL_IS_ACTIVE(val)) {
+          
+          uint32_t reg_index = PTP_ATQBAL_REG_INDEX(val);
+
+          // write timestamp back to AQTBA registers
+          e810_timestamp_t ts = ptp.phc_sample_tx(reg_index);
+          printf("TXX: %lu \n", ts.time);
+          
+	        // dpdk shifts the tx timestamp down eight bits
+          regs.REG_PF_SB_ATQBAL = PTP_ATQBAL_SET_TS(ts.time << 8);
+          regs.REG_PF_SB_ATQBAH = PTP_ATQBAH_SET_TS(ts.time << 8);
+        }
+
+        break;
+      }
+
+      case PF_SB_ATQBAH: {
+        // there is no documentation about what writing to this register is supposed to do but it's marked as RW
+        DEBUG_LOG_PTP("Warning: Tried to write PF_SB_ATQBAH"); 
+        regs.REG_PF_SB_ATQBAH = val;
+        break;
+      }
+
+      case PTP_GLTSYN_CMD:
+        regs.REG_GLTSYN_CMD = val; break;
+
+      case PTP_GLTSYN_CMD_SYNC: {
+
+          if(val == PTP_GLTSYN_CMD_SYNC_INC) {
+            DEBUG_LOG_PTP("Warning: HW Command GLTSYN_CMD_SYNC_INC not implemented!");
+
+          } else if(val == PTP_GLTSYN_CMD_SYNC_DEC) {
+            DEBUG_LOG_PTP("Warning: HW Command GLTSYN_CMD_SYNC_DEC not implemented!");
+
+          } else if (val == PTP_GLTSYN_CMD_SYNC_EXEC) {
+            uint8_t sel_master = PTP_GLTSYN_CMD_SEL_MASTER(regs.REG_GLTSYN_CMD);
+
+            uint8_t cmd = PTP_GLTSYN_GET_CMD(regs.REG_GLTSYN_CMD);
+            switch(cmd) {
+              case PTP_GLTSYN_CMD_INIT_TIME_INCVAL: {
+                // only emulate timer 0
+                e810_timestamp_t new_time = {
+                    .value = (__int128) regs.REG_GLTSYN_SHTIME[0]
+                        | ((__int128) regs.REG_GLTSYN_SHTIME << 32) 
+                        | ((__int128) regs.REG_GLTSYN_SHTIME << 64) 
+                };
+
+                ptp.phc_write(new_time);
+                
+                for (uint32_t i = 0; i < 4; i++)
+                  regs.REG_GLTSYN_INCVAL[i] = regs.REG_GLTSYN_SHADJ[i];
+                
+                uint64_t new_incval = (uint64_t) regs.REG_GLTSYN_SHADJ[0] | ((uint64_t) regs.REG_GLTSYN_SHADJ[1] << 32);
+                ptp.set_incval(new_incval);
+
+                uint64_t adj = ((uint64_t) regs.REG_GLTSYN_SHADJ[2 * sel_master] << 32)
+                  | regs.REG_GLTSYN_SHADJ[2 * sel_master + 1];
+                ptp.adjust(adj);
+                break;
+              }
+
+              case PTP_GLTSYN_CMD_ADJ_TIME:{
+
+                uint64_t adj = ((uint64_t) regs.REG_GLTSYN_SHADJ[2 * sel_master] << 32)
+                  | regs.REG_GLTSYN_SHADJ[2 * sel_master + 1];
+                ptp.adjust(adj);
+                break;
+              }
+              
+              case PTP_GLTSYN_CMD_ADJ_TIME_AFTER_TGT: {
+                DEBUG_LOG_PTP("Warning: HW Command GLTSYN_CMD_ADJ_TIME_AFTER_TGT not implemented!");
+
+              } default:
+                return;
+            }
+          }
+        break;
+      }
+
+      case PTP_GLTSYN_SHTIME(0) ... PTP_GLTSYN_SHTIME(5): {
+        const uint64_t index = (addr - PTP_GLTSYN_SHTIME(0)) >> 2;
+        regs.REG_GLTSYN_SHTIME[index] = val; break;
+      }
+
+      case PTP_GLTSYN_SHADJ(0) ... PTP_GLTSYN_SHADJ(3): {
+        const uint64_t index = (addr - PTP_GLTSYN_SHADJ(0)) >> 2;
+        regs.REG_GLTSYN_SHADJ[index] = val; break;
+      }
+
+      case PTP_GLTSYN_ENA(0):
+        DEBUG_LOG_PTP("Enabled PTP for clock 0")
+        regs.REG_GLTSYN_ENA[0] = (val & 1);
+        this->ptp.set_enabled(0); break;
+
+      case PTP_GLTSYN_ENA(1):
+        DEBUG_LOG_PTP("Enabled PTP for clock 1")
+        regs.REG_GLTSYN_ENA[1] = (val & 1);
+        this->ptp.set_enabled(1); break;
 
       default:
-#ifdef DEBUG_DEV
-        std::cout << "unhandled mem write addr=" << addr << " val=" << val
-            << logger::endl;
-#endif
+        DEBUG_LOG_DEV("unhandled mem write addr=" << addr << " val=" << val)
         break;
     }
   }
@@ -1141,12 +1301,12 @@ int_ev::int_ev() {
   time_ = 0;
 }
 
-}  // namespace i40e
+}  // namespace e810
 
 class i40e_factory : public nicbm::MultiNicRunner::DeviceFactory {
   public:
     virtual nicbm::Runner::Device &create() override {
-      return *new i40e::e810_bm;
+      return *new e810::e810_bm;
     }
 };
 

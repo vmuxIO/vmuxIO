@@ -5,6 +5,7 @@ sources += files(
     'sims/nic/e810_bm/e810_adminq.cc', 'sims/nic/e810_bm/e810_ceq.cc',
     'sims/nic/e810_bm/e810_cqp.cc', 'sims/nic/e810_bm/e810_hmc.cc',
     'sims/nic/e810_bm/e810_lan.cc', 'sims/nic/e810_bm/e810_queues.cc',
+    'sims/nic/e810_bm/e810_ptp.cc',
     'sims/nic/e810_bm/rss.cc', 'sims/nic/e810_bm/xsums.cc',
     'libsimbricks/simbricks/nicbm/nicbm.cc',
     'libsimbricks/simbricks/nicbm/multinic.cc',

@@ -18,9 +18,11 @@
 #include <rte_cycles.h>
 #include <rte_lcore.h>
 #include <rte_mbuf.h>
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/util.hpp"
 #include "src/drivers/driver.hpp"
 #include "src/drivers/flow_blocks.hpp"
+#include <unistd.h>
 
 #define RX_RING_SIZE 1024
 #define TX_RING_SIZE 1024
@@ -75,6 +77,10 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 	uint16_t i;
 	/* Ethernet port configured with default settings. 8< */
 	struct rte_eth_conf port_conf = {
+		.rxmode = {
+			.offloads = 
+				RTE_ETH_RX_OFFLOAD_TIMESTAMP
+		},
 		.txmode = {
 			.offloads =
 				RTE_ETH_TX_OFFLOAD_VLAN_INSERT |
@@ -82,8 +88,11 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 				RTE_ETH_TX_OFFLOAD_UDP_CKSUM   |
 				RTE_ETH_TX_OFFLOAD_TCP_CKSUM   |
 				RTE_ETH_TX_OFFLOAD_SCTP_CKSUM  |
-				RTE_ETH_TX_OFFLOAD_TCP_TSO,
+				RTE_ETH_TX_OFFLOAD_TCP_TSO	   |
+				RTE_ETH_TX_OFFLOAD_MULTI_SEGS, 
 		},
+
+
 	};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
@@ -162,7 +171,7 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, struct rte_mempool *mb
 			ret, port_id);
 	}
 	/* >8 End of starting the port. */
-
+  	
 	printf(":: initializing port: %d done\n", port_id);
 }
 /* >8 End of Port initialization used in flow filtering. */
@@ -187,7 +196,7 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 	uint16_t q;
 	struct rte_eth_dev_info dev_info;
 	struct rte_eth_txconf txconf;
-
+	
 	if (!rte_eth_dev_is_valid_port(port))
 		return -1;
 
@@ -247,15 +256,18 @@ port_init(uint16_t port, struct rte_mempool *mbuf_pool)
 			   " %02" PRIx8 " %02" PRIx8 " %02" PRIx8 "\n",
 			port, RTE_ETHER_ADDR_BYTES(&addr));
 
-	/* Enable RX in promiscuous mode for the Ethernet device. */
+ 
+  	/* Enable RX in promiscuous mode for the Ethernet device. */
 	retval = rte_eth_promiscuous_enable(port);
+	
 	/* End of setting RX port in promiscuous mode. */
 	if (retval != 0)
 		return retval;
-
+	
 	return 0;
 }
 /* >8 End of main functional part of port initialization. */
+
 
 static void
 lcore_poll_once(void) {
@@ -449,14 +461,19 @@ public:
 
 		/* closing and releasing resources */
 		rte_flow_flush(this->port_id, &error);
-		ret = rte_eth_dev_stop(this->port_id);
-		if (ret < 0)
+    	rte_eth_timesync_disable(this->port_id);   
+		
+    	ret = rte_eth_dev_stop(this->port_id);
+	
+  		if (ret < 0) {
 			printf("Failed to stop port %u: %s",
 		       	 this->port_id, rte_strerror(-ret));
+    	}
+
 		rte_eth_dev_close(this->port_id);
-			/* clean up the EAL */
-			rte_eal_cleanup();
-		}
+		/* clean up the EAL */
+		rte_eal_cleanup();
+	}
 
 	// blocks, busy waiting!
 	void poll_once() {
@@ -483,8 +500,12 @@ public:
 			pkt->data_len = len;
 			pkt->pkt_len = len;
 			pkt->nb_segs = 1;
-			copy_buf_to_pkt((void*)buf, len, pkt, 0);
 
+			// TODO	
+			pkt->ol_flags |= RTE_MBUF_F_TX_IEEE1588_TMST; 
+		
+			copy_buf_to_pkt((void*)buf, len, pkt, 0);
+			
 			/* Send burst of TX packets. */
 			const uint16_t nb_tx = rte_eth_tx_burst(port, queue,
 					&pkt, 1);
@@ -545,11 +566,56 @@ public:
 
   virtual void recv_consumed(int vm_id) {
     // free pkt
-		for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++)
-			rte_pktmbuf_free(this->bufs[buf]);
+	for (uint16_t buf = 0; buf < this->nb_bufs_used; buf++) 
+		rte_pktmbuf_free(this->bufs[buf]);
 		
     this->nb_bufs_used = 0;
+  
   }
+ 
+  /* Enables Timesync / PTP */
+  virtual void enableTimesync(uint16_t port) {
+	uint32_t retval = rte_eth_timesync_enable(port);
+	if (retval < 0) {
+		perror("Could not enable Timesync");
+	}
+  } 
+  
+  /* Get timestamp from NIC (global clock 0) */
+  struct timespec readCurrentTimestamp() {
+
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+    if(rte_eth_timesync_read_time(0, &ts)) {
+		perror("Dpdk current time failed!");
+	}
+    
+	return ts;
+  }
+
+  uint64_t readTxTimestamp(uint16_t portid) {
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+
+	if(rte_eth_timesync_read_tx_timestamp(portid, &ts)) {
+		perror("Dpdk TX timestamp failed!");
+	}
+
+	uint64_t tstamp = (TIMESPEC_TO_NANOS(ts) & 0xFFFFFFFFFF);
+	
+	return tstamp;
+  };
+  
+  uint64_t readRxTimestamp(uint16_t portid) {
+	struct timespec ts = { .tv_sec=0, .tv_nsec=0 };
+
+	if(rte_eth_timesync_read_rx_timestamp(portid, &ts, 0)) {
+		perror("Dpdk RX timestamp failed!");
+	}
+
+	// dpdk adds the timestamp and the global time together, so we split up the timestamp
+	uint64_t tstamp = (TIMESPEC_TO_NANOS(ts) & 0xFFFFFFFFFF);
+
+	return tstamp;
+  };
 
   virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
   	if (!this->mediate[vm_id]) {
@@ -561,7 +627,7 @@ public:
   	printf("dpdk add switch rule\n");
 
 		struct rte_flow_error error;
-  	struct rte_flow* flow;
+  		struct rte_flow* flow;
 		struct rte_ether_addr src_mac;
 		struct rte_ether_addr src_mask;
 		struct rte_ether_addr dest_mac;
@@ -598,5 +664,9 @@ public:
   virtual bool mediation_disable(int vm_id) {
 		// die("unimplemented: you need to flush switch rules from the emulator to the device");
 		return false;
+  }
+
+  virtual bool is_mediating(int vm_id) {
+	return this->mediate[vm_id];
   }
 };

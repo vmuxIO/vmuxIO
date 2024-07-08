@@ -107,6 +107,7 @@
     ethtool
     stress
     iptables
+    linuxptp
   ];
 
   hardware.firmware = [ linux-firmware-pinned ];

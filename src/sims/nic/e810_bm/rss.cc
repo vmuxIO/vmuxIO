@@ -24,7 +24,7 @@
 
 #include "sims/nic/e810_bm/e810_bm.h"
 
-namespace i40e {
+namespace e810 {
 
 rss_key_cache::rss_key_cache(const uint32_t (&key_)[key_len / 4]) : key(key_) {
   cache_dirty = true;
@@ -87,4 +87,4 @@ uint32_t rss_key_cache::hash_ipv4(uint32_t sip, uint32_t dip, uint16_t sp,
 
   return res;
 }
-}  // namespace i40e
+}  // namespace e810

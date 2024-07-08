@@ -17,7 +17,7 @@
     nixpkgs-2111.url = "github:NixOS/nixpkgs/nixos-21.11";
 
     flake-utils.url = "github:numtide/flake-utils";
-
+    
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -268,6 +268,7 @@
         # not available in 22.05 yet
         # python310.pkgs.types-pyyaml
         ethtool
+        linuxptp
 
         # deps for tests
         (pkgs.python3.withPackages (ps: [

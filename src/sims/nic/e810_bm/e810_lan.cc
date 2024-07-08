@@ -23,17 +23,19 @@
  */
 
 #include <arpa/inet.h>
+#include <cstdint>
 #include <stdlib.h>
 #include <string.h>
 
 #include <cassert>
 #include <iostream>
 #include <string>
+#include "sims/nic/e810_bm/e810_ptp.h"
 #include "sims/nic/e810_bm/headers.h"
 #include "sims/nic/e810_bm/e810_base_wrapper.h"
 #include "sims/nic/e810_bm/e810_bm.h"
 
-namespace i40e {
+namespace e810 {
 
 lan::lan(e810_bm &dev_, size_t num_qs_)
     : dev(dev_), log("lan", dev_.runner_), rss_kc(dev_.regs.pfqf_hkey),
@@ -77,7 +79,7 @@ void lan::qena_updated(uint16_t idx, bool rx) {
     else {
       q.enable(rx);
     }
-    
+
   } else if (!(reg & QRX_CTRL_QENA_REQ_M) && q.is_enabled()) {
     q.disable();
   }
@@ -111,7 +113,7 @@ bool lan::rss_steering(const void *data, size_t len, uint16_t &queue,
   if (tcp->eth.type == htons(ETH_TYPE_IP) && tcp->ip.proto == IP_PROTO_TCP) {
     hash = rss_kc.hash_ipv4(ntohl(tcp->ip.src), ntohl(tcp->ip.dest),
                             ntohs(tcp->tcp.src), ntohs(tcp->tcp.dest));
-    
+
     #ifdef DEBUG_LAN
     std::cout << "TCP IP Ethernet" << logger::endl;
     #endif
@@ -310,6 +312,7 @@ void lan_queue_rx::initialize() {
   }
   uint8_t *ctx_p = reinterpret_cast<uint8_t *>(&(packed_ctx[0]));
   
+
   uint16_t *head_p = reinterpret_cast<uint16_t *>(ctx_p + 0);
   uint64_t *base_p = reinterpret_cast<uint64_t *>(ctx_p + 4);
   uint16_t *qlen_p = reinterpret_cast<uint16_t *>(ctx_p + 11);
@@ -321,7 +324,6 @@ void lan_queue_rx::initialize() {
 
   base = ((*base_p) & ((1ULL << 57) - 1)) * 128;
   len = (*qlen_p >> 1) & ((1 << 13) - 1);
-  printf("rx_init this 0x%p len %d (0x%p)\n", this, len, &len);
 
   dbuff_size = (((*dbsz_p) >> 6) & ((1 << 7) - 1)) * 128;
   hbuff_size = (((*hbsz_p) >> 5) & ((1 << 5) - 1)) * 64;
@@ -337,14 +339,14 @@ void lan_queue_rx::initialize() {
 
 // #endif
   
-  
+
   if (!longdesc) {
     std::cout << "lan_queue_rx::initialize: currently only 32B descs "
            " supported"
         << logger::endl;
     abort();
   }
-  
+
   if (dtype != 0) {
     std::cout << "lan_queue_rx::initialize: no header split supported"
         << logger::endl;
@@ -365,6 +367,30 @@ queue_base::desc_ctx &lan_queue_rx::desc_ctx_create() {
   return *new rx_desc_ctx(*this);
 }
 
+/* determine if we should sample a ptp rx timestamp for this packet */
+bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
+  // if no global timer is active, do not sample
+  if (!PTP_GLTSYN_ENA(dev.regs.REG_GLTSYN_ENA[0]) || !PTP_GLTSYN_ENA(dev.regs.REG_GLTSYN_ENA[1])) {
+    return false;
+  }
+
+  const headers::pkt_udp *udp =
+      reinterpret_cast<const headers::pkt_udp *>(data);
+  const void *ptp_start;
+
+  if (udp->eth.type == htons(ETH_TYPE_IP) && udp->ip.proto == IP_PROTO_UDP) {
+
+    // check UDP port
+    uint16_t port = ntohs(udp->udp.dest);
+    return port == PTP_UDP_1 || port == PTP_UDP_2;
+
+  } else {
+
+    // return true iff ethertype is PTP
+    return udp->eth.type == htons(ETH_TYPE_PTP);
+  }
+}
+
 void lan_queue_rx::packet_received(const void *data, size_t pktlen,
                                    uint32_t h) {
   size_t num_descs = (pktlen + dbuff_size - 1) / dbuff_size;
@@ -374,7 +400,7 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
   }
   if (!enabled)
     return;
-  
+
 
   if (dcache.size() < num_descs) {
 #ifdef DEBUG_LAN
@@ -382,6 +408,12 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
         << logger::endl;
 #endif
     return;
+  }
+
+  e810_timestamp_t timestamp = { .value=0 };
+
+  if (ptp_should_sample_rx(data, pktlen)) {
+    timestamp = dev.ptp.phc_sample_rx(0);
   }
 
   for (size_t i = 0; i < num_descs; i++) {
@@ -394,13 +426,13 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
     dcache.pop_front();
 
     const uint8_t *buf = (const uint8_t *)data + (dbuff_size * i);
-  
+
     if (i == num_descs - 1) {
       // last packet
-      ctx.packet_received(buf, pktlen - dbuff_size * i, true);
+      ctx.packet_received(buf, pktlen - dbuff_size * i, timestamp, true);
     } else {
-      
-      ctx.packet_received(buf, dbuff_size, false);
+
+      ctx.packet_received(buf, dbuff_size, timestamp, false);
     }
   }
 }
@@ -418,7 +450,7 @@ void lan_queue_rx::rx_desc_ctx::process() {
 }
 
 void lan_queue_rx::rx_desc_ctx::packet_received(const void *data, size_t pktlen,
-                                                bool last) {
+                                                e810_timestamp_t timestamp, bool last) {
   union ice_32byte_rx_desc *rxd =
       reinterpret_cast<union ice_32byte_rx_desc *>(desc);
   union ice_32b_rx_flex_desc *flex_rxd =
@@ -428,13 +460,17 @@ void lan_queue_rx::rx_desc_ctx::packet_received(const void *data, size_t pktlen,
   rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_DD_S);
   rxd->wb.qword1.status_error_len |= (pktlen << 38);
 
+  // write to TS registers of flex context
+  flex_rxd->wb.flex_ts.ts_high_0 = (uint16_t) timestamp.time & 0xFFFF;
+  flex_rxd->wb.flex_ts.ts_high_1 = (uint16_t) ((timestamp.time >> 16) & 0xFFFF);
+  flex_rxd->wb.ts_low = 0x1; // set the LSB to 1 to indicate validity
+
   if (last) {
     rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_EOF_S);
-    // TODO(antoinek): only if checksums are correct
     rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_L3L4P_S);
-  } 
-  data_write(addr, pktlen, data);
-  
+  }
+
+  data_write(addr, pktlen, data); 
 }
 
 lan_queue_tx::lan_queue_tx(lan &lanmgr_, uint32_t &reg_tail_, size_t idx_,
@@ -505,6 +541,7 @@ bool lan_queue_tx::trigger_tx_packet() {
   uint64_t d1;
   uint32_t iipt, l4t, pkt_len, total_len = 0, data_limit;
   bool tso = false;
+  bool tsync = false;
   uint32_t tso_mss = 0, tso_paylen = 0;
   uint16_t maclen = 0, iplen = 0, l4len = 0;
 
@@ -528,9 +565,16 @@ bool lan_queue_tx::trigger_tx_packet() {
 
     uint16_t cmd =
         ((d1 & ICE_TXD_CTX_QW1_CMD_M) >> ICE_TXD_CTX_QW1_CMD_S);
+    
     tso = !!(cmd & ICE_TX_CTX_DESC_TSO);
-    tso_mss = ((d1 ) >> ICE_TXD_CTX_QW1_MSS_S) & 0x3FFFULL;
+    tso_mss = (d1 & ICE_TXD_CTX_QW1_MSS_M) >> ICE_TXD_CTX_QW1_MSS_S;
 
+    tsync = !!(cmd & ICE_TX_CTX_DESC_TSYN);
+
+    if (tso && tsync) {
+      std::cout << "Error: Tried to transmit packet with tsync and tso enabled!" << logger::endl;
+    }
+    
 #ifdef DEBUG_LAN
     std::cout << "  tso=" << (int)tso << " mss=" << tso_mss << logger::endl;
 #endif
@@ -703,6 +747,7 @@ bool lan_queue_tx::trigger_tx_packet() {
 void lan_queue_tx::trigger_tx() {
   while (trigger_tx_packet()) {
   }
+
 }
 
 lan_queue_tx::tx_desc_ctx::tx_desc_ctx(lan_queue_tx &queue_)
@@ -773,4 +818,4 @@ void lan_queue_tx::dma_hwb::done() {
   queue.trigger();
   delete this;
 }
-}  // namespace i40e
+}  // namespace e810

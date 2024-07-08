@@ -72,10 +72,13 @@ vmuxDpdkE1000:
   sudo {{proot}}/build_release/vmux -u -q -d none -m e1000-emu -s {{vmuxSock}} -- -l 1 -n 1
 
 vmuxDpdkE810:
-  sudo gdb --args {{proot}}/build/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
+  sudo {{proot}}/build/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
 
 vmuxMed:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1
+
+vmuxDpdkE810Gdb:
+  sudo gdb --args {{proot}}/build/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
 
 nic-emu:
   sudo ip link delete {{vmuxTap}} || true
@@ -466,6 +469,7 @@ build:
   nix build -o {{proot}}/ycsb .#ycsb
   nix build -o {{proot}}/fastclick .#fastclick
   nix build -o {{proot}}/vmux-nixbuild .#vmux
+  pushd ./test/ptptest; make; popd
   [[ -z $(git submodule status | grep "^-") ]] || echo WARN: git submodules status: not in sync
 
 update:
