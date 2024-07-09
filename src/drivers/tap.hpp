@@ -75,7 +75,7 @@ public:
   }
 
   virtual void recv_consumed(int _vm_number) {
-    this->nb_bufs_used = 0;
+    this->nb_bufs_used[0] = 0;
   }
 
   void dumpRx() {
