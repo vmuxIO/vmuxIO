@@ -493,11 +493,12 @@ class Bench(Generic[T], ContextDecorator):
                 pass # leave default tqdm_constructor
 
     def __enter__(self):
-        self.tqdm = self.tqdm_constructor(total=self.time_remaining_s+0.1, # +0.1 to avoid float summing errors
-              unit="s",
+        total_min = (self.time_remaining_s + 0.1) / 60 # +0.1 to avoid float summing errors
+        self.tqdm = self.tqdm_constructor(total=total_min,
+              unit="min",
               # - cut off float decimals
               # - append newline to print every update to new line (to avoid garbled newlines when we print between progress updates)
-              bar_format="{l_bar}{bar}| {n:.0f}/{total:.0f}sec [{elapsed}<{remaining}, {rate_fmt}{postfix}]\n",
+              bar_format="{l_bar}{bar}| {n:.0f}/{total:.0f}min [{elapsed}<{remaining}, {rate_fmt}{postfix}]\n",
               )
         return self, self.remaining_tests
 
@@ -560,11 +561,11 @@ class Bench(Generic[T], ContextDecorator):
 
     def done(self, done: T):
         # TODO make this obsolete: integrate it into iterators and __exit__ or so
-        self.remaining_tests.remove(done)
+        self.remaining_tests = [ test for test in self.remaining_tests if test != done ]
         time_remaining_new_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
         time_progress_s = self.time_remaining_s - time_remaining_new_s
         self.time_remaining_s = time_remaining_new_s
-        self.tqdm.update(time_progress_s)
+        self.tqdm.update(time_progress_s / 60)
 
 
 import measure_vnf
