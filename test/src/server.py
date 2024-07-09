@@ -8,12 +8,13 @@ from abc import ABC
 from os import listdir, remove
 from os.path import join as path_join
 from os.path import dirname as path_dirname
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Type
 from enums import Interface, MultiHost
 from pathlib import Path
 from util import strip_subnet_mask
 import copy
 import base64
+import cpupinning
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
 MAX_VMS: int = 35; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
@@ -91,6 +92,7 @@ class Server(ABC):
     moongen_dir: str
     moonprogs_dir: str
     xdp_reflector_dir: str
+    cpupinner: cpupinning.CpuPinner = cpupinning.CpuPinner(None)
     localhost: bool = False
     nixos: bool = False
     ssh_config: Optional[str] = None
@@ -113,6 +115,7 @@ class Server(ABC):
         __init__ : Initialize the object.
         """
         self.nixos = True # all hosts are nixos actually
+        self.cpupinner = cpupinning.CpuPinner(self)
         return
         self.localhost = self.fqdn == 'localhost' or self.fqdn == getfqdn()
         try:
@@ -1710,10 +1713,15 @@ class Host(Server):
                 f' -initrd {project_root}/nix/results/test-guest-initrd/initrd' +
                 f' -append \\"root=/dev/vda console=ttyS0 init=/init $(cat {project_root}/nix/results/test-guest-kernelParams) {extkern}\\"')
 
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        nix_shell = f"nix shell --inputs-from {project_root} nixpkgs#numactl --command"
+        numactl = f"numactl -C {self.cpupinner.qemu(vm_number)}"
+        # numactl = ""
+
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
-            "sudo " +
+            f"sudo {nix_shell} {numactl} " +
             qemu_bin_path +
             f' -machine {machine_type}' +
             ' -cpu host' +
@@ -1788,7 +1796,7 @@ class Host(Server):
             vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, num_vms)}"
             args = f' -s {vmux_socket} -d {self.test_iface_addr}'
         if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]:
-            dpdk_args += " -u -- -l 1 -n 1"
+            dpdk_args += f" -u -- -l {self.cpupinner.vmux_main()}"
         if interface.guest_driver() == "ice":
             vmux_mode = "emulation"
         elif interface.guest_driver() == "e1000":
@@ -1797,17 +1805,17 @@ class Host(Server):
             vmux_mode = "mediation"
         if not interface.is_passthrough():
             if num_vms == 0:
-                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'
+                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(1)} -f {self.cpupinner.vmux_runner(1)}'
             else:
                 for vm_number in MultiHost.range(num_vms):
                     vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, vm_number)}"
-                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode}'
+                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(vm_number)} -f {self.cpupinner.vmux_runner(vm_number)}'
 
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
         nix_shell = f"nix shell --inputs-from {project_root} nixpkgs#numactl --command"
-        numactl = "numactl -C 1-5 "
-        # numactl = ""
+        # numactl = "numactl -C 1-5 "
+        numactl = ""
         self.tmux_new(
             'vmux',
             f'ulimit -n 4096; sudo {nix_shell} {numactl} {self.vmux_path} -q -b {base_mac}'
@@ -2155,6 +2163,8 @@ class LoadGen(Server):
         redis_cmd = f"redis-server \\*:6379 --protected-mode no"
         nix_cmd = f"nix shell --inputs-from {project_root} nixpkgs#redis --command {redis_cmd}"
         self.tmux_new("redis", f"{nix_cmd}; sleep 999")
+
+        # --save "" --io-threads 8
 
 
     def stop_redis(self):
