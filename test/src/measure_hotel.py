@@ -199,7 +199,7 @@ class DeathStarBench:
             loadgen.exec(f"sudo rm {remote_output_file} || true")
             LoadGen.stop_wrk2(loadgen)
             workdir = f"{loadgen.moonprogs_dir}/../../subprojects/deathstarbench/{self.app}"
-            LoadGen.start_wrk2(loadgen, self.frontend_url, self.script, duration=DURATION_S, outfile=remote_output_file, workdir=workdir)
+            LoadGen.start_wrk2(loadgen, self.frontend_url, self.script, duration=DURATION_S, outfile=remote_output_file, workdir=workdir, rate=test.rps)
             time.sleep(DURATION_S + 1)
             try:
                 loadgen.wait_for_success(f'[[ $(tail -n 1 {remote_output_file}) = *"AUTOTEST_DONE"* ]]')
@@ -231,7 +231,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.VMUX_DPDK_E810,
         Interface.VMUX_MED,
         ]
-    rpsList = [ 1, 2, 4, 8, 10, 20, 40, 80, 120 ]
+    rpsList = [ 1, 2, 4, 8, 16, 64, 128, 1048 ]
     # rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
     repetitions = 4
@@ -240,9 +240,9 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         interfaces = [ Interface.BRIDGE_E1000 ]
         # interfaces = [ Interface.VMUX_EMU ]
         rpsList = [ 10 ]
-        # apps = [ "hotelReservation" ]
+        apps = [ "hotelReservation" ]
         # apps = [ "socialNetwork" ]
-        apps = [ "mediaMicroservices" ]
+        # apps = [ "mediaMicroservices" ]
         repetitions = 1
 
     # plan the measurement
