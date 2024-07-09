@@ -988,6 +988,13 @@ class Server(ABC):
         for addr in self.get_nic_ip_addresses(iface):
             self.exec(f'sudo ip addr del {addr} dev {iface}')
 
+    def add_arp_entries(self: 'Server', others: Dict[int, Type['Server']]):
+        for vm_num, other_vm in others.items():
+            ip = strip_subnet_mask(other_vm.test_iface_ip_net)
+            mac = MultiHost.mac(other_vm.test_iface_mac, vm_num)
+            dev = self.test_iface
+            self.exec(f"sudo ip neighbour add {ip} dev {dev} lladdr {mac}")
+
     def start_moongen_reflector(self: 'Server'):
         """
         Start the libmoon L2 reflector.
@@ -1972,13 +1979,6 @@ class Guest(Server):
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
         self.exec(f'sudo ip link set {self.test_iface} up')
 
-    def add_arp_entries(self: 'Guest', others: Dict[int, 'Server']):
-        for vm_num, other_vm in others.items():
-            ip = MultiHost.ip(strip_subnet_mask(other_vm.test_iface_ip_net), vm_num)
-            mac = MultiHost.mac(other_vm.test_iface_mac, vm_num)
-            dev = other_vm.test_iface
-            self.exec(f"sudo ip neighbour add {ip} dev {dev} lladdr {mac}")
-
     def start_iperf_server(self, server_hostname: str):
         """
         Starts an iperf server listening on port "port". Returns the ip address the server is bound to.
@@ -2192,11 +2192,11 @@ class LoadGen(Server):
         elif ipt.direction != "forward":
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
 
-        if length != "-1":
-            options += " -l {length}"
+        if length != -1:
+            options += f" -l {length}"
 
         if proto == "udp":
-            options += " -u"
+            options += " -u -b 0"
         elif proto != "tcp":
             warning(f"Unknown protocol {proto}. Using tcp.")
 
