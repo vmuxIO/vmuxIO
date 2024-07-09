@@ -256,10 +256,9 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
                         # guest: set up networking
 
-                        if interface.is_passthrough():
-                            guest.modprobe_test_iface_drivers(interface=interface)
+                        if interface.guest_driver() == "ice":
                             guest.bind_test_iface() # bind vfio driver
-                        else:
+                        else: # supports software-tap with kernel interfaces only
                             guest.modprobe_test_iface_drivers(interface=interface)
                             guest.setup_test_iface_ip_net()
 
