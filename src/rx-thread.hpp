@@ -14,8 +14,9 @@ class RxThread {
     std::atomic_bool running; // set to false to terminate this thread
     std::string termination_error; // non-null if Runner terminated with error
     std::shared_ptr<VmuxDevice> device;
+    cpu_set_t cpupin;
 
-    RxThread(std::shared_ptr<VmuxDevice> device): device(device) { }
+    RxThread(std::shared_ptr<VmuxDevice> device, cpu_set_t cpupin): device(device), cpupin(cpupin) { }
 
     void start() {
       running.store(1);
@@ -31,13 +32,7 @@ class RxThread {
       }
 
       // set cpu affinity
-      size_t num_cores = sysconf(_SC_NPROCESSORS_ONLN); // Get the number of available cores
-      cpu_set_t cpuset;
-      CPU_ZERO(&cpuset);
-      CPU_SET(((device->device_id * 6) + 7) % num_cores, &cpuset);
-      // for (size_t j = 0; j < num_cores; j++)
-      //     CPU_SET(j, &cpuset);
-      ret = pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
+      ret = pthread_setaffinity_np(thread, sizeof(this->cpupin), &this->cpupin);
       if (ret != 0)
           die("failed to set pthread cpu affinity");
     }
