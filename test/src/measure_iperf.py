@@ -83,6 +83,73 @@ class IPerfTest(AbstractBenchTest):
         }]
         return DataFrame(data=data)
 
+    def run(self, repetition: int, guests, loadgen, host):
+        #cleanup
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            guest.stop_iperf_server()
+            loadgen.stop_iperf_client(vm_num=i)
+        end_foreach(guests, foreach_parallel)
+
+        def remote_output_file(vm_num):
+            return f"/tmp/iperf_result_vm{vm_num}.json"
+        def tmp_remote_output_file(vm_num):
+            return f"/tmp/tmp_iperf_result_vm{vm_num}.json"
+        local_output_file = self.output_filepath(repetition)
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            loadgen.exec(f"sudo rm {remote_output_file(i)} || true")
+            loadgen.exec(f"sudo rm {tmp_remote_output_file(i)} || true")
+        end_foreach(guests, foreach_parallel)
+
+        info("Starting iperf")
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            # workaround for ARP being broken in vMux: ping the loadgen once
+            guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
+
+            guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
+        end_foreach(guests, foreach_parallel)
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            loadgen.run_iperf_client(self, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file(i), tmp_remote_output_file(i), proto=self.proto, length=self.length, vm_num=i)
+        end_foreach(guests, foreach_parallel)
+
+        time.sleep(DURATION_S)
+        # time.sleep(DURATION_S / 2)
+        # remote_cpufile = "/tmp/vmux_cpupins.log"
+        # host.exec(f"ps H -o pid,tid,%cpu,psr,comm -p $(pgrep vmux) > {remote_cpufile}; ps H -o pid,tid,%cpu,psr,args -p $(pgrep qemu) | awk '\"'\"'{{print $1, $2, $3, $4, $42}}'\"'\"' >> {remote_cpufile}")
+        # time.sleep(DURATION_S / 2)
+
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            try:
+                loadgen.wait_for_success(f'[[ -e {remote_output_file(i)} ]]', timeout=20)
+            except TimeoutError:
+                error('Waiting for output file timed out.')
+            finally:
+                loadgen.copy_from(remote_output_file(i), self.output_path_per_vm(repetition, i))
+        end_foreach(guests, foreach_parallel)
+        # host.copy_from(remote_cpufile, self.output_filepath(repetition, extension="cpus"))
+
+
+        # teardown
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            guest.stop_iperf_server()
+            loadgen.stop_iperf_client(vm_num=i)
+        end_foreach(guests, foreach_parallel)
+
+        # summarize results of VM
+        with open(local_output_file, 'w') as file:
+            dfs = []
+            for i, guest in guests.items():
+                try:
+                    dfs += [ self.summarize(repetition, i) ]
+                except Exception as e:
+                    warning(f"Can't process result of VM {i} repetition {repetition}. Did the benchmark fail?")
+                    _ignore = traceback.format_exc()
+            # to_string preserves all cols
+            if len(dfs) > 0:
+                summary = pd.concat(dfs).to_string()
+            else:
+                summary = "no results"
+            file.write(summary)
+
 
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
@@ -190,70 +257,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         info(f"Running {test}")
 
                         for repetition in range(repetitions):
-                            #cleanup
-                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                                guest.stop_iperf_server()
-                                loadgen.stop_iperf_client(vm_num=i)
-                            end_foreach(guests, foreach_parallel)
+                            test.run(repetition, guests, loadgen, host)
 
-                            def remote_output_file(vm_num):
-                                return f"/tmp/iperf_result_vm{vm_num}.json"
-                            def tmp_remote_output_file(vm_num):
-                                return f"/tmp/tmp_iperf_result_vm{vm_num}.json"
-                            local_output_file = test.output_filepath(repetition)
-                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                                loadgen.exec(f"sudo rm {remote_output_file(i)} || true")
-                                loadgen.exec(f"sudo rm {tmp_remote_output_file(i)} || true")
-                            end_foreach(guests, foreach_parallel)
-
-                            info("Starting iperf")
-                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                                # workaround for ARP being broken in vMux: ping the loadgen once
-                                guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
-
-                                guest.start_iperf_server(strip_subnet_mask(guest.test_iface_ip_net))
-                            end_foreach(guests, foreach_parallel)
-                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                                loadgen.run_iperf_client(test, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file(i), tmp_remote_output_file(i), proto=proto, length=length, vm_num=i)
-                            end_foreach(guests, foreach_parallel)
-                            time.sleep(DURATION_S)
-                            # time.sleep(DURATION_S / 2)
-                            # remote_cpufile = "/tmp/vmux_cpupins.log"
-                            # host.exec(f"ps H -o pid,tid,%cpu,psr,comm -p $(pgrep vmux) > {remote_cpufile}; ps H -o pid,tid,%cpu,psr,args -p $(pgrep qemu) | awk '\"'\"'{{print $1, $2, $3, $4, $42}}'\"'\"' >> {remote_cpufile}")
-                            # time.sleep(DURATION_S / 2)
-
-                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                                try:
-                                    loadgen.wait_for_success(f'[[ -e {remote_output_file(i)} ]]', timeout=20)
-                                except TimeoutError:
-                                    error('Waiting for output file timed out.')
-                                finally:
-                                    loadgen.copy_from(remote_output_file(i), test.output_path_per_vm(repetition, i))
-                            end_foreach(guests, foreach_parallel)
-                            # host.copy_from(remote_cpufile, self.output_filepath(repetition, extension="cpus"))
-
-
-                            # teardown
-                            def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                                guest.stop_iperf_server()
-                                loadgen.stop_iperf_client(vm_num=i)
-                            end_foreach(guests, foreach_parallel)
-
-                            # summarize results of VM
-                            with open(local_output_file, 'w') as file:
-                                dfs = []
-                                for i, guest in guests.items():
-                                    try:
-                                        dfs += [ test.summarize(repetition, i) ]
-                                    except Exception as e:
-                                        warning(f"Can't process result of VM {i} repetition {repetition}. Did the benchmark fail?")
-                                        _ignore = traceback.format_exc()
-                                # to_string preserves all cols
-                                if len(dfs) > 0:
-                                    summary = pd.concat(dfs).to_string()
-                                else:
-                                    summary = "no results"
-                                file.write(summary)
                         bench.done(test)
                 loadgen.stop_xdp_pure_reflector()
             # end VM
