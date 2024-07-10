@@ -176,6 +176,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 loadgen.setup_test_iface_ip_net()
                 loadgen.stop_xdp_pure_reflector()
                 loadgen.start_xdp_pure_reflector()
+                # install inter-VM ARP rules (except first one which actually receives ARP. If we prevent ARP on the first one, all break somehow.)
+                loadgen.add_arp_entries({ i_:guest_ for i_, guest_ in guests.items() if i_ != 1 })
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
@@ -215,6 +217,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                                 loadgen.run_iperf_client(test, DURATION_S, strip_subnet_mask(guest.test_iface_ip_net), remote_output_file(i), tmp_remote_output_file(i), proto=proto, length=length, vm_num=i)
                             end_foreach(guests, foreach_parallel)
                             time.sleep(DURATION_S)
+                            # time.sleep(DURATION_S / 2)
+                            # remote_cpufile = "/tmp/vmux_cpupins.log"
+                            # host.exec(f"ps H -o pid,tid,%cpu,psr,comm -p $(pgrep vmux) > {remote_cpufile}; ps H -o pid,tid,%cpu,psr,args -p $(pgrep qemu) | awk '\"'\"'{{print $1, $2, $3, $4, $42}}'\"'\"' >> {remote_cpufile}")
+                            # time.sleep(DURATION_S / 2)
 
                             def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                                 try:
@@ -224,6 +230,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                                 finally:
                                     loadgen.copy_from(remote_output_file(i), test.output_path_per_vm(repetition, i))
                             end_foreach(guests, foreach_parallel)
+                            # host.copy_from(remote_cpufile, self.output_filepath(repetition, extension="cpus"))
 
 
                             # teardown
