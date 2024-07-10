@@ -25,6 +25,7 @@ public:
   std::atomic_bool running; // set to false to terminate this thread
   std::string socket;
   std::string termination_error; // non-null if Runner terminated with error
+  cpu_set_t cpupin;
 
   // void (*VmuxRunner::interrupt_handler)(void);
 
@@ -36,8 +37,8 @@ public:
   };
 
   VmuxRunner(std::string socket, std::shared_ptr<VmuxDevice> device, int efd,
-             std::shared_ptr<VfioUserServer> vfu)
-      : vfu(vfu), device(device) {
+             std::shared_ptr<VfioUserServer> vfu, cpu_set_t cpupin)
+      : vfu(vfu), device(device), cpupin(cpupin) {
     state.store(0);
     this->socket = socket;
   }
@@ -54,13 +55,7 @@ public:
     }
 
     // set cpu affinity
-    size_t num_cores = sysconf(_SC_NPROCESSORS_ONLN); // Get the number of available cores
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(((device->device_id * 6) + 6) % num_cores, &cpuset);
-    // for (size_t j = 0; j < num_cores; j++)
-    //     CPU_SET(j, &cpuset);
-    ret = pthread_setaffinity_np(thread, sizeof(cpuset), &cpuset);
+    ret = pthread_setaffinity_np(thread, sizeof(this->cpupin), &this->cpupin);
     if (ret != 0)
         die("failed to set pthread cpu affinity");
   }
