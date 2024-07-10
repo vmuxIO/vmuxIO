@@ -107,15 +107,19 @@ class Ycsb():
         pass
 
     def run(self, host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: YcsbTest):
-        loadgen.stop_redis() # cleanup
-        loadgen.start_redis()
+        # start redis shards
+        redis_ports = []
+        for i in range(loadgen.cpupinner.redis_shards()): # usually 12
+            loadgen.stop_redis(nr=i) # cleanup
+            redis_ports += [ loadgen.start_redis(nr=i) ]
 
-        # load test data
-        loadgen.exec(f"sudo rm /tmp/ycsb-load.log || true")
-        loadgen.stop_ycsb() # cleanup
-        loadgen.start_ycsb("localhost", outfile="/tmp/ycsb-load.log", load=True)
-        loadgen.wait_for_success(f'[[ $(tail -n 1 /tmp/ycsb-load.log) = *"AUTOTEST_DONE"* ]]')
-        loadgen.stop_ycsb()
+        # load test data into each shard
+        for port in redis_ports:
+            loadgen.exec(f"sudo rm /tmp/ycsb-load.log || true")
+            loadgen.stop_ycsb() # cleanup
+            loadgen.start_ycsb("localhost", outfile="/tmp/ycsb-load.log", load=True, port=port)
+            loadgen.wait_for_success(f'[[ $(tail -n 1 /tmp/ycsb-load.log) = *"AUTOTEST_DONE"* ]]')
+            loadgen.stop_ycsb()
 
         info(f"Running ycsb {test.repetitions} times")
 
@@ -129,7 +133,8 @@ class Ycsb():
 
             # start test on all guests
             def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                guest.start_ycsb("10.1.0.2", rate=test.rps, runtime=DURATION_S, threads=1, outfile=remote_output_file)
+                port = redis_ports[(i - 1) % len(redis_ports)] # round robin assign shards to VMs
+                guest.start_ycsb("10.1.0.2", rate=test.rps, runtime=DURATION_S, threads=1, port=port, outfile=remote_output_file)
             end_foreach(guests, foreach_parallel)
 
             time.sleep(DURATION_S + 1)
@@ -163,7 +168,8 @@ class Ycsb():
                 file.write(raw_data)
 
 
-        loadgen.stop_redis()
+        for i in range(len(redis_ports)):
+            loadgen.stop_redis(nr=i)
         pass
 
 
