@@ -1092,7 +1092,7 @@ class Server(ABC):
         self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
 
 
-    def start_ycsb(self, fqdn: str, rate: int = 100, runtime: int = 8, threads: int = 8, outfile: str = "/tmp/outfile.log", load: bool = False):
+    def start_ycsb(self, fqdn: str, rate: int = 100, runtime: int = 8, threads: int = 8, port: int = 6379, outfile: str = "/tmp/outfile.log", load: bool = False):
         """
         rate: target requests rate per second. -1 to request at max rate
         runtime: in secs
@@ -1107,14 +1107,14 @@ class Server(ABC):
             ops = 429496729 # MAX_INT
             core_properties = f"-p operationcount={ops}" \
                     f" -p maxexecutiontime={runtime}"
-            if rate is None:
-                target_rate = f"-target {rate}"
-            else:
+            if rate is None or rate == -1:
                 target_rate = ""
+            else:
+                target_rate = f"-target {rate}"
 
-            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 {core_properties} -threads {threads} {target_rate}'
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port={port} {core_properties} -threads {threads} {target_rate}'
         else:
-            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped load redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 -threads {threads}'
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped load redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port={port} -threads {threads}'
         self.tmux_new('ycsb', f'{ycsb_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
         # error indicating strings: in live-status updates: READ-FAILED WRITE-FAILED end-report:
         # [READ], Return=ERROR
@@ -2158,17 +2158,17 @@ class LoadGen(Server):
     def stop_wrk2(server: 'Server'):
         server.tmux_kill('wrk2')
 
-    def start_redis(self):
+    def start_redis(self, nr: int = 0):
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
-        redis_cmd = f"redis-server \\*:6379 --protected-mode no"
+        port = 6379 + nr
+        redis_cmd = f'redis-server --port {port} --protected-mode no --save ""'
         nix_cmd = f"nix shell --inputs-from {project_root} nixpkgs#redis --command {redis_cmd}"
-        self.tmux_new("redis", f"{nix_cmd}; sleep 999")
+        self.tmux_new(f"redis{nr}", f"{nix_cmd}; sleep 999")
+        return port
 
-        # --save "" --io-threads 8
 
-
-    def stop_redis(self):
-        self.tmux_kill("redis")
+    def stop_redis(self, nr: int = 0):
+        self.tmux_kill(f"redis{nr}")
 
     def setup_test_iface_ip_net(self: 'LoadGen'):
         """
