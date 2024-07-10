@@ -231,8 +231,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.VMUX_DPDK_E810,
         Interface.VMUX_MED,
         ]
-    rpsList = [ 1, 2, 4, 8, 16, 64, 128, 1048 ]
-    # rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
+    rpsList = [ 8, 16, 32, 64, 128, 256, 1048 ]
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
     repetitions = 4
     DURATION_S = 61 if not G.BRIEF else 11

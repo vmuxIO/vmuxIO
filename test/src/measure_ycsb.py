@@ -183,7 +183,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     interfaces = [
         Interface.VFIO,
-        Interface.VMUX_PT,
+        # Interface.VMUX_PT, # interrupts dont work
         Interface.VMUX_EMU,
         # Interface.VMUX_DPDK, # multi-vm broken right now
         Interface.BRIDGE_E1000,
@@ -197,13 +197,14 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     repetitions = 2
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        # interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.BRIDGE_VHOST, Interface.VMUX_DPDK_E810 ]
         interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VFIO ]
         # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
-        rpsList = [ 1 ]
+        rpsList = [ -1 ]
         repetitions = 1
-        vm_nums = [ 2, 4, 8, 16, 32 ]
+        DURATION_S = 300
+        vm_nums = [ 32 ]
 
     # test = YcsbTest(
     #         repetitions=1,

@@ -169,23 +169,33 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_DPDK_E810,
           Interface.VMUX_MED
           ]
+    udp_interfaces = [ # tap based interfaces have very broken ARP behaviour with udp
+          Interface.VFIO,
+          Interface.VMUX_DPDK,
+          Interface.VMUX_DPDK_E810,
+          Interface.VMUX_MED
+          ]
     directions = [ "forward" ]
     vm_nums = [ 1, 2, 4, 8, 16, 32 ]
     tcp_lengths = [ -1 ]
-    udp_lengths = [ 64, 128, 256, 512, 1024, 1470, 9000 ]
+    udp_lengths = [ 64, 128, 256, 512, 1024, 1470 ]
     repetitions = 3
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.VMUX_DPDK_E810, Interface.BRIDGE_E1000 ]
         interfaces = [ Interface.VMUX_DPDK_E810 ]
+        # interfaces = [ Interface.VMUX_EMU ]
         directions = [ "forward" ]
+        # vm_nums = [ 1, 2, 4 ]
         vm_nums = [ 1 ]
+        DURATION_S = 10
         repetitions = 1
 
     def exclude(test):
-        return Interface(test.interface).is_passthrough() and test.num_vms > 1
+        return (Interface(test.interface).is_passthrough() and test.num_vms > 1)
 
-    tests = []
+    tests: List[IPerfTest] = []
 
     # multi-VM TCP tests, but only one length
     test_matrix = dict(
@@ -199,11 +209,11 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     tests += IPerfTest.list_tests(test_matrix, exclude_test=exclude)
 
     if not G.BRIEF:
-        # packet-size UDP tests, but only one VM
+        # packet-size UDP tests, but only one VM and not tap based interfaces
         test_matrix = dict(
             repetitions=[ repetitions ],
             direction=directions,
-            interface=[ interface.value for interface in interfaces],
+            interface=[ interface.value for interface in udp_interfaces],
             num_vms=[ 1 ],
             length=udp_lengths,
             proto=["udp"]

@@ -585,7 +585,7 @@ def main():
     info("")
     measure_ycsb.main(measurement, plan_only=True)
     info("")
-    # measure_iperf.main(measurement, plan_only=True)
+    measure_iperf.main(measurement, plan_only=True)
     info("")
     measure_mediation.main(measurement, plan_only=True)
     info("")
@@ -593,10 +593,10 @@ def main():
     info("Running benchmarks ...")
     info("")
     # measure_vnf.main(measurement)
+    measure_ycsb.main(measurement)
+    measure_iperf.main(measurement)
     measure_mediation.main(measurement)
     measure_hotel.main(measurement)
-    measure_ycsb.main(measurement)
-    # measure_iperf.main(measurement)
 
 if __name__ == "__main__":
     main()

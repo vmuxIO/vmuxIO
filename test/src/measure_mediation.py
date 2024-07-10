@@ -103,6 +103,7 @@ def run_test(host: Host, loadgen: LoadGen, guest: Guest, test: MediationTest, re
     guest.exec(f"sudo rm {remote_fastclick_log} || true")
     loadgen.exec(f"sudo rm {remote_moongen_throughput} || true")
     loadgen.exec(f"sudo rm {remote_moongen_histogram} || true")
+    loadgen.stop_l2_load_latency(loadgen)
 
     info("Starting Fastclick")
     if test.fastclick == "software":
@@ -170,32 +171,34 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [
           Interface.VMUX_MED,
-          # Interface.VMUX_DPDK_E810,
-          # Interface.VFIO,
-          # Interface.VMUX_PT,
+          Interface.VMUX_DPDK_E810,
+          Interface.VFIO,
+          Interface.VMUX_PT,
           ]
     tap_interfaces = [
           Interface.BRIDGE_E1000,
-          # Interface.BRIDGE,
+          Interface.BRIDGE,
+          Interface.BRIDGE_VHOST,
           ]
     fastclicks = [
             "hardware",
             "software",
             ]
     vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
-    rates = [ 1000, 40000 ]
+    rates = [ 40000 ]
     repetitions = 9
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
+        # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
         # interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
         # interfaces = [ Interface.VMUX_MED ]
-        # interfaces = [ Interface.VMUX_EMU_E810 ]
+        interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
-        # fastclicks = [ "hardware" ]
-        fastclicks = [ "software-tap" ]
+        fastclicks = [ "hardware" ]
+        # fastclicks = [ "software-tap" ]
         vm_nums = [ 1 ]
         repetitions = 1
+        # DURATION_S = 10000
         rates = [ 40000 ]
 
     tests = []
