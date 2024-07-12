@@ -119,7 +119,7 @@ class IPerfTest(AbstractBenchTest):
 
         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
             try:
-                loadgen.wait_for_success(f'[[ -e {remote_output_file(i)} ]]', timeout=20)
+                loadgen.wait_for_success(f'[[ -e {remote_output_file(i)} ]]', timeout=30)
             except TimeoutError:
                 error('Waiting for output file timed out.')
             finally:
@@ -165,7 +165,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           # Interface.VMUX_PT, # interrupts dont work
           Interface.VMUX_EMU,
           # Interface.VMUX_EMU_E810, # tap backend not implemented for e810 (see #127)
-          Interface.VMUX_DPDK,
+          # Interface.VMUX_DPDK, # e1000 dpdk backend doesn't support multi-VM
           Interface.VMUX_DPDK_E810,
           Interface.VMUX_MED
           ]
@@ -252,7 +252,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     pass
                 loadgen.setup_test_iface_ip_net()
                 loadgen.stop_xdp_pure_reflector()
-                loadgen.start_xdp_pure_reflector()
+                # loadgen.start_xdp_pure_reflector()
                 # install inter-VM ARP rules (except first one which actually receives ARP. If we prevent ARP on the first one, all break somehow.)
                 loadgen.add_arp_entries({ i_:guest_ for i_, guest_ in guests.items() if i_ != 1 })
 

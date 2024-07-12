@@ -294,7 +294,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     pass
                 loadgen.setup_test_iface_ip_net()
                 loadgen.stop_xdp_pure_reflector()
-                loadgen.start_xdp_pure_reflector()
+                if not interface.needs_br_tap():
+                    # for dpdk based vmux backends, we need this xdp program to simulate an upstream network.
+                    # Tap based systems like qemu sometimes break with this for some reason though.
+                    loadgen.start_xdp_pure_reflector()
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
