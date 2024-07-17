@@ -63,6 +63,7 @@ nix develop
 build a few sofware packages and symlink the results
 
 ```shell
+git submodule update --init --recursive
 just build
 ```
 

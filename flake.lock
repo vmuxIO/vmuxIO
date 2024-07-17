@@ -10,13 +10,13 @@
         "revCount": 31118,
         "submodules": true,
         "type": "git",
-        "url": "https://public-access:glpat-ye-ZjvZJzssBRhYmoemC@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
+        "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
       },
       "original": {
         "ref": "v21.11-libmoon",
         "submodules": true,
         "type": "git",
-        "url": "https://public-access:glpat-ye-ZjvZJzssBRhYmoemC@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
+        "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
       }
     },
     "dpdk-src": {
@@ -93,20 +93,20 @@
     "libmoon-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1667227091,
-        "narHash": "sha256-cLR+7SWruMAK6dbQy/fS2yUbKiWfClAIfSk3QEW4mZE=",
+        "lastModified": 1721226957,
+        "narHash": "sha256-DuPUg2OIYH6KIbQ/etLPyub6cjhh2w4LitYBJ2d57Sk=",
         "ref": "dpdk-21.11",
-        "rev": "73bdbda1beef6b8177428b76d3f44ea75a9753fa",
-        "revCount": 621,
+        "rev": "264bf7844e04153be894e584fc1a5526ec8fe050",
+        "revCount": 622,
         "submodules": true,
         "type": "git",
-        "url": "https://public-access:glpat-xnmZ-yizTjswVRBsjtDS@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
+        "url": "https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
       },
       "original": {
         "ref": "dpdk-21.11",
         "submodules": true,
         "type": "git",
-        "url": "https://public-access:glpat-xnmZ-yizTjswVRBsjtDS@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
+        "url": "https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
       }
     },
     "libmoon-src": {
@@ -131,20 +131,20 @@
     "moongen-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1667403878,
-        "narHash": "sha256-q0jdpKbsAFwO/Axj+fn6+CekylP3Rkcoc97wRsGvZKQ=",
+        "lastModified": 1721227788,
+        "narHash": "sha256-08H6csyKolSfoXKY/VTABYkOBsVnujCA8rRc3kNM+TI=",
         "ref": "master",
-        "rev": "685a36a97763cf4e3fc6481224bb263fe002bde5",
-        "revCount": 1463,
+        "rev": "4971b6a86eb78b0e335fc1734264c5bf6334d217",
+        "revCount": 1465,
         "submodules": true,
         "type": "git",
-        "url": "https://public-access:glpat-G8kFYA45GcDP-oR-oyDj@gitlab.lrz.de/okelmann/moongen-lachnit.git"
+        "url": "https://vmux-public-03:glpat-mzjPaHL4HHd6wmY1Ln-y@gitlab.lrz.de/okelmann/moongen-lachnit.git"
       },
       "original": {
         "ref": "master",
         "submodules": true,
         "type": "git",
-        "url": "https://public-access:glpat-G8kFYA45GcDP-oR-oyDj@gitlab.lrz.de/okelmann/moongen-lachnit.git"
+        "url": "https://vmux-public-03:glpat-mzjPaHL4HHd6wmY1Ln-y@gitlab.lrz.de/okelmann/moongen-lachnit.git"
       }
     },
     "moonmux-src": {

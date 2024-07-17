@@ -43,16 +43,16 @@
     };
 
     moongen-lachnit-src = {
-      url = "git+https://public-access:glpat-G8kFYA45GcDP-oR-oyDj@gitlab.lrz.de/okelmann/moongen-lachnit.git?ref=master&submodules=1";
+      url = "git+https://vmux-public-03:glpat-mzjPaHL4HHd6wmY1Ln-y@gitlab.lrz.de/okelmann/moongen-lachnit.git?ref=master&submodules=1";
       flake = false;
     };
     libmoon-lachnit-src = {
       #url = "git+file:///home/okelmann/idp-lachnit/moongen/libmoon";
-      url = "git+https://public-access:glpat-xnmZ-yizTjswVRBsjtDS@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-21.11&submodules=1";
+      url = "git+https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-21.11&submodules=1";
       flake = false;
     };
     dpdk-lachnit-src = {
-      url = "git+https://public-access:glpat-ye-ZjvZJzssBRhYmoemC@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v21.11-libmoon&submodules=1";
+      url = "git+https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v21.11-libmoon&submodules=1";
       flake = false;
     };
 
