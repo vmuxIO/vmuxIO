@@ -120,8 +120,9 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 
 	/* Configuring number of RX and TX queues connected to single port. 8< */
 	struct rte_mempool *rx_pool;
+	size_t magic = 36; // when we set the PTP capability on the pNIC, bigger rx bursts can cause problems that look like as if the pool was exhausted (leaked mbufs). This magic threashold fixes it. Decrement by one to get the error again.
 	for (i = 0; i < nr_queues; i++) {
-		size_t rx_buffers = NUM_MBUFS; // TODO
+		size_t rx_buffers = NUM_MBUFS + magic;
 		// TODO allocate these elsewhere
 		rx_pool = rte_pktmbuf_pool_create(std::format("RX_MBUF_POOL_{}", i).c_str(), rx_buffers ,
 			64, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id()); // TODO constant for cache
