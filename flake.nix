@@ -57,7 +57,7 @@
     };
 
     xdp-reflector-src = {
-      url = "git+https://github.com/gierens/xdp-reflector?ref=main&submodules=1";
+      url = "git+https://github.com/vmuxIO/xdp-reflector?ref=main&submodules=1";
       flake = false;
     };
     qemu-ioregionfd-src = {
@@ -277,6 +277,7 @@
           ps.netaddr
           ps.pandas
           ps.tqdm
+          ps.requests
 
           # dependencies for hosts/prepare.py
           ps.pyyaml

@@ -5,6 +5,7 @@ from logging import (info, debug, error, warning,
 from server import Host, Guest, LoadGen, MultiHost
 from enums import Machine, Interface, Reflector
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
+from util import safe_cast, product_dict, strip_subnet_mask
 import time
 from pathlib import Path
 import pandas as pd
@@ -106,15 +107,19 @@ class Ycsb():
         pass
 
     def run(self, host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: YcsbTest):
-        loadgen.stop_redis() # cleanup
-        loadgen.start_redis()
+        # start redis shards
+        redis_ports = []
+        for i in range(loadgen.cpupinner.redis_shards()): # usually 12
+            loadgen.stop_redis(nr=i) # cleanup
+            redis_ports += [ loadgen.start_redis(nr=i) ]
 
-        # load test data
-        loadgen.exec(f"sudo rm /tmp/ycsb-load.log || true")
-        loadgen.stop_ycsb() # cleanup
-        loadgen.start_ycsb("localhost", outfile="/tmp/ycsb-load.log", load=True)
-        loadgen.wait_for_success(f'[[ $(tail -n 1 /tmp/ycsb-load.log) = *"AUTOTEST_DONE"* ]]')
-        loadgen.stop_ycsb()
+        # load test data into each shard
+        for port in redis_ports:
+            loadgen.exec(f"sudo rm /tmp/ycsb-load.log || true")
+            loadgen.stop_ycsb() # cleanup
+            loadgen.start_ycsb("localhost", outfile="/tmp/ycsb-load.log", load=True, port=port)
+            loadgen.wait_for_success(f'[[ $(tail -n 1 /tmp/ycsb-load.log) = *"AUTOTEST_DONE"* ]]')
+            loadgen.stop_ycsb()
 
         info(f"Running ycsb {test.repetitions} times")
 
@@ -128,7 +133,8 @@ class Ycsb():
 
             # start test on all guests
             def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                guest.start_ycsb("10.1.0.2", rate=test.rps, runtime=DURATION_S, threads=1, outfile=remote_output_file)
+                port = redis_ports[(i - 1) % len(redis_ports)] # round robin assign shards to VMs
+                guest.start_ycsb("10.1.0.2", rate=test.rps, runtime=DURATION_S, threads=1, port=port, outfile=remote_output_file)
             end_foreach(guests, foreach_parallel)
 
             time.sleep(DURATION_S + 1)
@@ -162,7 +168,8 @@ class Ycsb():
                 file.write(raw_data)
 
 
-        loadgen.stop_redis()
+        for i in range(len(redis_ports)):
+            loadgen.stop_redis(nr=i)
         pass
 
 
@@ -176,7 +183,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     interfaces = [
         Interface.VFIO,
-        Interface.VMUX_PT,
+        # Interface.VMUX_PT, # interrupts dont work
         Interface.VMUX_EMU,
         # Interface.VMUX_DPDK, # multi-vm broken right now
         Interface.BRIDGE_E1000,
@@ -190,13 +197,14 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     repetitions = 2
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        # interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.BRIDGE_VHOST, Interface.VMUX_DPDK_E810 ]
         interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VFIO ]
         # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
-        rpsList = [ 1 ]
+        rpsList = [ -1 ]
         repetitions = 1
-        vm_nums = [ 2, 4, 8, 16, 32 ]
+        DURATION_S = 300
+        vm_nums = [ 32 ]
 
     # test = YcsbTest(
     #         repetitions=1,
@@ -254,6 +262,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
+                    # workaround for ARP being broken in vMux: ping the loadgen once
+                    guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
                 end_foreach(guests, foreach_parallel)
 
                 for rps in rpsList:

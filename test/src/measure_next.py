@@ -7,8 +7,8 @@ from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen
 from enums import Machine, Interface, Reflector, MultiHost
-from measure import AbstractBenchTest, Measurement, end_foreach
-from util import safe_cast, product_dict, strip_subnet_mask
+from measure import Bench, AbstractBenchTest, Measurement, end_foreach
+from util import safe_cast, product_dict
 from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
 import time
 from os.path import isfile, join as path_join
@@ -199,7 +199,7 @@ class DeathStarBench:
             loadgen.exec(f"sudo rm {remote_output_file} || true")
             LoadGen.stop_wrk2(loadgen)
             workdir = f"{loadgen.moonprogs_dir}/../../subprojects/deathstarbench/{self.app}"
-            LoadGen.start_wrk2(loadgen, self.frontend_url, self.script, duration=DURATION_S, outfile=remote_output_file, workdir=workdir, rate=test.rps)
+            LoadGen.start_wrk2(loadgen, self.frontend_url, self.script, duration=DURATION_S, outfile=remote_output_file, workdir=workdir)
             time.sleep(DURATION_S + 1)
             try:
                 loadgen.wait_for_success(f'[[ $(tail -n 1 {remote_output_file}) = *"AUTOTEST_DONE"* ]]')
@@ -219,7 +219,7 @@ class DeathStarBench:
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
-    host, loadgen = measurement.hosts()
+    # host, loadgen = measurement.hosts()
     global DURATION_S
 
     interfaces = [
@@ -228,10 +228,9 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.BRIDGE_E1000,
         Interface.BRIDGE,
         Interface.BRIDGE_VHOST,
-        Interface.VMUX_DPDK_E810,
-        Interface.VMUX_MED,
+        # Interface.VMUX_DPDK_E810,
         ]
-    rpsList = [ 8, 16, 32, 64, 128, 256, 1048 ]
+    rpsList = [ 10, 100, 200, 300, 400, 500, 600 ]
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
     repetitions = 4
     DURATION_S = 61 if not G.BRIEF else 11
@@ -239,26 +238,42 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         interfaces = [ Interface.BRIDGE_E1000 ]
         # interfaces = [ Interface.VMUX_EMU ]
         rpsList = [ 10 ]
-        apps = [ "hotelReservation" ]
+        # apps = [ "hotelReservation" ]
         # apps = [ "socialNetwork" ]
-        # apps = [ "mediaMicroservices" ]
+        apps = [ "mediaMicroservices" ]
         repetitions = 1
 
     # plan the measurement
-    moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
-    deathstarbenches = {app: DeathStarBench(app, moonprogs_dir) for app in apps}
+    # moonprogs_dir = f"{measurement.config['guest']['moonprogs_dir']}"
+    moonprogs_dir = "/tmp/none"
+    # deathstarbenches = {app: DeathStarBench(app, moonprogs_dir) for app in apps}
+    deathstarbenches = {app: len(app) for app in apps}
+    tests = []
+    time_needed_s = 0
     for app in apps:
-        bench = deathstarbenches[app]
+        bench_app = deathstarbenches[app]
         test_matrix = dict(
             interface=[ interface.value for interface in interfaces],
             rps=rpsList,
             app=[ app ],
             repetitions=[ repetitions ],
-            num_vms=[ len(bench.docker_compose) ]
+            num_vms=[ bench_app ]
             )
         info(f"DeathStarBench execution plan {app}:")
-        DeathStarBenchTest.estimate_time(test_matrix, ["app", "interface", "num_vms"])
+        time_needed_s += DeathStarBenchTest.estimate_time(test_matrix, args_reboot = ["app", "interface", "num_vms"])
+        tests += DeathStarBenchTest.list_tests(test_matrix)
 
+    with Bench(tests = tests, args_reboot = ["app", "interface", "num_vms"], brief = G.BRIEF) as (bench, bench_tests):
+        for app, app_tests in bench.iterator(bench_tests, "app"):
+            print(f"- Doing app {app}")
+            for interface, interface_tests in bench.iterator(app_tests, "interface"):
+                print(f"-- Doing interface {interface}")
+                for test in interface_tests:
+                    print(f"--- Doing test {test}")
+                    time.sleep(.1)
+                    bench.done(test)
+
+    exit(0)
     if plan_only:
         return
 
@@ -293,19 +308,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 except Exception:
                     pass
                 loadgen.setup_test_iface_ip_net()
-                loadgen.stop_xdp_pure_reflector()
-                if not interface.needs_br_tap():
-                    # for dpdk based vmux backends, we need this xdp program to simulate an upstream network.
-                    # Tap based systems like qemu sometimes break with this for some reason though.
-                    loadgen.start_xdp_pure_reflector()
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
                     guest.setup_test_iface_ip_net()
-                    # install inter-VM ARP rules (except the host i that we install it on)
-                    guest.add_arp_entries({ i_:guest_ for i_, guest_ in guests.items() if i_ != i })
-                    # workaround for ARP being broken in vMux: ping the loadgen once
-                    guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
                 end_foreach(guests, foreach_parallel)
 
                 for rps in rpsList:
@@ -323,10 +329,9 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     else:
                         info(f"skipping {test}")
 
-                loadgen.stop_xdp_pure_reflector()
-
     DeathStarBench.find_errors(G.OUT_DIR)
 
 if __name__ == "__main__":
-    measurement = Measurement()
+    # measurement = Measurement()
+    measurement = None
     main(measurement)

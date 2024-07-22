@@ -41,6 +41,7 @@
 #include "src/devices/vmux-device.hpp"
 #include "src/drivers/dpdk.hpp"
 #include "src/drivers/tap.hpp"
+#include "src/rx-thread.hpp"
 
 extern "C" {
 #include "libvfio-user.h"
@@ -97,9 +98,10 @@ Result<void> _main(int argc, char **argv) {
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices; // all devices
   std::vector<std::shared_ptr<VmuxDevice>>
-      pollingDevices; // devices backed by poll based drivers
+      mainThreadPolling; // devices backed by poll based drivers
   std::vector<std::shared_ptr<VfioUserServer>> vfuServers;
   std::vector<std::shared_ptr<Driver>> drivers; // network backend for emulation
+  std::vector<std::unique_ptr<RxThread>> pollingThreads;
   std::string group_arg;
   // int HARDWARE_REVISION; // could be set by vfu_pci_set_class:
   // vfu_ctx->pci.config_space->hdr.rid = 0x02;
@@ -107,9 +109,15 @@ Result<void> _main(int argc, char **argv) {
   std::vector<std::string> tapNames;
   std::vector<std::string> sockets;
   std::vector<std::string> modes;
+  std::vector<cpu_set_t> rxThreadCpus;
+  std::vector<cpu_set_t> runnerThreadCpus;
+  cpu_set_t default_cpuset;
+  Util::parse_cpuset("0-6", default_cpuset);
   bool useDpdk = false;
+  bool pollInMainThread = false;
   uint8_t mac_addr[6];
-  while ((ch = getopt(argc, argv, "hd:t:s:m:b:qu")) != -1) {
+  cpu_set_t cpuset;
+  while ((ch = getopt(argc, argv, "hd:t:s:m:a:e:f:b:qu")) != -1) {
     switch (ch) {
     case 'q':
       LOG_LEVEL = LOG_ERR;
@@ -132,6 +140,18 @@ Result<void> _main(int argc, char **argv) {
     case 'm':
       modes.push_back(optarg);
       break;
+    case 'e':
+      if (!Util::parse_cpuset(optarg, cpuset)) {
+        die("vmuxRx%zu, Cannot parse cpu pinning set\n", rxThreadCpus.size())
+      }
+      rxThreadCpus.push_back(cpuset);
+      break;
+    case 'f':
+      if (!Util::parse_cpuset(optarg, cpuset)) {
+        die("vmuxRUnner%zu, Cannot parse cpu pinning set\n", runnerThreadCpus.size())
+      }
+      runnerThreadCpus.push_back(cpuset);
+      break;
     case '?':
     case 'h':
       std::cout
@@ -148,7 +168,9 @@ Result<void> _main(int argc, char **argv) {
              "as backend for emulation (or \"none\" if not applicable)\n"
           << "-s /tmp/vmux.sock                      Path of the socket\n"
           << "-m passthrough                         vMux mode: "
-             "passthrough, emulation, mediation, e1000-emu\n";
+             "passthrough, emulation, mediation, e1000-emu\n"
+          << "-e cpuset                              pin Rx thread to cpus. Takes arguements similar to cpuset. Default: 0-6\n"
+          << "-f cpuset                              pin Runner thread to cpus.\n";
       return outcome::success();
     default:
       break;
@@ -173,6 +195,14 @@ Result<void> _main(int argc, char **argv) {
     errno = EINVAL;
     die("Command line arguments need to specify the same number of devices, "
         "taps, sockets and modes");
+  }
+
+  // fill default cpusets
+  for (size_t i = rxThreadCpus.size();  i <= sockets.size(); i++) {
+    rxThreadCpus.push_back(default_cpuset);
+  }
+  for (size_t i = runnerThreadCpus.size();  i <= sockets.size(); i++) {
+    runnerThreadCpus.push_back(default_cpuset);
   }
 
   // parse base mac
@@ -275,8 +305,11 @@ Result<void> _main(int argc, char **argv) {
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
     devices.push_back(device);
-    if (useDpdk)
-      pollingDevices.push_back(device);
+    if (useDpdk && pollInMainThread)
+      mainThreadPolling.push_back(device);
+    if (useDpdk && !pollInMainThread) {
+      pollingThreads.push_back(std::make_unique<RxThread>(device, rxThreadCpus[i]));
+    }
   }
 
   for (size_t i = 0; i < pciAddresses.size(); i++) {
@@ -287,7 +320,7 @@ Result<void> _main(int argc, char **argv) {
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     printf("Using: %s\n", pciAddresses[i].c_str());
     runner.push_back(std::make_unique<VmuxRunner>(sockets[i], devices[i], efd,
-                                                  vfuServers[i]));
+                                                  vfuServers[i], runnerThreadCpus[i]));
     runner[i]->start();
 
     while (runner[i]->state != 2)
@@ -303,6 +336,11 @@ Result<void> _main(int argc, char **argv) {
       usleep(10000);
     }
   }
+
+  for (auto &pollingThread : pollingThreads) {
+    pollingThread->start();
+  }
+
   // printf("pfd->revents & POLLIN: %d\n",
   //        runner[0]->get_interrupts().pollfds[
   //            runner[0]->get_interrupts().irq_intx_pollfd_idx
@@ -310,7 +348,7 @@ Result<void> _main(int argc, char **argv) {
 
   // runtime loop
   int poll_timeout;
-  if (useDpdk) {
+  if (useDpdk && pollInMainThread) {
     poll_timeout = 0; // dpdk: busy polling
   } else {
     poll_timeout = 500; // default: event based
@@ -329,7 +367,7 @@ Result<void> _main(int argc, char **argv) {
         foobar = false;
       }
 #endif
-      for (size_t j = 0; j < pollingDevices.size(); j++) {
+      for (size_t j = 0; j < mainThreadPolling.size(); j++) {
         // dpdk: do busy polling
         devices[j]->rx_callback(j, devices[j].get());
       }
@@ -345,12 +383,17 @@ Result<void> _main(int argc, char **argv) {
 
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     runner[i]->stop();
+    pollingThreads[i]->stop();
   }
 
   Result<void> res = Ok();
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     if (Result<void> e = runner[i]->join()) {} else {
-      printf("Thread %zu failed: %s\n", i, e.error().c_str());
+      printf("Runner thread %zu failed: %s\n", i, e.error().c_str());
+      res = Err("Terminating because a thread failed.");
+    }
+    if (Result<void> e = pollingThreads[i]->join()) {} else {
+      printf("Poling rx thread %zu failed: %s\n", i, e.error().c_str());
       res = Err("Terminating because a thread failed.");
     }
   }

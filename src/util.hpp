@@ -62,6 +62,7 @@ inline auto Ok(auto value) {
   return outcome::success(value);
 }
 
+// TODO remove device id int. It is in the device!
 typedef void (*callback_fn)(int, void *);
 
 struct epoll_callback {
@@ -258,6 +259,50 @@ public:
           printf("%c", isprint(buf[i+j]) ? buf[i+j] : '.');
       printf("\n");
     }
+  }
+
+  static bool is_valid_number(const std::string& s) {
+    return !s.empty() && std::all_of(s.begin(), s.end(), ::isdigit);
+  }
+
+  // Thanks, chatgpt.
+  static bool parse_cpuset(const std::string &cpuset_str, cpu_set_t &cpu_set) {
+    CPU_ZERO(&cpu_set);
+    std::stringstream ss(cpuset_str);
+    std::string token;
+
+    while (std::getline(ss, token, ',')) {
+        size_t dash_pos = token.find('-');
+        if (dash_pos != std::string::npos) {
+            // Handle range like 9-10
+            std::string start_str = token.substr(0, dash_pos);
+            std::string end_str = token.substr(dash_pos + 1);
+            if (is_valid_number(start_str) && is_valid_number(end_str)) {
+                int start = std::stoi(start_str);
+                int end = std::stoi(end_str);
+                if (start > end) {
+                    std::cerr << "Error: Invalid range '" << token << "'\n";
+                    return false;
+                }
+                for (int i = start; i <= end; ++i) {
+                    CPU_SET(i, &cpu_set);
+                }
+            } else {
+                std::cerr << "Error: Invalid range '" << token << "'\n";
+                return false;
+            }
+        } else {
+            // Handle single number like 9
+            if (is_valid_number(token)) {
+                int cpu = std::stoi(token);
+                CPU_SET(cpu, &cpu_set);
+            } else {
+                std::cerr << "Error: Invalid CPU number '" << token << "'\n";
+                return false;
+            }
+        }
+    }
+    return true;
   }
 };
 

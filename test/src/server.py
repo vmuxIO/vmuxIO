@@ -8,11 +8,13 @@ from abc import ABC
 from os import listdir, remove
 from os.path import join as path_join
 from os.path import dirname as path_dirname
-from typing import Optional
+from typing import Optional, List, Dict, Type
 from enums import Interface, MultiHost
 from pathlib import Path
+from util import strip_subnet_mask
 import copy
 import base64
+import cpupinning
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
 MAX_VMS: int = 35; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
@@ -90,6 +92,7 @@ class Server(ABC):
     moongen_dir: str
     moonprogs_dir: str
     xdp_reflector_dir: str
+    cpupinner: cpupinning.CpuPinner = cpupinning.CpuPinner(None)
     localhost: bool = False
     nixos: bool = False
     ssh_config: Optional[str] = None
@@ -112,6 +115,7 @@ class Server(ABC):
         __init__ : Initialize the object.
         """
         self.nixos = True # all hosts are nixos actually
+        self.cpupinner = cpupinning.CpuPinner(self)
         return
         self.localhost = self.fqdn == 'localhost' or self.fqdn == getfqdn()
         try:
@@ -987,6 +991,13 @@ class Server(ABC):
         for addr in self.get_nic_ip_addresses(iface):
             self.exec(f'sudo ip addr del {addr} dev {iface}')
 
+    def add_arp_entries(self: 'Server', others: Dict[int, Type['Server']]):
+        for vm_num, other_vm in others.items():
+            ip = strip_subnet_mask(other_vm.test_iface_ip_net)
+            mac = MultiHost.mac(other_vm.test_iface_mac, vm_num)
+            dev = self.test_iface
+            self.exec(f"sudo ip neighbour add {ip} dev {dev} lladdr {mac}")
+
     def start_moongen_reflector(self: 'Server'):
         """
         Start the libmoon L2 reflector.
@@ -1012,6 +1023,30 @@ class Server(ABC):
         -------
         """
         self.tmux_kill('reflector')
+
+    def start_xdp_pure_reflector(self: 'Server', iface: str = None):
+        if not iface:
+            iface = self.test_iface
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        xdgDir = f"{project_root}/xdp-pure"
+        xdgProgram = f"{xdgDir}/lib/pure_reflector.o"
+
+        # compile xdp program for the Servers MAC address
+        LOCAL_MAC = f"{{ 0xb4, 0x96, 0x91, 0xb3, 0x8b, 0x04 }}" # TODO
+        flakeUrl = f"git+file:///{project_root}?rev=$(cd {project_root}; git rev-parse HEAD)"
+        nixExpr = f'(builtins.getFlake {flakeUrl}).packages.x86_64-linux.xdp-reflector.overrideAttrs (_: _: {{ LOCAL_MAC = \\"{LOCAL_MAC}\\"; }})'
+        self.exec(f'nix build --expr "{nixExpr}" -o {xdgDir}')
+
+        self.exec(f'sudo ip link set {iface} promisc on')
+        self.exec(f'sudo ip link set {iface} xdpgeneric obj ' +
+                  f'{xdgProgram} sec xdp')
+        self.exec(f'sudo ip link set {iface} up')
+
+    def stop_xdp_pure_reflector(self: 'Server', iface: str = None):
+        if not iface:
+            iface = self.test_iface
+        self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
+        self.exec(f'sudo ip link set {iface} promisc off || true')
 
     def start_xdp_reflector(self: 'Server', iface: str = None):
         """
@@ -1057,7 +1092,7 @@ class Server(ABC):
         self.exec(f'sudo ip link set {iface} xdpgeneric off || true')
 
 
-    def start_ycsb(self, fqdn: str, rate: int = 100, runtime: int = 8, threads: int = 8, outfile: str = "/tmp/outfile.log", load: bool = False):
+    def start_ycsb(self, fqdn: str, rate: int = 100, runtime: int = 8, threads: int = 8, port: int = 6379, outfile: str = "/tmp/outfile.log", load: bool = False):
         """
         rate: target requests rate per second. -1 to request at max rate
         runtime: in secs
@@ -1072,14 +1107,14 @@ class Server(ABC):
             ops = 429496729 # MAX_INT
             core_properties = f"-p operationcount={ops}" \
                     f" -p maxexecutiontime={runtime}"
-            if rate is None:
-                target_rate = f"-target {rate}"
-            else:
+            if rate is None or rate == -1:
                 target_rate = ""
+            else:
+                target_rate = f"-target {rate}"
 
-            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 {core_properties} -threads {threads} {target_rate}'
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped run redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port={port} {core_properties} -threads {threads} {target_rate}'
         else:
-            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped load redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port=6379 -threads {threads}'
+            ycsb_cmd = f'{ycsb_path}/bin/ycsb-wrapped load redis -s -P {workloads_path}/workloada -p redis.host={fqdn} -p redis.port={port} -threads {threads}'
         self.tmux_new('ycsb', f'{ycsb_cmd} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
         # error indicating strings: in live-status updates: READ-FAILED WRITE-FAILED end-report:
         # [READ], Return=ERROR
@@ -1089,7 +1124,7 @@ class Server(ABC):
         self.tmux_kill("ycsb")
 
 
-    def start_fastclick(self, program: str, outfile: str, script_args: dict = dict()):
+    def start_fastclick(self, program: str, outfile: str, script_args: dict = dict(), dpdk: bool = True):
         """
         program: path to .click file relative to project root
         outfile: path to remote log file
@@ -1099,7 +1134,10 @@ class Server(ABC):
         fastclick_bin = f"{project_root}/fastclick/bin/click"
         fastclick_program = f"{project_root}{program}"
         args = ' '.join([f'{key}={value}' for key, value in script_args.items()])
-        self.tmux_new('fastclick', f'{fastclick_bin} --dpdk \'-l 0\' -- {fastclick_program} {args} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
+        dpdk_args = ""
+        if dpdk:
+            dpdk_args = f'--dpdk \'-l 0\' --'
+        self.tmux_new('fastclick', f'{fastclick_bin} {dpdk_args} {fastclick_program} {args} 2>&1 | tee {outfile}; echo AUTOTEST_DONE >> {outfile}; sleep 999');
 
 
     def stop_fastclick(self):
@@ -1675,10 +1713,15 @@ class Host(Server):
                 f' -initrd {project_root}/nix/results/test-guest-initrd/initrd' +
                 f' -append \\"root=/dev/vda console=ttyS0 init=/init $(cat {project_root}/nix/results/test-guest-kernelParams) {extkern}\\"')
 
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        nix_shell = f"nix shell --inputs-from {project_root} nixpkgs#numactl --command"
+        numactl = f"numactl -C {self.cpupinner.qemu(vm_number)}"
+        # numactl = ""
+
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
-            "sudo " +
+            f"sudo {nix_shell} {numactl} " +
             qemu_bin_path +
             f' -machine {machine_type}' +
             ' -cpu host' +
@@ -1753,7 +1796,7 @@ class Host(Server):
             vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, num_vms)}"
             args = f' -s {vmux_socket} -d {self.test_iface_addr}'
         if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]:
-            dpdk_args += " -u -- -l 1 -n 1"
+            dpdk_args += f" -u -- -l {self.cpupinner.vmux_main()}"
         if interface.guest_driver() == "ice":
             vmux_mode = "emulation"
         elif interface.guest_driver() == "e1000":
@@ -1762,17 +1805,17 @@ class Host(Server):
             vmux_mode = "mediation"
         if not interface.is_passthrough():
             if num_vms == 0:
-                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode}'
+                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(1)} -f {self.cpupinner.vmux_runner(1)}'
             else:
                 for vm_number in MultiHost.range(num_vms):
                     vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, vm_number)}"
-                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode}'
+                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(vm_number)} -f {self.cpupinner.vmux_runner(vm_number)}'
 
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
         nix_shell = f"nix shell --inputs-from {project_root} nixpkgs#numactl --command"
-        numactl = "numactl -C 1-5 "
-        # numactl = ""
+        # numactl = "numactl -C 1-5 "
+        numactl = ""
         self.tmux_new(
             'vmux',
             f'ulimit -n 4096; sudo {nix_shell} {numactl} {self.vmux_path} -q -b {base_mac}'
@@ -1943,7 +1986,6 @@ class Guest(Server):
         # sometimes the VM needs a bit of extra time until it can assign an IP
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
         self.exec(f'sudo ip link set {self.test_iface} up')
-
 
     def start_iperf_server(self, server_hostname: str):
         """
@@ -2116,15 +2158,17 @@ class LoadGen(Server):
     def stop_wrk2(server: 'Server'):
         server.tmux_kill('wrk2')
 
-    def start_redis(self):
+    def start_redis(self, nr: int = 0):
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
-        redis_cmd = f"redis-server \\*:6379 --protected-mode no"
+        port = 6379 + nr
+        redis_cmd = f'redis-server --port {port} --protected-mode no --save ""'
         nix_cmd = f"nix shell --inputs-from {project_root} nixpkgs#redis --command {redis_cmd}"
-        self.tmux_new("redis", f"{nix_cmd}; sleep 999")
+        self.tmux_new(f"redis{nr}", f"{nix_cmd}; sleep 999")
+        return port
 
 
-    def stop_redis(self):
-        self.tmux_kill("redis")
+    def stop_redis(self, nr: int = 0):
+        self.tmux_kill(f"redis{nr}")
 
     def setup_test_iface_ip_net(self: 'LoadGen'):
         """
@@ -2140,9 +2184,10 @@ class LoadGen(Server):
         self.exec(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
 
 
-    def run_iperf_client(self, ipt: "IPerfTest", runtime: int, server_hostname: str, output_path: str, tmp_out_path: str):
+    def run_iperf_client(self, ipt: "IPerfTest", runtime: int, server_hostname: str, output_path: str, tmp_out_path: str, proto: str = "tcp", length: int = -1, vm_num = ""):
         """
         Starts iperf client
+        length: default if -1
         """
 
         options = ""
@@ -2152,16 +2197,22 @@ class LoadGen(Server):
 
         if ipt.direction  == "reverse":
             options += " -R"
-
         elif ipt.direction == "bidirectional":
             options += " --bidir"
-
         elif ipt.direction != "forward":
             warning(f"Unknown direction \"{ipt.direction}\". Using forward direction")
 
+        if length != -1:
+            options += f" -l {length}"
+
+        if proto == "udp":
+            options += " -u -b 0"
+        elif proto != "tcp":
+            warning(f"Unknown protocol {proto}. Using tcp.")
+
         info("Starting iperf client on " + server_hostname)
-        self.tmux_new("iperf3-client", f"iperf3 -c {server_hostname} -t {runtime} {options} | tee {tmp_out_path}; cp {tmp_out_path} {output_path}; sleep 999")
+        self.tmux_new(f"iperf3-client{vm_num}", f"iperf3 -c {server_hostname} -t {runtime} {options} | tee {tmp_out_path}; cp {tmp_out_path} {output_path}; sleep 999")
 
 
-    def stop_iperf_client(self):
-        self.tmux_kill("iperf3-client")
+    def stop_iperf_client(self, vm_num = ""):
+        self.tmux_kill(f"iperf3-client{vm_num}")

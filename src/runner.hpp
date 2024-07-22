@@ -14,6 +14,7 @@
     return;                                                                    \
   } while (0)
 
+// TODO rename to VfioUserThread
 class VmuxRunner {
 public:
   std::shared_ptr<VfioUserServer> vfu;
@@ -21,9 +22,10 @@ public:
   std::thread runner;
   std::shared_ptr<Capabilities> caps;
   std::atomic_int state;
-  std::atomic_bool running;
+  std::atomic_bool running; // set to false to terminate this thread
   std::string socket;
   std::string termination_error; // non-null if Runner terminated with error
+  cpu_set_t cpupin;
 
   // void (*VmuxRunner::interrupt_handler)(void);
 
@@ -35,17 +37,32 @@ public:
   };
 
   VmuxRunner(std::string socket, std::shared_ptr<VmuxDevice> device, int efd,
-             std::shared_ptr<VfioUserServer> vfu)
-      : vfu(vfu), device(device) {
+             std::shared_ptr<VfioUserServer> vfu, cpu_set_t cpupin)
+      : vfu(vfu), device(device), cpupin(cpupin) {
     state.store(0);
     this->socket = socket;
   }
 
-  void start() { runner = std::thread(&VmuxRunner::run, this); }
+  void start() {
+    runner = std::thread(&VmuxRunner::run, this);
+    pthread_t thread = runner.native_handle();
+
+    char name[16] = { 0 };
+    snprintf(name, 16, "vmuxRunner%u", device->device_id);
+    int ret = pthread_setname_np(thread, name);
+    if (ret != 0) {
+      die("cant rename thread");
+    }
+
+    // set cpu affinity
+    ret = pthread_setaffinity_np(thread, sizeof(this->cpupin), &this->cpupin);
+    if (ret != 0)
+        die("failed to set pthread cpu affinity");
+  }
 
   void stop() { running.store(0); }
 
-  Result<void> join() { 
+  Result<void> join() {
     runner.join();
     if (!this->termination_error.empty()) {
       return Err(this->termination_error);

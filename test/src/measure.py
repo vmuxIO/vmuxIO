@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from util import safe_cast, product_dict
-from typing import Iterator, cast, List, Dict, Callable, Tuple, Any
+from typing import Iterator, cast, List, Dict, Callable, Tuple, Any, Self, TypeVar, Iterable, Type, Generic
 from os.path import isfile, join as path_join
+import os
 from abc import ABC, abstractmethod
 from server import Host, Guest, LoadGen
 import autotest as autotest
@@ -9,11 +10,11 @@ from configparser import ConfigParser
 from argparse import (ArgumentParser, ArgumentDefaultsHelpFormatter, Namespace,
                       FileType, ArgumentTypeError)
 from typing import Tuple, Iterator, Any, Dict, Callable
-from contextlib import contextmanager
+from contextlib import contextmanager, ContextDecorator
 from enums import Machine, Interface, Reflector, MultiHost
 from logging import (info, debug, error, warning,
                      DEBUG, INFO, WARN, ERROR)
-from util import safe_cast
+from util import safe_cast, deduplicate
 from pathlib import Path
 import copy
 import time
@@ -21,6 +22,8 @@ from concurrent.futures import ThreadPoolExecutor
 import subprocess
 from root import QEMU_BUILD_DIR
 from conf import G
+from tqdm import tqdm
+from tqdm.contrib.telegram import tqdm as tqdm_telegram
 
 NUM_WORKERS = 8 # with 16, it already starts failing on rose
 
@@ -265,13 +268,15 @@ class Measurement:
         self.host.cleanup_network()
 
 
+A = TypeVar("A", bound='AbstractBenchTest')
+
 @dataclass
 class AbstractBenchTest(ABC):
     # magic parameter: repetitions
     # Feature matrixes for other parameters take lists of values to iterate over.
     # Wile repetitions is also a list in the feature matrix, even single value (e.g. 3) still means that this test will be run 3 times.
     repetitions: int
-    num_vms: int
+    num_vms: int # assumed to always be in args_reboot
 
     @abstractmethod
     def test_infix(self) -> str:
@@ -299,7 +304,7 @@ class AbstractBenchTest(ABC):
         return False
 
     @classmethod
-    def list_tests(cls, test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> List[Any]:
+    def list_tests(cls: Type[A], test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> List[A]:
         """
         test_matrix:
         dict where every key corresponds to a constructor parameter/field for this cls/BenchTest (same list as test_parameters() returns).
@@ -311,6 +316,56 @@ class AbstractBenchTest(ABC):
             if not exclude_test(test):
                 ret += [ test ]
         return ret
+
+    @classmethod
+    def test_matrix(cls: Type[A], tests: List[A]):
+        """
+        Generalizes a list of tests into a test matrix.
+        Note, that this matrix can be a superset of the original list of tests.
+        This can happen for example, if the list is a filtered version of list_tests(), because this sparseness cannot be represented by a test_matrix.
+        """
+        if len(tests) == 0:
+            return dict()
+
+        ret = dict()
+        for key in tests[0].__dict__.keys():
+            values = []
+            for test in tests:
+                value = test.__dict__[key]
+                if value not in values:
+                    values += [ value ]
+            ret[key] = values
+
+        return ret
+
+    @classmethod
+    def test_matrix_string(cls: Type[A], tests: List[A]) -> str:
+        """
+        Calls test_matrix() and formats the output nicely.
+        """
+        test_matrix = cls.test_matrix(tests)
+
+        # calculate sparseness (how many entries in the test matrix are actually in tests)
+        num_tests_matrix = 0
+        for values in test_matrix.values():
+            if num_tests_matrix == 0:
+                num_tests_matrix = len(values)
+            else:
+                num_tests_matrix *= len(values)
+        matrix_usage = len(tests) / num_tests_matrix
+        sparseness = f"{(1 - matrix_usage)*100:.0f}%"
+
+        dimensions = len(test_matrix.keys())
+        if matrix_usage == 1:
+            description = f"{dimensions} dimensional feature matrix: "
+        else:
+            description = f"{dimensions} dimensional feature matrix ({sparseness} sparse): "
+
+        ret = description + "{ \n"
+        for key, values in test_matrix.items():
+            values = ", ".join([ str(v) for v in values])
+            ret += f"  {key}: {values}\n"
+        return ret + "}"
 
     @classmethod
     def any_needed(cls, test_matrix: Dict[str, List[Any]], exclude_test = lambda test: False) -> bool:
@@ -347,13 +402,25 @@ class AbstractBenchTest(ABC):
         Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
         kwargs_reboot: test_matrix keys. Changing these parameters requires a reboot.
         """
+        tests = cls.list_tests(test_matrix)
+        return cls.estimate_time2(tests, args_reboot=args_reboot, prints=True)
+
+    @classmethod
+    def estimate_time2(cls, tests: List[Self], args_reboot: List[str], prints: bool = True) -> float:
+        """
+        Test matrix: like kwargs used to initialize DeathStarBenchTest, but every value is the list of values.
+        kwargs_reboot: test_matrix keys. Changing these parameters requires a reboot.
+        tests: if not None, ignore test_matrix
+        """
+        # usually we check if a test has already been run. Hence we never run the same test twice.
+        tests = deduplicate(tests)
+
         total = 0
         needed = 0
         needed_s = 0.0
         unknown_runtime = False
-        # TODO use list_tests here and incorporate exclude_test
-        for test_args in product_dict(test_matrix):
-            test = cls(**test_args)
+        tests_needed = []
+        for test in tests:
             total += 1
             if test.needed():
                 needed += 1
@@ -361,28 +428,36 @@ class AbstractBenchTest(ABC):
                 if estimated_runtime == -1:
                     unknown_runtime = True
                 needed_s += estimated_runtime
+                tests_needed += [ test ]
 
-        # args not relevant for reboots
-        args_no_reboot = [ key for key in test_matrix.keys() if key not in args_reboot ]
-        # example (1st) test parameters not relevant for reboots
-        kwargs_no_reboot = {key: test_matrix[key][0] for key in args_no_reboot }
-        # test parameters relevant for reboots:
-        reboot_matrix = {key: value for key, value in test_matrix.items() if key in args_reboot}
-        # loop over all reboots
-        for test_args in product_dict(reboot_matrix):
-            test_args = {**test_args, **kwargs_no_reboot}
-            test = cls(**test_args)
+        # find test parameters that trigger reboots
+        reboot_triggers = []
+        reboot_tests = []
+        for test in tests_needed:
+            # only test parameters relevant for reboots
+            test_parameters = dict()
+            for key in args_reboot:
+                test_parameters[key] = test.__dict__[key]
+            # append only the first test that triggeres a reboot
+            if test_parameters not in reboot_triggers:
+                reboot_triggers += [ test_parameters ]
+                reboot_tests += [ test ]
+
+        # estimate time needed for reboots
+        for trigger, test in zip(reboot_triggers, reboot_tests):
             duration_s = Measurement.estimated_boottime(test.num_vms)
             if "repetitions" in args_reboot:
                 duration_s *= test.repetitions
             needed_s += duration_s
 
-        if unknown_runtime:
-            info(f"Test not cached yet: {needed}/{total}. Time to completion not known.")
-        else:
-            info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
+        if prints:
+            if unknown_runtime:
+                info(f"Test not cached yet: {needed}/{total}. Time to completion not known.")
+            else:
+                info(f"Test not cached yet: {needed}/{total}. Expected time to completion: {needed_s/60:.0f}min ({needed_s/60/60:.1f}h)")
 
         return needed_s
+
 
     @classmethod
     def test_parameters(cls) -> List[str]:
@@ -390,6 +465,107 @@ class AbstractBenchTest(ABC):
         return the list of names of input parameters for this test
         """
         return [i for i in cls.__match_args__]
+
+T = TypeVar("T", bound=AbstractBenchTest)
+
+class Bench(Generic[T], ContextDecorator):
+    tqdm: Any
+
+    def __init__(self, tests: List[T], args_reboot: List[str] = [], brief: bool = False):
+        self.args_reboot = args_reboot
+        assert len(tests) > 0
+        self.remaining_tests = [ test for test in tests if test.needed()]
+        self.time_remaining_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
+        self.tqdm_constructor = tqdm
+        self.brief = brief
+        self.probe_peter()
+
+    def probe_peter(self):
+        if not self.brief:
+            try:
+                runtime_dir = os.environ["XDG_RUNTIME_DIR"]
+                with open(f"{runtime_dir}/telegram_bot_token", 'r') as file:
+                    data = file.read().strip()
+                def my_tqdm(*args, **kwargs):
+                    return tqdm_telegram(*args, chat_id="272730663", token=data, **kwargs)
+                self.tqdm_constructor = my_tqdm
+            except Exception:
+                pass # leave default tqdm_constructor
+
+    def __enter__(self):
+        total_min = (self.time_remaining_s + 0.1) / 60 # +0.1 to avoid float summing errors
+        self.tqdm = self.tqdm_constructor(total=total_min,
+              unit="min",
+              # - cut off float decimals
+              # - append newline to print every update to new line (to avoid garbled newlines when we print between progress updates)
+              bar_format="{l_bar}{bar}| {n:.0f}/{total:.0f}min [{elapsed}<{remaining}, {rate_fmt}{postfix}]\n",
+              )
+        return self, self.remaining_tests
+
+    def __exit__(self, *exc):
+        self.tqdm.close()
+
+    def iterator(self, tests: List[T], test_parameter: str) -> Iterable[Tuple[Any, List[T]]]:
+        """
+        Return an iterator over all values of test_parameter of tests.
+        test_parameter: name of the parameter (AbstractBenchTest member variable name) to iterate over
+        """
+        parameter_values = [ test.__dict__[test_parameter] for test in tests ]
+        parameter_values = deduplicate(parameter_values)
+        for parameter_value in parameter_values:
+            parameter_tests = [ test for test in tests if test.__dict__[test_parameter] == parameter_value]
+            yield (parameter_value, parameter_tests)
+
+
+    def multi_iterator(self, tests: List[T], test_parameters: List[str]) -> Iterable[Tuple[List[Any], List[T]]]:
+        """
+        Loops over test_parameters (member variables in tests[] objects).
+
+        Like multi_iterator(), but can be used like:
+        for [a_param, b_param], tests_ in bench.multi_iterator(tests, ["a", "b"]):
+            ...
+        """
+        for iteration_parameter_dict, iteration_tests in self.multi_iterator_dict(tests, test_parameters):
+            iteration_parameters = [ iteration_parameter_dict[parameter_name] for parameter_name in test_parameters ]
+            yield (iteration_parameters, iteration_tests)
+
+
+    def multi_iterator_dict(self, tests: List[T], test_parameters: List[str]) -> Iterable[Tuple[Dict[str, Any], List[T]]]:
+        """
+        Can replace nested iterators.
+
+        Example:
+        for param_a, a_tests in bench.iterator(tests, "a"):
+            for param_b, b_tests in bench.iterator(a_tests, "b"):
+                ...
+        Replaced with:
+        for params, tests_ in bench.multi_iterator(tests, ["a", "b"]):
+            param_a = params["a"]
+            param_b = params["b"]
+            ...
+        """
+        if len(tests) == 0:
+            return
+
+        test_matrix = tests[0].test_matrix(tests)
+        loop_matrix = { key: value for (key, value) in test_matrix.items() if key in test_parameters }
+        # from the potential feature matrix, generate a list of all possible parameter combinations
+        potential_iterations = product_dict(loop_matrix)
+        for iteration_parameters in potential_iterations:
+            # find all tests that match the parameters of this iteration
+            iteration_tests = [ test for test in tests if all(map(lambda kv: test.__dict__[kv[0]] == kv[1], iteration_parameters.items())) ]
+            if len(iteration_tests) == 0:
+                # can happen if the original list does not contain all tests generated by a full feature matrix
+                continue
+            yield (iteration_parameters, iteration_tests)
+
+    def done(self, done: T):
+        # TODO make this obsolete: integrate it into iterators and __exit__ or so
+        self.remaining_tests = [ test for test in self.remaining_tests if test != done ]
+        time_remaining_new_s = AbstractBenchTest.estimate_time2(self.remaining_tests, args_reboot=self.args_reboot, prints=False)
+        time_progress_s = self.time_remaining_s - time_remaining_new_s
+        self.time_remaining_s = time_remaining_new_s
+        self.tqdm.update(time_progress_s / 60)
 
 
 import measure_vnf
@@ -409,7 +585,7 @@ def main():
     info("")
     measure_ycsb.main(measurement, plan_only=True)
     info("")
-    # measure_iperf.main(measurement, plan_only=True)
+    measure_iperf.main(measurement, plan_only=True)
     info("")
     measure_mediation.main(measurement, plan_only=True)
     info("")
@@ -417,10 +593,10 @@ def main():
     info("Running benchmarks ...")
     info("")
     # measure_vnf.main(measurement)
+    measure_ycsb.main(measurement)
+    measure_iperf.main(measurement)
     measure_mediation.main(measurement)
     measure_hotel.main(measurement)
-    measure_ycsb.main(measurement)
-    # measure_iperf.main(measurement)
 
 if __name__ == "__main__":
     main()

@@ -361,20 +361,20 @@
     "xdp-reflector-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1666444048,
-        "narHash": "sha256-OSxZJBYqdP2AICHhT/DeTyQl5MM9Sy6YzXPk0DeMs3Y=",
+        "lastModified": 1720031325,
+        "narHash": "sha256-4Oe1FvPdjoNFheueE+o2KM9POB+3ZjNglwDTpEHIDIk=",
         "ref": "main",
-        "rev": "e60f72c90c6cbc49a8d57e42ac3ddcf762d6cbdb",
-        "revCount": 13,
+        "rev": "a411d17516ba9b43d8b4eb27aca1a110dce76af1",
+        "revCount": 16,
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/gierens/xdp-reflector"
+        "url": "https://github.com/vmuxIO/xdp-reflector"
       },
       "original": {
         "ref": "main",
         "submodules": true,
         "type": "git",
-        "url": "https://github.com/gierens/xdp-reflector"
+        "url": "https://github.com/vmuxIO/xdp-reflector"
       }
     }
   },

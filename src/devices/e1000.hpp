@@ -87,7 +87,7 @@ public:
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
     if (e1000_rx_is_ready(this_->e1000)) {
       this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
-      for (uint16_t i = 0; i < this_->driver->nb_bufs_used; i++) {
+      for (uint16_t i = 0; i < this_->driver->nb_bufs_used[0]; i++) {
         while(!e1000_rx_is_ready(this_->e1000)) {
           // blocking pause to reduce memory contention while spinning.
           // 100us seem to yield good results.

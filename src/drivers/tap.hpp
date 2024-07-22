@@ -15,7 +15,7 @@ public:
   char ifName[IFNAMSIZ];
 
   Tap() {
-    this->alloc_rx_lists(1);
+    this->alloc_rx_lists(1, 1);
     this->alloc_rx_bufs();
   }
 
@@ -65,7 +65,7 @@ public:
   void recv(int _vm_number) {
     size_t n = read(this->fd, this->rxBufs[0], Tap::MAX_BUF);
     this->rxBuf_used[0] = n;
-    this->nb_bufs_used = 1;
+    this->nb_bufs_used[0] = 1;
     if (LOG_LEVEL >= LOG_DEBUG) {
       printf("recv %zu bytes\n", n);
       Util::dump_pkt(this->rxBufs[0], this->rxBuf_used[0]);
@@ -75,7 +75,7 @@ public:
   }
 
   virtual void recv_consumed(int _vm_number) {
-    this->nb_bufs_used = 0;
+    this->nb_bufs_used[0] = 0;
   }
 
   void dumpRx() {
