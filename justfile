@@ -484,14 +484,17 @@ update:
 docker-rebuild:
   cd subprojects/deathstarbench/wrk2; docker build -t wrk2d .
 
+  yq -r ".services[] | .image" subprojects/deathstarbench/hotelReservation/docker-compose.yml | xargs -I{} sh -c "docker pull {} || echo Some repositories are expected not to exist because we will build them ourselves in the next step"
   cd subprojects/deathstarbench/hotelReservation; docker-compose build
   docker image save -o {{proot}}/VMs/docker-images-hotelReservation.tar $(yq -r ".services[] | .image" subprojects/deathstarbench/hotelReservation/docker-compose.yml)
   # cd subprojects/deathstarbench/hotelReservation; docker-compose up
   # cd subprojects/deathstarbench/hotelReservation; docker run -ti --mount type=bind,source=$(pwd)/wrk2,target=/wrk2 --network host wrk2 wrk -D exp -t 1 -c 1 -d 1 -L -s ./wrk2/scripts/hotel-reservation/mixed-workload_type_1.lua http://localhost:5000 -R 1
 
+  yq -r ".services[] | .image" subprojects/deathstarbench/socialNetwork/docker-compose.yml | xargs -I{} sh -c "docker pull {} || echo Some repositories are expected not to exist because we will build them ourselves in the next step"
   cd subprojects/deathstarbench/socialNetwork; docker-compose build
   docker image save -o {{proot}}/VMs/docker-images-socialNetwork.tar $(yq -r ".services[] | .image" subprojects/deathstarbench/socialNetwork/docker-compose.yml)
 
+  yq -r ".services[] | .image" subprojects/deathstarbench/mediaMicroservices/docker-compose.yml | xargs -I{} sh -c "docker pull {} || echo Some repositories are expected not to exist because we will build them ourselves in the next step"
   cd subprojects/deathstarbench/mediaMicroservices; docker-compose build
   docker image save -o {{proot}}/VMs/docker-images-mediaMicroservices.tar $(yq -r ".services[] | .image" subprojects/deathstarbench/mediaMicroservices/docker-compose.yml)
 
