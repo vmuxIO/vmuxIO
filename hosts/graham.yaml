@@ -1,26 +1,34 @@
 iommu_on: true
+hugepages1G: 8
 devices:
-  - name: ethLoadgen
+  - name: ethDut
     pci: "81:00.0"
-    if: enp129s0f0
+    if: enp129s0f0np0
     mac: b4:96:91:a4:1c:f0
     type: Intel E810-C 100G
     pciid: 8086:1592
     # known good versions:
-    firmware-versions: 
-      - "2.15 0x800049c3 1.2789.0"
-      - "2.30 0x80005d1e 1.2877.0"
+    firmware-versions:
+      # - "2.15 0x800049c3 1.2789.0"
+      # - "2.30 0x80005d1e 1.2877.0"
+      # The only one that can do rte_flow: ~>4.x
+      - "4.40 0x8001c979 1.3534.0"
+      - "4.40 0x8001c967 1.3534.0"
     dpdk-driver: vfio-pci
     kernel-driver: ice
-  - name: ethDut
-    pci: "81:00.1"
-    if: enp129s0f1
-    mac: b4:96:91:a4:1c:f1
-    type: Intel E810-C 100G
-    pciid: 8086:1592
-    # known good versions:
-    firmware-versions: 
-      - "2.15 0x800049c3 1.2789.0"
-      - "2.30 0x80005d1e 1.2877.0"
-    dpdk-driver: vfio-pci
-    kernel-driver: ice
+  # second port is used by someone else:
+  # - name: ethDut
+  #   pci: "81:00.1"
+  #   if: enp129s0f1np1
+  #   mac: b4:96:91:a4:1c:f1
+  #   type: Intel E810-C 100G
+  #   pciid: 8086:1592
+  #   # known good versions:
+  #   firmware-versions:
+  #     # - "2.15 0x800049c3 1.2789.0"
+  #     # - "2.30 0x80005d1e 1.2877.0"
+  #     # The only one that can do rte_flow: ~>4.x
+  #     - "4.40 0x8001c979 1.3534.0"
+  #     - "4.40 0x8001c967 1.3534.0"
+  #   dpdk-driver: vfio-pci
+  #   kernel-driver: ice

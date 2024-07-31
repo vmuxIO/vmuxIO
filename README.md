@@ -60,7 +60,7 @@ load development shell with necessary packages
 nix develop
 ```
 
-build a few sofware packages and symlink the results
+build a few sofware packages and symlink the results to `./`.
 
 ```shell
 git submodule update --init --recursive
@@ -70,8 +70,7 @@ just build
 run checks and bind correct dpdk/passthrough drivers
 
 ```shell
-just prepare ./hosts/ryan.yaml 
-ulimit -n 2048 # or set nixos systemd.extraConfig = ''DefaultLimitNOFILE=2048:524288''
+just prepare
 ```
 
 do a performance measurement with moongen-lachnit and two or one PFs:
@@ -106,7 +105,7 @@ to use vMux instead of qemu for emulation/passthrough:
 # start vMux
 just vmuxPt
 # or
-just vmuxE810
+just vmuxDpdkE810
 # or
 just vmuxE1000
 

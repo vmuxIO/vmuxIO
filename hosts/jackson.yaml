@@ -1,27 +1,35 @@
-iommu_on: false
+iommu_on: true
 hugepages1G: 8
 devices:
   - name: ethLoadgen
     pci: "51:00.0"
-    if: enp81s0f0
+    pci_full: "0000:51:00.0"
+    if: enp81s0f0np0
     mac: b4:96:91:a4:1b:88
     type: Intel E810-C 100G
     pciid: 8086:1592
     # known good versions:
     firmware-versions: 
-      - "2.15 0x800049c3 1.2789.0"
-      - "2.30 0x80005d1e 1.2877.0"
-    dpdk-driver: igb_uio
+      # - "2.15 0x800049c3 1.2789.0"
+      # - "2.30 0x80005d1e 1.2877.0"
+      # The only one that can do rte_flow: ~>4.x
+      - "4.40 0x8001c979 1.3534.0"
+      - "4.40 0x8001c967 1.3534.0"
+    dpdk-driver: vfio-pci
     kernel-driver: ice
   - name: ethDut
     pci: "51:00.1"
-    if: enp81s0f1
+    pci_full: "0000:51:00.1"
+    if: enp81s0f1np1
     mac: b4:96:91:a4:1b:89
     type: Intel E810-C 100G
     pciid: 8086:1592
     # known good versions:
     firmware-versions: 
-      - "2.15 0x800049c3 1.2789.0"
-      - "2.30 0x80005d1e 1.2877.0"
-    dpdk-driver: igb_uio
+      # - "2.15 0x800049c3 1.2789.0"
+      # - "2.30 0x80005d1e 1.2877.0"
+      # The only one that can do rte_flow: ~>4.x
+      - "4.40 0x8001c979 1.3534.0"
+      - "4.40 0x8001c967 1.3534.0"
+    dpdk-driver: vfio-pci
     kernel-driver: ice
