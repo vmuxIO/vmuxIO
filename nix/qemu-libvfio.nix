@@ -2,14 +2,14 @@
 # with pkgs2211;
 with pkgs;
 qemu_full.overrideAttrs ( new: old: rec {
-  src = fetchFromGitHub {
-    owner = "oracle";
+  src = fetchFromGitLab {
+    owner = "jlevon";
     repo = "qemu";
-    rev = "ed8ad9728a9c0eec34db9dff61dfa2f1dd625637"; # main 18.07.2023
-    hash = "sha256-kGNJ1yt44L6y/kw9YFJjbyQQ1/hzoI+tuun8p7ObnqM=";
+    rev = "fef8cc556476196777b31ac70ad287e1eb108b94"; # master.vfio-user 01.08.2024
+    hash = "sha256-LCfP7yShrXSxfR7r7sB1wL+nbAGi2Gpyx1qmMro7fEY=";
     fetchSubmodules = true;
   };
-  
+
   #when updating qemu, sync these with what is specified in qemu/subprojects/*.wrap
   libvfio-user-src = pkgs.fetchFromGitLab {
     owner = "qemu-project";
@@ -49,7 +49,7 @@ qemu_full.overrideAttrs ( new: old: rec {
 
   version = "8.0.50";
   buildInputs = [ libndctl ] ++ old.buildInputs;
-  nativeBuildInputs = [ json_c cmocka ] ++ old.nativeBuildInputs;
+  nativeBuildInputs = [ json_c cmocka python3Packages.tomli ] ++ old.nativeBuildInputs;
   hardeningDisable = [ "all" ];
 
   # emulate meson subproject dependency management
@@ -72,7 +72,7 @@ qemu_full.overrideAttrs ( new: old: rec {
     cp $sourceRoot/subprojects/packagefiles/berkeley-testfloat-3/* $sourceRoot/subprojects/berkeley-testfloat-3
   '';
 
-  configureFlags = # old.configureFlags ++ 
+  configureFlags = # old.configureFlags ++
   [ # old.configureFlags
   "--disable-dependency-tracking"
   # "--prefix=${out}"
@@ -153,11 +153,11 @@ qemu_full.overrideAttrs ( new: old: rec {
     "--disable-vvfat"
     "--disable-qed"
     "--disable-parallels"
-  ] ++ [ "--enable-kvm" "--enable-vfio-user-server" "--enable-multiprocess" ];
+  ] ++ [ "--enable-kvm" "--enable-vfio-user-server" "--enable-multiprocess" "--enable-vfio-user-client" ];
   patchPath = "${nixpkgs.outPath}/pkgs/applications/virtualization/qemu";
-  patches = # old.patches ++ 
+  patches = # old.patches ++
     [
-      "${patchPath}/fix-qemu-ga.patch"
+      # "${patchPath}/fix-qemu-ga.patch"
       # we omit macos patches and one fetchpatch for nested virt
       # ./qemu8-libvfio-sock.patch
     ] ++
