@@ -131,6 +131,27 @@ prepare-direct-boot HOST="guest":
     nix eval --write-to {{proot}}/nix/results/{{HOST}}-kernelParams .#nixosConfigurations.{{HOST}}.config.boot.kernelParams --apply 'builtins.concatStringsSep " "'
 
 
+# works with jlevons patched qemu 9
+# Exhibits same problems as vMux with mult-vCPU guests: iperf throughput drops to 0 sometimes
+qemu-virtionet:
+  #!/usr/bin/env bash
+  set -x
+  sudo ip tuntap add mode tap tap0
+  sudo ip link set dev tap0 up
+  sudo ip a add 10.0.0.1/24 dev tap0
+  sudo rm /tmp/rem-sock-{{user}} || true
+  sudo rm /tmp/remotesock-{{user}} || true
+  sudo rm {{vmuxSock}} || true
+  sudo ./qemu/bin/qemu-system-x86_64 \
+    -machine x-remote,vfio-user=on \
+    -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
+    -device e1000,id=netdev0,netdev=net0 \
+    -nographic \
+    -object x-vfio-user-server,id=vfioobj1,type=unix,path={{vmuxSock}},device=netdev0 \
+    -monitor unix:/tmp/rem-sock-{{user}},server,nowait
+  sudo ip link del tap0
+
+
 vm-libvfio-user:
     sudo rm {{qemuMem}} || true
     sudo qemu/bin/qemu-system-x86_64 \
