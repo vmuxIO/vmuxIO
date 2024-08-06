@@ -49,7 +49,7 @@ private:
   }
 
 public:
-  E1000EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq, const uint8_t (*mac_addr)[6]) : VmuxDevice(device_id, driver) {
+  E1000EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, bool spaced_interrupts, std::shared_ptr<GlobalInterrupts> globalIrq, const uint8_t (*mac_addr)[6]) : VmuxDevice(device_id, driver, NULL) {
     this->irqThrottle = std::make_shared<InterruptThrottlerNone>(efd, IRQ_IDX, globalIrq);
     globalIrq->add(this->irqThrottle);
     if (!rust_logs_initialized) {

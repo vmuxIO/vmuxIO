@@ -227,6 +227,10 @@ public:
     }
   }
 
+  static uint64_t macToInt(uint8_t mac[6]) {
+    return ( 0xFFFFFFFFFFFF & *(uint64_t*)(mac) );
+  }
+
   // approximates rte_get_timer_hz() as 3GHz
   static void rte_delay_us_block(uint us) {
     const uint64_t start = rte_get_timer_cycles();

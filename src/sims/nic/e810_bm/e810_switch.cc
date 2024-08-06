@@ -28,9 +28,9 @@ bool e810_switch::add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
   this->mac_rules[dst_mac] = queue_id;
   auto driver = this->dev.vmux->device->driver;
   auto device_id = this->dev.vmux->device->device_id;
-  bool result = driver->add_switch_rule(device_id, hdr->h_dest, queue_id - this->dev.vsi0_first_queue);
+  bool installed_rule = this->dev.vmux->device->add_switch_rule(device_id, hdr->h_dest, queue_id - this->dev.vsi0_first_queue);
 
-  return true;
+  return installed_rule;
 }
 
 /**

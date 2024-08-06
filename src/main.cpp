@@ -94,6 +94,7 @@ Result<void> _main(int argc, char **argv) {
   std::string device = "0000:18:00.0";
   std::vector<std::string> pciAddresses;
   std::shared_ptr<GlobalInterrupts> globalIrq;
+  std::shared_ptr<GlobalPolicies> globalPolicies;
   std::vector<std::unique_ptr<VmuxRunner>> runner;
   std::vector<std::shared_ptr<VfioConsumer>> vfioc;
   std::vector<std::shared_ptr<VmuxDevice>> devices; // all devices
@@ -271,6 +272,7 @@ Result<void> _main(int argc, char **argv) {
 
   int nr_threads = vfioc.size() + 1; // runner threads + 1 main thread
   globalIrq = std::make_shared<GlobalInterrupts>(nr_threads);
+  globalPolicies = std::make_shared<GlobalPolicies>();
 
   // create devices
   for (size_t i = 0; i < pciAddresses.size(); i++) {
@@ -288,10 +290,10 @@ Result<void> _main(int argc, char **argv) {
       device = std::make_shared<StubDevice>();
     }
     if (modes[i] == "emulation") {
-      device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq);
+      device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq, globalPolicies);
     }
     if (modes[i] == "mediation") {
-      device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq);
+      device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq, globalPolicies);
       device->driver->mediation_enable(i);
     }
     if (modes[i] == "e1000-emu") {

@@ -7,6 +7,7 @@
 #include "sims/nic/e810_bm/e810_bm.h"
 #include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/devices/vmux-device.hpp"
+#include "src/policies/policies.hpp"
 #include "util.hpp"
 #include "vfio-consumer.hpp"
 #include "vfio-server.hpp"
@@ -57,7 +58,7 @@ private:
 public:
   std::shared_ptr<e810::e810_bm> model;
 
-  E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob) : VmuxDevice(device_id, driver) {
+  E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob, std::shared_ptr<GlobalPolicies> policies) : VmuxDevice(device_id, driver, policies) {
     this->driver = driver;
     memcpy((void*)this->mac_addr, mac_addr, 6);
 
@@ -147,6 +148,18 @@ public:
     this->model->SetupIntro(this->deviceIntro);
   }
 
+  bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
+    this->policies->mutex.lock();
+    bool rule_installed = false;
+
+    bool policy_accepts = this->policies->switchPolicy.add_switch_rule(vm_id, dst_addr, dst_queue);
+    if (policy_accepts) {
+      bool rule_installed = driver->add_switch_rule(vm_id, dst_addr, dst_queue);
+    }
+
+    this->policies->mutex.unlock();
+    return rule_installed;
+  }
 
 private:
   void init_general_callbacks(VfioUserServer &vfu) {
