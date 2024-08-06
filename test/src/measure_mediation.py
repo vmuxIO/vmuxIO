@@ -21,7 +21,7 @@ import os
 from pandas import DataFrame, read_csv, concat
 from conf import G
 
-
+PER_VM_FLOWS = 3
 
 @dataclass
 class MediationTest(AbstractBenchTest):
@@ -93,14 +93,31 @@ class MediationTest(AbstractBenchTest):
 def strip_subnet_mask(ip_addr: str):
     return ip_addr[ : ip_addr.index("/")]
 
-def run_test(host: Host, loadgen: LoadGen, guest: Guest, test: MediationTest, repetition: int):
+
+def write_fastclick_rules(guest: Guest, vm_number: int, path: str):
+    def line(mac: str, queue: int):
+        return f"ingress pattern eth dst spec {mac} dst mask ff:ff:ff:ff:ff:ff / end actions queue index {queue} / end\n"
+
+    start = (vm_number - 1) * PER_VM_FLOWS
+    content = ""
+    for i in range(PER_VM_FLOWS):
+        offset = start + i
+        mac = MultiHost.mac("00:00:00:00:00:00", offset)
+        content += line(mac, i)
+    guest.write(content, path)
+
+
+def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: MediationTest, repetition: int):
+    example_guest = next(iter(guests.values()))
     remote_fastclick_log = "/tmp/fastclick.log"
     local_fastclick_log = test.output_filepath_fastclick(repetition)
     remote_moongen_throughput = "/tmp/throughput.csv"
     local_moongen_throughput = test.output_filepath_throughput(repetition)
     remote_moongen_histogram = "/tmp/histogram.csv"
     local_moongen_histogram = test.output_filepath_histogram(repetition)
-    guest.exec(f"sudo rm {remote_fastclick_log} || true")
+    def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+        guest.exec(f"sudo rm {remote_fastclick_log} || true")
+    end_foreach(guests, foreach_parallel)
     loadgen.exec(f"sudo rm {remote_moongen_throughput} || true")
     loadgen.exec(f"sudo rm {remote_moongen_histogram} || true")
     loadgen.stop_l2_load_latency(loadgen)
@@ -109,32 +126,38 @@ def run_test(host: Host, loadgen: LoadGen, guest: Guest, test: MediationTest, re
     if test.fastclick == "software":
         fastclick_program = "test/fastclick/mac-switch-software.click"
         fastclick_args = {
-            'ifacePCI0': guest.test_iface_addr,
+            'ifacePCI0': example_guest.test_iface_addr,
         }
     elif test.fastclick == "hardware":
         fastclick_program = "test/fastclick/mac-switch-hardware.click"
-        project_root = f"{guest.moonprogs_dir}/../../"
+        project_root = f"{example_guest.moonprogs_dir}/../../"
         fastclick_rules = f"{project_root}/test/fastclick/test_dpdk_nic_rules"
         fastclick_rules = "/home/host/vmuxIO/test/fastclick/test_dpdk_nic_rules"
+        fastclick_rules = "/tmp/test_dpdk_nic_rules"
         fastclick_args = {
-            'ifacePCI0': guest.test_iface_addr,
+            'ifacePCI0': example_guest.test_iface_addr,
             'rules': fastclick_rules
         }
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            write_fastclick_rules(guest, i, fastclick_rules)
+        end_foreach(guests, foreach_parallel)
     elif test.fastclick == "software-tap":
         fastclick_program = "test/fastclick/mac-switch-software-tap.click"
         fastclick_args = {
-            'if': guest.test_iface,
+            'if': example_guest.test_iface,
         }
     else:
         raise Exception("Unknown fastclick program type")
 
-    guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=fastclick_args)
+    def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+        guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=fastclick_args)
+    end_foreach(guests, foreach_parallel)
     time.sleep(10) # fastclick takes roughly as long as moongen to start, be we give it some slack nevertheless
     info("Starting MoonGen")
     loadgen.run_l2_load_latency(loadgen, "00:00:00:00:00:00", test.rate,
             runtime = DURATION_S,
             size = 60,
-            nr_macs = 3,
+            nr_macs = PER_VM_FLOWS * len(guests.values()),
             histfile = remote_moongen_histogram,
             statsfile = remote_moongen_throughput,
             outfile = '/tmp/output.log'
@@ -148,18 +171,22 @@ def run_test(host: Host, loadgen: LoadGen, guest: Guest, test: MediationTest, re
         error('Waiting for moongen output file timed out.')
 
     # await fastclick logs
-    guest.stop_fastclick()
-    try:
-        guest.wait_for_success(f'[[ $(tail -n 5 {remote_fastclick_log}) = *"AUTOTEST_DONE"* ]]')
-    except TimeoutError:
-        error('Waiting for fastclick output file to appear timed out')
+    def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+        guest.stop_fastclick()
+        try:
+            guest.wait_for_success(f'[[ $(tail -n 5 {remote_fastclick_log}) = *"AUTOTEST_DONE"* ]]')
+        except TimeoutError:
+            error('Waiting for fastclick output file to appear timed out')
+        guest.kill_fastclick()
+    end_foreach(guests, foreach_parallel)
 
     # teardown
     loadgen.stop_l2_load_latency(loadgen)
-    guest.kill_fastclick()
 
     # collect artefacts
-    guest.copy_from(remote_fastclick_log, local_fastclick_log)
+    def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+        guest.copy_from(remote_fastclick_log, local_fastclick_log)
+    end_foreach(guests, foreach_parallel)
     loadgen.copy_from(remote_moongen_throughput, local_moongen_throughput)
     loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
 
@@ -196,7 +223,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         # interfaces = [ Interface.VMUX_PT ]
         fastclicks = [ "hardware" ]
         # fastclicks = [ "software-tap" ]
-        vm_nums = [ 1 ]
+        vm_nums = [ 2 ]
         repetitions = 1
         # DURATION_S = 10000
         rates = [ 40000 ]
@@ -240,7 +267,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                 interface = Interface(interface)
                 info("Booting VM for this test matrix:")
                 info(MediationTest.test_matrix_string(a_tests))
-                with measurement.virtual_machine(interface) as guest:
+                with measurement.virtual_machines(interface, num_vms) as guests:
                     for rate, rate_tests in bench.iterator(a_tests, "rate"):
                         assert len(rate_tests) == 1 # we have looped through all variables now, right?
                         test = rate_tests[0]
@@ -259,14 +286,16 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
                         # guest: set up networking
 
-                        if interface.guest_driver() == "ice":
-                            guest.bind_test_iface() # bind vfio driver
-                        else: # supports software-tap with kernel interfaces only
-                            guest.modprobe_test_iface_drivers(interface=interface)
-                            guest.setup_test_iface_ip_net()
+                        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+                            if interface.guest_driver() == "ice":
+                                guest.bind_test_iface() # bind vfio driver
+                            else: # supports software-tap with kernel interfaces only
+                                guest.modprobe_test_iface_drivers(interface=interface)
+                                guest.setup_test_iface_ip_net()
+                        end_foreach(guests, foreach_parallel)
 
                         # run test
-                        run_test(host, loadgen, guest, test, repetition)
+                        run_test(host, loadgen, guests, test, repetition)
 
                         # summarize results
                         local_summary_file = test.output_filepath(repetition)
@@ -278,6 +307,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                             except Exception as e:
                                 summary = str(e)
                             file.write(summary)
+                        breakpoint()
                         bench.done(test)
 
 
