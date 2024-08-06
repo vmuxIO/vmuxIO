@@ -40,8 +40,8 @@ class MediationTest(AbstractBenchTest):
     def output_filepath_throughput(self, repetition: int) -> str:
         return self.output_filepath(repetition, extension = "throughput.csv")
 
-    def output_filepath_fastclick(self, repetition: int) -> str:
-        return self.output_filepath(repetition, extension = "fastclick.log")
+    def output_filepath_fastclick(self, repetition: int, vm_number: int) -> str:
+        return str(Path(G.OUT_DIR) / f"mediationVMs_{self.test_infix()}_rep{repetition}" / f"vm{vm_number}.log")
 
     def estimated_runtime(self) -> float:
         """
@@ -60,8 +60,8 @@ class MediationTest(AbstractBenchTest):
     #             failure = True
     #     return failure
 
-    def summarize(self, repetition: int) -> DataFrame:
-        with open(self.output_filepath_fastclick(repetition), 'r') as f:
+    def summarize(self, repetition: int, vm_num: int) -> DataFrame:
+        with open(self.output_filepath_fastclick(repetition, vm_num), 'r') as f:
             fastclickLog: List[str] = f.readlines()
         with open(self.output_filepath_throughput(repetition), 'r') as f:
             moongen = read_csv(f)
@@ -81,6 +81,7 @@ class MediationTest(AbstractBenchTest):
         data = [{
             **asdict(self), # put selfs member variables and values into this dict
             "repetition": repetition,
+            "vm_num": vm_num,
             "rxPackets": rx_packets,
             "txPackets": tx_packets,
             "txMpps": tx_mpps,
@@ -110,7 +111,6 @@ def write_fastclick_rules(guest: Guest, vm_number: int, path: str):
 def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: MediationTest, repetition: int):
     example_guest = next(iter(guests.values()))
     remote_fastclick_log = "/tmp/fastclick.log"
-    local_fastclick_log = test.output_filepath_fastclick(repetition)
     remote_moongen_throughput = "/tmp/throughput.csv"
     local_moongen_throughput = test.output_filepath_throughput(repetition)
     remote_moongen_histogram = "/tmp/histogram.csv"
@@ -185,7 +185,7 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
 
     # collect artefacts
     def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-        guest.copy_from(remote_fastclick_log, local_fastclick_log)
+        guest.copy_from(remote_fastclick_log, test.output_filepath_fastclick(repetition, i))
     end_foreach(guests, foreach_parallel)
     loadgen.copy_from(remote_moongen_throughput, local_moongen_throughput)
     loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
@@ -218,8 +218,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
         # interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
-        # interfaces = [ Interface.VMUX_MED ]
-        interfaces = [ Interface.VMUX_DPDK_E810 ]
+        interfaces = [ Interface.VMUX_MED ]
+        # interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
         fastclicks = [ "hardware" ]
         # fastclicks = [ "software-tap" ]
@@ -300,14 +300,15 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         # summarize results
                         local_summary_file = test.output_filepath(repetition)
                         with open(local_summary_file, 'w') as file:
-                            try:
-                                # to_string preserves all cols
-                                summary = test.summarize(repetition)
-                                summary = summary.to_string()
-                            except Exception as e:
-                                summary = str(e)
+                            dfs = []
+                            for i, guest in guests.items():
+                                try:
+                                    # to_string preserves all cols
+                                    dfs += [ test.summarize(repetition, i) ]
+                                except Exception as e:
+                                    summary = str(e)
+                            summary = concat(dfs).to_string()
                             file.write(summary)
-                        breakpoint()
                         bench.done(test)
 
 
