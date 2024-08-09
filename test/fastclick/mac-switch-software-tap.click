@@ -14,13 +14,16 @@ define(
 	$numa       false,
 	$mode       flow,    // Rx mode required by the DPDK Flow Rule Manager
 	$verbose    99,
-	$rules      ./test/fastclick/test_dpdk_nic_rules        // Better provide absolute path
+	$rules      ./test/fastclick/test_dpdk_nic_rules,        // Better provide absolute path
+	$class0     0/000000000000,
+	$class1     0/010000000000,
+	$class2     0/020000000000,
 );
 
 
 fd0::FromDevice($if, PROMISC true)
 
-fd0 -> c :: Classifier(0/000000000000, 0/010000000000, 0/020000000000, -);
+fd0 -> c :: Classifier($class0, $class1, $class2, -);
 
 c[0] -> dropped0 :: AverageCounterIMP()
   	 -> Discard;

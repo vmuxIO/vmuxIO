@@ -641,7 +641,7 @@ public:
   	printf("dpdk add switch rule\n");
 
 		struct rte_flow_error error;
-  		struct rte_flow* flow;
+  	struct rte_flow* flow;
 		struct rte_ether_addr src_mac;
 		struct rte_ether_addr src_mask;
 		struct rte_ether_addr dest_mac;

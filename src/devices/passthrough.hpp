@@ -13,7 +13,7 @@
 class PassthroughDevice : public VmuxDevice {
 public:
   PassthroughDevice(int device_id, std::shared_ptr<VfioConsumer> vfioc,
-                    std::string pci_address) : VmuxDevice(device_id, NULL) {
+                    std::string pci_address) : VmuxDevice(device_id, NULL, NULL) {
     this->vfioc = vfioc;
     this->init_pci_ids(pci_address);
   }

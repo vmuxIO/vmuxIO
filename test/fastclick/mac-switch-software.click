@@ -17,7 +17,10 @@ define(
 	$numa       false,
 	$mode       flow,    // Rx mode required by the DPDK Flow Rule Manager
 	$verbose    99,
-	$rules      ./test/fastclick/test_dpdk_nic_rules        // Better provide absolute path
+	$rules      ./test/fastclick/test_dpdk_nic_rules,        // Better provide absolute path
+	$class0     0/000000000000,
+	$class1     0/010000000000,
+	$class2     0/020000000000,
 );
 
 // NIC in Flow Rule Manager's mode
@@ -30,7 +33,7 @@ fd0 :: FromDPDKDevice(
 	// , PAUSE full // according to click docs this is needed for rte_flow but i claim it is entirely unrelated
 );
 
-fd0 -> c :: Classifier(0/000000000000, 0/010000000000, 0/020000000000, -);
+fd0 -> c :: Classifier($class0, $class1, $class2, -);
 
 c[0] -> dropped0 :: AverageCounterIMP()
   	 -> Discard;

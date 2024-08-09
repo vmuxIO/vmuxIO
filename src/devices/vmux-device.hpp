@@ -2,6 +2,7 @@
 
 #include "vfio-consumer.hpp"
 #include "drivers/driver.hpp"
+#include "policies/policies.hpp"
 // #include "vfio-server.hpp"
 #include <cstdint>
 #include <memory>
@@ -68,16 +69,23 @@ public:
   std::mutex vfu_ctx_mutex; // should be held by a thread accessing vfu_ctx or its private pointer
 
   std::shared_ptr<Driver> driver;
+  std::shared_ptr<GlobalPolicies> policies;
 
   int device_id;
 
   callback_fn rx_callback;
 
-  virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) = 0;
-
-  VmuxDevice(int device_id, std::shared_ptr<Driver> driver) : driver(driver), device_id(device_id), rx_callback(NULL) {};
+  VmuxDevice(int device_id, std::shared_ptr<Driver> driver, std::shared_ptr<GlobalPolicies> policies) : driver(driver), policies(policies), device_id(device_id), rx_callback(NULL) {};
 
   virtual ~VmuxDevice() = default;
+
+  virtual void setup_vfu(std::shared_ptr<VfioUserServer> vfu) = 0;
+
+  /// Attempt to install a rte_flow rule. Return false if installing failed or not possible due to policy.
+  virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t dst_queue) {
+    // the default device does not support switch rules
+    return false;
+  }
 
   inline bool isMediating() {
     return this->driver->is_mediating(this->device_id);
@@ -86,6 +94,6 @@ public:
 
 class StubDevice : public VmuxDevice {
 public:
-  StubDevice() : VmuxDevice(-1, NULL) { this->vfioc = NULL; }
+  StubDevice() : VmuxDevice(-1, NULL, NULL) { this->vfioc = NULL; }
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu){};
 };
