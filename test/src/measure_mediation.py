@@ -95,6 +95,19 @@ def strip_subnet_mask(ip_addr: str):
     return ip_addr[ : ip_addr.index("/")]
 
 
+# rules for software fastclick
+def fastclick_classifiers(vm_number: int):
+    ret = dict()
+    start = (vm_number - 1) * PER_VM_FLOWS
+    for i in range(PER_VM_FLOWS):
+        offset = start + i
+        mac = MultiHost.mac("00:00:00:00:00:00", offset)
+        class__ = "".join(reversed(mac.split(":")))
+        class_ = f"0/{class__}"
+        ret[f"class{i}"] = class_
+    return ret
+
+# rules for rte_flow fastclick
 def write_fastclick_rules(guest: Guest, vm_number: int, path: str):
     def line(mac: str, queue: int):
         return f"ingress pattern eth dst spec {mac} dst mask ff:ff:ff:ff:ff:ff / end actions queue index {queue} / end\n"
@@ -150,7 +163,8 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
         raise Exception("Unknown fastclick program type")
 
     def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-        guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=fastclick_args)
+        args = { **fastclick_args, **fastclick_classifiers(i) }
+        guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=args)
     end_foreach(guests, foreach_parallel)
     time.sleep(10) # fastclick takes roughly as long as moongen to start, be we give it some slack nevertheless
     info("Starting MoonGen")
@@ -191,6 +205,12 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
     loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
 
 
+def exclude(test):
+    return (Interface(test.interface).is_passthrough() and test.num_vms > 1) or \
+        (Interface(test.interface) == Interface.VMUX_DPDK_E810 and test.num_vms > 1) or \
+        (Interface(test.interface) == Interface.VMUX_DPDK and test.fastclick == "software" and test.num_vms > 1)
+
+
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     host, loadgen = measurement.hosts()
     global DURATION_S
@@ -198,7 +218,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [
           Interface.VMUX_MED,
-          Interface.VMUX_DPDK_E810,
+          Interface.VMUX_DPDK_E810, # yields bogus results: doesn't implement multi-VM!
           Interface.VFIO,
           Interface.VMUX_PT,
           ]
@@ -211,18 +231,18 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             "hardware",
             "software",
             ]
-    vm_nums = [ 1 ] # 2 VMs are currently not supported for VMUX_DPDK*
+    vm_nums = [ 1, 2, 4, 8, 16, 32, 64 ] # 2 VMs are currently not supported for VMUX_DPDK*
     rates = [ 40000 ]
     repetitions = 9
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
-        # interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
-        interfaces = [ Interface.VMUX_MED ]
+        interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
+        # interfaces = [ Interface.VMUX_MED ]
         # interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
-        fastclicks = [ "hardware" ]
-        # fastclicks = [ "software-tap" ]
+        # fastclicks = [ "hardware" ]
+        fastclicks = [ "software-tap" ]
         vm_nums = [ 2 ]
         repetitions = 1
         # DURATION_S = 10000
@@ -236,7 +256,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         num_vms=vm_nums,
         rate=rates
     )
-    tests += MediationTest.list_tests(test_matrix)
+    tests += MediationTest.list_tests(test_matrix, exclude_test=exclude)
 
     # software-tap benchmarks
     test_matrix = dict(
@@ -247,7 +267,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         rate=rates
     )
     if not G.BRIEF:
-        tests += MediationTest.list_tests(test_matrix)
+        tests += MediationTest.list_tests(test_matrix, exclude_test=exclude)
 
     info(f"Mediation test execution plan:")
     args_reboot = ["interface", "num_vms", "repetitions", "fastclick"]
