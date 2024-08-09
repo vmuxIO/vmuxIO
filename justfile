@@ -520,7 +520,7 @@ docker-rebuild:
   docker image save -o {{proot}}/VMs/docker-images-mediaMicroservices.tar $(yq -r ".services[] | .image" subprojects/deathstarbench/mediaMicroservices/docker-compose.yml)
 
 
-vm-init:
+vm-init NUM="35":
   #!/usr/bin/env python3
   import subprocess
   import os
@@ -532,7 +532,7 @@ vm-init:
   start_ip = ipaddress.IPv4Address("192.168.56.20")
 
 
-  for i in range(1, 801):
+  for i in range(1, {{NUM}}):
     print(f"wrinting cloud-init {i}")
     ip = f"{start_ip + i - 1}"
 
@@ -565,10 +565,12 @@ vm-init:
   shutil.copy("{{proot}}/VMs/cloud-init/vm1.img", "{{proot}}/VMs/cloud-init/vm0.img")
 
 
-vm-overwrite NUM="35": vm-init
+vm-overwrite NUM="64":
   #!/usr/bin/env bash
   set -x
   set -e
+  echo "Initializing disks for {{NUM}} VMs"
+  just vm-init {{NUM}}
   mkdir -p {{proot}}/VMs
   just prepare-direct-boot test-guest
   just prepare-direct-boot host
