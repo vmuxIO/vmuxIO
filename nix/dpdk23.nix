@@ -32,7 +32,7 @@
 
 let
   mod = kernel != null;
-  debug = false;
+  debug = true;
 in
 stdenv.mkDerivation {
   pname = "dpdk";
@@ -71,6 +71,10 @@ stdenv.mkDerivation {
     rdma-core
     # Requested by pkg-config.
     libbsd
+  ];
+
+  patches = [
+    ./dpdk23.queue-limits.patch
   ];
 
   postPatch = ''

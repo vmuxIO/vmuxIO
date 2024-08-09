@@ -1,0 +1,25 @@
+From d414f1953f122932535b1aceb40069eea67e2a0e Mon Sep 17 00:00:00 2001
+From: Pogobanane <aenderboy@gmx.de>
+Date: Wed, 7 Aug 2024 20:59:13 +0000
+Subject: [PATCH] ignore traffic class queue limits
+
+---
+ drivers/net/ice/ice_ethdev.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ice/ice_ethdev.c b/drivers/net/ice/ice_ethdev.c
+index 4bad39c2c1..d7ce3a96b0 100644
+--- a/drivers/net/ice/ice_ethdev.c
++++ b/drivers/net/ice/ice_ethdev.c
+@@ -894,7 +894,7 @@ ice_vsi_config_tc_queue_mapping(struct ice_vsi *vsi,
+ 	else
+ 		vsi->nb_qps = RTE_MIN
+ 			((uint16_t)vsi->adapter->hw.func_caps.common_cap.num_msix_vectors - 2,
+-			RTE_MIN(vsi->nb_qps, ICE_MAX_Q_PER_TC));
++			vsi->nb_qps);
+ 
+ 	/* nb_qps(hex)  -> fls */
+ 	/* 0000		-> 0 */
+-- 
+2.42.0
+

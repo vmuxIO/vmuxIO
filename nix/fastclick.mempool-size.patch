@@ -1,0 +1,25 @@
+From 2803031d8683541660d27d222abb69623f11a243 Mon Sep 17 00:00:00 2001
+From: Pogobanane <aenderboy@gmx.de>
+Date: Wed, 7 Aug 2024 19:47:00 +0000
+Subject: [PATCH] increase default mempool size
+
+---
+ lib/dpdkdevice.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/dpdkdevice.cc b/lib/dpdkdevice.cc
+index dc3ed6931..bd7e36851 100644
+--- a/lib/dpdkdevice.cc
++++ b/lib/dpdkdevice.cc
+@@ -1545,7 +1545,7 @@ DPDKRing::parse(Args* args) {
+  */
+ int DPDKDevice::DEFAULT_NB_MBUF = 32*4096*2 - 1;
+ #else
+-int DPDKDevice::DEFAULT_NB_MBUF = 65536 - 1;
++int DPDKDevice::DEFAULT_NB_MBUF = 300 * 256 * 4 + 1; // enough space for 300 queues
+ #endif
+ Vector<int> DPDKDevice::NB_MBUF = Vector<int>();
+ #ifdef RTE_MBUF_DEFAULT_BUF_SIZE
+-- 
+2.42.0
+

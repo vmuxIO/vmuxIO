@@ -7,7 +7,7 @@
 let
   dpdk = selfpkgs.dpdk23; # needed for ice package thingy
   # dpdk = self.inputs.nixpkgs.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
-  debug = false;
+  debug = true;
 in
 pkgs.stdenv.mkDerivation {
   pname = "fastclick";
@@ -38,6 +38,7 @@ pkgs.stdenv.mkDerivation {
   patches = [
     ./fastclick.per-thread-counter.patch
     ./fastclick.dpdk23.patch # patch needed for FromDPDKDevice(FLOW_RULES_FILE) with dpdk 23
+    ./fastclick.mempool-size.patch
   ];
 
   postPatch = ''

@@ -106,8 +106,9 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 
 	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
 	printf(":: initializing port: %d\n", port_id);
+	int tx_queues_override = 0; // nr_queues
 	ret = rte_eth_dev_configure(port_id,
-				nr_queues, nr_queues, &port_conf);
+				nr_queues, tx_queues_override, &port_conf);
 	if (ret < 0) {
 		rte_exit(EXIT_FAILURE,
 			":: cannot configure device: err=%d, port=%u\n",
@@ -145,7 +146,7 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 	txq_conf.offloads = port_conf.txmode.offloads;
 
 	struct rte_mempool *tx_pool;
-	for (i = 0; i < nr_queues; i++) {
+	for (i = 0; i < tx_queues_override; i++) {
 		size_t tx_buffers = NUM_MBUFS; // TODO
 		// TODO allocate these elsewhere
 		tx_pool = rte_pktmbuf_pool_create(std::format("TX_MBUF_POOL_{}", i).c_str(), tx_buffers ,
@@ -379,8 +380,13 @@ public:
 		unsigned nb_ports;
 		uint16_t portid;
 
+		// for excessive number of queues we exceed some default list size with 2k hugepages
+		int ret = rte_memzone_max_set(2560*2);
+		if (ret < 0)
+			rte_exit(EXIT_FAILURE, "Error with EAL initialization\n");
+
 		/* Initializion the Environment Abstraction Layer (EAL). 8< */
-		int ret = rte_eal_init(argc, argv);
+		ret = rte_eal_init(argc, argv);
 		if (ret < 0)
 			rte_exit(EXIT_FAILURE, "Error with EAL initialization\n");
 		/* >8 End of initialization the Environment Abstraction Layer (EAL). */
