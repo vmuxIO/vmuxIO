@@ -50,6 +50,9 @@ public:
 
   // vm_id can be used to serve multiple VMs with one single driver
   virtual void send(int vm_id, const char *buf, const size_t len) = 0;
+	virtual bool send_tso(int vm_id, const char *buf, const size_t len, const bool end_of_packet, uint64_t l2_len, uint64_t l3_len, uint64_t l4_len, uint64_t tso_segsz) {
+    return false;
+  }
   virtual void recv(int vm_id) = 0;
   virtual void recv_consumed(int vm_id) = 0;
   
