@@ -50,6 +50,17 @@ public:
 
   // vm_id can be used to serve multiple VMs with one single driver
   virtual void send(int vm_id, const char *buf, const size_t len) = 0;
+  // specialized function to send packets with TSO
+  // can be called multiple times to collect multiple buffers of data
+  // set end_of_packet=true on the last call
+  // if this function returns false at any moment, no data was sent
+  // packets were queued for sending if this function returns true while end_of_packet==true
+  virtual bool send_tso(int vm_id, const char *buf, const size_t len,
+                        const bool end_of_packet, uint64_t l2_len,
+                        uint64_t l3_len, uint64_t l4_len, uint64_t tso_segsz) {
+    // by default, TSO is not supported
+    return false;
+  }
   virtual void recv(int vm_id) = 0;
   virtual void recv_consumed(int vm_id) = 0;
   
