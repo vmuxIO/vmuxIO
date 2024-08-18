@@ -153,8 +153,9 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 	for (i = 0; i < nr_queues; i++) {
 		size_t tx_buffers = NUM_MBUFS; // TODO
 		// TODO allocate these elsewhere
+		size_t buffer_size = tso_supported ? (4096 * 4 + RTE_PKTMBUF_HEADROOM) : RTE_MBUF_DEFAULT_BUF_SIZE;
 		tx_pool = rte_pktmbuf_pool_create(std::format("TX_MBUF_POOL_{}", i).c_str(), tx_buffers ,
-			64, 0, (4096*4) + RTE_PKTMBUF_HEADROOM, rte_socket_id()); // TODO constant for cache
+			64, 0, buffer_size, rte_socket_id()); // TODO constant for cache
 		if (tx_pool == NULL)
 			rte_exit(EXIT_FAILURE, "Cannot create tx mbuf pool %d\n", i);
 		tx_mbuf_pools.push_back(tx_pool);
@@ -361,8 +362,7 @@ private:
 	std::vector<bool> mediate; // per VM
 
 	bool tso_supported = false;
-	struct rte_mbuf *tso_first = nullptr;
-	struct rte_mbuf *tso_last = nullptr;
+	struct rte_mbuf **tso_seg = nullptr;
 
 
 	// get queue id of native queue
@@ -423,6 +423,9 @@ public:
 
 		/* Initializing all ports. 8< */
 		filtering_init_port(port_id, nr_queues, this->rx_mbuf_pools, this->tx_mbuf_pools, this->tso_supported);
+		if (this->tso_supported) {
+			this->tso_seg = (struct rte_mbuf **) calloc(nr_queues, sizeof(struct rte_mbuf *));
+		}
 		// RTE_ETH_FOREACH_DEV(portid)
 		// 	if (port_init(portid, mbuf_pool) != 0)
 		// 		rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
@@ -546,10 +549,12 @@ public:
 		if (!tso_supported) return false;
 		
 		uint16_t queue = this->get_tx_queue_id(vm_id, 0);
+		struct rte_mbuf *tso_first = this->tso_seg[queue];
+
 		// allocate and initialize first segment
-		if (tso_last == nullptr) {
-			tso_first = tso_last = rte_pktmbuf_alloc(this->tx_mbuf_pools[queue]);
-			if (tso_last == nullptr) {
+		if (tso_first == nullptr) {
+			tso_first = rte_pktmbuf_alloc(this->tx_mbuf_pools[queue]);
+			if (tso_first == nullptr) {
 				printf("WARN: Dpdk::send_tso: alloc failed\n");
 				return false;
 			}
@@ -557,13 +562,7 @@ public:
 			tso_first->pkt_len = 0;
 			tso_first->data_len = 0;
 		}
-
-		// TODO test
-		// if (tso_first->pkt_len + len > 8000) {
-		// 	rte_pktmbuf_free(tso_first);
-		// 	tso_first = tso_last = nullptr;
-		// 	return false;
-		// }
+		struct rte_mbuf *tso_last = rte_pktmbuf_lastseg(tso_first);
 
 		// copy data
 		for (size_t copied = 0; copied < len; ) {
@@ -573,8 +572,8 @@ public:
 				struct rte_mbuf *newseg = rte_pktmbuf_alloc(this->tx_mbuf_pools[queue]);
 				if (newseg == nullptr) {
 					printf("WARN: Dpdk::send_tso: alloc failed\n");
+					this->tso_seg[queue] = nullptr;
 					rte_pktmbuf_free(tso_first);
-					tso_first = tso_last = nullptr;
 					return false;
 				}
 				tso_last->next = newseg;
@@ -591,14 +590,16 @@ public:
 			copied += copy_n;
 		}
 
-		if (!end_of_packet)
+		if (!end_of_packet) {
+			this->tso_seg[queue] = tso_first;
 			return true;
+		}
 
 		// sanity check: headers should all be in first segment
 		if (l2_len + l3_len + l4_len > tso_first->data_len) {
 				printf("WARN: Dpdk::send_tso: headers too large\n");
+				this->tso_seg[queue] = nullptr;
 				rte_pktmbuf_free(tso_first);
-				tso_first = tso_last = nullptr;
 				return false;
 		}
 		
@@ -624,17 +625,14 @@ public:
 			if (nb_tx != 1) {
 				printf("\nWARNING: Sending tso packet failed. \n");
 				rte_pktmbuf_free(tso_first);
-				tso_first = tso_last = nullptr;
+				this->tso_seg[queue] = nullptr;
 				return false;
 			}
 		}
 
 		// sent packet successfully
 		if_log_level(LOG_DEBUG, printf("send_tso: %zu\n", (size_t)tso_first->pkt_len));
-		// TODO: check if buffer needs to be freed here
-		// we run out of memory if we don't, but dpdk examples seem to indicate otherwise?
-		// rte_pktmbuf_free(tso_first);
-		tso_first = tso_last = nullptr;
+		this->tso_seg[queue] = nullptr;
 		return true;
 	}
 
