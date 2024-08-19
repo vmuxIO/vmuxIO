@@ -76,12 +76,42 @@ vmuxDpdkE810:
 
 vmuxMed:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
-  
+
 vmuxMedLog:
   sudo {{proot}}/build/vmux -u -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 2>&1 | rg 'ice_callback|send|qemu|dominik'
 
 vmuxMedPerf:
-  sudo perf record -g -- {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 || true
+  #!/usr/bin/env bash
+
+  # from perf-record man page
+  ctl_fifo=/tmp/perf_{{user}}_ctl.fifo
+  test -p ${ctl_fifo} && unlink ${ctl_fifo}
+  mkfifo ${ctl_fifo}
+  exec {ctl_fd}<>${ctl_fifo}
+
+  ctl_ack_fifo=/tmp/perf_{{user}}_ctl_ack.fifo
+  test -p ${ctl_ack_fifo} && unlink ${ctl_ack_fifo}
+  mkfifo ${ctl_ack_fifo}
+  exec {ctl_fd_ack}<>${ctl_ack_fifo}
+  
+  sudo perf record -D -1 --control "fifo:${ctl_fifo},${ctl_ack_fifo}" -F 400 -g -- {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 &
+  perf_pid=$!
+
+  sleep 5 && read -p 'Press enter to start recording.'
+  echo "Enabling perf"
+  echo 'enable' >&${ctl_fd} && read -u ${ctl_fd_ack} e1 && echo "enabled(${e1})"
+  sleep 60
+  echo "Disabling perf"
+  echo 'disable' >&${ctl_fd} && read -u ${ctl_fd_ack} d1 && echo "disabled(${d1})"
+
+  exec {ctl_fd_ack}>&-
+  unlink ${ctl_ack_fifo}
+
+  exec {ctl_fd}>&-
+  unlink ${ctl_fifo}
+
+  wait -n ${perf_pid}
+
   sudo chown dominik perf.data
   perf script >vmuxMed.perf
 
