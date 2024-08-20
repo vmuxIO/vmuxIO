@@ -650,7 +650,7 @@ dpdk_helloworld: dpdk-setup
   meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
 
 fastclick: 
-  sudo ./fastclick/bin/click --dpdk "-l 2-10" -- ./test/fastclick/dpdk-flow-parser.click
+  sudo ./fastclick/bin/click --dpdk "-l 0" -- ./test/fastclick/pktgen-l2.click
 
 pktgen: 
   nix shell .#pktgen

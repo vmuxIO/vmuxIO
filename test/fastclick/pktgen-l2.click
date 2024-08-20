@@ -13,7 +13,7 @@ define($L 60, $N 100, $S 100000);
 
 //You do not need to change these to the real ones, just have the dmac match the receiver's one
 define($mymac 90:e2:ba:c3:79:66)
-define($dmac 90:e2:ba:c3:76:6e)
+define($dmac b4:96:91:a4:1b:88)
 //Ip are just for a convenient payload as this is l2
 define($myip 192.168.130.13)
 define($dstip 192.168.128.13)
