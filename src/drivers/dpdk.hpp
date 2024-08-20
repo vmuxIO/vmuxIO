@@ -362,6 +362,8 @@ private:
 	std::vector<bool> mediate; // per VM
 
 	bool tso_supported = false;
+	// list of current tso buffers
+	// one per queue
 	struct rte_mbuf **tso_seg = nullptr;
 
 
@@ -539,13 +541,12 @@ public:
 			}
 			if_log_level(LOG_DEBUG, printf("send: "));
 			if_log_level(LOG_DEBUG, Util::dump_pkt((void*)buf, len));
-
-			/* Free packets. */
-			// rte_pktmbuf_free(pkt);
 		}
 	}
 
-	virtual bool send_tso(int vm_id, const char *buf, const size_t len, const bool end_of_packet, uint64_t l2_len, uint64_t l3_len, uint64_t l4_len, uint64_t tso_segsz) {
+	virtual bool send_tso(int vm_id, const char *buf, const size_t len,
+	                      const bool end_of_packet, uint64_t l2_len,
+	                      uint64_t l3_len, uint64_t l4_len, uint64_t tso_segsz) {
 		if (!tso_supported) return false;
 		
 		uint16_t queue = this->get_tx_queue_id(vm_id, 0);
@@ -564,7 +565,7 @@ public:
 		}
 		struct rte_mbuf *tso_last = rte_pktmbuf_lastseg(tso_first);
 
-		// copy data
+		// copy data into dpdk buffers
 		for (size_t copied = 0; copied < len; ) {
 			size_t tailroom = rte_pktmbuf_tailroom(tso_last);
 			// allocate another segment if needed
@@ -584,7 +585,8 @@ public:
 
 			// fill segment
 			size_t copy_n = std::min(tailroom, len - copied);
-			rte_memcpy(rte_pktmbuf_mtod_offset(tso_last, char *, tso_last->data_len), buf + copied, copy_n);
+			rte_memcpy(rte_pktmbuf_mtod_offset(tso_last, char *, tso_last->data_len),
+			           buf + copied, copy_n);
 			tso_last->data_len += copy_n;
 			tso_first->pkt_len += copy_n;
 			copied += copy_n;
@@ -631,7 +633,9 @@ public:
 		}
 
 		// sent packet successfully
-		if_log_level(LOG_DEBUG, printf("send_tso: %zu\n", (size_t)tso_first->pkt_len));
+		if_log_level(LOG_DEBUG,
+			printf("send_tso: %zu\n", (size_t)tso_first->pkt_len)
+		);
 		this->tso_seg[queue] = nullptr;
 		return true;
 	}

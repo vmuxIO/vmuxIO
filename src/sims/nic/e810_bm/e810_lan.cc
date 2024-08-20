@@ -665,7 +665,8 @@ bool lan_queue_tx::trigger_tx_packet() {
       d1 = rd->d->cmd_type_offset_bsz;
       uint16_t pkt_len =
           (d1) >> ICE_TXD_QW1_TX_BUF_SZ_S;
-      if (!dev.vmux->EthSendTso(rd->data, pkt_len, i + 1 == dcnt, maclen, iplen, l4len, tso_mss)) {
+      if (!dev.vmux->EthSendTso(rd->data, pkt_len, i + 1 == dcnt, maclen, iplen,
+                                l4len, tso_mss)) {
         hardware_tso_success = false;
         break;
       }
