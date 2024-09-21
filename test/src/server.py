@@ -2163,6 +2163,7 @@ class LoadGen(Server):
         port = 6379 + nr
         redis_cmd = f'redis-server --port {port} --protected-mode no --save ""'
         nix_cmd = f"nix shell --inputs-from {project_root} nixpkgs#redis --command {redis_cmd}"
+        #alternative: NIXPKGS_ALLOW_UNFREE=1 nix shell --impure github:nixos/nixpkgs/109e13db243249e26b8b8d861424578400aae882#dragonflydb; dragonfly --port 6379 --logtostderr --dbfilename /tmp/foo
         self.tmux_new(f"redis{nr}", f"{nix_cmd}; sleep 999")
         return port
 

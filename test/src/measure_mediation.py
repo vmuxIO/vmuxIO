@@ -233,7 +233,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             ]
     vm_nums = [ 1, 2, 4, 8, 16, 32, 64 ] # 2 VMs are currently not supported for VMUX_DPDK*
     rates = [ 40000 ]
-    repetitions = 9
+    repetitions = 3
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
