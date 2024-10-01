@@ -68,6 +68,10 @@
       url = "git+https://github.com/tbarbette/fastclick.git";
       flake = false;
     };
+    dpdkdk-src = {
+      url = "git+https://github.com/kreudom/dpdk?ref=dk&submodules=1";
+      flake = false;
+    };
   };
 
   outputs = {
@@ -113,6 +117,11 @@
       dpdk23 = pkgs.callPackage ./nix/dpdk23.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
+      };
+      dpdkdk = pkgs.callPackage ./nix/dpdkdk.nix {
+        kernel = pkgs.linuxPackages_5_10.kernel;
+        inherit (flakepkgs) linux-firmware-pinned;
+        inherit self;
       };
       dpdk22 = pkgs.callPackage ./nix/dpdk23.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;

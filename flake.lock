@@ -38,6 +38,25 @@
         "url": "https://github.com/vmuxIO/dpdk"
       }
     },
+    "dpdkdk-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1690560343,
+        "narHash": "sha256-1GR7+VKI7OxUsHSRBc/jz2HcUYOZ6lAKuer2anhqKV0=",
+        "ref": "dk",
+        "rev": "12fcafcd62286933e6b167b14856d21f642efa5f",
+        "revCount": 36551,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/kreudom/dpdk"
+      },
+      "original": {
+        "ref": "dk",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/kreudom/dpdk"
+      }
+    },
     "fastclick-src": {
       "flake": false,
       "locked": {
@@ -307,6 +326,7 @@
       "inputs": {
         "dpdk-lachnit-src": "dpdk-lachnit-src",
         "dpdk-src": "dpdk-src",
+        "dpdkdk-src": "dpdkdk-src",
         "fastclick-src": "fastclick-src",
         "flake-utils": "flake-utils",
         "libmoon-lachnit-src": "libmoon-lachnit-src",
