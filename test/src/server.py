@@ -336,6 +336,7 @@ class Server(ABC):
         Throw if cpufreq is wrong
         """
         intel_path = "/sys/devices/system/cpu/intel_pstate/no_turbo"
+        intel_powersave = "/sys/devices/system/cpu/intel_pstate/min_perf_pct"
         amd_path = "/sys/devices/system/cpu/cpufreq/boost" # every other CPU
         if (self.isfile(intel_path)):
             try:
@@ -343,7 +344,13 @@ class Server(ABC):
             except CalledProcessError:
                 error(f"Please run on {self.fqdn}: echo 1 | sudo tee {intel_path}")
                 raise Exception(f"Wrong CPU freqency on {self.fqdn}")
-        else:
+        if (self.isfile(intel_powersave)):
+            try:
+                self.exec(f"[[ $(cat {intel_powersave}) -eq 100 ]]")
+            except CalledProcessError:
+                error(f"Please run on {self.fqdn}: echo 100 | sudo tee {intel_powersave}")
+                raise Exception(f"Wrong CPU freqency on {self.fqdn}")
+        if (self.isfile(amd_path)):
             try:
                 self.exec(f"[[ $(cat {amd_path}) -eq 0 ]]")
             except CalledProcessError:
