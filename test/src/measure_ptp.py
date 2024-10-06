@@ -16,7 +16,7 @@ from conf import G
 class PTPTest(AbstractBenchTest):
 
     interface: Interface # VMUX interface
-    mode: str # can be: dpdk-guest, dpdk-host, ptp4l-guest, ptp4l-host 
+    mode: str # can be: dpdk-guest, dpdk-host, ptp4l-guest, ptp4l-host
 
     def test_infix(self):
         return f"ptp_{self.interface}"
@@ -55,11 +55,11 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_MED ]
 
     modes = [
-        "dpdk-guest", 
+        "dpdk-guest",
         "dpdk-host",
         "ptp4l-host"
     ]
-    
+
     test_matrix = dict(
         repetitions=[ 1 ],
         interface=[ interface.value for interface in interfaces],
@@ -69,28 +69,28 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # info(f"PTP Test execution plan:")
     # PTPTest.estimate_time(test_matrix, ["interface"])
 
-    for iface in interfaces: 
+    for iface in interfaces:
         ptp_test = PTPTest(interface=iface, mode="dpdk-guest", num_vms=1, repetitions=1)
       #  run_test(ptp_test)
-    
-    run_test(PTPTest(interface=None, mode="dpdk-host", num_vms=0, repetitions=1))
+
+    run_test(PTPTest(interface=Interface.VFIO, mode="dpdk-host", num_vms=0, repetitions=1))
 
 def run_test(ptp_test: PTPTest, repetition=0):
-   
+
     host, loadgen = measurement.hosts()
     DURATION_S = 100 if not G.BRIEF else 30
-    
+
     info('Binding loadgen interface')
     loadgen.modprobe_test_iface_drivers()
     loadgen.release_test_iface() # bind linux driver
-    
+
     try:
         loadgen.delete_nic_ip_addresses(loadgen.test_iface)
     except Exception:
         pass
 
     loadgen.setup_test_iface_ip_net()
-    
+
     # Test ptpclient on host
     if ptp_test.mode == "dpdk-host":
         # cleanup
@@ -100,7 +100,7 @@ def run_test(ptp_test: PTPTest, repetition=0):
         info("Testing DPDK PTP Client on host")
         host.bind_test_iface()
         host.modprobe_test_iface_drivers()
-        
+
         info("Start ptp client")
         out_dir = ptp_test.output_filepath(repetition)
 
@@ -110,39 +110,46 @@ def run_test(ptp_test: PTPTest, repetition=0):
         remote_path = "/tmp/out.txt"
         host.start_ptp_client(remote_path)
         time.sleep(DURATION_S)
-                
+
         host.stop_ptp_client()
         loadgen.stop_ptp4l()
-        
+
         # remove unnecessary information
         host.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
 
         host.copy_from(f"{remote_path}.filtered", out_dir)
 
-        return
+        # return
 
     # boot VMs
     with measurement.virtual_machine(ptp_test.interface) as guest:
-        # loadgen: set up interfaces and networking
-        
-        guest.bind_test_iface()
+        # cleanup
+        loadgen.stop_ptp4l()
+        guest.stop_ptp_client()
 
-        info("Start ptp clinet")
+        info("Testing DPDK PTP Client on host")
+        guest.bind_test_iface()
+        guest.modprobe_test_iface_drivers()
+
+        info("Start ptp client")
         out_dir = ptp_test.output_filepath(repetition)
 
         info("Start ptp server")
         loadgen.start_ptp4l()
 
-        guest.start_ptp_client("out.txt")
+        remote_path = "/tmp/out.txt"
+        guest.start_ptp_client(remote_path)
         time.sleep(DURATION_S)
-                
+
         guest.stop_ptp_client()
         loadgen.stop_ptp4l()
-        
-        guest.copy_from("out.txt", out_dir)
-        
+
         # remove unnecessary information
-        loadgen.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {out_dir} | sudo tee {out_dir}")
+        guest.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
+
+        guest.copy_from(f"{remote_path}.filtered", f"{out_dir}.vm")
+        breakpoint()
+        pass
 
 
 if __name__ == "__main__":
