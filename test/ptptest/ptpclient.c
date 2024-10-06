@@ -1,4 +1,6 @@
-/* SPDX-License-Identifier: BSD-3-Clause
+/* Modified version of DPDK's ptpclient example
+ * 
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright(c) 2015 Intel Corporation
  */
 
@@ -529,6 +531,12 @@ update_kernel_time(void)
 
 }
 
+int64_t freq_adjust = 0;
+int64_t moving_average = 0;
+int64_t wait_until_freq_adjust = 3;
+int64_t counter = -3;
+struct timespec last_ts;
+
 /*
  * Parse the DELAY_RESP message.
  */
@@ -553,12 +561,33 @@ parse_drsp(struct ptpv2_data_slave_ordinary *ptp_data)
 				((uint64_t)ntohl(rx_tstamp->sec_lsb)) |
 				(((uint64_t)ntohs(rx_tstamp->sec_msb)) << 32);
 
+			
+
 			/* Evaluate the delta for adjustment. */
 			ptp_data->delta = delta_eval(ptp_data);
+			printf("freq adjust: %ldns avg: %ld counter: %ld \n", freq_adjust, counter);
+			
+			
+			if (counter < 0) 
+				counter++;
+			else if (counter > 0) {
+				moving_average += ptp_data->delta;
+				counter--;
+			} else {
+				freq_adjust += moving_average / wait_until_freq_adjust;
+			
+				moving_average = 0;
+				counter = wait_until_freq_adjust;
+			}
 
-			rte_eth_timesync_adjust_time(ptp_data->portid, ptp_data->delta);
+			int64_t seconds_since_last_ts = ptp_data->tstamp3.tv_sec - last_ts.tv_sec;
+			int64_t nanos_since_last_ts = ptp_data->tstamp3.tv_nsec - last_ts.tv_nsec;
 
-			ptp_data->current_ptp_port = ptp_data->portid;
+			int64_t freq_delta = freq_adjust * seconds_since_last_ts + freq_adjust * nanos_since_last_ts / 1000000000;
+
+			rte_eth_timesync_adjust_time(ptp_data->portid, ptp_data->delta + freq_delta);
+
+			last_ts = ptp_data->tstamp3;
 
 			/* Update kernel time if enabled in app parameters. */
 			if (ptp_data->kernel_time_set == 1)

@@ -1,6 +1,7 @@
 import re
 from tqdm import tqdm
 import pandas as pd
+import glob
 
 # Regular expression to parse the strace output
 strace_pattern = re.compile(r'(\w+)\((.*?)\)\s+=\s+(-?\d+|0x[0-9a-fA-F]+)(?:\s+\((.*?)\))?')
@@ -8,7 +9,12 @@ strace_pattern = re.compile(r'(\w+)\((.*?)\)\s+=\s+(-?\d+|0x[0-9a-fA-F]+)(?:\s+\
 # Parse the strace output
 def parse_strace_output(lines):
     parsed_data = []
-    for line in tqdm(lines):
+    for line_ in tqdm(lines):
+        starts_with_pid = line_.split(' ')[0].isdigit() if (len(line_.split(' ')) > 0) else False
+        if starts_with_pid:
+            line = " ".join(line_.split(' ')[1:])
+        else:
+            line = line_
         match = strace_pattern.match(line)
         if match:
             syscall = match.group(1)
@@ -28,15 +34,18 @@ def log(msg: str):
 
 def collect_histograms(files, ignored_syscalls=[]):
     syscall_histograms = dict()
-    for category, file in files.items():
-        with open(file, 'r') as f:
-            log(f"reading {file}")
-            lines = f.readlines()
+    for category, file_glob in files.items():
+        dfs = []
+        for file in glob.glob(file_glob):
+            with open(file, 'r') as f:
+                log(f"reading {file}")
+                lines = f.readlines()
 
-        # Parse the provided strace output
-        log(f"parsing {file}")
-        parsed_strace = parse_strace_output(lines)
-        df = pd.DataFrame(parsed_strace)
+            # Parse the provided strace output
+            log(f"parsing {file}")
+            parsed_strace = parse_strace_output(lines)
+            dfs += [ pd.DataFrame(parsed_strace) ]
+        df = pd.concat(dfs)
         df = df[~df.syscall.isin(ignored_syscalls)]
         syscall_counts = df['syscall'].value_counts()
         syscall_histograms[category] = syscall_counts
@@ -47,11 +56,13 @@ def merge_histograms(syscall_histograms, categoryA, categoryB, how='outer'):
     outer_join = full_join[full_join.isna().any(axis=1)]
     return full_join, outer_join
 
+# file paths support globbing
 files = {
         "allnet": "./strace-allnet",
         "nonet": "./strace-nonet",
         "vmux": "./strace-vmux",
-        # "literal-vmux": "./strace-literal-vmux"
+        # "literal-vmux": "./strace-literal-vmux" # data missing
+        "literal-vmux": "./strace-runtime/strace-literal-vmux.*"
          }
 ignored_syscalls = [
         "restart_syscall" # not a syscall we can block
@@ -81,13 +92,18 @@ log(f"change of {decrease*100}%")
 
 log("crucially, it can restrict syscalls to open network connections from 'listen(for any ip)' to connect(to vmux socket)'")
 
-breakpoint()
 # =======================
 # Compare literal-vmux vs qemu
 
 log("")
+log(f"Qemu uses {len(syscall_histograms['allnet'])} syscalls")
 log(f"Qemu-vmux uses {len(syscall_histograms['vmux'])} syscalls")
 log(f"vMux uses {len(syscall_histograms['literal-vmux'])} syscalls")
+
+log("")
+
+log(f"Qemu uses the foolowing syscalls: {' '.join(syscall_histograms['allnet'].keys())}")
+log(f"vMux uses the foolowing syscalls: {' '.join(syscall_histograms['literal-vmux'].keys())}")
 
 vmux_more_syscalls_than_qemu = len(syscall_histograms['literal-vmux']) - len(syscall_histograms['vmux'])
 full, outer = merge_histograms(syscall_histograms, 'literal-vmux', 'vmux', how='inner')

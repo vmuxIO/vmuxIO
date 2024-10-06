@@ -231,14 +231,19 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.VMUX_DPDK_E810,
         Interface.VMUX_MED,
         ]
-    rpsList = [ 8, 16, 32, 64, 128, 256, 1048 ]
+    rpsList = {
+            'hotelReservation': [ 16, 32, 64, 128, 256, 512, 1024 ],
+            'socialNetwork': [ 64, 128, 256, 512, 1024, 2048, 4096 ],
+            'mediaMicroservices': [ 8, 16, 32, 64, 128, 256, 512 ]
+            }
     apps = [ "hotelReservation", "socialNetwork", "mediaMicroservices" ]
     repetitions = 4
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         interfaces = [ Interface.BRIDGE_E1000 ]
         # interfaces = [ Interface.VMUX_EMU ]
-        rpsList = [ 10 ]
+        rps = [ 10 ]
+        rpsList = { 'hotelReservation': rps, 'socialNetwork': rps, 'mediaMicroservices': rps }
         apps = [ "hotelReservation" ]
         # apps = [ "socialNetwork" ]
         # apps = [ "mediaMicroservices" ]
@@ -251,7 +256,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         bench = deathstarbenches[app]
         test_matrix = dict(
             interface=[ interface.value for interface in interfaces],
-            rps=rpsList,
+            rps=rpsList[app],
             app=[ app ],
             repetitions=[ repetitions ],
             num_vms=[ len(bench.docker_compose) ]
