@@ -245,7 +245,7 @@ vm-strace-nonet EXTRA_CMDLINE="":
 
 vm-strace-vmux:
     sudo rm {{qemuMem}} || true
-    sudo strace -o /tmp/strace-vmux qemu/bin/qemu-system-x86_64 \
+    sudo strace -ff -o /tmp/strace-vmux qemu/bin/qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
         -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
@@ -490,7 +490,7 @@ build:
   nix build -o {{proot}}/ycsb .#ycsb
   nix build -o {{proot}}/fastclick .#fastclick
   nix build -o {{proot}}/vmux-nixbuild .#vmux
-  pushd ./test/ptptest; make; popd
+  pushd ./test/ptptest; make -B; popd
   [[ -z $(git submodule status | grep "^-") ]] || echo WARN: git submodules status: not in sync
 
 update:
