@@ -85,7 +85,7 @@ void e810_bm::SetupIntro(struct SimbricksProtoPcieDevIntro &di) {
 }
 
 void e810_bm::DmaComplete(nicbm::DMAOp &op) {
-  dma_base &dma = dynamic_cast<dma_base &>(op);
+  dma_base &dma = static_cast<dma_base &>(op);
 #ifdef DEBUG_DEV
   std::cout << "dma_complete(" << &op << ")" << logger::endl;
 #endif

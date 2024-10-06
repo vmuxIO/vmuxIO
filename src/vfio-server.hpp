@@ -422,7 +422,8 @@ public:
   /* Convert dma addr (iova) to addr where it is locally mapped
    */
   void *dma_local_addr(uintptr_t dma_address, size_t len) {
-    for (const auto &[iova_start_, segment] : this->mappings) {
+    for (auto mapping = this->mappings.crbegin(); mapping != this->mappings.crend(); ++mapping) {
+      const auto &[iova_start_, segment] = *mapping;
       uintptr_t vaddr_start = (uintptr_t)segment->iov_base;
       uintptr_t vaddr_end = (uintptr_t)segment->iov_base + segment->iov_len;
       uintptr_t iova_start = (uintptr_t)iova_start_;
