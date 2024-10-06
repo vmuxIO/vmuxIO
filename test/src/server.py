@@ -1867,7 +1867,8 @@ class Host(Server):
 
     def start_ptp_client(self, out_dir: str):
         self.exec(f": > {out_dir}")
-        self.tmux_new("ptpclient", f"sudo ./test/ptptest/build/ptpclient -l 0 -n 4 -a {self.test_iface_addr} -- T 0 -p 1 >> {out_dir}")
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        self.tmux_new("ptpclient", f"sudo {project_root}/test/ptptest/build/ptpclient -l 0 -n 4 -a {self.test_iface_addr} -- T 0 -p 1 >> {out_dir}; sleep 999")
 
     def stop_ptp_client(self):
         self.tmux_kill("ptpclient")
@@ -2240,7 +2241,7 @@ class LoadGen(Server):
         self.tmux_kill(f"iperf3-client{vm_num}")
 
     def start_ptp4l(self, software_ts=False):
-        self.tmux_new("ptp4l", f"sudo ptp4l -i {self.test_iface} -m -E -2 { '-S' if software_ts else '' }")
+        self.tmux_new("ptp4l", f"sudo {self._Server__cmd_with_package('linuxptp')} ptp4l -i {self.test_iface} -m -E -2 { '-S' if software_ts else '' }")
 
     def stop_ptp4l(self):
         self.tmux_kill("ptp4l")

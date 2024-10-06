@@ -93,6 +93,10 @@ def run_test(ptp_test: PTPTest, repetition=0):
     
     # Test ptpclient on host
     if ptp_test.mode == "dpdk-host":
+        # cleanup
+        loadgen.stop_ptp4l()
+        host.stop_ptp_client()
+
         info("Testing DPDK PTP Client on host")
         host.bind_test_iface()
         host.modprobe_test_iface_drivers()
@@ -103,17 +107,18 @@ def run_test(ptp_test: PTPTest, repetition=0):
         info("Start ptp server")
         loadgen.start_ptp4l()
 
-        host.start_ptp_client("out.txt")
-        breakpoint()
+        remote_path = "/tmp/out.txt"
+        host.start_ptp_client(remote_path)
         time.sleep(DURATION_S)
                 
         host.stop_ptp_client()
         loadgen.stop_ptp4l()
         
-        host.copy_from("out.txt", out_dir)
-        
         # remove unnecessary information
-        loadgen.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {out_dir} | sudo tee {out_dir}")
+        host.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
+
+        host.copy_from(f"{remote_path}.filtered", out_dir)
+
         return
 
     # boot VMs
