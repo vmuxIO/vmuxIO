@@ -3,7 +3,7 @@ from logging import (info, debug, error, warning, getLogger,
                      DEBUG, INFO, WARN, ERROR)
 from server import Host, Guest, LoadGen, MultiHost
 from enums import Machine, Interface, Reflector
-from measure import AbstractBenchTest, Measurement
+from measure import Bench, AbstractBenchTest, Measurement, end_foreach
 from util import safe_cast, product_dict
 import time
 from os.path import isfile, join as path_join
@@ -19,13 +19,13 @@ class PTPTest(AbstractBenchTest):
     mode: str # can be: dpdk-guest, dpdk-host, ptp4l-guest, ptp4l-host
 
     def test_infix(self):
-        return f"ptp_{self.interface}"
+        return f"ptp_{self.mode}_{self.interface}"
 
     def estimated_runtime(self) -> float:
         """
         estimate time needed to run this benchmark excluding boot time in seconds
         """
-        return 0
+        return DURATION_S * self.repetitions
 
     def find_error(self, repetition: int) -> bool:
         failure = False
@@ -56,26 +56,38 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     modes = [
         "dpdk-guest",
-        "dpdk-host",
-        "ptp4l-host"
+        # "dpdk-host",
+        # "ptp4l-host"
     ]
+
+    if G.BRIEF:
+        interfaces = [ Interface.VMUX_MED ]
+        modes = [ "dpdk-guest" ]
 
     test_matrix = dict(
         repetitions=[ 1 ],
-        interface=[ interface.value for interface in interfaces],
-        modes=modes
+        num_vms=[ 0 ],
+        interface=interfaces, # [ interface.value for interface in interfaces],
+        mode=modes
     )
+    tests = PTPTest.list_tests(test_matrix)
+    if not G.BRIEF:
+        tests += [ PTPTest(interface=None, mode="dpdk-host", num_vms=0, repetitions=1) ]
 
     # info(f"PTP Test execution plan:")
     # PTPTest.estimate_time(test_matrix, ["interface"])
 
-    for iface in interfaces:
-        ptp_test = PTPTest(interface=iface, mode="dpdk-guest", num_vms=1, repetitions=1)
-      #  run_test(ptp_test)
+    with Bench(tests=tests, args_reboot = ["mode", "interface", "num_vms"], brief = G.BRIEF) as (bench, bench_tests):
+        for [mode, interface, num_vms], test in bench.multi_iterator(bench_tests, ["mode", "interface", "num_vms"]):
+            assert len(test) == 1 # we have looped through all variables now, right?
+            test = test[0]
+            # test = PTPTest(interface=iface, mode="dpdk-guest", num_vms=0, repetitions=1)
+            run_test(test)
+            bench.done(test)
 
-    run_test(PTPTest(interface=Interface.VFIO, mode="dpdk-host", num_vms=0, repetitions=1))
 
 def run_test(ptp_test: PTPTest, repetition=0):
+    global DURATION_S
 
     host, loadgen = measurement.hosts()
     DURATION_S = 100 if not G.BRIEF else 30
@@ -125,7 +137,7 @@ def run_test(ptp_test: PTPTest, repetition=0):
 
         host.copy_from(f"{remote_path}.filtered", out_dir)
 
-        # return
+        return
 
     # boot VMs
     with measurement.virtual_machine(ptp_test.interface) as guest:
@@ -153,7 +165,7 @@ def run_test(ptp_test: PTPTest, repetition=0):
         # remove unnecessary information
         guest.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
 
-        guest.copy_from(f"{remote_path}.filtered", f"{out_dir}.vm")
+        guest.copy_from(f"{remote_path}.filtered", f"{out_dir}")
         pass
 
 
