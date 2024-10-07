@@ -19,7 +19,8 @@ class PTPTest(AbstractBenchTest):
     mode: str # can be: dpdk-guest, dpdk-host, ptp4l-guest, ptp4l-host
 
     def test_infix(self):
-        return f"ptp_{self.mode}_{self.interface}"
+        interface = "none" if self.interface is None else self.interface.value
+        return f"ptp_{self.mode}_{interface}"
 
     def estimated_runtime(self) -> float:
         """
@@ -45,7 +46,11 @@ def strip_subnet_mask(ip_addr: str):
 
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
+    global DURATION_S
+
     host, loadgen = measurement.hosts()
+
+    DURATION_S = 100 if not G.BRIEF else 30
 
     # set up test plan
     interfaces = [
@@ -87,10 +92,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
 
 def run_test(ptp_test: PTPTest, repetition=0):
-    global DURATION_S
-
     host, loadgen = measurement.hosts()
-    DURATION_S = 100 if not G.BRIEF else 30
 
     info('Binding loadgen interface')
     loadgen.modprobe_test_iface_drivers()
