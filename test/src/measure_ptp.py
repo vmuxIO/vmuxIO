@@ -22,6 +22,9 @@ class PTPTest(AbstractBenchTest):
         interface = "none" if self.interface is None else self.interface.value
         return f"ptp_{self.mode}_{interface}"
 
+    def per_vm_output_path(self, repetition: int, vm_nr: int) -> str:
+        return f"{self.output_filepath(repetition)}.vm{vm_nr}"
+
     def estimated_runtime(self) -> float:
         """
         estimate time needed to run this benchmark excluding boot time in seconds
@@ -147,32 +150,45 @@ def run_test(ptp_test: PTPTest, repetition=0):
         return
 
     # boot VMs
-    with measurement.virtual_machine(ptp_test.interface) as guest:
+    with measurement.virtual_machines(ptp_test.interface, num=ptp_test.num_vms) as guests:
         # cleanup
         loadgen.stop_ptp4l()
-        guest.stop_ptp_client()
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            guest.stop_ptp_client()
+        end_foreach(guests, foreach_parallel)
 
         info("Testing DPDK PTP Client on host")
-        guest.bind_test_iface()
-        guest.modprobe_test_iface_drivers()
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            guest.bind_test_iface()
+            guest.modprobe_test_iface_drivers()
+        end_foreach(guests, foreach_parallel)
 
         info("Start ptp client")
-        out_dir = ptp_test.output_filepath(repetition)
+        # out_dir = ptp_test.output_filepath(repetition)
 
         info("Start ptp server")
         loadgen.start_ptp4l()
 
         remote_path = "/tmp/out.txt"
-        guest.start_ptp_client(remote_path)
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            guest.start_ptp_client(remote_path)
+        end_foreach(guests, foreach_parallel)
+
         time.sleep(DURATION_S)
 
-        guest.stop_ptp_client()
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            guest.stop_ptp_client()
+        end_foreach(guests, foreach_parallel)
+
         loadgen.stop_ptp4l()
 
         # remove unnecessary information
-        guest.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
+        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+            guest.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
+            guest.copy_from(f"{remote_path}.filtered", ptp_test.per_vm_output_path(repetition, i))
+        end_foreach(guests, foreach_parallel)
 
-        guest.copy_from(f"{remote_path}.filtered", f"{out_dir}")
+        breakpoint()
         pass
 
 
