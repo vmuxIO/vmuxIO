@@ -64,18 +64,23 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         # "dpdk-host",
         # "ptp4l-host"
     ]
+    num_vms = [ 1, 2 ]
 
     if G.BRIEF:
         interfaces = [ Interface.VMUX_MED ]
         modes = [ "dpdk-guest" ]
+        # num_vms = [ 1 ]
+        num_vms = [ 2 ]
 
     test_matrix = dict(
         repetitions=[ 1 ],
-        num_vms=[ 0 ],
+        num_vms=num_vms,
         interface=interfaces, # [ interface.value for interface in interfaces],
         mode=modes
     )
-    tests = PTPTest.list_tests(test_matrix)
+    def exclude(test):
+        return (test.num_vms > 1) and ("host" in test.mode)
+    tests = PTPTest.list_tests(test_matrix, exclude_test=exclude)
     if not G.BRIEF:
         tests += [ PTPTest(interface=None, mode="dpdk-host", num_vms=0, repetitions=1) ]
 
