@@ -94,6 +94,12 @@ def run_test(ptp_test: PTPTest, repetition=0):
     # Test ptpclient on host
     if ptp_test.mode == "dpdk-host":
         # cleanup
+        try:
+            host.kill_guest()
+        except Exception as e:
+            error("Could not kill guest VMs")
+            error(e.with_traceback())
+            pass
         loadgen.stop_ptp4l()
         host.stop_ptp_client()
 
@@ -148,7 +154,6 @@ def run_test(ptp_test: PTPTest, repetition=0):
         guest.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
 
         guest.copy_from(f"{remote_path}.filtered", f"{out_dir}.vm")
-        breakpoint()
         pass
 
 
