@@ -3,6 +3,7 @@
  */
 
 #pragma once
+#include "util.hpp"
 #include <cstdint>
 #include <rte_flow.h>
 #include <rte_ether.h>
@@ -165,8 +166,8 @@ generate_eth_flow(uint16_t port_id, uint16_t rx_q,
 	rte_ether_addr_copy(dest_mask, &eth_mask.dst);
 	rte_ether_addr_copy(src_mac, &eth_spec.src);
 	rte_ether_addr_copy(src_mask, &eth_mask.src);
-	// eth_spec.type = etype;
-	// eth_mask.type = etype_mask;
+	eth_spec.type = htobe16(etype);
+	eth_mask.type = etype_mask;
 	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[0].spec = &eth_spec;
 	pattern[0].mask = &eth_mask;

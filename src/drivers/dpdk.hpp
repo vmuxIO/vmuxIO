@@ -708,7 +708,7 @@ public:
 			return false;
 		}
 		rte_ether_format_addr(fmt, sizeof(fmt), &dest_mac);
-  	printf("added rule dst_mac %s -> queue %d\n", fmt, queue_id);
+  	printf("added rule dst_mac %s etype 0x%x -> queue %d\n", fmt, etype, queue_id);
 
   	return true;
   }
