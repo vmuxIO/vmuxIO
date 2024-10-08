@@ -2110,6 +2110,7 @@ class LoadGen(Server):
                             runtime: int = 60,
                             size: int = 60,
                             nr_macs: int = 0,
+                            nr_ethertypes: int = 0,
                             histfile: str = '/tmp/histogram.csv',
                             statsfile: str = '/tmp/throughput.csv',
                             outfile: str = '/tmp/output.log'
@@ -2148,7 +2149,7 @@ class LoadGen(Server):
                       'sudo bin/MoonGen '
                       f'{server.moonprogs_dir}/l2-load-latency.lua ' +
                       f'-r {rate} -f {histfile} -T {runtime} -s {size} ' +
-                      f' -c {statsfile} -m {nr_macs} ' +
+                      f' -c {statsfile} -m {nr_macs} -e {nr_ethertypes} ' +
                       f'{server._test_iface_id} {mac} ' +
                       f'2>&1 | tee {outfile}')
 

@@ -143,17 +143,17 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
         }
     elif test.fastclick == "hardware":
         fastclick_program = "test/fastclick/mac-switch-hardware.click"
-        project_root = f"{example_guest.moonprogs_dir}/../../"
-        fastclick_rules = f"{project_root}/test/fastclick/test_dpdk_nic_rules"
-        fastclick_rules = "/home/host/vmuxIO/test/fastclick/test_dpdk_nic_rules"
-        fastclick_rules = "/tmp/test_dpdk_nic_rules"
+        project_root = str(Path(example_guest.moonprogs_dir) / "../..") # click wants nicely formatted paths
+        fastclick_rules = f"{project_root}/test/fastclick/rteflow_etype_rules"
+        # fastclick_rules = f"{project_root}/test/fastclick/rteflow_empty"
+        # fastclick_rules = "/tmp/test_dpdk_nic_rules"
+        # def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+        #     write_fastclick_rules(guest, i, fastclick_rules)
+        # end_foreach(guests, foreach_parallel)
         fastclick_args = {
             'ifacePCI0': example_guest.test_iface_addr,
             'rules': fastclick_rules
         }
-        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-            write_fastclick_rules(guest, i, fastclick_rules)
-        end_foreach(guests, foreach_parallel)
     elif test.fastclick == "software-tap":
         fastclick_program = "test/fastclick/mac-switch-software-tap.click"
         fastclick_args = {
@@ -168,10 +168,11 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
     end_foreach(guests, foreach_parallel)
     time.sleep(10) # fastclick takes roughly as long as moongen to start, be we give it some slack nevertheless
     info("Starting MoonGen")
-    loadgen.run_l2_load_latency(loadgen, "00:00:00:00:00:00", test.rate,
+    loadgen.run_l2_load_latency(loadgen, "52:54:00:fa:00:61", test.rate,
             runtime = DURATION_S,
             size = 60,
-            nr_macs = PER_VM_FLOWS * len(guests.values()),
+            nr_macs = len(guests.values()),
+            nr_ethertypes=PER_VM_FLOWS,
             histfile = remote_moongen_histogram,
             statsfile = remote_moongen_throughput,
             outfile = '/tmp/output.log'
@@ -203,6 +204,9 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
     end_foreach(guests, foreach_parallel)
     loadgen.copy_from(remote_moongen_throughput, local_moongen_throughput)
     loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
+
+    breakpoint()
+    pass
 
 
 def exclude(test):
@@ -237,16 +241,16 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
-        interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
-        # interfaces = [ Interface.VMUX_MED ]
+        # interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
+        interfaces = [ Interface.VMUX_MED ]
         # interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
-        # fastclicks = [ "hardware" ]
-        fastclicks = [ "software-tap" ]
+        fastclicks = [ "hardware" ]
+        # fastclicks = [ "software-tap" ]
         vm_nums = [ 2 ]
         repetitions = 1
         # DURATION_S = 10000
-        rates = [ 40000 ]
+        rates = [ 1 ]
 
     tests = []
     test_matrix = dict(
