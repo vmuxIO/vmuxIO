@@ -87,6 +87,12 @@ public:
     return false;
   }
 
+  /// Attempt to install a rte_flow rule. Return false if installing failed or not possible due to policy.
+  virtual bool add_switch_etype_rule(int vm_id, uint16_t ethertype, uint16_t dst_queue) {
+    // the default device does not support switch rules
+    return false;
+  }
+
   inline bool isMediating() {
     return this->driver->is_mediating(this->device_id);
   }

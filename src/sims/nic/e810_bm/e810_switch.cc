@@ -24,11 +24,18 @@ bool e810_switch::add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
   }
 
   struct ethhdr *hdr = (struct ethhdr*)(add_sw_rules->pdata.lkup_tx_rx.hdr);
-  uint64_t dst_mac = 0xFFFFFFFFFFFF & *(uint64_t*)(hdr->h_dest);
-  this->mac_rules[dst_mac] = queue_id;
   auto driver = this->dev.vmux->device->driver;
   auto device_id = this->dev.vmux->device->device_id;
-  bool installed_rule = this->dev.vmux->device->add_switch_rule(device_id, hdr->h_dest, queue_id - this->dev.vsi0_first_queue);
+
+  // mac rules
+  // uint64_t dst_mac = 0xFFFFFFFFFFFF & *(uint64_t*)(hdr->h_dest);
+  // this->mac_rules[dst_mac] = queue_id;
+  // bool installed_rule = this->dev.vmux->device->add_switch_rule(device_id, hdr->h_dest, queue_id - this->dev.vsi0_first_queue);
+
+  // ethertype rules
+  uint16_t etype = be16toh(hdr->h_proto);
+  this->ethertype_rules[etype] = queue_id;
+  bool installed_rule = this->dev.vmux->device->add_switch_etype_rule(device_id, etype, queue_id - this->dev.vsi0_first_queue);
 
   return installed_rule;
 }
@@ -52,14 +59,14 @@ void e810_switch::select_queue(const void* data, size_t len, uint16_t* queue) {
 void e810_switch::print_sw_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
   if (add_sw_rules->type == ICE_AQC_SW_RULES_T_LKUP_RX || add_sw_rules->type == ICE_AQC_SW_RULES_T_LKUP_TX) {
     bool is_rx = add_sw_rules->type == ICE_AQC_SW_RULES_T_LKUP_RX;
-    cout << "   " << 
+    cout << "   " <<
       (is_rx ? "rx" : "tx") <<
       " lookup recipe_id=" << add_sw_rules->pdata.lkup_tx_rx.recipe_id <<
-      (is_rx ? " src_port=" : " src_vsi=") << add_sw_rules->pdata.lkup_tx_rx.src << 
+      (is_rx ? " src_port=" : " src_vsi=") << add_sw_rules->pdata.lkup_tx_rx.src <<
       " rule_index=" << add_sw_rules->pdata.lkup_tx_rx.index <<
       logger::endl;
-    cout << "   " << 
-      "hdr_len=" << add_sw_rules->pdata.lkup_tx_rx.hdr_len << 
+    cout << "   " <<
+      "hdr_len=" << add_sw_rules->pdata.lkup_tx_rx.hdr_len <<
       logger::endl;
     uint32_t action_type = (add_sw_rules->pdata.lkup_tx_rx.act & ICE_SINGLE_ACT_TYPE_M) >> ICE_SINGLE_ACT_TYPE_S;
     uint32_t vsi_id_list = (add_sw_rules->pdata.lkup_tx_rx.act & ICE_SINGLE_ACT_VSI_ID_M) >> ICE_SINGLE_ACT_VSI_ID_S;
@@ -69,7 +76,7 @@ void e810_switch::print_sw_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
       cout << "   action VSI id/list=" << vsi_id_list <<
         logger::endl;
     } else if (action_type == ICE_SINGLE_ACT_TO_Q) {
-      cout << "   action Queue idx=" << queue_id << 
+      cout << "   action Queue idx=" << queue_id <<
         " region=? hdr:" << logger::endl;
       Util::hexdump(add_sw_rules->pdata.lkup_tx_rx.hdr, add_sw_rules->pdata.lkup_tx_rx.hdr_len);
     } else if (action_type == ICE_SINGLE_ACT_PRUNE && !large_action) {

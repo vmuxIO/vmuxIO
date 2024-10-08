@@ -120,6 +120,7 @@ struct rte_flow *
 generate_eth_flow(uint16_t port_id, uint16_t rx_q,
 		const struct rte_ether_addr *src_mac, const struct rte_ether_addr *src_mask,
 		const struct rte_ether_addr *dest_mac, const struct rte_ether_addr *dest_mask,
+		const uint16_t etype, const uint16_t etype_mask,
 		struct rte_flow_error *error)
 {
 	/* Declaring structs being used. 8< */

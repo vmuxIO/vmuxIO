@@ -450,7 +450,8 @@ public:
 			// send all VM traffic to the first queue of each VM by default
 			flow = generate_eth_flow(port_id, this->get_rx_queue_id(queue_nb, 0),
 						&src_mac, &src_mask,
-						&dest_mac, &dest_mask, &error);
+						&dest_mac, &dest_mask,
+						0, 0, &error);
 			/* >8 End of create flow and the flow rule. */
 			if (!flow) {
 			printf("Flow can't be created %d message: %s\n",
@@ -657,7 +658,49 @@ public:
 		memcpy(dest_mac.addr_bytes, dst_addr, 6);
 		flow = generate_eth_flow(port_id, queue_id,
 					&src_mac, &src_mask,
-					&dest_mac, &dest_mask, &error);
+					&dest_mac, &dest_mask,
+					0, 0, &error);
+		if (!flow) {
+			printf("Flow can't be created %d message: %s\n",
+				error.type,
+				error.message ? error.message : "(no stated reason)");
+			return false;
+		}
+		rte_ether_format_addr(fmt, sizeof(fmt), &dest_mac);
+  	printf("added rule dst_mac %s -> queue %d\n", fmt, queue_id);
+
+  	return true;
+  }
+
+	// TODO deduplicate code with above
+  virtual bool add_switch_rule(int vm_id, uint8_t dst_addr[6], uint16_t etype, uint16_t dst_queue) {
+  	if (!this->mediate[vm_id]) {
+  		// for emulation we ignore switch rules.
+  		// Because we don't send queue hints to the behavioral model, it emulates the switch then.
+  		return true;
+  	}
+
+  	printf("dpdk add switch etype rule\n");
+
+		struct rte_flow_error error;
+  	struct rte_flow* flow;
+		struct rte_ether_addr src_mac;
+		struct rte_ether_addr src_mask;
+		struct rte_ether_addr dest_mac;
+		struct rte_ether_addr dest_mask;
+		char fmt[20];
+		uint16_t queue_id = this->get_rx_queue_id(vm_id, dst_queue);
+
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mac);
+		rte_ether_unformat_addr("00:00:00:00:00:00", &src_mask);
+		// rte_ether_unformat_addr("52:54:00:fa:00:60", &dest_mac);
+		rte_ether_unformat_addr("FF:FF:FF:FF:FF:FF", &dest_mask);
+
+		memcpy(dest_mac.addr_bytes, dst_addr, 6);
+		flow = generate_eth_flow(port_id, queue_id,
+					&src_mac, &src_mask,
+					&dest_mac, &dest_mask,
+					etype, 0xFFFF, &error);
 		if (!flow) {
 			printf("Flow can't be created %d message: %s\n",
 				error.type,

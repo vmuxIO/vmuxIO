@@ -64,6 +64,11 @@ public:
     return false;
   }
 
+  // return false if rule cant be allocated
+  virtual bool add_switch_rule(int vm_id, uint8_t mac_addr[6], uint16_t etype, uint16_t dst_queue) {
+    return false;
+  }
+
   virtual bool mediation_enable(int vm_id) {
     return false;
   }

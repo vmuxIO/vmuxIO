@@ -34,7 +34,7 @@ private:
 
   epoll_callback tapCallback;
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
-               
+
   std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle;
 
   void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
@@ -155,6 +155,19 @@ public:
     bool policy_accepts = this->policies->switchPolicy.add_switch_rule(vm_id, dst_addr, dst_queue);
     if (policy_accepts) {
       bool rule_installed = driver->add_switch_rule(vm_id, dst_addr, dst_queue);
+    }
+
+    this->policies->mutex.unlock();
+    return rule_installed;
+  }
+
+  bool add_switch_etype_rule(int vm_id, uint16_t ethertype, uint16_t dst_queue) {
+    this->policies->mutex.lock();
+    bool rule_installed = false;
+
+    bool policy_accepts = true; // this->policies->switchPolicy.add_switch_rule(vm_id, dst_addr, dst_queue); // etype is always fine, given that we merge it with the dstMAac matching rule
+    if (policy_accepts) {
+      bool rule_installed = driver->add_switch_rule(vm_id, (uint8_t*)this->mac_addr, ethertype, dst_queue);
     }
 
     this->policies->mutex.unlock();

@@ -26,7 +26,6 @@ public:
     this->switch_rules[mac] = vm_id;
     return true;
   }
-
 };
 
 class GlobalPolicies {
