@@ -14,11 +14,12 @@ namespace e810 {
 bool e810_switch::add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
   uint32_t action_type = (add_sw_rules->pdata.lkup_tx_rx.act & ICE_SINGLE_ACT_TYPE_M) >> ICE_SINGLE_ACT_TYPE_S;
   uint32_t queue_id = (add_sw_rules->pdata.lkup_tx_rx.act & ICE_SINGLE_ACT_Q_INDEX_M) >> ICE_SINGLE_ACT_Q_INDEX_S;
+  uint16_t recipe_idx = 0; // default recipe (only one we support)
   if (
       add_sw_rules->type != ICE_AQC_SW_RULES_T_LKUP_RX || // we only support simple sw rules
       action_type != ICE_SINGLE_ACT_TO_Q || // we only support forwarding to a queue
-      add_sw_rules->pdata.lkup_tx_rx.recipe_id != 0 || // we only support recipe 0 (hardcoded in firmware)
-      add_sw_rules->pdata.lkup_tx_rx.hdr_len != 56 // depends on the recipe 0
+      add_sw_rules->pdata.lkup_tx_rx.recipe_id != recipe_idx || // we only support recipe 0 (hardcoded in firmware)
+      add_sw_rules->pdata.lkup_tx_rx.hdr_len != this->recipies[recipe_idx].size() // depends on the recipe 0 (should be 56)
       ) {
     return false; // rule too complicated: not supported by this emulator
   }
@@ -35,6 +36,15 @@ bool e810_switch::add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {
   // ethertype rules
   uint16_t etype = be16toh(hdr->h_proto);
   this->ethertype_rules[etype] = queue_id;
+  std::vector<uint8_t> *rule = new std::vector<uint8_t>();
+  for (size_t i = 0; i < this->recipies[recipe_idx].size(); i++) {
+    uint8_t mask = this->recipies[recipe_idx][i];
+    uint8_t byte = mask & add_sw_rules->pdata.lkup_tx_rx.hdr[i];
+    rule->push_back(byte);
+  }
+  this->rules.push_back(rule);
+  this->rules_recipe_idx.push_back(recipe_idx);
+  this->rules_dst_queues.push_back(queue_id);
   bool installed_rule = this->dev.vmux->device->add_switch_etype_rule(device_id, etype, queue_id - this->dev.vsi0_first_queue);
 
   return installed_rule;
@@ -58,11 +68,31 @@ void e810_switch::select_queue(const void* data, size_t len, uint16_t* queue) {
     return;
   }
 
-  uint16_t ethertype = be16toh(packet_hdr->h_proto);
-  if (auto search = this->ethertype_rules.find(dst_mac); search != this->ethertype_rules.end()) {
-    *queue = search->second; // return map entry, if it exists
-    return;
+  for (size_t rule_idx = 0; rule_idx < this->rules.size(); rule_idx++) {
+    uint16_t recipe_idx = this->rules_recipe_idx[rule_idx];
+    auto rule = *this->rules[rule_idx];
+    // based on recipies[recipe_idx], data, and rule, we can determine if the rule matches
+    bool rule_matches = true;
+    for (size_t i = 0; i < this->recipies[recipe_idx].size(); i++) {
+      uint8_t mask = this->recipies[recipe_idx][i];
+      uint8_t masked = mask & ((uint8_t*)data)[i];
+      bool byte_matches = masked == rule[i];
+      if (!byte_matches) {
+        rule_matches = false;
+        break;
+      }
+    }
+    if (rule_matches) {
+      *queue = this->rules_dst_queues[rule_idx];
+      return;
+    }
   }
+
+  // uint16_t ethertype = be16toh(packet_hdr->h_proto);
+  // if (auto search = this->ethertype_rules.find(dst_mac); search != this->ethertype_rules.end()) {
+  //   *queue = search->second; // return map entry, if it exists
+  //   return;
+  // }
 }
 
 void e810_switch::print_sw_rule(struct ice_aqc_sw_rules_elem *add_sw_rules) {

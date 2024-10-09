@@ -308,5 +308,13 @@ public:
     }
     return true;
   }
+
+  static void delay_cycles(size_t cycles) {
+    for (size_t i = 0; i <= cycles; i++) {
+      asm("nop");
+    }
+  }
+
+  static uint64_t rand();
 };
 

@@ -768,11 +768,32 @@ class shadow_ram {
 class e810_switch {
   std::map<uint64_t, uint16_t> mac_rules; // dst mac address (odd alignment/byte order...) -> dst queue idx
   std::map<uint16_t, uint16_t> ethertype_rules; // ethertype -> dst queue idx
+  std::vector<std::vector<uint8_t>*> rules; // list of (recipe idx, match data)
+  std::vector<uint16_t> rules_recipe_idx; // rules*[i] is for recipes[recipe_idx[i]]
+  std::vector<uint16_t> rules_dst_queues; // rules*[i] is for recipes[recipe_idx[i]]
+  std::vector<std::vector<uint8_t>> recipies;
+  // recipe to only match ethertype:
+  std::vector<uint8_t> recipe1 = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
   e810_bm &dev;
 
   public:
 
-  e810_switch(e810_bm &dev_) : dev(dev_) {};
+  e810_switch(e810_bm &dev_) : dev(dev_) {
+   size_t excess_rules = 0;
+   for (size_t i = 0; i < excess_rules; i++) {
+    uint64_t mac = Util::rand();
+    this->mac_rules[mac] = -1;
+   }
+
+   // our default recipe
+   this->recipies.push_back(this->recipe1);
+  };
+
+  ~e810_switch() {
+   for (auto rule : this->rules) {
+    delete rule;
+   }
+  }
 
   bool add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
 
