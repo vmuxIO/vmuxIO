@@ -171,6 +171,7 @@ generate_eth_flow(uint16_t port_id, uint16_t rx_q,
 	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[0].spec = &eth_spec;
 	pattern[0].mask = &eth_mask;
+  // Util::hexdump((void*)&eth_spec, sizeof(struct rte_flow_item_eth));
 	/* >8 End of setting the first level of the pattern. */
 
 	/*
