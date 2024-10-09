@@ -82,15 +82,15 @@ function sendMacs(queue, bufs, pktSize, dstMac, numDstMacs, numEthertypes)
 	local mac_nr = parseMacAddress(dstMac, 1)
 	while mg.running() do
     bufs:alloc(pktSize)
-    for i, buf in ipairs(bufs) do
-      local type = 0x1234 + ((i-1) % numEthertypes)
+    for i, buf in ipairs(bufs) do -- usually there are 63 bufs
       -- local dst = mac_nr + ((i-1) % numDstMacs)
-      local mac_offset = ((i-1) % numDstMacs) -- TODO we dont send all types to all macs!
+      local mac_offset = ((i-1) % numDstMacs)
+      local type = 0x1234 + (math.floor((i-1) / numDstMacs) % (numEthertypes))
   		-- local e = buf:getEthPacket()
   		-- e.type = 0x123
       setMac(buf, mac_nr, mac_offset)
       setEthertype(buf, type)
-      buf:dump()
+      -- buf:dump()
     end
     queue:send(bufs)
   end
