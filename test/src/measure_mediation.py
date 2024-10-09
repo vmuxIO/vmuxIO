@@ -96,7 +96,7 @@ def strip_subnet_mask(ip_addr: str):
 
 
 # rules for software fastclick
-def fastclick_classifiers(vm_number: int):
+def fastclick_mac_classifiers(vm_number: int):
     ret = dict()
     start = (vm_number - 1) * PER_VM_FLOWS
     for i in range(PER_VM_FLOWS):
@@ -104,6 +104,16 @@ def fastclick_classifiers(vm_number: int):
         mac = MultiHost.mac("00:00:00:00:00:00", offset)
         class__ = "".join(reversed(mac.split(":")))
         class_ = f"0/{class__}"
+        ret[f"class{i}"] = class_
+    return ret
+
+# rules for software fastclick
+def fastclick_ethertype_classifiers(vm_number: int):
+    ret = dict()
+    start = 0x1234
+    for i in range(PER_VM_FLOWS):
+        etype = start + i
+        class_ = f"0/{etype:X}"
         ret[f"class{i}"] = class_
     return ret
 
@@ -163,7 +173,7 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
         raise Exception("Unknown fastclick program type")
 
     def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-        args = { **fastclick_args, **fastclick_classifiers(i) }
+        args = { **fastclick_args, **fastclick_ethertype_classifiers(i) }
         guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=args)
     end_foreach(guests, foreach_parallel)
     time.sleep(10) # fastclick takes roughly as long as moongen to start, be we give it some slack nevertheless
@@ -205,14 +215,15 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
     loadgen.copy_from(remote_moongen_throughput, local_moongen_throughput)
     loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
 
-    breakpoint()
+    # breakpoint()
     pass
 
 
 def exclude(test):
     return (Interface(test.interface).is_passthrough() and test.num_vms > 1) or \
-        (Interface(test.interface) == Interface.VMUX_DPDK_E810 and test.num_vms > 1) or \
         (Interface(test.interface) == Interface.VMUX_DPDK and test.fastclick == "software" and test.num_vms > 1)
+
+        # (Interface(test.interface) == Interface.VMUX_DPDK_E810 and test.num_vms > 1) or \
 
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
