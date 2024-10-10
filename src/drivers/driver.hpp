@@ -11,6 +11,18 @@ struct vmux_descriptor {
   std::optional<uint16_t> dst_queue;
 };
 
+inline vmux_descriptor *vmux_descriptor_alloc(size_t buf_len) {
+  auto descriptor = new vmux_descriptor;
+  descriptor->buf = (char*) malloc(buf_len);
+  descriptor->len = buf_len;
+  return descriptor;
+}
+
+inline void vmux_descriptor_free(vmux_descriptor *desc) {
+  free(desc->buf);
+  delete desc;
+}
+
 // Abstract class for Driver backends
 class Driver {
 public:

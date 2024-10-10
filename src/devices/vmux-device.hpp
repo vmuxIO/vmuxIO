@@ -6,6 +6,7 @@
 // #include "vfio-server.hpp"
 #include <cstdint>
 #include <memory>
+#include <boost/lockfree/queue.hpp>
 
 class VfioUserServer;
 
@@ -71,11 +72,13 @@ public:
   std::shared_ptr<Driver> driver;
   std::shared_ptr<GlobalPolicies> policies;
 
+  boost::lockfree::queue<vmux_descriptor*> inject_packets; // allows other devices to inject packets here
+
   int device_id;
 
   callback_fn rx_callback;
 
-  VmuxDevice(int device_id, std::shared_ptr<Driver> driver, std::shared_ptr<GlobalPolicies> policies) : driver(driver), policies(policies), device_id(device_id), rx_callback(NULL) {};
+  VmuxDevice(int device_id, std::shared_ptr<Driver> driver, std::shared_ptr<GlobalPolicies> policies) : driver(driver), policies(policies), inject_packets(64),  device_id(device_id), rx_callback(NULL) {};
 
   virtual ~VmuxDevice() = default;
 

@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <net/ethernet.h>
 #include <string>
 #include <ctime>
 
@@ -36,6 +37,7 @@ private:
   int efd = 0; // if non-null: eventfd registered for this->tap->fd
 
   std::vector<std::shared_ptr<InterruptThrottlerSimbricks>> irqThrottle;
+  std::shared_ptr<std::vector<std::shared_ptr<VmuxDevice>>> broadcast_destinations;
 
   void registerDriverEpoll(std::shared_ptr<Driver> driver, int efd) {
     if (driver->fd == 0)
@@ -58,7 +60,7 @@ private:
 public:
   std::shared_ptr<e810::e810_bm> model;
 
-  E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob, std::shared_ptr<GlobalPolicies> policies) : VmuxDevice(device_id, driver, policies) {
+  E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob, std::shared_ptr<GlobalPolicies> policies, std::shared_ptr<std::vector<std::shared_ptr<VmuxDevice>>> broadcast_destinations) : VmuxDevice(device_id, driver, policies), broadcast_destinations(broadcast_destinations) {
     this->driver = driver;
     memcpy((void*)this->mac_addr, mac_addr, 6);
 
@@ -115,18 +117,57 @@ public:
     }
   }
 
+
   // forward rx event callback from tap to this E1000EmulatedDevice
   static void driver_cb(int vm_number, void *this__) {
     E810EmulatedDevice *this_ = (E810EmulatedDevice*) this__;
     this_->processAllPollTimers();
+
+    // check if we received packets from other threads
+    // TODO we can extract that into a function called by the sending thread
+    vmux_descriptor *packet_descriptor;
+    if (this_->inject_packets.pop(packet_descriptor)) {
+      // TODO send these packets first
+      this_->vfu_ctx_mutex.lock();
+      this_->model->EthRx(0, {}, packet_descriptor->buf, packet_descriptor->len); // hardcode port 0
+      this_->vfu_ctx_mutex.unlock();
+      vmux_descriptor_free(packet_descriptor);
+    }
+
+    // receive our packets
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
     // for (uint16_t ) {}
 		for (int q_idx = 0; q_idx < 4; q_idx++) { // TODO hardcoded max_queues_per_vm
 			int queue_id = vm_number * 4 + q_idx;// TODO this_->get_rx_queue_id(vm_id, q_idx);
 			for (uint16_t i = queue_id * 32; i < (queue_id * 32+ this_->driver->nb_bufs_used[queue_id]); i++) { // TODO 32 = BURST_SIZE
-        this_->vfu_ctx_mutex.lock();
-        this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
-        this_->vfu_ctx_mutex.unlock();
+        if (q_idx == 0) { // we are the default queue and receive others packets as well
+          // TODO avoid this overhead by using queue 0 for the last available VM
+
+          // check rx packets for PTP multicasts
+          char* packet = this_->driver->rxBufs[i];
+          auto len = this_->driver->rxBuf_used[i];
+          if (len >= sizeof(struct ether_header)) {
+            struct ethhdr* packet_hdr = (struct ethhdr*) packet;
+            uint64_t dst_mac = 0xFFFFFFFFFFFF & *(uint64_t*)(packet_hdr->h_dest);
+            if (dst_mac == 0x000000191b01) { // PTP MAC 01:1b:19:00:00:00
+              printf("PTP packet\n");
+              auto descriptor = vmux_descriptor_alloc(len);
+              memcpy(descriptor->buf, packet, len);
+              // TODO push to other device
+              auto second_vm = (*this_->broadcast_destinations)[1];
+              if (!second_vm->inject_packets.push(descriptor)) {
+                // if injection queue is full, drop packet
+                vmux_descriptor_free(descriptor);
+              } else {
+                printf("PTP pushed to second VM\n");
+              }
+            }
+          }
+        } else {
+          this_->vfu_ctx_mutex.lock();
+          this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
+          this_->vfu_ctx_mutex.unlock();
+        }
 			}
 		}
     this_->driver->recv_consumed(vm_number);

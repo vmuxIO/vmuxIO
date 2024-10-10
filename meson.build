@@ -86,7 +86,7 @@ exe = executable('vmux', 'src/main.cpp',
   c_args : sims_flags,
   # dependencies : [libvfio_user_dep, cxx.find_library('boost_fiber')],
   # link_args : '-lboost',
-  link_args : ['-lboost_fiber', '-lboost_context', '-lboost_timer', '-lboost_chrono'] + dpdk_link_args,
+  link_args : ['-lboost_fiber', '-lboost_context', '-lboost_timer', '-lboost_chrono', '-lboost_atomic'] + dpdk_link_args,
   dependencies : [libvfio_user_dep, boost_dep, nic_emu_dep],
   install : true)
 
