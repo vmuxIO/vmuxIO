@@ -59,6 +59,7 @@ private:
 
 public:
   std::shared_ptr<e810::e810_bm> model;
+  std::atomic<size_t> ptp_target_vm_idx = 0; // only relevant for device that uses default queue which receives PTP
 
   E810EmulatedDevice(int device_id, std::shared_ptr<Driver> driver, int efd, const uint8_t (*mac_addr)[6], std::shared_ptr<GlobalInterrupts> irq_glob, std::shared_ptr<GlobalPolicies> policies, std::shared_ptr<std::vector<std::shared_ptr<VmuxDevice>>> broadcast_destinations) : VmuxDevice(device_id, driver, policies), broadcast_destinations(broadcast_destinations) {
     this->driver = driver;
@@ -126,7 +127,7 @@ public:
     // check if we received packets from other threads
     // TODO we can extract that into a function called by the sending thread
     vmux_descriptor *packet_descriptor;
-    if (this_->inject_packets.pop(packet_descriptor)) {
+    if (UNLIKELY(this_->inject_packets.pop(packet_descriptor))) {
       // TODO send these packets first
       this_->vfu_ctx_mutex.lock();
       this_->model->EthRx(0, {}, packet_descriptor->buf, packet_descriptor->len); // hardcode port 0
@@ -150,16 +151,15 @@ public:
             struct ethhdr* packet_hdr = (struct ethhdr*) packet;
             uint64_t dst_mac = 0xFFFFFFFFFFFF & *(uint64_t*)(packet_hdr->h_dest);
             if (dst_mac == 0x000000191b01) { // PTP MAC 01:1b:19:00:00:00
-              printf("PTP packet\n");
               auto descriptor = vmux_descriptor_alloc(len);
               memcpy(descriptor->buf, packet, len);
               // TODO push to other device
-              auto second_vm = (*this_->broadcast_destinations)[1];
+              auto second_vm = (*this_->broadcast_destinations)[this_->ptp_target_vm_idx.load()];
               if (!second_vm->inject_packets.push(descriptor)) {
                 // if injection queue is full, drop packet
                 vmux_descriptor_free(descriptor);
               } else {
-                printf("PTP pushed to second VM\n");
+                printf("pushed PTP packet to VM %lu\n", this_->ptp_target_vm_idx.load());
               }
             }
           }

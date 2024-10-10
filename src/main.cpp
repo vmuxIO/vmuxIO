@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <boost/outcome.hpp>
 
+#include "policies/ptp.hpp"
 #include "src/caps.hpp"
 #include "src/util.hpp"
 #include "src/vfio-consumer.hpp"
@@ -330,6 +331,8 @@ Result<void> _main(int argc, char **argv) {
     while (runner[i]->state != 2)
       ;
   }
+
+  auto ptpPolicy = PtpPolicy(devices[0], broadcast_destinations, efd);
 
   // VmuxRunner r(socket,device);
   // r.start();
