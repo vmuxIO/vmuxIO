@@ -53,7 +53,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
     host, loadgen = measurement.hosts()
 
-    DURATION_S = 100 if not G.BRIEF else 30
+    DURATION_S = 15*20 if not G.BRIEF else 80
 
     # set up test plan
     interfaces = [
@@ -68,15 +68,17 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         # "ptp4l-host"
     ]
     num_vms = [ 1, 2 ]
+    repetitions = 3
 
     if G.BRIEF:
         interfaces = [ Interface.VMUX_MED ]
         modes = [ "dpdk-guest" ]
         # num_vms = [ 1 ]
         num_vms = [ 2 ]
+        repetitions = 3
 
     test_matrix = dict(
-        repetitions=[ 1 ],
+        repetitions=[ repetitions ],
         num_vms=num_vms,
         interface=interfaces, # [ interface.value for interface in interfaces],
         mode=modes
@@ -85,7 +87,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         return (test.num_vms > 1) and ("host" in test.mode)
     tests = PTPTest.list_tests(test_matrix, exclude_test=exclude)
     if not G.BRIEF:
-        tests += [ PTPTest(interface=None, mode="dpdk-host", num_vms=0, repetitions=1) ]
+        tests += [ PTPTest(interface=None, mode="dpdk-host", num_vms=0, repetitions=repetitions) ]
 
     # info(f"PTP Test execution plan:")
     # PTPTest.estimate_time(test_matrix, ["interface"])
@@ -95,7 +97,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             assert len(test) == 1 # we have looped through all variables now, right?
             test = test[0]
             # test = PTPTest(interface=iface, mode="dpdk-guest", num_vms=0, repetitions=1)
-            run_test(test)
+            for repetition in range(test.repetitions):
+                run_test(test, repetition=repetition)
             bench.done(test)
 
 
@@ -145,7 +148,8 @@ def run_test(ptp_test: PTPTest, repetition=0):
         # remove unnecessary information
         host.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
 
-        host.copy_from(f"{remote_path}.filtered", out_dir)
+        host.copy_from(f"{remote_path}.filtered", f"{out_dir}.filtered")
+        host.copy_from(f"{remote_path}", out_dir)
 
         return
 
@@ -185,10 +189,11 @@ def run_test(ptp_test: PTPTest, repetition=0):
         # remove unnecessary information
         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
             guest.exec(f"grep -oP \"Delta between master and slave.*?:\K-?\d+\" {remote_path} | tail -n +2 | sudo tee {remote_path}.filtered")
-            guest.copy_from(f"{remote_path}.filtered", ptp_test.per_vm_output_path(repetition, i))
+            # guest.copy_from(f"{remote_path}.filtered", ptp_test.per_vm_output_path(repetition, i))
+            guest.copy_from(f"{remote_path}.filtered", f"{ptp_test.per_vm_output_path(repetition, i)}.filtered")
+            guest.copy_from(f"{remote_path}", ptp_test.per_vm_output_path(repetition, i))
         end_foreach(guests, foreach_parallel)
 
-        breakpoint()
         pass
 
 

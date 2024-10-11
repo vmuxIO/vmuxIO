@@ -233,7 +233,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [
           Interface.VMUX_MED,
-          Interface.VMUX_DPDK_E810, # yields bogus results: doesn't implement multi-VM!
+          Interface.VMUX_DPDK_E810,
           Interface.VFIO,
           Interface.VMUX_PT,
           ]
@@ -257,11 +257,12 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         # interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
         fastclicks = [ "hardware" ]
+        # fastclicks = [ "hardware" ]
         # fastclicks = [ "software-tap" ]
-        vm_nums = [ 2 ]
+        vm_nums = [ 4 ]
         repetitions = 1
         # DURATION_S = 10000
-        rates = [ 1 ]
+        rates = [ 40000 ]
 
     tests = []
     test_matrix = dict(
