@@ -73,9 +73,12 @@ public:
     PtpPolicy* this_ = (PtpPolicy*) this__;
     auto e810dev = std::dynamic_pointer_cast<E810EmulatedDevice>(this_->default_device);
     if (e810dev) {
-      auto vm_id = (e810dev->ptp_target_vm_idx.load() + 1) % this_->broadcast_destinations->size();
-      e810dev->ptp_target_vm_idx.store(vm_id);
-      printf("New PTP target: VM %lu\n", vm_id);
+      auto old_id = e810dev->ptp_target_vm_idx.load();
+      if (old_id != -1) {
+        auto vm_id = (old_id + 1) % this_->broadcast_destinations->size();
+        e810dev->ptp_target_vm_idx.store(vm_id);
+        printf("New PTP target: VM %lu\n", vm_id);
+      }
     }
     uint64_t nr_expirations = 0;
     read(this_->timer_fd, &nr_expirations, sizeof(uint64_t));
