@@ -241,6 +241,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.BRIDGE_E1000,
           Interface.BRIDGE,
           Interface.BRIDGE_VHOST,
+          Interface.VMUX_DPDK,
           ]
     fastclicks = [
             "hardware",

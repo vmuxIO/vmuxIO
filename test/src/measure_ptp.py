@@ -71,7 +71,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     repetitions = 3
 
     if G.BRIEF:
-        interfaces = [ Interface.VMUX_MED ]
+        interfaces = [ Interface.VFIO ]
+        # interfaces = [ Interface.VMUX_MED ]
         modes = [ "dpdk-guest" ]
         # num_vms = [ 1 ]
         num_vms = [ 2 ]
@@ -84,15 +85,17 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         mode=modes
     )
     def exclude(test):
-        return (test.num_vms > 1) and ("host" in test.mode)
+        return ((test.num_vms > 1) and ("host" in test.mode)) or \
+                ((test.num_vms > 1) and (test.interface.is_passthrough()))
     tests = PTPTest.list_tests(test_matrix, exclude_test=exclude)
     if not G.BRIEF:
         tests += [ PTPTest(interface=None, mode="dpdk-host", num_vms=0, repetitions=repetitions) ]
+    args_reboot = ["mode", "interface", "num_vms", "repetitions"]
 
-    # info(f"PTP Test execution plan:")
-    # PTPTest.estimate_time(test_matrix, ["interface"])
+    info(f"PTP Test execution plan:")
+    PTPTest.estimate_time2(tests, args_reboot)
 
-    with Bench(tests=tests, args_reboot = ["mode", "interface", "num_vms"], brief = G.BRIEF) as (bench, bench_tests):
+    with Bench(tests=tests, args_reboot = args_reboot, brief = G.BRIEF) as (bench, bench_tests):
         for [mode, interface, num_vms], test in bench.multi_iterator(bench_tests, ["mode", "interface", "num_vms"]):
             assert len(test) == 1 # we have looped through all variables now, right?
             test = test[0]
@@ -193,6 +196,9 @@ def run_test(ptp_test: PTPTest, repetition=0):
             guest.copy_from(f"{remote_path}.filtered", f"{ptp_test.per_vm_output_path(repetition, i)}.filtered")
             guest.copy_from(f"{remote_path}", ptp_test.per_vm_output_path(repetition, i))
         end_foreach(guests, foreach_parallel)
+
+        with open(f"{ptp_test.output_filepath(repetition)}", "w") as f:
+            f.write("done\n")
 
         pass
 
