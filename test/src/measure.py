@@ -573,6 +573,7 @@ import measure_hotel
 import measure_ycsb
 import measure_iperf
 import measure_mediation
+import measure_ptp
 
 def main():
     measurement = Measurement()
@@ -596,6 +597,7 @@ def main():
     measure_mediation.main(measurement)
     measure_ycsb.main(measurement)
     measure_hotel.main(measurement)
+    measure_ptp.main(measurement)
     measure_iperf.main(measurement)
 
 if __name__ == "__main__":
