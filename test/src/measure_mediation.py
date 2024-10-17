@@ -96,7 +96,7 @@ def strip_subnet_mask(ip_addr: str):
 
 
 # rules for software fastclick
-def fastclick_classifiers(vm_number: int):
+def fastclick_mac_classifiers(vm_number: int):
     ret = dict()
     start = (vm_number - 1) * PER_VM_FLOWS
     for i in range(PER_VM_FLOWS):
@@ -104,6 +104,16 @@ def fastclick_classifiers(vm_number: int):
         mac = MultiHost.mac("00:00:00:00:00:00", offset)
         class__ = "".join(reversed(mac.split(":")))
         class_ = f"0/{class__}"
+        ret[f"class{i}"] = class_
+    return ret
+
+# rules for software fastclick
+def fastclick_ethertype_classifiers(vm_number: int):
+    ret = dict()
+    start = 0x1234
+    for i in range(PER_VM_FLOWS):
+        etype = start + i
+        class_ = f"0/{etype:X}"
         ret[f"class{i}"] = class_
     return ret
 
@@ -143,17 +153,17 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
         }
     elif test.fastclick == "hardware":
         fastclick_program = "test/fastclick/mac-switch-hardware.click"
-        project_root = f"{example_guest.moonprogs_dir}/../../"
-        fastclick_rules = f"{project_root}/test/fastclick/test_dpdk_nic_rules"
-        fastclick_rules = "/home/host/vmuxIO/test/fastclick/test_dpdk_nic_rules"
-        fastclick_rules = "/tmp/test_dpdk_nic_rules"
+        project_root = str(Path(example_guest.moonprogs_dir) / "../..") # click wants nicely formatted paths
+        fastclick_rules = f"{project_root}/test/fastclick/rteflow_etype_rules"
+        # fastclick_rules = f"{project_root}/test/fastclick/rteflow_empty"
+        # fastclick_rules = "/tmp/test_dpdk_nic_rules"
+        # def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
+        #     write_fastclick_rules(guest, i, fastclick_rules)
+        # end_foreach(guests, foreach_parallel)
         fastclick_args = {
             'ifacePCI0': example_guest.test_iface_addr,
             'rules': fastclick_rules
         }
-        def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-            write_fastclick_rules(guest, i, fastclick_rules)
-        end_foreach(guests, foreach_parallel)
     elif test.fastclick == "software-tap":
         fastclick_program = "test/fastclick/mac-switch-software-tap.click"
         fastclick_args = {
@@ -163,15 +173,16 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
         raise Exception("Unknown fastclick program type")
 
     def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-        args = { **fastclick_args, **fastclick_classifiers(i) }
+        args = { **fastclick_args, **fastclick_ethertype_classifiers(i) }
         guest.start_fastclick(fastclick_program, remote_fastclick_log, script_args=args)
     end_foreach(guests, foreach_parallel)
     time.sleep(10) # fastclick takes roughly as long as moongen to start, be we give it some slack nevertheless
     info("Starting MoonGen")
-    loadgen.run_l2_load_latency(loadgen, "00:00:00:00:00:00", test.rate,
+    loadgen.run_l2_load_latency(loadgen, "52:54:00:fa:00:61", test.rate,
             runtime = DURATION_S,
             size = 60,
-            nr_macs = PER_VM_FLOWS * len(guests.values()),
+            nr_macs = len(guests.values()),
+            nr_ethertypes=PER_VM_FLOWS,
             histfile = remote_moongen_histogram,
             statsfile = remote_moongen_throughput,
             outfile = '/tmp/output.log'
@@ -204,11 +215,15 @@ def run_test(host: Host, loadgen: LoadGen, guests: Dict[int, Guest], test: Media
     loadgen.copy_from(remote_moongen_throughput, local_moongen_throughput)
     loadgen.copy_from(remote_moongen_histogram, local_moongen_histogram)
 
+    # breakpoint()
+    pass
+
 
 def exclude(test):
     return (Interface(test.interface).is_passthrough() and test.num_vms > 1) or \
-        (Interface(test.interface) == Interface.VMUX_DPDK_E810 and test.num_vms > 1) or \
         (Interface(test.interface) == Interface.VMUX_DPDK and test.fastclick == "software" and test.num_vms > 1)
+
+        # (Interface(test.interface) == Interface.VMUX_DPDK_E810 and test.num_vms > 1) or \
 
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
@@ -218,7 +233,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [
           Interface.VMUX_MED,
-          Interface.VMUX_DPDK_E810, # yields bogus results: doesn't implement multi-VM!
+          Interface.VMUX_DPDK_E810,
           Interface.VFIO,
           Interface.VMUX_PT,
           ]
@@ -226,6 +241,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.BRIDGE_E1000,
           Interface.BRIDGE,
           Interface.BRIDGE_VHOST,
+          Interface.VMUX_DPDK,
           ]
     fastclicks = [
             "hardware",
@@ -237,13 +253,14 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
-        interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
-        # interfaces = [ Interface.VMUX_MED ]
+        # interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
+        interfaces = [ Interface.VMUX_MED ]
         # interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
+        fastclicks = [ "hardware" ]
         # fastclicks = [ "hardware" ]
-        fastclicks = [ "software-tap" ]
-        vm_nums = [ 2 ]
+        # fastclicks = [ "software-tap" ]
+        vm_nums = [ 4 ]
         repetitions = 1
         # DURATION_S = 10000
         rates = [ 40000 ]

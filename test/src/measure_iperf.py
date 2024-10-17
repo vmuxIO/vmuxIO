@@ -188,7 +188,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         # interfaces = [ Interface.VMUX_EMU ]
         directions = [ "forward" ]
         # vm_nums = [ 1, 2, 4 ]
-        vm_nums = [ 128, 160 ]
+        vm_nums = [ 2 ]
+        # vm_nums = [ 128, 160 ]
         DURATION_S = 10
         repetitions = 1
 

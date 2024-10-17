@@ -1195,6 +1195,17 @@ class Server(ABC):
         self.exec("cat /tmp/extra_hosts >> /etc/hosts")
 
 
+    def start_ptp_client(self, out_dir: str):
+        self.exec(f": > {out_dir}")
+        project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
+        self.tmux_new("ptpclient", f"sudo {project_root}/test/ptptest/build/ptpclient -l 0 -n 4 -a {self.test_iface_addr} -- T 0 -p 1 >> {out_dir}; sleep 999")
+
+
+    def stop_ptp_client(self):
+        self.tmux_kill("ptpclient")
+
+
+
 class BatchExec:
     """
     Execution through ssh brings overheads of authentication etc.
@@ -1865,13 +1876,6 @@ class Host(Server):
         # TODO destroy admin interfaces!
 
 
-    def start_ptp_client(self, out_dir: str):
-        self.exec(f": > {out_dir}")
-        self.tmux_new("ptpclient", f"sudo ./test/ptptest/build/ptpclient -l 0 -n 4 -a {self.test_iface_addr} -- T 0 -p 1 >> {out_dir}")
-
-    def stop_ptp_client(self):
-        self.tmux_kill("ptpclient")
-
 class Guest(Server):
     """
     Guest class.
@@ -2015,13 +2019,6 @@ class Guest(Server):
         """
         self.tmux_kill("iperf3-server")
 
-    def start_ptp_client(self, out_dir: str):
-        self.copy_to("./test/ptptest", "./ptptest", recursive=True)
-        self.exec(f": > {out_dir}")
-        self.tmux_new("ptpclient", f"./ptptest/build/ptpclient -l 0 -n 4 -a {self.test_iface_addr} -- T 0 -p 1 >> {out_dir}")
-
-    def stop_ptp_client(self):
-        self.tmux_kill("ptpclient")
 
 class LoadGen(Server):
     """
@@ -2113,6 +2110,7 @@ class LoadGen(Server):
                             runtime: int = 60,
                             size: int = 60,
                             nr_macs: int = 0,
+                            nr_ethertypes: int = 0,
                             histfile: str = '/tmp/histogram.csv',
                             statsfile: str = '/tmp/throughput.csv',
                             outfile: str = '/tmp/output.log'
@@ -2151,7 +2149,7 @@ class LoadGen(Server):
                       'sudo bin/MoonGen '
                       f'{server.moonprogs_dir}/l2-load-latency.lua ' +
                       f'-r {rate} -f {histfile} -T {runtime} -s {size} ' +
-                      f' -c {statsfile} -m {nr_macs} ' +
+                      f' -c {statsfile} -m {nr_macs} -e {nr_ethertypes} ' +
                       f'{server._test_iface_id} {mac} ' +
                       f'2>&1 | tee {outfile}')
 
@@ -2240,7 +2238,7 @@ class LoadGen(Server):
         self.tmux_kill(f"iperf3-client{vm_num}")
 
     def start_ptp4l(self, software_ts=False):
-        self.tmux_new("ptp4l", f"sudo ptp4l -i {self.test_iface} -m -E -2 { '-S' if software_ts else '' }")
+        self.tmux_new("ptp4l", f"sudo {self._Server__cmd_with_package('linuxptp')} ptp4l -i {self.test_iface} -m -E -2 { '-S' if software_ts else '' }")
 
     def stop_ptp4l(self):
         self.tmux_kill("ptp4l")

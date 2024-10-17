@@ -277,7 +277,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             # skip VM boots if possible
             test_matrix = dict(
                 interface=[ interface.value ],
-                rps=rpsList,
+                rps=rpsList[app],
                 app=[ app ],
                 repetitions=[ repetitions ],
                 num_vms=[ num_vms ]
@@ -313,7 +313,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                     guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
                 end_foreach(guests, foreach_parallel)
 
-                for rps in rpsList:
+                for rps in rpsList[app]:
                     # the actual test
                     test = DeathStarBenchTest(
                             repetitions=repetitions,
