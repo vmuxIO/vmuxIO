@@ -336,6 +336,7 @@ class Server(ABC):
         Throw if cpufreq is wrong
         """
         intel_path = "/sys/devices/system/cpu/intel_pstate/no_turbo"
+        intel_powersave = "/sys/devices/system/cpu/intel_pstate/min_perf_pct"
         amd_path = "/sys/devices/system/cpu/cpufreq/boost" # every other CPU
         if (self.isfile(intel_path)):
             try:
@@ -343,7 +344,13 @@ class Server(ABC):
             except CalledProcessError:
                 error(f"Please run on {self.fqdn}: echo 1 | sudo tee {intel_path}")
                 raise Exception(f"Wrong CPU freqency on {self.fqdn}")
-        else:
+        if (self.isfile(intel_powersave)):
+            try:
+                self.exec(f"[[ $(cat {intel_powersave}) -eq 100 ]]")
+            except CalledProcessError:
+                error(f"Please run on {self.fqdn}: echo 100 | sudo tee {intel_powersave}")
+                raise Exception(f"Wrong CPU freqency on {self.fqdn}")
+        if (self.isfile(amd_path)):
             try:
                 self.exec(f"[[ $(cat {amd_path}) -eq 0 ]]")
             except CalledProcessError:
@@ -1858,6 +1865,13 @@ class Host(Server):
         # TODO destroy admin interfaces!
 
 
+    def start_ptp_client(self, out_dir: str):
+        self.exec(f": > {out_dir}")
+        self.tmux_new("ptpclient", f"sudo ./test/ptptest/build/ptpclient -l 0 -n 4 -a {self.test_iface_addr} -- T 0 -p 1 >> {out_dir}")
+
+    def stop_ptp_client(self):
+        self.tmux_kill("ptpclient")
+
 class Guest(Server):
     """
     Guest class.
@@ -2001,6 +2015,13 @@ class Guest(Server):
         """
         self.tmux_kill("iperf3-server")
 
+    def start_ptp_client(self, out_dir: str):
+        self.copy_to("./test/ptptest", "./ptptest", recursive=True)
+        self.exec(f": > {out_dir}")
+        self.tmux_new("ptpclient", f"./ptptest/build/ptpclient -l 0 -n 4 -a {self.test_iface_addr} -- T 0 -p 1 >> {out_dir}")
+
+    def stop_ptp_client(self):
+        self.tmux_kill("ptpclient")
 
 class LoadGen(Server):
     """
@@ -2163,6 +2184,7 @@ class LoadGen(Server):
         port = 6379 + nr
         redis_cmd = f'redis-server --port {port} --protected-mode no --save ""'
         nix_cmd = f"nix shell --inputs-from {project_root} nixpkgs#redis --command {redis_cmd}"
+        #alternative: NIXPKGS_ALLOW_UNFREE=1 nix shell --impure github:nixos/nixpkgs/109e13db243249e26b8b8d861424578400aae882#dragonflydb; dragonfly --port 6379 --logtostderr --dbfilename /tmp/foo
         self.tmux_new(f"redis{nr}", f"{nix_cmd}; sleep 999")
         return port
 
@@ -2216,3 +2238,9 @@ class LoadGen(Server):
 
     def stop_iperf_client(self, vm_num = ""):
         self.tmux_kill(f"iperf3-client{vm_num}")
+
+    def start_ptp4l(self, software_ts=False):
+        self.tmux_new("ptp4l", f"sudo ptp4l -i {self.test_iface} -m -E -2 { '-S' if software_ts else '' }")
+
+    def stop_ptp4l(self):
+        self.tmux_kill("ptp4l")

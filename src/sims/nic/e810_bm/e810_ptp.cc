@@ -18,6 +18,9 @@ PTPManager::PTPManager(e810_bm &dev_)
 void PTPManager::set_enabled(uint32_t clock) {
   // clock value is currently unused
   this->dev.vmux->device->driver->enableTimesync(0);
+  auto e810_dev = dynamic_pointer_cast<E810EmulatedDevice>(this->dev.vmux->device);
+  assert(e810_dev != NULL);
+  e810_dev->ptp_target_vm_idx = 0; // enable PTP mediation
 }
 
 e810_timestamp_t PTPManager::phc_read() {

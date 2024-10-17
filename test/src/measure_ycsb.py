@@ -193,7 +193,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.VMUX_MED,
         ]
     rpsList = [ -1 ]
-    vm_nums = [ 1, 2, 4, 8 , 16, 32 ]
+    vm_nums = [ 1, 2, 4, 8 , 16, 32, 64 ]
     repetitions = 2
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:

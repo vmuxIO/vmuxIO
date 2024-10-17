@@ -1,0 +1,3 @@
+ingress pattern eth dst spec 00:00:00:00:00:00 dst mask 00:00:00:00:00:00 type is 0x1234 / end actions queue index 0 / end
+ingress pattern eth dst spec 00:00:00:00:00:00 dst mask 00:00:00:00:00:00 type is 0x1235 / end actions queue index 1 / end
+ingress pattern eth dst spec 00:00:00:00:00:00 dst mask 00:00:00:00:00:00 type is 0x1236 / end actions queue index 2 / end

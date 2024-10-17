@@ -3,6 +3,7 @@
  */
 
 #pragma once
+#include "util.hpp"
 #include <cstdint>
 #include <rte_flow.h>
 #include <rte_ether.h>
@@ -120,6 +121,7 @@ struct rte_flow *
 generate_eth_flow(uint16_t port_id, uint16_t rx_q,
 		const struct rte_ether_addr *src_mac, const struct rte_ether_addr *src_mask,
 		const struct rte_ether_addr *dest_mac, const struct rte_ether_addr *dest_mask,
+		const uint16_t etype, const uint16_t etype_mask,
 		struct rte_flow_error *error)
 {
 	/* Declaring structs being used. 8< */
@@ -164,9 +166,12 @@ generate_eth_flow(uint16_t port_id, uint16_t rx_q,
 	rte_ether_addr_copy(dest_mask, &eth_mask.dst);
 	rte_ether_addr_copy(src_mac, &eth_spec.src);
 	rte_ether_addr_copy(src_mask, &eth_mask.src);
+	eth_spec.type = htobe16(etype);
+	eth_mask.type = etype_mask;
 	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
 	pattern[0].spec = &eth_spec;
 	pattern[0].mask = &eth_mask;
+  // Util::hexdump((void*)&eth_spec, sizeof(struct rte_flow_item_eth));
 	/* >8 End of setting the first level of the pattern. */
 
 	/*

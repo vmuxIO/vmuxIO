@@ -1,0 +1,19 @@
+iommu_on: true
+hugepages1G: 0
+devices:
+  - name: ethDut
+    pci: "61:00.0"
+    pci_full: "0000:61:00.0"
+    if: enp97s0np0
+    mac: b4:96:91:b3:8a:90
+    type: Intel E810-C 100G
+    pciid: 8086:1592
+    # known good versions:
+    firmware-versions:
+      # - "2.15 0x800049c3 1.2789.0"
+      # - "2.30 0x80005d1e 1.2877.0"
+      # The only one that can do rte_flow: ~>4.x
+      - "4.40 0x8001c979 1.3534.0"
+    dpdk-driver: vfio-pci
+    kernel-driver: ice
+
