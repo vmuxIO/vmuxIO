@@ -77,6 +77,9 @@ vmuxDpdkE810:
 vmuxMed:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
 
+vmuxVdpdk:
+  sudo gdb --args {{proot}}/build/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
+
 vmuxMedLog:
   sudo {{proot}}/build/vmux -u -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 2>&1 | rg 'ice_callback|send|qemu|dominik'
 
@@ -650,7 +653,7 @@ dpdk_helloworld: dpdk-setup
   meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
 
 fastclick: 
-  sudo ./fastclick/bin/click --dpdk "-l 0" -- ./test/fastclick/pktgen-l2.click
+  sudo ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level 8 -- ./test/fastclick/pktgen-l2.click
 
 pktgen: 
   nix shell .#pktgen

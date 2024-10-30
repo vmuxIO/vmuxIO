@@ -26,6 +26,7 @@
 #include <unistd.h>
 #include <boost/outcome.hpp>
 
+#include "devices/vdpdk.hpp"
 #include "src/caps.hpp"
 #include "src/util.hpp"
 #include "src/vfio-consumer.hpp"
@@ -293,6 +294,9 @@ Result<void> _main(int argc, char **argv) {
     if (modes[i] == "mediation") {
       device = std::make_shared<E810EmulatedDevice>(i, drivers[i], efd, &mac_addr, globalIrq);
       device->driver->mediation_enable(i);
+    }
+    if (modes[i] == "vdpdk") {
+      device = std::make_shared<VdpdkDevice>(i, drivers[i]);
     }
     if (modes[i] == "e1000-emu") {
 #ifdef BUILD_E1000_EMU
