@@ -3,7 +3,8 @@
 #include "src/vfio-server.hpp"
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
-: VmuxDevice(device_id, std::move(driver)) {
+: VmuxDevice(device_id, std::move(driver)),
+  recv_memory(std::make_unique<char[]>(0x1000)) {
   // TODO figure out appropriate IDs
   this->info.pci_vendor_id = 0x1af4; // Red Hat Virtio Devices
   this->info.pci_device_id = 0x7abc; // Unused
@@ -21,7 +22,7 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   this->vfuServer = std::move(vfu);
   auto ctx = this->vfuServer->vfu_ctx;
 
-  int region_flags = VFU_REGION_FLAG_READ | VFU_REGION_FLAG_MEM;
+  int region_flags = VFU_REGION_FLAG_RW | VFU_REGION_FLAG_MEM;
   int ret = vfu_setup_region(ctx, VFU_PCI_DEV_BAR0_REGION_IDX,
                              0x1000, region_access_cb_static,
                              region_flags, NULL, 0,
@@ -40,9 +41,26 @@ void VdpdkDevice::rx_callback_static(int vm_number, void *this__) {
 }
 
 ssize_t VdpdkDevice::region_access_cb(char *buf, size_t count, loff_t offset, bool is_write) {
-  if (is_write) return -1;
+  printf("Region access: count %zx, offset %lx\n", count, (long)offset);
 
-  strncpy(buf, "Hello from vmux", count);
+  if (offset < 0 || offset > 0x1000) return -1;
+
+  if (is_write) {
+    if ((size_t)(0x1000 - offset) < count) return -1;
+    memcpy(recv_memory.get() + offset, buf, count);
+
+    if (memchr(buf, '\0', count) != NULL) {
+      printf("Received message: %s\n", recv_memory.get());
+    }
+    return count;
+  }
+  
+  char msg[] = "Hello from vmux";
+  if ((size_t)offset >= sizeof(msg)) {
+    memset(buf, 0, count);
+  } else {
+    strncpy(buf, msg + offset, count);
+  }
   return count;
 }
 

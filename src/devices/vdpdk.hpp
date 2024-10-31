@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/devices/vmux-device.hpp"
+#include <memory>
 
 class VdpdkDevice : public VmuxDevice {
 public:
@@ -9,6 +10,8 @@ public:
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override;
 
 private:
+  std::unique_ptr<char[]> recv_memory;
+  
   void rx_callback_fn(int vm_number);
   static void rx_callback_static(int vm_number, void *);
 
