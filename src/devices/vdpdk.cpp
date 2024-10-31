@@ -1,9 +1,6 @@
 #include "src/devices/vdpdk.hpp"
-
-void VdpdkDevice::rx_callback_static(int vm_number, void *this__) {
-  VdpdkDevice *this_ = (VdpdkDevice *)this__;
-  this_->rx_callback_fn(vm_number);
-}
+#include "libvfio-user.h"
+#include "src/vfio-server.hpp"
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
 : VmuxDevice(device_id, std::move(driver)) {
@@ -22,8 +19,36 @@ VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
 
 void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   this->vfuServer = std::move(vfu);
+  auto ctx = this->vfuServer->vfu_ctx;
+
+  int region_flags = VFU_REGION_FLAG_READ | VFU_REGION_FLAG_MEM;
+  int ret = vfu_setup_region(ctx, VFU_PCI_DEV_BAR0_REGION_IDX,
+                             0x1000, region_access_cb_static,
+                             region_flags, NULL, 0,
+                             -1, 0);
+  if (ret)
+    die("failed to setup BAR region (%d)", errno);
 }
 
 void VdpdkDevice::rx_callback_fn(int vm_number) {
   // TODO
 }
+
+void VdpdkDevice::rx_callback_static(int vm_number, void *this__) {
+  VdpdkDevice *this_ = (VdpdkDevice *)this__;
+  this_->rx_callback_fn(vm_number);
+}
+
+ssize_t VdpdkDevice::region_access_cb(char *buf, size_t count, loff_t offset, bool is_write) {
+  if (is_write) return -1;
+
+  strncpy(buf, "Hello from vmux", count);
+  return count;
+}
+
+ssize_t VdpdkDevice::region_access_cb_static(vfu_ctx_t *ctx, char *buf, size_t count,
+                                       loff_t offset, bool is_write) {
+  VdpdkDevice *this_ = (VdpdkDevice *)vfu_get_private(ctx);
+  return this_->region_access_cb(buf, count, offset, is_write);
+}
+
