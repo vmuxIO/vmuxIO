@@ -41,11 +41,11 @@
     "dpdkdk-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1730385332,
-        "narHash": "sha256-u1fPRCwk3ikLvEn94fv50P8sPGuaUJyLjVWfC/Ff3a8=",
+        "lastModified": 1730469005,
+        "narHash": "sha256-Zp7sDFf4kKuD8YSbIxh1ERC9Xij+IhfokHgwBZoajIU=",
         "ref": "dk",
-        "rev": "0c9050a9281d349c26be053cb5e2db127cd85be8",
-        "revCount": 36559,
+        "rev": "504b1f8d1dd4fb8eeecad0ab6ffaae18a2d4417b",
+        "revCount": 36565,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/kreudom/dpdk"
