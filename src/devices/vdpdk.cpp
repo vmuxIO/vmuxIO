@@ -51,7 +51,7 @@ ssize_t VdpdkDevice::region_access_cb(char *buf, size_t count, loff_t offset, bo
   // printf("Region access: count %zx, offset %lx, is_write %d\n", count, (long)offset, (int)is_write);
 
   if (offset < 0 || offset > 0x1000) return -1;
-  if ((size_t)(0x1000 - offset) > count) return -1;
+  if ((size_t)(0x1000 - offset) < count) return -1;
 
   if (is_write) {
     return region_access_write(buf, count, offset);
