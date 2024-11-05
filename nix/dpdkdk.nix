@@ -33,7 +33,7 @@
 
 let
   mod = kernel != null;
-  debug = false;
+  debug = true;
 in
 stdenv.mkDerivation {
   pname = "dpdkdk";
