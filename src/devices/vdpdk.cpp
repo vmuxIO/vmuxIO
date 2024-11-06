@@ -4,10 +4,11 @@
 
 enum VDPDK_OFFSET {
   DEBUG_STRING = 0x0,
-  PACKET_BEGIN = 0x40,
-  PACKET_DATA = 0x80,
-  PACKET_END = 0xc0,
-  RX_LEN = 0x100,
+  TX_SIGNAL = 0x40,
+};
+
+enum VDPDK_TX_OFFSET {
+  PKT_LEN = (0x1000 - 2),
 };
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
@@ -85,30 +86,14 @@ ssize_t VdpdkDevice::region_access_cb_static(vfu_ctx_t *ctx, char *buf, size_t c
 
 ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offset) {
   switch (offset) {
-  case DEBUG_STRING: {
-    bool is_terminal = memchr(buf, 0, count) != NULL;
-    dbg_string.append(buf, count);
-    if (is_terminal) {
-      printf("Received debug string: %s\n", dbg_string.c_str());
+    case DEBUG_STRING: {
+      bool is_terminal = memchr(buf, 0, count) != NULL;
+      dbg_string.append(buf, count);
+      if (is_terminal) {
+        printf("Received debug string: %s\n", dbg_string.c_str());
+      }
+      return count;
     }
-    return count;
-  }
-
-  case PACKET_BEGIN:
-    if (!pkt_buf.empty()) {
-      puts("Packet buffer not empty on PACKET_BEGIN");
-      pkt_buf.clear();
-    }
-    return count;
-
-  case PACKET_DATA:
-    pkt_buf.insert(pkt_buf.end(), buf, buf + count);
-    return count;
-
-  case PACKET_END:
-    driver->send(device_id, (const char *)pkt_buf.data(), pkt_buf.size());
-    pkt_buf.clear();
-    return count;
   }
 
   printf("Invalid write offset: %x\n", offset);
@@ -116,14 +101,29 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
 }
 
 ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset) {
-  if (offset >= PACKET_BEGIN) return -1;
-  char msg[] = "Hello from vmux";
-  static_assert(sizeof(msg) <= PACKET_BEGIN);
+  if (count == 0) return -1;
+  if (offset < 0x40) {
+    char msg[] = "Hello from vmux";
+    static_assert(sizeof(msg) <= 0x40);
 
-  if (offset >= sizeof(msg)) {
-    memset(buf, 0, count);
-  } else {
-    strncpy(buf, msg + offset, count);
+    if (offset >= sizeof(msg)) {
+      memset(buf, 0, count);
+    } else {
+      strncpy(buf, msg + offset, count);
+    }
+    return count;
   }
-  return count;
+
+  switch (offset) {
+    case TX_SIGNAL: {
+      uint16_t pkt_len = txbuf[PKT_LEN] | ((uint16_t)txbuf[PKT_LEN + 1] << 8);
+      driver->send(device_id, (const char *)txbuf.ptr(), pkt_len);
+      memset(buf, 0, count);
+      buf[0] = 1;
+      return count;
+    }
+  }
+
+  printf("Invalid read offset: %x\n", offset);
+  return -1;
 }
