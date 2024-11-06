@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/devices/vmux-device.hpp"
+#include "memfd.hpp"
 #include <string>
 #include <vector>
 
@@ -12,7 +13,9 @@ public:
 
 private:
   std::string dbg_string;
-  std::vector<unsigned char> pkt_buf;
+  std::vector<unsigned char> pkt_buf; // TODO remove
+  MemFd txbuf{"vdpdk_tx", 0x1000};
+  MemFd rxbuf{"vdpdk_rx", 0x1000};
   
   void rx_callback_fn(int vm_number);
   static void rx_callback_static(int vm_number, void *);

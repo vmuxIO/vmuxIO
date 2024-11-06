@@ -34,8 +34,25 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
                              0x1000, region_access_cb_static,
                              region_flags, NULL, 0,
                              -1, 0);
-  if (ret)
-    die("failed to setup BAR region (%d)", errno);
+  if (ret) {
+    die("failed to setup BAR0 region (%d)", errno);
+  }
+
+  ret = vfu_setup_region(ctx, VFU_PCI_DEV_BAR1_REGION_IDX,
+                             txbuf.size(), NULL,
+                             region_flags, NULL, 0,
+                             txbuf.fd(), 0);
+  if (ret) {
+    die("failed to setup BAR1 region (%d)", errno);
+  }
+
+  ret = vfu_setup_region(ctx, VFU_PCI_DEV_BAR2_REGION_IDX,
+                             rxbuf.size(), NULL,
+                             region_flags, NULL, 0,
+                             rxbuf.fd(), 0);
+  if (ret) {
+    die("failed to setup BAR2 region (%d)", errno);
+  }
 }
 
 void VdpdkDevice::rx_callback_fn(int vm_number) {
