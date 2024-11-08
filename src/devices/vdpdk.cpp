@@ -2,17 +2,24 @@
 #include "libvfio-user.h"
 #include "src/vfio-server.hpp"
 
+#include <rte_io.h>
+
 enum VDPDK_OFFSET {
   DEBUG_STRING = 0x0,
   TX_SIGNAL = 0x40,
 };
 
-enum VDPDK_TX_OFFSET {
-  PKT_LEN = (0x1000 - 2),
+enum VDPDK_CONSTS {
+  REGION_SIZE = 0x1000,
+  PKT_SIGNAL_OFF = REGION_SIZE - 0x40,
+  PKT_LEN_OFF = PKT_SIGNAL_OFF - 2,
+  MAX_PKT_LEN = PKT_LEN_OFF,
 };
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
-: VmuxDevice(device_id, std::move(driver)) {
+: VmuxDevice(device_id, std::move(driver)),
+  txbuf{"vdpdk_tx", REGION_SIZE},
+  rxbuf{"vdpdk_rx", REGION_SIZE} {
   // TODO figure out appropriate IDs
   this->info.pci_vendor_id = 0x1af4; // Red Hat Virtio Devices
   this->info.pci_device_id = 0x7abc; // Unused
@@ -54,6 +61,10 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   if (ret) {
     die("failed to setup BAR2 region (%d)", errno);
   }
+
+  tx_poll_thread = std::jthread{[this](std::stop_token stop){
+    this->tx_poll(std::move(stop));
+  }};
 }
 
 void VdpdkDevice::rx_callback_fn(int vm_number) {
@@ -114,16 +125,32 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
     return count;
   }
 
-  switch (offset) {
-    case TX_SIGNAL: {
-      uint16_t pkt_len = txbuf[PKT_LEN] | ((uint16_t)txbuf[PKT_LEN + 1] << 8);
-      driver->send(device_id, (const char *)txbuf.ptr(), pkt_len);
-      memset(buf, 0, count);
-      buf[0] = 1;
-      return count;
-    }
-  }
+  // switch (offset) {
+  //   case TX_SIGNAL: {
+  //     uint16_t pkt_len = txbuf[PKT_LEN] | ((uint16_t)txbuf[PKT_LEN + 1] << 8);
+  //     driver->send(device_id, (const char *)txbuf.ptr(), pkt_len);
+  //     memset(buf, 0, count);
+  //     buf[0] = 1;
+  //     return count;
+  //   }
+  // }
 
   printf("Invalid read offset: %x\n", offset);
   return -1;
+}
+
+void VdpdkDevice::tx_poll(std::stop_token stop) {
+  uint8_t *lock = (uint8_t *)(txbuf.ptr() + PKT_SIGNAL_OFF);
+  while (true) {
+    while (rte_read8(lock) != 0) {
+      if (stop.stop_requested()) return;
+    }
+
+    uint16_t pkt_len = txbuf[PKT_LEN_OFF] | ((uint16_t)txbuf[PKT_LEN_OFF + 1] << 8);
+    if (pkt_len > 0 && pkt_len <= MAX_PKT_LEN) {
+      driver->send(device_id, (const char *)txbuf.ptr(), pkt_len);
+    }
+
+    rte_write8(1, lock);
+  }
 }

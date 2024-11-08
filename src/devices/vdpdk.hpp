@@ -3,7 +3,7 @@
 #include "src/devices/vmux-device.hpp"
 #include "memfd.hpp"
 #include <string>
-#include <vector>
+#include <thread>
 
 class VdpdkDevice : public VmuxDevice {
 public:
@@ -13,9 +13,8 @@ public:
 
 private:
   std::string dbg_string;
-  std::vector<unsigned char> pkt_buf; // TODO remove
-  MemFd txbuf{"vdpdk_tx", 0x1000};
-  MemFd rxbuf{"vdpdk_rx", 0x1000};
+  MemFd txbuf;
+  MemFd rxbuf;
   
   void rx_callback_fn(int vm_number);
   static void rx_callback_static(int vm_number, void *);
@@ -25,4 +24,8 @@ private:
                                          loff_t offset, bool is_write);
   ssize_t region_access_write(char *buf, size_t count, unsigned offset);
   ssize_t region_access_read(char *buf, size_t count, unsigned offset);
+
+  // declare this last, so it is destroyed first
+  std::jthread tx_poll_thread;
+  void tx_poll(std::stop_token stop);
 };
