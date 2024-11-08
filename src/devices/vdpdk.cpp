@@ -146,9 +146,19 @@ void VdpdkDevice::tx_poll(std::stop_token stop) {
       if (stop.stop_requested()) return;
     }
 
-    uint16_t pkt_len = txbuf[PKT_LEN_OFF] | ((uint16_t)txbuf[PKT_LEN_OFF + 1] << 8);
-    if (pkt_len > 0 && pkt_len <= MAX_PKT_LEN) {
-      driver->send(device_id, (const char *)txbuf.ptr(), pkt_len);
+    unsigned char *pkt_len_ptr = txbuf.ptr() + PKT_LEN_OFF;
+    unsigned char *data_ptr = txbuf.ptr();
+
+    while (data_ptr < pkt_len_ptr) {
+      uint16_t pkt_len = pkt_len_ptr[0] | ((uint16_t)pkt_len_ptr[1] << 8);
+      uint16_t max_pkt_len = pkt_len_ptr - data_ptr;
+      if (pkt_len == 0 || pkt_len > max_pkt_len) {
+        break;
+      }
+
+      driver->send(device_id, (const char *)data_ptr, pkt_len);
+      data_ptr += pkt_len;
+      pkt_len_ptr -= 2;
     }
 
     rte_write8(1, lock);
