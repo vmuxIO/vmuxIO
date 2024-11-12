@@ -6,14 +6,12 @@
 
 enum VDPDK_OFFSET {
   DEBUG_STRING = 0x0,
-  TX_SIGNAL = 0x40,
 };
 
 enum VDPDK_CONSTS {
   REGION_SIZE = 0x1000,
   PKT_SIGNAL_OFF = REGION_SIZE - 0x40,
-  PKT_LEN_OFF = PKT_SIGNAL_OFF - 2,
-  MAX_PKT_LEN = PKT_LEN_OFF,
+  MAX_PKT_LEN = PKT_SIGNAL_OFF,
 };
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
@@ -152,19 +150,27 @@ void VdpdkDevice::tx_poll(std::stop_token stop) {
       if (stop.stop_requested()) return;
     }
 
-    unsigned char *pkt_len_ptr = txbuf.ptr() + PKT_LEN_OFF;
-    unsigned char *data_ptr = txbuf.ptr();
+    unsigned char *ptr = txbuf.ptr();
+    unsigned char *end = ptr + MAX_PKT_LEN;
+    constexpr size_t addr_size = sizeof(uintptr_t);
 
-    while (data_ptr < pkt_len_ptr) {
-      uint16_t pkt_len = pkt_len_ptr[0] | ((uint16_t)pkt_len_ptr[1] << 8);
-      uint16_t max_pkt_len = pkt_len_ptr - data_ptr;
-      if (pkt_len == 0 || pkt_len > max_pkt_len) {
+    while (ptr + addr_size + 2 <= end) {
+      uint16_t pkt_len = ptr[0] | ((uint16_t)ptr[1] << 8);
+      ptr += 2;
+      if (pkt_len == 0) {
         break;
       }
 
-      driver->send(device_id, (const char *)data_ptr, pkt_len);
-      data_ptr += pkt_len;
-      pkt_len_ptr -= 2;
+      uintptr_t dma_addr;
+      memcpy(&dma_addr, ptr, addr_size);
+      const char *data_ptr = (const char *)vfuServer->dma_local_addr(dma_addr, pkt_len);
+      if (data_ptr == NULL) {
+        printf("Invalid DMA address (%lx)\n", (unsigned long)dma_addr);
+        break;
+      }
+      ptr += addr_size;
+
+      driver->send(device_id, data_ptr, pkt_len);
     }
 
     rte_write8(1, lock);
