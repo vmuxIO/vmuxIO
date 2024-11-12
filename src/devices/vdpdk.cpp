@@ -62,6 +62,12 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
     die("failed to setup BAR2 region (%d)", errno);
   }
 
+  ret = vfu_setup_device_dma(ctx, dma_register_cb_static,
+                             dma_unregister_cb_static);
+  if (ret) {
+    die("failed to setup device dma (%d)", errno);
+  }
+
   tx_poll_thread = std::jthread{[this](std::stop_token stop){
     this->tx_poll(std::move(stop));
   }};
@@ -163,4 +169,24 @@ void VdpdkDevice::tx_poll(std::stop_token stop) {
 
     rte_write8(1, lock);
   }
+}
+
+void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
+  uint32_t flags = 0;
+  VfioUserServer::map_dma_here(ctx, vfuServer.get(), info, &flags);
+}
+
+void VdpdkDevice::dma_register_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
+  VdpdkDevice *this_ = (VdpdkDevice *)vfu_get_private(ctx);
+  return this_->dma_register_cb(ctx, info);
+}
+
+void VdpdkDevice::dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
+  uint32_t flags = 0;
+  VfioUserServer::unmap_dma_here(ctx, vfuServer.get(), info);
+}
+
+void VdpdkDevice::dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
+  VdpdkDevice *this_ = (VdpdkDevice *)vfu_get_private(ctx);
+  return this_->dma_unregister_cb(ctx, info);
 }

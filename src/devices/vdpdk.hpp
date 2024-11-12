@@ -25,6 +25,11 @@ private:
   ssize_t region_access_write(char *buf, size_t count, unsigned offset);
   ssize_t region_access_read(char *buf, size_t count, unsigned offset);
 
+  void dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info);
+  static void dma_register_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info);
+  void dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info);
+  static void dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info);
+
   // declare this last, so it is destroyed first
   std::jthread tx_poll_thread;
   void tx_poll(std::stop_token stop);
