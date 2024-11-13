@@ -28,6 +28,8 @@ VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
   this->info.pci_subclass = 0;
   this->info.pci_revision = 1;
 
+  rte_write8(1, rxbuf.ptr() + PKT_SIGNAL_OFF);
+
   this->rx_callback = rx_callback_static;
 }
 
@@ -72,7 +74,73 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
 }
 
 void VdpdkDevice::rx_callback_fn(int vm_number) {
-  // TODO
+  uint8_t *lock = (uint8_t *)(rxbuf.ptr() + PKT_SIGNAL_OFF);
+
+  // Only try locking for a bit
+  // If we can't lock, we wan't to return to give control back to the RX thread
+  bool locked = false;
+  for (unsigned i = 0; i < 2048; i++) {
+    if (rte_read8(lock) == 0) {
+      locked = true;
+      break;
+    }
+  }
+  if (!locked) {
+    return;
+  }
+
+  driver->recv(vm_number);
+
+  unsigned char *ptr = rxbuf.ptr();
+  unsigned char *end = ptr + MAX_PKT_LEN;
+  constexpr size_t addr_size = sizeof(uintptr_t);
+
+  bool have_buffers = true;
+  for (int q_idx = 0; q_idx < 4 && have_buffers; q_idx++) { // TODO hardcoded max_queues_per_vm
+    int queue_id = vm_number * 4 + q_idx;// TODO this_->get_rx_queue_id(vm_id, q_idx);
+    for (uint16_t i = queue_id * 32; i < (queue_id * 32+ driver->nb_bufs_used[queue_id]); i++) { // TODO 32 = BURST_SIZE
+      // this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
+
+      if (ptr + 2 + addr_size > end) {
+        have_buffers = false;
+        break;
+      }
+
+      uint16_t max_pkt_len = ptr[0] | ((uint16_t)ptr[1] << 8);
+      if (max_pkt_len == 0) {
+        have_buffers = false;
+        break;
+      }
+
+      uintptr_t dma_addr;
+      memcpy(&dma_addr, ptr + 2, addr_size);
+      void *data_ptr = vfuServer->dma_local_addr(dma_addr, max_pkt_len);
+      if (data_ptr == NULL) {
+        printf("Invalid DMA address (%lx)\n", (unsigned long)dma_addr);
+        have_buffers = false;
+        break;
+      }
+      size_t pkt_len = driver->rxBuf_used[i];
+      if (pkt_len > max_pkt_len) {
+        printf("Packet too large (%lx > %x)\n", (unsigned long)pkt_len, (unsigned)max_pkt_len);
+        have_buffers = false;
+        break;
+      }
+
+      memcpy(data_ptr, driver->rxBufs[i], pkt_len);
+      ptr[0] = pkt_len;
+      ptr[1] = pkt_len >> 8;
+      ptr += 2 + addr_size;
+    }
+  }
+
+  if (ptr + 2 + addr_size <= end) {
+    ptr[0] = 0;
+    ptr[1] = 0;
+  }
+
+  rte_write8(1, lock);
+  driver->recv_consumed(vm_number);
 }
 
 void VdpdkDevice::rx_callback_static(int vm_number, void *this__) {
