@@ -3,15 +3,21 @@
 #include "src/vfio-server.hpp"
 
 #include <rte_io.h>
+#include <format>
 
 enum VDPDK_OFFSET {
   DEBUG_STRING = 0x0,
+  TX_QUEUE_START = 0x40,
+  TX_QUEUE_STOP = 0x80,
 };
 
 enum VDPDK_CONSTS {
   REGION_SIZE = 0x1000,
   PKT_SIGNAL_OFF = REGION_SIZE - 0x40,
   MAX_PKT_LEN = PKT_SIGNAL_OFF,
+
+  TX_DESC_SIZE = 0x20,
+  TX_FLAG_AVAIL = 1,
 };
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
@@ -114,6 +120,8 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
 
       uintptr_t dma_addr;
       memcpy(&dma_addr, ptr + 2, addr_size);
+
+      std::lock_guard guard(vfu_ctx_mutex);
       void *data_ptr = vfuServer->dma_local_addr(dma_addr, max_pkt_len);
       if (data_ptr == NULL) {
         printf("Invalid DMA address (%lx)\n", (unsigned long)dma_addr);
@@ -177,6 +185,41 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       }
       return count;
     }
+
+    case TX_QUEUE_START: {
+      if (count != 2) return -1;
+      uint16_t queue_idx;
+      memcpy(&queue_idx, buf, 2);
+      if (queue_idx != 0) {
+        printf("TX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
+        return count;
+      }
+
+      uint64_t ring_addr;
+      memcpy(&ring_addr, txbuf.ptr(), 8);
+      uint16_t idx_mask;
+      memcpy(&idx_mask, txbuf.ptr() + 8, 2);
+
+      // Start polling
+      tx_poll_thread = std::jthread{[this, ring_addr, idx_mask](std::stop_token stop){
+        this->tx_poll(std::move(stop), ring_addr, idx_mask);
+      }};
+      return count;
+    }
+
+    case TX_QUEUE_STOP: {
+      if (count != 2) return -1;
+      uint16_t queue_idx;
+      memcpy(&queue_idx, buf, 2);
+      if (queue_idx != 0) {
+        printf("TX_QUEUE_STOP: Invalid queue idx %d", (int)queue_idx);
+        return count;
+      }
+
+      // Stop polling
+      tx_poll_thread = std::jthread{};
+      return count;
+    }
   }
 
   printf("Invalid write offset: %x\n", offset);
@@ -211,41 +254,77 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
   return -1;
 }
 
-void VdpdkDevice::tx_poll(std::stop_token stop) {
-  uint8_t *lock = (uint8_t *)(txbuf.ptr() + PKT_SIGNAL_OFF);
+void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t idx_mask) {
+  size_t ring_size = ((size_t)idx_mask + 1) * TX_DESC_SIZE;
+
+  puts(std::format("Start TX polling with iova {:#x}, mask {:#x}, size {:#x}", ring_iova, idx_mask, ring_size).c_str());
+
+  std::unique_lock dma_lock(dma_mutex);
+  unsigned char *ring = (unsigned char *)vfuServer->dma_local_addr(ring_iova, ring_size);
+  if (!ring) {
+    printf("Invalid ring_iova\n");
+    return;
+  }
+  uint16_t idx = 0;
   while (true) {
-    while (rte_read8(lock) != 0) {
-      if (stop.stop_requested()) return;
+    // Check if stop requested
+    if (stop.stop_requested()) {
+      return;
     }
 
-    unsigned char *ptr = txbuf.ptr();
-    unsigned char *end = ptr + MAX_PKT_LEN;
-    constexpr size_t addr_size = sizeof(uintptr_t);
-
-    while (ptr + addr_size + 2 <= end) {
-      uint16_t pkt_len = ptr[0] | ((uint16_t)ptr[1] << 8);
-      ptr += 2;
-      if (pkt_len == 0) {
-        break;
+    // Check if DMA mapping wants to change
+    if (dma_flag.test()) {
+      // Release lock
+      dma_lock.unlock();
+      // Wait until vfio-user thread holds mutex
+      while (dma_flag.test());
+      // Re-aquire lock
+      dma_lock.lock();
+      // Ensure ring address is still valid
+      ring = (unsigned char *)vfuServer->dma_local_addr(ring_iova, ring_size);
+      if (!ring) {
+        printf("DMA unmapped during TX poll\n");
+        return;
       }
-
-      uintptr_t dma_addr;
-      memcpy(&dma_addr, ptr, addr_size);
-      const char *data_ptr = (const char *)vfuServer->dma_local_addr(dma_addr, pkt_len);
-      if (data_ptr == NULL) {
-        printf("Invalid DMA address (%lx)\n", (unsigned long)dma_addr);
-        break;
-      }
-      ptr += addr_size;
-
-      driver->send(device_id, data_ptr, pkt_len);
     }
 
-    rte_write8(1, lock);
+    unsigned char *buf_iova_addr = ring + (size_t)(idx & idx_mask) * TX_DESC_SIZE;
+    unsigned char *buf_len_addr = buf_iova_addr + 8;
+    unsigned char *desc_flags_addr = buf_len_addr + 2;
+
+    uint16_t flags = rte_read16(desc_flags_addr);
+    // If next descriptor is not available, try again
+    if (!(flags & TX_FLAG_AVAIL)) {
+      continue;
+    }
+
+    // If FLAG_AVAIL is set, we own the buffer and need to send it
+    uint64_t buf_iova;
+    memcpy(&buf_iova, buf_iova_addr, 8);
+    uint16_t buf_len;
+    memcpy(&buf_len, buf_len_addr, 2);
+    void *buf_addr = vfuServer->dma_local_addr(buf_iova, buf_len);
+    if (!buf_addr) {
+      printf("Invalid packet iova!\n");
+      return;
+    }
+
+    driver->send(device_id, (const char *)buf_addr, buf_len);
+
+    // Release buffer back to VM
+    flags &= ~TX_FLAG_AVAIL;
+    rte_write16(flags, desc_flags_addr);
+
+    // Go to next descriptor
+    // Index wraps naturally on overflow
+    idx++;
   }
 }
 
 void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
+  dma_flag.test_and_set();
+  std::lock_guard guard(dma_mutex);
+  dma_flag.clear();
   uint32_t flags = 0;
   VfioUserServer::map_dma_here(ctx, vfuServer.get(), info, &flags);
 }
@@ -256,6 +335,9 @@ void VdpdkDevice::dma_register_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
 }
 
 void VdpdkDevice::dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
+  dma_flag.test_and_set();
+  std::lock_guard guard(dma_mutex);
+  dma_flag.clear();
   uint32_t flags = 0;
   VfioUserServer::unmap_dma_here(ctx, vfuServer.get(), info);
 }
