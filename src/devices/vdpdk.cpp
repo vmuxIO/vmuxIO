@@ -73,10 +73,6 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   if (ret) {
     die("failed to setup device dma (%d)", errno);
   }
-
-  tx_poll_thread = std::jthread{[this](std::stop_token stop){
-    this->tx_poll(std::move(stop));
-  }};
 }
 
 void VdpdkDevice::rx_callback_fn(int vm_number) {
