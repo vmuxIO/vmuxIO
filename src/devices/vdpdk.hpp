@@ -3,7 +3,7 @@
 #include "src/devices/vmux-device.hpp"
 #include "memfd.hpp"
 #include <atomic>
-#include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 
@@ -20,10 +20,17 @@ private:
 
   // we use this to ensure we don't have to lock the VfuServer for every dma access
   // if we don't lock at all, it's possible that the dma mapping is released while we access it
-  std::mutex dma_mutex;
+  std::shared_mutex dma_mutex;
   // set if vfio-user wants to change dma mapping
   std::atomic_flag dma_flag;
-  
+
+  struct RxQueue {
+    uintptr_t ring_iova;
+    uint16_t idx_mask;
+    uint16_t idx;
+  };
+  std::atomic<std::shared_ptr<RxQueue>> rx_queue;
+
   void rx_callback_fn(int vm_number);
   static void rx_callback_static(int vm_number, void *);
 

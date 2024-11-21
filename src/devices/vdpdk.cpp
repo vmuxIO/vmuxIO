@@ -9,15 +9,19 @@ enum VDPDK_OFFSET {
   DEBUG_STRING = 0x0,
   TX_QUEUE_START = 0x40,
   TX_QUEUE_STOP = 0x80,
+
+  RX_QUEUE_START = 0x140,
+  RX_QUEUE_STOP = 0x180,
 };
 
 enum VDPDK_CONSTS {
   REGION_SIZE = 0x1000,
-  PKT_SIGNAL_OFF = REGION_SIZE - 0x40,
-  MAX_PKT_LEN = PKT_SIGNAL_OFF,
 
   TX_DESC_SIZE = 0x20,
   TX_FLAG_AVAIL = 1,
+
+  RX_DESC_SIZE = 0x20,
+  RX_FLAG_AVAIL = 1,
 };
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
@@ -33,8 +37,6 @@ VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
   this->info.pci_class = 2;
   this->info.pci_subclass = 0;
   this->info.pci_revision = 1;
-
-  rte_write8(1, rxbuf.ptr() + PKT_SIGNAL_OFF);
 
   this->rx_callback = rx_callback_static;
 }
@@ -76,26 +78,13 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
 }
 
 void VdpdkDevice::rx_callback_fn(int vm_number) {
-  uint8_t *lock = (uint8_t *)(rxbuf.ptr() + PKT_SIGNAL_OFF);
-
-  // Only try locking for a bit
-  // If we can't lock, we wan't to return to give control back to the RX thread
-  bool locked = false;
-  for (unsigned i = 0; i < 2048; i++) {
-    if (rte_read8(lock) == 0) {
-      locked = true;
-      break;
-    }
-  }
-  if (!locked) {
-    return;
-  }
-
   driver->recv(vm_number);
 
-  unsigned char *ptr = rxbuf.ptr();
-  unsigned char *end = ptr + MAX_PKT_LEN;
-  constexpr size_t addr_size = sizeof(uintptr_t);
+  // We delay loading this until we actually know if packets were received
+  std::shared_lock dma_lock(dma_mutex, std::defer_lock);
+  std::shared_ptr<RxQueue> rxq;
+  size_t ring_size;
+  unsigned char *ring;
 
   bool have_buffers = true;
   for (int q_idx = 0; q_idx < 4 && have_buffers; q_idx++) { // TODO hardcoded max_queues_per_vm
@@ -103,47 +92,73 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
     for (uint16_t i = queue_id * 32; i < (queue_id * 32+ driver->nb_bufs_used[queue_id]); i++) { // TODO 32 = BURST_SIZE
       // this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
 
-      if (ptr + 2 + addr_size > end) {
+      // If we reach this point, at least one packet was received
+
+      // Lock and load rx_queue parameters
+      if (!rxq) {
+        rxq = rx_queue.load();
+        // If no queue was created, we are done
+        if (!rxq) {
+          have_buffers = false;
+          break;
+        }
+
+        dma_lock.lock();
+        ring_size = ((size_t)rxq->idx_mask + 1) * RX_DESC_SIZE;
+        ring = (unsigned char *)vfuServer->dma_local_addr(rxq->ring_iova, ring_size);
+        if (!ring) {
+          printf("DMA unmapped during RX poll\n");
+          have_buffers = false;
+          break;
+        }
+      }
+
+      unsigned char *buf_iova_addr = ring + (size_t)(rxq->idx & rxq->idx_mask) * RX_DESC_SIZE;
+      unsigned char *buf_len_addr = buf_iova_addr + 8;
+      unsigned char *desc_flags_addr = buf_len_addr + 2;
+
+      uint16_t flags = rte_read16(desc_flags_addr);
+      // If next descriptor is not available, we are out of buffers
+      if (!(flags & RX_FLAG_AVAIL)) {
         have_buffers = false;
         break;
       }
 
-      uint16_t max_pkt_len = ptr[0] | ((uint16_t)ptr[1] << 8);
-      if (max_pkt_len == 0) {
+      // If FLAG_AVAIL is set, we own the buffer and can copy the packet into it
+      uint64_t buf_iova;
+      memcpy(&buf_iova, buf_iova_addr, 8);
+      uint16_t buf_len;
+      memcpy(&buf_len, buf_len_addr, 2);
+      void *buf_addr = vfuServer->dma_local_addr(buf_iova, buf_len);
+      if (!buf_addr) {
+        printf("Invalid packet iova!\n");
         have_buffers = false;
         break;
       }
 
-      uintptr_t dma_addr;
-      memcpy(&dma_addr, ptr + 2, addr_size);
-
-      std::lock_guard guard(vfu_ctx_mutex);
-      void *data_ptr = vfuServer->dma_local_addr(dma_addr, max_pkt_len);
-      if (data_ptr == NULL) {
-        printf("Invalid DMA address (%lx)\n", (unsigned long)dma_addr);
-        have_buffers = false;
-        break;
-      }
+      // Check sizes
       size_t pkt_len = driver->rxBuf_used[i];
-      if (pkt_len > max_pkt_len) {
-        printf("Packet too large (%lx > %x)\n", (unsigned long)pkt_len, (unsigned)max_pkt_len);
+      uint16_t pkt_len_u16 = pkt_len;
+      if (pkt_len > buf_len || pkt_len > pkt_len_u16) {
+        printf("Packet too large (%lx > %x)\n", (unsigned long)pkt_len, (unsigned)buf_len);
         have_buffers = false;
         break;
       }
 
-      memcpy(data_ptr, driver->rxBufs[i], pkt_len);
-      ptr[0] = pkt_len;
-      ptr[1] = pkt_len >> 8;
-      ptr += 2 + addr_size;
+      // Copy data
+      memcpy(buf_addr, driver->rxBufs[i], pkt_len);
+      memcpy(buf_len_addr, &pkt_len_u16, 2);
+
+      // Release buffer back to VM
+      flags &= ~RX_FLAG_AVAIL;
+      rte_write16(flags, desc_flags_addr);
+
+      // Go to next descriptor
+      // Index wraps naturally on overflow
+      rxq->idx++;
     }
   }
 
-  if (ptr + 2 + addr_size <= end) {
-    ptr[0] = 0;
-    ptr[1] = 0;
-  }
-
-  rte_write8(1, lock);
   driver->recv_consumed(vm_number);
 }
 
@@ -216,6 +231,43 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       tx_poll_thread = std::jthread{};
       return count;
     }
+
+    case RX_QUEUE_START: {
+      if (count != 2) return -1;
+      uint16_t queue_idx;
+      memcpy(&queue_idx, buf, 2);
+      if (queue_idx != 0) {
+        printf("RX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
+        return count;
+      }
+
+      uint64_t ring_addr;
+      memcpy(&ring_addr, rxbuf.ptr(), 8);
+      uint16_t idx_mask;
+      memcpy(&idx_mask, rxbuf.ptr() + 8, 2);
+
+      auto rxq = std::make_shared<RxQueue>();
+      rxq->ring_iova = ring_addr;
+      rxq->idx_mask = idx_mask;
+      rxq->idx = 0;
+
+      rx_queue = rxq;
+
+      return count;
+    }
+
+    case RX_QUEUE_STOP: {
+      if (count != 2) return -1;
+      uint16_t queue_idx;
+      memcpy(&queue_idx, buf, 2);
+      if (queue_idx != 0) {
+        printf("RX_QUEUE_STOP: Invalid queue idx %d", (int)queue_idx);
+        return count;
+      }
+
+      rx_queue = nullptr;
+      return count;
+    }
   }
 
   printf("Invalid write offset: %x\n", offset);
@@ -255,7 +307,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
 
   puts(std::format("Start TX polling with iova {:#x}, mask {:#x}, size {:#x}", ring_iova, idx_mask, ring_size).c_str());
 
-  std::unique_lock dma_lock(dma_mutex);
+  std::shared_lock dma_lock(dma_mutex);
   unsigned char *ring = (unsigned char *)vfuServer->dma_local_addr(ring_iova, ring_size);
   if (!ring) {
     printf("Invalid ring_iova\n");
