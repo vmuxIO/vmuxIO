@@ -7,7 +7,7 @@
 let
   dpdk = selfpkgs.dpdkdk; # needed for ice package thingy
   # dpdk = self.inputs.nixpkgs.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
-  debug = true;
+  debug = false;
 in
 pkgs.stdenv.mkDerivation {
   pname = "fastclick";

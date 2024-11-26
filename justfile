@@ -75,10 +75,11 @@ vmuxDpdkE810:
   sudo {{proot}}/build/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 -v
 
 vmuxMed:
-  sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
+  sudo {{proot}}/build_release/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
 
 vmuxVdpdk:
-  sudo gdb -ex "handle SIGTERM nostop print pass" --args {{proot}}/build/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
+  # sudo gdb -ex "handle SIGTERM nostop print pass" --args {{proot}}/build/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
+  sudo {{proot}}/build_release/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
 
 vmuxMedLog:
   sudo {{proot}}/build/vmux -u -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 2>&1 | rg 'ice_callback|send|qemu|dominik'
