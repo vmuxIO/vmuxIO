@@ -85,21 +85,28 @@ public:
   // forward rx event callback from tap to this E1000EmulatedDevice
   static void driver_cb(int vm_number, void *this__) {
     E1000EmulatedDevice *this_ = (E1000EmulatedDevice*) this__;
-    if (e1000_rx_is_ready(this_->e1000)) {
-      this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
-      for (uint16_t i = 0; i < this_->driver->nb_bufs_used[0]; i++) {
+    // TODO: should this be here? We wait on the same condition below.
+    if (!e1000_rx_is_ready(this_->e1000)) {
+      return;
+    }
+
+    this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
+		for (unsigned q_idx = 0; q_idx < this_->driver->max_queues_per_vm; q_idx++) {
+		  auto &rxq = this_->driver->get_rx_queue(vm_number, q_idx);
+			for (uint16_t i = 0; i < rxq.nb_bufs_used; i++) {
+			  auto &rxBuf = rxq.rxBufs[i];
         while(!e1000_rx_is_ready(this_->e1000)) {
           // blocking pause to reduce memory contention while spinning.
           // 100us seem to yield good results.
           Util::rte_delay_us_block(100);
         }
         this_->vfu_ctx_mutex.lock();
-        this_->ethRx(this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]);
+        this_->ethRx(rxBuf.data, rxBuf.used);
         this_->vfu_ctx_mutex.unlock();
-      }
-      this_->driver->recv_consumed(vm_number);
-      // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
-    }
+			}
+		}
+    this_->driver->recv_consumed(vm_number);
+    // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
   }
 
   void ethRx(char *data, size_t len) {

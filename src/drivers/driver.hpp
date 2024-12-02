@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
+#include <vector>
 #include "util.hpp"
 
 struct vmux_descriptor {
@@ -14,37 +15,66 @@ struct vmux_descriptor {
 // Abstract class for Driver backends
 class Driver {
 public:
-  static const int MAX_BUF = 9000; // should be enough even for most jumboframes
+  static constexpr int MAX_BUF = 9000; // should be enough even for most jumboframes
 
   int fd = 0; // may be a non-null fd to poll on
-  size_t nb_bufs = 0; // rxBufs allocated
-  // struct vmux_descriptor **bufs; //
-  // TODO revise this: !!!
-  size_t *nb_bufs_used; // rxBufs filled with data (per queue, value must be <= BURST_SIZE) (size=global queues)
-  char **rxBufs; // size=global_queues * BUSRT_SIZE
-  size_t *rxBuf_used; // how much each rxBuf is actually filled with data (size=global_queues * BURST_SIZE)
-  std::optional<uint16_t> *rxBuf_queue; // optional hints to destination queues (size=global_queues * BURST_SIZE)
-  char txFrame[MAX_BUF];
 
-  void alloc_rx_lists(size_t global_queues, size_t per_queue_bursts) {
-    this->nb_bufs_used = (size_t*) calloc(global_queues, sizeof(size_t));
-    size_t nb_bufs = global_queues * per_queue_bursts;
-    this->nb_bufs = nb_bufs;
-    this->rxBufs = (char**) malloc(nb_bufs * sizeof(char*));
-    this->rxBuf_used = (size_t*) calloc(nb_bufs, sizeof(size_t));
-    this->rxBuf_queue = (std::optional<uint16_t>*) malloc(nb_bufs * sizeof(std::optional<uint16_t>));
-    this->rxBuf_queue = new std::optional<uint16_t>[nb_bufs]();
-    if (!this->rxBufs)
-      die("Cannot allocate rxBufs");
+  struct RxBuf {
+    char *data = nullptr;
+    size_t used = 0; // how much the rxBuf is actually filled with data
+    std::optional<uint16_t> queue; // optional hint to destination queue
+  };
+
+  struct RxQueue {
+    std::vector<RxBuf> rxBufs;
+    size_t nb_bufs_used = 0; // rxBufs filled with data
+  };
+
+  std::vector<RxQueue> rxQueues;
+
+  // to map VMs to RxQueues:
+  // for every i from 0 to below max_queues_per_vm:
+  // the queue index `vm_queue_stride * vm_id + i` belongs to VM
+  unsigned max_queues_per_vm;
+  unsigned vm_queue_stride;
+
+  RxQueue &get_rx_queue(unsigned vm, unsigned queue) {
+    return rxQueues[vm * vm_queue_stride + queue];
+  }
+
+  void alloc_rx_lists(size_t global_queues,
+                      size_t per_queue_bursts,
+                      unsigned max_queues_per_vm,
+                      unsigned vm_queue_stride) {
+    rxQueues.resize(global_queues);
+    for (auto &rxq : rxQueues) {
+      rxq.rxBufs.resize(per_queue_bursts);
+    }
+    this->max_queues_per_vm = max_queues_per_vm;
+    this->vm_queue_stride = vm_queue_stride;
   }
 
   void alloc_rx_bufs() {
-    if (this->nb_bufs == 0)
+    if (rxQueues.empty())
       die("rxBuf lists uninitialized. Call alloc_rx_lists first.")
-    for (size_t i = 0; i < nb_bufs; i++) {
-      this->rxBufs[i] = (char*) malloc(this->MAX_BUF);
-      if (!this->rxBufs)
-        die("Cannot allocate rxBuf");
+
+    for (auto &rxq : rxQueues) {
+      for (auto &rxbuf : rxq.rxBufs) {
+        rxbuf.data = (char *)malloc(Driver::MAX_BUF);
+        if (!rxbuf.data)
+          die("Cannot allocate rxBuf");
+      }
+    }
+  }
+
+  void free_rx_bufs() {
+    for (auto &rxq : rxQueues) {
+      for (auto &rxbuf : rxq.rxBufs) {
+        if (!rxbuf.data)
+          continue;
+        free(rxbuf.data);
+        rxbuf.data = nullptr;
+      }
     }
   }
 

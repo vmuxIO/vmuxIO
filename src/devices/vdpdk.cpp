@@ -87,12 +87,11 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
   unsigned char *ring;
 
   bool have_buffers = true;
-  for (int q_idx = 0; q_idx < 4 && have_buffers; q_idx++) { // TODO hardcoded max_queues_per_vm
-    int queue_id = vm_number * 4 + q_idx;// TODO this_->get_rx_queue_id(vm_id, q_idx);
-    for (uint16_t i = queue_id * 32; i < (queue_id * 32+ driver->nb_bufs_used[queue_id]); i++) { // TODO 32 = BURST_SIZE
-      // this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
-
+  for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm && have_buffers; q_idx++) {
+    auto &driver_rxq = driver->get_rx_queue(vm_number, q_idx);
+    for (uint16_t i = 0; i < driver_rxq.nb_bufs_used; i++) {
       // If we reach this point, at least one packet was received
+      auto &driver_rxBuf = driver_rxq.rxBufs[i];
 
       // Lock and load rx_queue parameters
       if (!rxq) {
@@ -137,7 +136,7 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
       }
 
       // Check sizes
-      size_t pkt_len = driver->rxBuf_used[i];
+      size_t pkt_len = driver_rxBuf.used;
       uint16_t pkt_len_u16 = pkt_len;
       if (pkt_len > buf_len || pkt_len > pkt_len_u16) {
         printf("Packet too large (%lx > %x)\n", (unsigned long)pkt_len, (unsigned)buf_len);
@@ -146,7 +145,7 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
       }
 
       // Copy data
-      memcpy(buf_addr, driver->rxBufs[i], pkt_len);
+      memcpy(buf_addr, driver_rxBuf.data, pkt_len);
       memcpy(buf_len_addr, &pkt_len_u16, 2);
 
       // Release buffer back to VM
