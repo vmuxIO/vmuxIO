@@ -3,6 +3,7 @@
 #include "src/vfio-server.hpp"
 
 #include <rte_io.h>
+#include <rte_mbuf.h>
 #include <rte_mempool.h>
 #include <format>
 
@@ -318,10 +319,19 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     printf("Invalid ring_iova\n");
     return;
   }
+
+  uint16_t queue_idx = dpdk_driver->get_tx_queue_id(device_id, 0);
+  struct rte_mempool *pool = dpdk_driver->tx_mbuf_pools[queue_idx];
+
+  constexpr unsigned burst_size = 128;
+  struct rte_mbuf *mbufs[burst_size];
+  unsigned nb_mbufs_used = 0;
+
   uint16_t idx = 0;
   while (true) {
     // Check if stop requested
     if (stop.stop_requested()) {
+      rte_pktmbuf_free_bulk(mbufs, nb_mbufs_used);
       return;
     }
 
@@ -346,6 +356,15 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     unsigned char *desc_flags_addr = buf_len_addr + 2;
 
     uint16_t flags = rte_read16(desc_flags_addr);
+    // Send packets in burst if buffer is full or no more packets are available
+    if (nb_mbufs_used == burst_size || !(flags & TX_FLAG_AVAIL)) {
+      uint16_t nb_tx = rte_eth_tx_burst(0, queue_idx, mbufs, nb_mbufs_used);
+      if (nb_tx < nb_mbufs_used) {
+        // Drop packets we couldn't send
+        rte_pktmbuf_free_bulk(mbufs + nb_tx, nb_mbufs_used - nb_tx);
+      }
+      nb_mbufs_used = 0;
+    }
     // If next descriptor is not available, try again
     if (!(flags & TX_FLAG_AVAIL)) {
       continue;
@@ -362,7 +381,24 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
       return;
     }
 
-    driver->send(device_id, (const char *)buf_addr, buf_len);
+    // Create pktmbuf
+    struct rte_mbuf *mbuf = rte_pktmbuf_alloc(pool);
+    if (!mbuf) {
+      // No buffer available yet
+      printf("Vdpdk mbuf alloc failed\n");
+      continue;
+    }
+    if (rte_pktmbuf_tailroom(mbuf) < buf_len) {
+      // Packet too large, drop it
+      printf("Packet from VM is too large for buffer.\n");
+      rte_pktmbuf_free(mbuf);
+    } else {
+      rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), buf_addr, buf_len);
+      mbuf->data_len = buf_len;
+      mbuf->pkt_len = buf_len;
+      mbuf->nb_segs = 1;
+      mbufs[nb_mbufs_used++] = mbuf;
+    }
 
     // Release buffer back to VM
     flags &= ~TX_FLAG_AVAIL;
