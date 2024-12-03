@@ -3,6 +3,7 @@
 #include "src/vfio-server.hpp"
 
 #include <rte_io.h>
+#include <rte_mempool.h>
 #include <format>
 
 enum VDPDK_OFFSET {
@@ -25,9 +26,14 @@ enum VDPDK_CONSTS {
 };
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
-: VmuxDevice(device_id, std::move(driver)),
+: VmuxDevice(device_id, driver),
   txbuf{"vdpdk_tx", REGION_SIZE},
-  rxbuf{"vdpdk_rx", REGION_SIZE} {
+  rxbuf{"vdpdk_rx", REGION_SIZE},
+  dpdk_driver(std::dynamic_pointer_cast<Dpdk>(driver)) {
+  if (!dpdk_driver) {
+    die("Using vDPDK without the DPDK backend is not supported.");
+  }
+
   // TODO figure out appropriate IDs
   this->info.pci_vendor_id = 0x1af4; // Red Hat Virtio Devices
   this->info.pci_device_id = 0x7abc; // Unused
@@ -393,3 +399,54 @@ void VdpdkDevice::dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info)
   VdpdkDevice *this_ = (VdpdkDevice *)vfu_get_private(ctx);
   return this_->dma_unregister_cb(ctx, info);
 }
+
+// TX MEMPOOL ADAPTER
+
+struct vdpdk_tx_mempool_private {
+  // Drivers may expect this as the memory pool's private data.
+  // By making it the first member, any pointer to vdpdk_tx_mempool_private
+  // is also a valid pointer to rte_pktmbuf_pool_private.
+  struct rte_pktmbuf_pool_private pkmbuf_private;
+
+  struct rte_mempool_ops *inner;
+};
+
+int vdpdk_tx_mempool_alloc(struct rte_mempool *mp) {
+  auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+  return priv->inner->alloc(mp);
+}
+
+void vdpdk_tx_mempool_free(struct rte_mempool *mp) {
+  auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+  priv->inner->free(mp);
+}
+
+int vdpdk_tx_mempool_enqueue(struct rte_mempool *mp, void *const *obj_table, unsigned int n) {
+  auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+  return priv->inner->enqueue(mp, obj_table, n);
+}
+
+int vdpdk_tx_mempool_dequeue(struct rte_mempool *mp, void **obj_table, unsigned int n) {
+  auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+  return priv->inner->dequeue(mp, obj_table, n);
+}
+
+unsigned vdpdk_tx_mempool_get_count(const struct rte_mempool *mp) {
+  auto priv = (const struct vdpdk_tx_mempool_private *)
+    rte_mempool_get_priv((struct rte_mempool *)mp);
+  return priv->inner->get_count(mp);
+}
+
+// This memory pool is a wrapper around a regular dpdk memory pool.
+// It exists to detect when a driver frees a pktmbuf. The freed pktmbuf is then
+// handed back to the guest VM.
+struct rte_mempool_ops vdpdk_tx_mempool {
+ .name = "VDPDK_TX_MEMPOOL",
+ .alloc = vdpdk_tx_mempool_alloc,
+ .free = vdpdk_tx_mempool_free,
+ .enqueue = vdpdk_tx_mempool_enqueue,
+ .dequeue = vdpdk_tx_mempool_dequeue,
+ .get_count = vdpdk_tx_mempool_get_count,
+};
+
+RTE_MEMPOOL_REGISTER_OPS(vdpdk_tx_mempool);

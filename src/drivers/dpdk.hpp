@@ -366,6 +366,7 @@ private:
 	// one per queue
 	struct rte_mbuf **tso_seg = nullptr;
 
+	friend class VdpdkDevice;
 
 	// get queue id of native queue
 	uint16_t get_rx_queue_id(int vm, int queue) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "drivers/dpdk.hpp"
 #include "src/devices/vmux-device.hpp"
 #include "memfd.hpp"
 #include <atomic>
@@ -17,6 +18,8 @@ private:
   std::string dbg_string;
   MemFd txbuf;
   MemFd rxbuf;
+
+  std::shared_ptr<Dpdk> dpdk_driver;
 
   // we use this to ensure we don't have to lock the VfuServer for every dma access
   // if we don't lock at all, it's possible that the dma mapping is released while we access it
