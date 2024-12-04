@@ -1,11 +1,16 @@
 #include "src/devices/vdpdk.hpp"
+#include "src/devices/vdpdk-consts.hpp"
 #include "libvfio-user.h"
 #include "src/vfio-server.hpp"
 
+#include <rte_eal.h>
 #include <rte_io.h>
 #include <rte_mbuf.h>
+#include <rte_mbuf_pool_ops.h>
 #include <rte_mempool.h>
 #include <format>
+
+using namespace VDPDK_CONSTS;
 
 enum VDPDK_OFFSET {
   DEBUG_STRING = 0x0,
@@ -16,16 +21,6 @@ enum VDPDK_OFFSET {
   RX_QUEUE_STOP = 0x180,
 };
 
-enum VDPDK_CONSTS {
-  REGION_SIZE = 0x1000,
-
-  TX_DESC_SIZE = 0x20,
-  TX_FLAG_AVAIL = 1,
-
-  RX_DESC_SIZE = 0x20,
-  RX_FLAG_AVAIL = 1,
-};
-
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
 : VmuxDevice(device_id, driver),
   txbuf{"vdpdk_tx", REGION_SIZE},
@@ -33,6 +28,9 @@ VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
   dpdk_driver(std::dynamic_pointer_cast<Dpdk>(driver)) {
   if (!dpdk_driver) {
     die("Using vDPDK without the DPDK backend is not supported.");
+  }
+  if (rte_eal_iova_mode() != RTE_IOVA_VA) {
+    die("vDPDK only supports virtual address IOVA mode. (Try using DPDK with --iova-mode=va)");
   }
 
   // TODO figure out appropriate IDs
@@ -322,12 +320,47 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
 
   uint16_t queue_idx = dpdk_driver->get_tx_queue_id(device_id, 0);
   struct rte_mempool *pool = dpdk_driver->tx_mbuf_pools[queue_idx];
+  assert(rte_pktmbuf_priv_size(pool) >= sizeof(struct rte_mbuf_ext_shared_info) + TX_DESC_SIZE);
 
   constexpr unsigned burst_size = 128;
   struct rte_mbuf *mbufs[burst_size];
   unsigned nb_mbufs_used = 0;
 
-  uint16_t idx = 0;
+  struct queue_data {
+    unsigned char *ring;
+    uint16_t front_idx, back_idx;
+    uint16_t idx_mask;
+  } queue_data = {};
+  queue_data.ring = ring;
+  queue_data.idx_mask = idx_mask;
+
+  uint16_t &idx = queue_data.back_idx;
+
+  rte_mbuf_extbuf_free_callback_t free_cb = [](void *addr, void *opaque) {
+    // opaque points to the copied descriptor, with the dma address replaced
+    // with a pointer to the queue data;
+    uintptr_t uptr;
+    struct queue_data *queue_data;
+    memcpy(&uptr, opaque, sizeof(uptr));
+    queue_data = (struct queue_data *)uptr;
+
+    unsigned char *desc_addr = queue_data->ring +
+                               (size_t)(queue_data->front_idx & queue_data->idx_mask) * TX_DESC_SIZE;
+    // TODO: can be removed
+    // It should be impossible that a buffer is freed without a corresponding available descriptor
+    uint16_t flags = rte_read16_relaxed(desc_addr + 10);
+    assert(flags & TX_FLAG_AVAIL);
+
+    // Copy descriptor into ring, skipping the dma/queue pointer
+    rte_memcpy(desc_addr, (char *)opaque + 8, TX_DESC_SIZE - 8);
+    // Unset FLAG_AVAIL to return buffer to guest
+    memcpy(&flags, (char *)opaque + 10, 2);
+    flags &= ~TX_FLAG_AVAIL;
+    rte_write16(flags, (char *)desc_addr + 10);
+
+    queue_data->front_idx++;
+  };
+
   while (true) {
     // Check if stop requested
     if (stop.stop_requested()) {
@@ -364,9 +397,18 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
         rte_pktmbuf_free_bulk(mbufs + nb_tx, nb_mbufs_used - nb_tx);
       }
       nb_mbufs_used = 0;
+      // Flags were possibly changed during tx if buffers were freed.
+      flags = rte_read16(desc_flags_addr);
     }
+
     // If next descriptor is not available, try again
     if (!(flags & TX_FLAG_AVAIL)) {
+      continue;
+    }
+
+    // If this buffer is attached to an mbuf, we fully wrapped around and need
+    // to wait until this descriptor was sent by DPDK.
+    if (flags & TX_FLAG_ATTACHED) {
       continue;
     }
 
@@ -393,16 +435,30 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
       printf("Packet from VM is too large for buffer.\n");
       rte_pktmbuf_free(mbuf);
     } else {
-      rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), buf_addr, buf_len);
+      // Initialize shared data info and copy descriptor into mbuf
+      auto shinfo = (struct rte_mbuf_ext_shared_info *)rte_mbuf_to_priv(mbuf);
+      unsigned char *mbuf_desc = (unsigned char *)rte_mbuf_to_priv(mbuf) + sizeof(*shinfo);
+      shinfo->free_cb = free_cb;
+      shinfo->fcb_opaque = mbuf_desc;
+      rte_mbuf_ext_refcnt_set(shinfo, 1);
+      memcpy(mbuf_desc + 8, buf_iova_addr + 8, TX_DESC_SIZE - 8);
+      // We also need to pass a pointer to the queue data to the free callback
+      uintptr_t uptr = (uintptr_t)&queue_data;
+      memcpy(mbuf_desc, &uptr, sizeof(uintptr_t));
+
+      // We use IOVA as VA mode, so we can simply pass the buf_addr for buf_iova.
+      rte_pktmbuf_attach_extbuf(mbuf, buf_addr, (rte_iova_t)buf_addr, buf_len, shinfo);
       mbuf->data_len = buf_len;
       mbuf->pkt_len = buf_len;
       mbuf->nb_segs = 1;
       mbufs[nb_mbufs_used++] = mbuf;
     }
 
-    // Release buffer back to VM
-    flags &= ~TX_FLAG_AVAIL;
-    rte_write16(flags, desc_flags_addr);
+    // Mark buffer as attached
+    flags |= TX_FLAG_ATTACHED;
+    // We do not synchronize across threads with this flag,
+    // so no memory barrier is needed.
+    rte_write16_relaxed(flags, desc_flags_addr);
 
     // Go to next descriptor
     // Index wraps naturally on overflow
@@ -437,52 +493,106 @@ void VdpdkDevice::dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info)
 }
 
 // TX MEMPOOL ADAPTER
+// Might not be needed after all. But can be repurposed for RX?
 
-struct vdpdk_tx_mempool_private {
-  // Drivers may expect this as the memory pool's private data.
-  // By making it the first member, any pointer to vdpdk_tx_mempool_private
-  // is also a valid pointer to rte_pktmbuf_pool_private.
-  struct rte_pktmbuf_pool_private pkmbuf_private;
+// struct vdpdk_tx_mempool_private {
+//   // Drivers may expect this as the memory pool's private data.
+//   // By making it the first member, any pointer to vdpdk_tx_mempool_private
+//   // is also a valid pointer to rte_pktmbuf_pool_private.
+//   struct rte_pktmbuf_pool_private pktmbuf_private;
 
-  struct rte_mempool_ops *inner;
-};
+//   struct rte_mempool_ops *inner;
+// };
 
-int vdpdk_tx_mempool_alloc(struct rte_mempool *mp) {
-  auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
-  return priv->inner->alloc(mp);
-}
+// static int vdpdk_tx_mempool_alloc(struct rte_mempool *mp) {
+//   auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+//   return priv->inner->alloc(mp);
+// }
 
-void vdpdk_tx_mempool_free(struct rte_mempool *mp) {
-  auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
-  priv->inner->free(mp);
-}
+// void vdpdk_tx_mempool_free(struct rte_mempool *mp) {
+//   auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+//   priv->inner->free(mp);
+// }
 
-int vdpdk_tx_mempool_enqueue(struct rte_mempool *mp, void *const *obj_table, unsigned int n) {
-  auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
-  return priv->inner->enqueue(mp, obj_table, n);
-}
+// static int vdpdk_tx_mempool_enqueue(struct rte_mempool *mp, void *const *obj_table, unsigned int n) {
+//   auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+//   return priv->inner->enqueue(mp, obj_table, n);
+// }
 
-int vdpdk_tx_mempool_dequeue(struct rte_mempool *mp, void **obj_table, unsigned int n) {
-  auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
-  return priv->inner->dequeue(mp, obj_table, n);
-}
+// static int vdpdk_tx_mempool_dequeue(struct rte_mempool *mp, void **obj_table, unsigned int n) {
+//   auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+//   return priv->inner->dequeue(mp, obj_table, n);
+// }
 
-unsigned vdpdk_tx_mempool_get_count(const struct rte_mempool *mp) {
-  auto priv = (const struct vdpdk_tx_mempool_private *)
-    rte_mempool_get_priv((struct rte_mempool *)mp);
-  return priv->inner->get_count(mp);
-}
+// static unsigned vdpdk_tx_mempool_get_count(const struct rte_mempool *mp) {
+//   auto priv = (const struct vdpdk_tx_mempool_private *)
+//     rte_mempool_get_priv((struct rte_mempool *)mp);
+//   return priv->inner->get_count(mp);
+// }
 
-// This memory pool is a wrapper around a regular dpdk memory pool.
-// It exists to detect when a driver frees a pktmbuf. The freed pktmbuf is then
-// handed back to the guest VM.
-struct rte_mempool_ops vdpdk_tx_mempool {
- .name = "VDPDK_TX_MEMPOOL",
- .alloc = vdpdk_tx_mempool_alloc,
- .free = vdpdk_tx_mempool_free,
- .enqueue = vdpdk_tx_mempool_enqueue,
- .dequeue = vdpdk_tx_mempool_dequeue,
- .get_count = vdpdk_tx_mempool_get_count,
-};
+// // This memory pool is a wrapper around a regular dpdk memory pool.
+// // It exists to detect when a driver frees a pktmbuf. The freed pktmbuf is then
+// // handed back to the guest VM.
+// struct rte_mempool_ops vdpdk_tx_mempool {
+//  .name = "VDPDK_TX_MEMPOOL",
+//  .alloc = vdpdk_tx_mempool_alloc,
+//  .free = vdpdk_tx_mempool_free,
+//  .enqueue = vdpdk_tx_mempool_enqueue,
+//  .dequeue = vdpdk_tx_mempool_dequeue,
+//  .get_count = vdpdk_tx_mempool_get_count,
+// };
 
-RTE_MEMPOOL_REGISTER_OPS(vdpdk_tx_mempool);
+// RTE_MEMPOOL_REGISTER_OPS(vdpdk_tx_mempool);
+
+// static void vdpdk_tx_mempool_init(struct rte_mempool *mp,
+//                                   void *opaque_arg,
+//                                   void *_m, unsigned int i) {
+//   auto m = (struct rte_mbuf *)_m;
+//   size_t mbuf_size = sizeof(struct rte_mbuf) + TX_DESC_SIZE;
+//   memset(m, 0, mbuf_size);
+//   m->priv_size = TX_DESC_SIZE;
+
+//   m->pool = mp;
+//   m->nb_segs = 1;
+//   m->port = RTE_MBUF_PORT_INVALID;
+//   m->ol_flags = RTE_MBUF_F_EXTERNAL;
+//   rte_mbuf_refcnt_set(m, 1);
+//   m->next = NULL;
+// }
+
+// static struct rte_mempool *vdpdk_create_tx_mempool(unsigned n) {
+//   size_t element_size = sizeof(struct rte_mbuf) + TX_DESC_SIZE;
+//   struct rte_mempool *mp = rte_mempool_create_empty("vdpdk_tx_adapter", n, element_size, 64, sizeof(struct vdpdk_tx_mempool_private), rte_socket_id(), 0);
+//   if (!mp) {
+//     die("Could not allocate vdpdk tx adapter mempool.");
+//   }
+//   auto best_ops_name = rte_mbuf_best_mempool_ops();
+//   struct rte_mempool_ops *best_ops = nullptr;
+//   for (unsigned i = 0; i < rte_mempool_ops_table.num_ops; i++) {
+//     if (strcmp(best_ops_name, rte_mempool_ops_table.ops[i].name) == 0) {
+//       best_ops = &rte_mempool_ops_table.ops[i];
+//     }
+//   }
+//   if (!best_ops) {
+//     die("Invalid dpdk mempool ops configured.");
+//   }
+
+//   auto priv = (struct vdpdk_tx_mempool_private *)rte_mempool_get_priv(mp);
+//   memset(priv, 0, sizeof(*priv));
+
+//   // TODO: pass through buffer sizes
+//   priv->pktmbuf_private.mbuf_priv_size = TX_DESC_SIZE;
+//   priv->pktmbuf_private.mbuf_data_room_size = 0;
+//   // We set this flag as a precaution, to ensure DPDK will not try to manage
+//   // the data buffers associated with these mbufs.
+//   priv->pktmbuf_private.flags = RTE_PKTMBUF_POOL_F_PINNED_EXT_BUF;
+//   priv->inner = best_ops;
+
+//   if (rte_mempool_set_ops_byname(mp, "VDPDK_TX_MEMPOOL", nullptr) != 0) {
+//     die("Could not set vdpdk tx mempool adapter ops.");
+//   }
+
+//   if (rte_mempool_populate_default(mp) < 0) {
+//     die("Could not allocate vdpdk tx adapter mempool.");
+//   }
+// }

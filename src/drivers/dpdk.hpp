@@ -26,6 +26,7 @@
 #include "src/util.hpp"
 #include "src/drivers/driver.hpp"
 #include "src/drivers/flow_blocks.hpp"
+#include "src/devices/vdpdk-consts.hpp"
 #include <unistd.h>
 
 #define RX_RING_SIZE 1024
@@ -153,8 +154,10 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 	for (i = 0; i < nr_queues; i++) {
 		// TODO allocate these elsewhere
 		size_t buffer_size = tso_supported ? (4096 * 4 + RTE_PKTMBUF_HEADROOM) : RTE_MBUF_DEFAULT_BUF_SIZE;
+		// Private data is used by Vdpdk
+		size_t priv_size = sizeof(struct rte_mbuf_ext_shared_info) + VDPDK_CONSTS::TX_DESC_SIZE;
 		tx_pool = rte_pktmbuf_pool_create(std::format("TX_MBUF_POOL_{}", i).c_str(), NUM_MBUFS * 2,
-			64, 0, buffer_size, rte_socket_id()); // TODO constant for cache
+			64, priv_size, buffer_size, rte_socket_id()); // TODO constant for cache
 		if (tx_pool == NULL)
 			rte_exit(EXIT_FAILURE, "Cannot create tx mbuf pool %d\n", i);
 		tx_mbuf_pools.push_back(tx_pool);
