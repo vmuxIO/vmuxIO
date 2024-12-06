@@ -311,6 +311,7 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
 
 void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t idx_mask) {
   constexpr bool DEBUG_OUTPUT = false;
+  constexpr bool ZERO_COPY = false;
 
   size_t ring_size = ((size_t)idx_mask + 1) * TX_DESC_SIZE;
 
@@ -446,11 +447,13 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
       continue;
     }
 
-    // If this buffer is attached to an mbuf, we fully wrapped around and need
-    // to wait until this descriptor was sent by DPDK.
-    if (flags & TX_FLAG_ATTACHED) {
-      rte_eth_tx_done_cleanup(0, queue_idx, 0);
-      continue;
+    if constexpr (ZERO_COPY) {
+      // If this buffer is attached to an mbuf, we fully wrapped around and need
+      // to wait until this descriptor was sent by DPDK.
+      if (flags & TX_FLAG_ATTACHED) {
+        rte_eth_tx_done_cleanup(0, queue_idx, 0);
+        continue;
+      }
     }
 
     // If FLAG_AVAIL is set, we own the buffer and need to send it
@@ -476,30 +479,41 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
       printf("Packet from VM is too large for buffer.\n");
       rte_pktmbuf_free(mbuf);
     } else {
-      // Initialize shared data info and copy descriptor into mbuf
-      auto shinfo = (struct rte_mbuf_ext_shared_info *)rte_mbuf_to_priv(mbuf);
-      unsigned char *mbuf_desc = (unsigned char *)rte_mbuf_to_priv(mbuf) + sizeof(*shinfo);
-      shinfo->free_cb = free_cb;
-      shinfo->fcb_opaque = mbuf_desc;
-      rte_mbuf_ext_refcnt_set(shinfo, 1);
-      memcpy(mbuf_desc + 8, buf_iova_addr + 8, TX_DESC_SIZE - 8);
-      // We also need to pass a pointer to the queue data to the free callback
-      uintptr_t uptr = (uintptr_t)&queue_data;
-      memcpy(mbuf_desc, &uptr, sizeof(uintptr_t));
+      if constexpr (ZERO_COPY) {
+        // Initialize shared data info and copy descriptor into mbuf
+        auto shinfo = (struct rte_mbuf_ext_shared_info *)rte_mbuf_to_priv(mbuf);
+        unsigned char *mbuf_desc = (unsigned char *)rte_mbuf_to_priv(mbuf) + sizeof(*shinfo);
+        shinfo->free_cb = free_cb;
+        shinfo->fcb_opaque = mbuf_desc;
+        rte_mbuf_ext_refcnt_set(shinfo, 1);
+        memcpy(mbuf_desc + 8, buf_iova_addr + 8, TX_DESC_SIZE - 8);
+        // We also need to pass a pointer to the queue data to the free callback
+        uintptr_t uptr = (uintptr_t)&queue_data;
+        memcpy(mbuf_desc, &uptr, sizeof(uintptr_t));
 
-      // We use IOVA as VA mode, so we can simply pass the buf_addr for buf_iova.
-      rte_pktmbuf_attach_extbuf(mbuf, buf_addr, (rte_iova_t)buf_addr, buf_len, shinfo);
+        // We use IOVA as VA mode, so we can simply pass the buf_addr for buf_iova.
+        rte_pktmbuf_attach_extbuf(mbuf, buf_addr, (rte_iova_t)buf_addr, buf_len, shinfo);
+      } else {
+        // Copy data to mbuf
+        rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), buf_addr, buf_len);
+      }
       mbuf->data_len = buf_len;
       mbuf->pkt_len = buf_len;
       mbuf->nb_segs = 1;
       mbufs[nb_mbufs_used++] = mbuf;
     }
 
-    // Mark buffer as attached
-    flags |= TX_FLAG_ATTACHED;
-    // We do not synchronize across threads with this flag,
-    // so no memory barrier is needed.
-    rte_write16_relaxed(flags, desc_flags_addr);
+    if constexpr (ZERO_COPY) {
+      // Mark buffer as attached
+      flags |= TX_FLAG_ATTACHED;
+      // We do not synchronize across threads with this flag,
+      // so no memory barrier is needed.
+      rte_write16_relaxed(flags, desc_flags_addr);
+    } else {
+      // Release buffer back to VM
+      flags &= ~TX_FLAG_AVAIL;
+      rte_write16(flags, desc_flags_addr);
+    }
 
     // Go to next descriptor
     // Index wraps naturally on overflow
