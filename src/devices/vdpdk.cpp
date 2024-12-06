@@ -4,6 +4,7 @@
 #include "src/vfio-server.hpp"
 
 #include <rte_eal.h>
+#include <rte_ethdev.h>
 #include <rte_io.h>
 #include <rte_mbuf.h>
 #include <rte_mbuf_pool_ops.h>
@@ -215,6 +216,8 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       uint16_t idx_mask;
       memcpy(&idx_mask, txbuf.ptr() + 8, 2);
 
+      // Stop left-over polling thread
+      tx_poll_thread = {};
       // Start polling
       tx_poll_thread = std::jthread{[this, ring_addr, idx_mask](std::stop_token stop){
         this->tx_poll(std::move(stop), ring_addr, idx_mask);
@@ -307,6 +310,8 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
 }
 
 void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t idx_mask) {
+  constexpr bool DEBUG_OUTPUT = false;
+
   size_t ring_size = ((size_t)idx_mask + 1) * TX_DESC_SIZE;
 
   puts(std::format("Start TX polling with iova {:#x}, mask {:#x}, size {:#x}", ring_iova, idx_mask, ring_size).c_str());
@@ -352,7 +357,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     assert(flags & TX_FLAG_AVAIL);
 
     // Copy descriptor into ring, skipping the dma/queue pointer
-    rte_memcpy(desc_addr, (char *)opaque + 8, TX_DESC_SIZE - 8);
+    rte_memcpy(desc_addr + 8, (char *)opaque + 8, TX_DESC_SIZE - 8);
     // Unset FLAG_AVAIL to return buffer to guest
     memcpy(&flags, (char *)opaque + 10, 2);
     flags &= ~TX_FLAG_AVAIL;
@@ -361,11 +366,12 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     queue_data->front_idx++;
   };
 
+  constexpr unsigned debug_interval = 20000000;
+  unsigned debug_counter = debug_interval;
   while (true) {
     // Check if stop requested
     if (stop.stop_requested()) {
-      rte_pktmbuf_free_bulk(mbufs, nb_mbufs_used);
-      return;
+      break;
     }
 
     // Check if DMA mapping wants to change
@@ -380,7 +386,41 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
       ring = (unsigned char *)vfuServer->dma_local_addr(ring_iova, ring_size);
       if (!ring) {
         printf("DMA unmapped during TX poll\n");
-        return;
+        break;
+      }
+    }
+
+    // Debug output
+    if constexpr (DEBUG_OUTPUT) {
+      if (--debug_counter == 0) {
+        debug_counter = debug_interval;
+        uint16_t last_flags = -1;
+        uint16_t flags;
+        unsigned min_idx = 0;
+        printf("\nTX RING REPORT\n");
+        for (uint16_t idx = 0; idx <= idx_mask + 1; idx++) {
+          if (idx <= idx_mask) {
+            auto flags_addr = ring + (size_t)idx * TX_DESC_SIZE + 10;
+            memcpy(&flags, flags_addr, 2);
+          }
+          if ((flags != last_flags && idx != 0) || idx == idx_mask + 1) {
+            const char *flag_str;
+            if ((last_flags & TX_FLAG_AVAIL) && (last_flags & TX_FLAG_ATTACHED)) {
+              flag_str = "AVAIL | ATTACHED";
+            } else if (last_flags & TX_FLAG_AVAIL) {
+              flag_str = "AVAIL";
+            } else if (last_flags != 0) {
+              flag_str = "ERROR";
+            } else {
+              flag_str = "";
+            }
+
+            printf("[%03x-%03x] %s (%x)\n", min_idx, idx - 1, flag_str, last_flags);
+            min_idx = idx;
+          }
+          last_flags = flags;
+        }
+        printf("front: %x, back %x\n", queue_data.front_idx, queue_data.back_idx);
       }
     }
 
@@ -409,6 +449,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     // If this buffer is attached to an mbuf, we fully wrapped around and need
     // to wait until this descriptor was sent by DPDK.
     if (flags & TX_FLAG_ATTACHED) {
+      rte_eth_tx_done_cleanup(0, queue_idx, 0);
       continue;
     }
 
@@ -464,6 +505,10 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     // Index wraps naturally on overflow
     idx++;
   }
+
+  // Try cleaning up to refill mempool
+  // TODO: consider simply freeing and allocating a new mempool
+  rte_pktmbuf_free_bulk(mbufs, nb_mbufs_used);
 }
 
 void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
