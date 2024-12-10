@@ -91,6 +91,7 @@ stdenv.mkDerivation {
     "-Dtests=false"
     "-Denable_docs=true"
     "-Denable_kmods=${lib.boolToString mod}"
+    "-Ddebug=true"
   ]
   ++ lib.optional debug "--buildtype=debug"
   # kni kernel driver is currently not compatble with 5.11
@@ -116,7 +117,7 @@ stdenv.mkDerivation {
   '';
 
   dontFixup = debug;
-  dontStrip = debug;
+  dontStrip = true;
 
   outputs =
     [ "out" ]

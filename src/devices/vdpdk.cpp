@@ -367,8 +367,11 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     queue_data->front_idx++;
   };
 
-  constexpr unsigned debug_interval = 20000000;
+  constexpr unsigned debug_interval = 10000000;
   unsigned debug_counter = debug_interval;
+  unsigned nb_cleanup_calls = 0;
+  int last_cleanup_result = 0xFFFFFF;
+
   while (true) {
     // Check if stop requested
     if (stop.stop_requested()) {
@@ -422,6 +425,17 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
           last_flags = flags;
         }
         printf("front: %x, back %x\n", queue_data.front_idx, queue_data.back_idx);
+
+        printf("\nTX MBUF REPORT\n");
+        unsigned mbuf_avail = rte_mempool_avail_count(pool);
+        unsigned mbuf_in_use = pool->size - mbuf_avail;
+        printf("available: %x\nin use: %x\n", mbuf_avail, mbuf_in_use);
+
+        if (nb_cleanup_calls > 0) {
+          printf("\nRING CLEANUP\n");
+          printf("called: %u times\nlast result: %d\n", nb_cleanup_calls, last_cleanup_result);
+          nb_cleanup_calls = 0;
+        }
       }
     }
 
@@ -451,7 +465,11 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
       // If this buffer is attached to an mbuf, we fully wrapped around and need
       // to wait until this descriptor was sent by DPDK.
       if (flags & TX_FLAG_ATTACHED) {
-        rte_eth_tx_done_cleanup(0, queue_idx, 0);
+        int freed = rte_eth_tx_done_cleanup(0, queue_idx, 0);
+        if constexpr (DEBUG_OUTPUT) {
+          nb_cleanup_calls++;
+          last_cleanup_result = freed;
+        }
         continue;
       }
     }
