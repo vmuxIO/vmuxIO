@@ -488,8 +488,14 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     // Create pktmbuf
     struct rte_mbuf *mbuf = rte_pktmbuf_alloc(pool);
     if (!mbuf) {
-      // No buffer available yet
+      // No buffer available
       printf("Vdpdk mbuf alloc failed\n");
+      // Try freeing buffers
+      int freed = rte_eth_tx_done_cleanup(0, queue_idx, 0);
+      if constexpr (DEBUG_OUTPUT) {
+        nb_cleanup_calls++;
+        last_cleanup_result = freed;
+      }
       continue;
     }
     if (rte_pktmbuf_tailroom(mbuf) < buf_len) {
