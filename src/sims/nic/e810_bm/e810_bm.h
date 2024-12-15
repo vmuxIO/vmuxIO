@@ -685,7 +685,7 @@ class lan_queue_rx : public lan_queue_base {
  public:
   lan_queue_rx(lan &lanmgr_, uint32_t &reg_tail, size_t idx, uint32_t &reg_ena,
                uint32_t &fpm_basereg, uint32_t &reg_intqctl);
-  
+
   virtual void reset();
   void packet_received(const void *data, size_t len, uint32_t hash);
   bool ptp_should_sample_rx(const void *data, size_t len);
@@ -767,11 +767,33 @@ class shadow_ram {
 
 class e810_switch {
   std::map<uint64_t, uint16_t> mac_rules; // dst mac address (odd alignment/byte order...) -> dst queue idx
+  std::map<uint16_t, uint16_t> ethertype_rules; // ethertype -> dst queue idx
+  std::vector<std::vector<uint8_t>*> rules; // list of (recipe idx, match data)
+  std::vector<uint16_t> rules_recipe_idx; // rules*[i] is for recipes[recipe_idx[i]]
+  std::vector<uint16_t> rules_dst_queues; // rules*[i] is for recipes[recipe_idx[i]]
+  std::vector<std::vector<uint8_t>> recipies;
+  // recipe to only match ethertype:
+  std::vector<uint8_t> recipe1 = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
   e810_bm &dev;
 
   public:
 
-  e810_switch(e810_bm &dev_) : dev(dev_) {};
+  e810_switch(e810_bm &dev_) : dev(dev_) {
+   size_t excess_rules = 0;
+   for (size_t i = 0; i < excess_rules; i++) {
+    uint64_t mac = Util::rand();
+    this->mac_rules[mac] = -1;
+   }
+
+   // our default recipe
+   this->recipies.push_back(this->recipe1);
+  };
+
+  ~e810_switch() {
+   for (auto rule : this->rules) {
+    delete rule;
+   }
+  }
 
   bool add_rule(struct ice_aqc_sw_rules_elem *add_sw_rules);
 
@@ -806,7 +828,7 @@ class e810_bm : public nicbm::Runner::Device {
   static const uint32_t NUM_RXDID = 64;
   static const uint16_t NUM_FD_GUAR = 8192;
   static const uint16_t NUM_FD_BEST_EFFORT = 8192;
-  
+
 
   struct e810_regs {
     uint32_t glgen_rstctl;
@@ -870,7 +892,7 @@ class e810_bm : public nicbm::Runner::Device {
     uint32_t pf_mbx_arqt;
 
     uint32_t pf_mbx_vt_pfalloc;
- 
+
     uint32_t pfqf_ctl_0;
 
     uint32_t pfqf_hkey[13];
@@ -892,7 +914,7 @@ class e810_bm : public nicbm::Runner::Device {
     uint32_t flex_rxdid_2[NUM_RXDID];
     uint32_t flex_rxdid_3[NUM_RXDID];
     uint32_t QRX_CTRL[2048];
-    
+
     uint32_t QRXFLXP_CNTXT[2048];
     uint32_t qtx_comm_head[NUM_QUEUES];
 

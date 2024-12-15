@@ -174,6 +174,27 @@ prepare-direct-boot HOST="guest":
     nix eval --write-to {{proot}}/nix/results/{{HOST}}-kernelParams .#nixosConfigurations.{{HOST}}.config.boot.kernelParams --apply 'builtins.concatStringsSep " "'
 
 
+# works with jlevons patched qemu 9
+# Exhibits same problems as vMux with mult-vCPU guests: iperf throughput drops to 0 sometimes
+qemu-virtionet:
+  #!/usr/bin/env bash
+  set -x
+  sudo ip tuntap add mode tap tap0
+  sudo ip link set dev tap0 up
+  sudo ip a add 10.0.0.1/24 dev tap0
+  sudo rm /tmp/rem-sock-{{user}} || true
+  sudo rm /tmp/remotesock-{{user}} || true
+  sudo rm {{vmuxSock}} || true
+  sudo ./qemu/bin/qemu-system-x86_64 \
+    -machine x-remote,vfio-user=on \
+    -netdev tap,id=net0,ifname=tap0,script=no,downscript=no \
+    -device e1000,id=netdev0,netdev=net0 \
+    -nographic \
+    -object x-vfio-user-server,id=vfioobj1,type=unix,path={{vmuxSock}},device=netdev0 \
+    -monitor unix:/tmp/rem-sock-{{user}},server,nowait
+  sudo ip link del tap0
+
+
 vm-libvfio-user:
     sudo rm {{qemuMem}} || true
     sudo qemu/bin/qemu-system-x86_64 \
@@ -267,7 +288,7 @@ vm-strace-nonet EXTRA_CMDLINE="":
 
 vm-strace-vmux:
     sudo rm {{qemuMem}} || true
-    sudo strace -o /tmp/strace-vmux qemu/bin/qemu-system-x86_64 \
+    sudo strace -ff -o /tmp/strace-vmux qemu/bin/qemu-system-x86_64 \
         -cpu host \
         -enable-kvm \
         -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
@@ -512,7 +533,7 @@ build:
   nix build -o {{proot}}/ycsb .#ycsb
   nix build -o {{proot}}/fastclick .#fastclick
   nix build -o {{proot}}/vmux-nixbuild .#vmux
-  pushd ./test/ptptest; make; popd
+  pushd ./test/ptptest; make -B; popd
   [[ -z $(git submodule status | grep "^-") ]] || echo WARN: git submodules status: not in sync
 
 update:
@@ -542,7 +563,7 @@ docker-rebuild:
   docker image save -o {{proot}}/VMs/docker-images-mediaMicroservices.tar $(yq -r ".services[] | .image" subprojects/deathstarbench/mediaMicroservices/docker-compose.yml)
 
 
-vm-init:
+vm-init NUM="35":
   #!/usr/bin/env python3
   import subprocess
   import os
@@ -554,7 +575,7 @@ vm-init:
   start_ip = ipaddress.IPv4Address("192.168.56.20")
 
 
-  for i in range(1, 801):
+  for i in range(1, {{NUM}}):
     print(f"wrinting cloud-init {i}")
     ip = f"{start_ip + i - 1}"
 
@@ -587,10 +608,12 @@ vm-init:
   shutil.copy("{{proot}}/VMs/cloud-init/vm1.img", "{{proot}}/VMs/cloud-init/vm0.img")
 
 
-vm-overwrite NUM="35": vm-init
+vm-overwrite NUM="64":
   #!/usr/bin/env bash
   set -x
   set -e
+  echo "Initializing disks for {{NUM}} VMs"
+  just vm-init {{NUM}}
   mkdir -p {{proot}}/VMs
   just prepare-direct-boot test-guest
   just prepare-direct-boot host

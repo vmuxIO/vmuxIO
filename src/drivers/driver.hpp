@@ -12,6 +12,18 @@ struct vmux_descriptor {
   std::optional<uint16_t> dst_queue;
 };
 
+inline vmux_descriptor *vmux_descriptor_alloc(size_t buf_len) {
+  auto descriptor = new vmux_descriptor;
+  descriptor->buf = (char*) malloc(buf_len);
+  descriptor->len = buf_len;
+  return descriptor;
+}
+
+inline void vmux_descriptor_free(vmux_descriptor *desc) {
+  free(desc->buf);
+  delete desc;
+}
+
 // Abstract class for Driver backends
 class Driver {
 public:
@@ -102,6 +114,11 @@ public:
 
   // return false if rule cant be allocated
   virtual bool add_switch_rule(int vm_id, uint8_t mac_addr[6], uint16_t dst_queue) {
+    return false;
+  }
+
+  // return false if rule cant be allocated
+  virtual bool add_switch_rule(int vm_id, uint8_t mac_addr[6], uint16_t etype, uint16_t dst_queue) {
     return false;
   }
 

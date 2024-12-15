@@ -176,7 +176,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_MED
           ]
     directions = [ "forward" ]
-    vm_nums = [ 1, 2, 4, 8, 16, 32 ]
+    vm_nums = [ 1, 2, 4, 8, 16, 32, 64 ]
     tcp_lengths = [ -1 ]
     udp_lengths = [ 64, 128, 256, 512, 1024, 1470 ]
     repetitions = 3
@@ -184,11 +184,12 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
         # interfaces = [ Interface.VMUX_DPDK_E810, Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_DPDK_E810 ]
+        interfaces = [ Interface.VMUX_MED ]
         # interfaces = [ Interface.VMUX_EMU ]
         directions = [ "forward" ]
         # vm_nums = [ 1, 2, 4 ]
-        vm_nums = [ 1 ]
+        vm_nums = [ 2 ]
+        # vm_nums = [ 128, 160 ]
         DURATION_S = 10
         repetitions = 1
 

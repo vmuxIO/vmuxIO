@@ -394,15 +394,14 @@ bool lan_queue_rx::ptp_should_sample_rx(const void *data, size_t len) {
 void lan_queue_rx::packet_received(const void *data, size_t pktlen,
                                    uint32_t h) {
   size_t num_descs = (pktlen + dbuff_size - 1) / dbuff_size;
-  if (!enabled) {
+  if (UNLIKELY(!enabled)) {
     std::cout << "rx queue is disabled "
         << logger::endl;
-  }
-  if (!enabled)
+
     return;
+  }
 
-
-  if (dcache.size() < num_descs) {
+  if (UNLIKELY(dcache.size() < num_descs)) {
 #ifdef DEBUG_LAN
     std::cout << " not enough rx descs (" << num_descs << ", dropping packet"
         << logger::endl;
@@ -412,8 +411,9 @@ void lan_queue_rx::packet_received(const void *data, size_t pktlen,
 
   e810_timestamp_t timestamp = { .value=0 };
 
-  if (ptp_should_sample_rx(data, pktlen)) {
+  if (UNLIKELY(ptp_should_sample_rx(data, pktlen))) {
     timestamp = dev.ptp.phc_sample_rx(0);
+    timestamp.ts_l = 0x1; // set the lower bits to 1 to indicate validity
   }
 
   for (size_t i = 0; i < num_descs; i++) {
@@ -460,10 +460,12 @@ void lan_queue_rx::rx_desc_ctx::packet_received(const void *data, size_t pktlen,
   rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_DD_S);
   rxd->wb.qword1.status_error_len |= (pktlen << 38);
 
-  // write to TS registers of flex context
-  flex_rxd->wb.flex_ts.ts_high_0 = (uint16_t) timestamp.time & 0xFFFF;
-  flex_rxd->wb.flex_ts.ts_high_1 = (uint16_t) ((timestamp.time >> 16) & 0xFFFF);
-  flex_rxd->wb.ts_low = 0x1; // set the LSB to 1 to indicate validity
+  if (UNLIKELY(timestamp.ts_l)) {
+    // write to TS registers of flex context
+    flex_rxd->wb.flex_ts.ts_high_0 = (uint16_t) timestamp.time & 0xFFFF;
+    flex_rxd->wb.flex_ts.ts_high_1 = (uint16_t) ((timestamp.time >> 16) & 0xFFFF);
+    flex_rxd->wb.ts_low = (uint8_t)timestamp.ts_l; 
+  }
 
   if (last) {
     rxd->wb.qword1.status_error_len |= (1 << ICE_RX_FLEX_DESC_STATUS0_EOF_S);

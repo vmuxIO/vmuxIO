@@ -19,13 +19,15 @@ We can:
 - do passthrough (e1000, E810)
 - emulate an e1000 and E810
 - emulate multiple queues for e810
-- partial rte_flow mediation for e810
+- mediate offloads: expose physical NIC offloads to device without passthrough
+  - PTP
+  - rte_flow
+  - ...
 
 We cannot yet: 
 
-- Minimize data plane overheads with mediated queue passthrough
-- Emulate of default switch recipes completely; Accept new recepies
-- Multi-VM rte_flow mediation
+- Minimize data plane overheads with mediated queue passthrough (see HD-IOV or vDPA)
+- Accept new switching policies. 
 
 ## Usage
 
