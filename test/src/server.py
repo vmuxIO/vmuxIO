@@ -15,6 +15,7 @@ from util import strip_subnet_mask
 import copy
 import base64
 import cpupinning
+import shlex
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
 MAX_VMS: int = 35; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
@@ -223,7 +224,9 @@ class Server(ABC):
         if self.ssh_as_root == True:
             sudo = "sudo "
 
-        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'"
+        # oof double quote, one layer removed by local shell, one by remote bash
+        command = shlex.quote(shlex.quote(command))
+        return check_output(f"{sudo}ssh{options} {self.fqdn} bash -c {command}"
                             # + " 2>&1 | tee /tmp/foo"
                             , stderr=STDOUT, shell=True).decode('utf-8')
 
