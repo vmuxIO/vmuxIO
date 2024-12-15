@@ -23,7 +23,7 @@ enum VDPDK_OFFSET {
 };
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
-: VmuxDevice(device_id, driver),
+: VmuxDevice(device_id, driver, nullptr),
   txbuf{"vdpdk_tx", REGION_SIZE},
   rxbuf{"vdpdk_rx", REGION_SIZE},
   dpdk_driver(std::dynamic_pointer_cast<Dpdk>(driver)) {
