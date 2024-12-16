@@ -37,6 +37,8 @@ extern "C" {
 #include "libvfio-user.h"
 }
 
+constexpr bool USE_DMA_MAP_HACK = false;
+
 class VfioUserServer;
 
 // break cyclic import: define empty classes (defined in device.hpp)
@@ -377,7 +379,7 @@ public:
     }
 
     // TODO: temporary hack, move this out of here
-    {
+    if constexpr (USE_DMA_MAP_HACK) {
       printf("MAP DPDK DMA\n");
       __builtin_dump_struct(mapping, &printf);
       struct rte_eth_dev_info info;
@@ -431,7 +433,7 @@ public:
     }
 
     // TODO: temporary hack, move this out of here
-    {
+    if constexpr (USE_DMA_MAP_HACK) {
       auto &mapping = vfu->mappings[info->iova.iov_base];
       struct rte_eth_dev_info info;
       if (rte_eth_dev_info_get(0, &info) != 0) {
