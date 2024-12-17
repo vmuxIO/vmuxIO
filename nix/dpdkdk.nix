@@ -26,7 +26,7 @@
     else if stdenv.isAarch64 then "generic"
     else null
   )
-, dpdkVersion ? "23.07"
+, dpdkVersion ? "22.11"
 , linux-firmware-pinned
 , self
 }:

@@ -69,7 +69,7 @@
       flake = false;
     };
     dpdkdk-src = {
-      url = "git+https://github.com/vmuxIO/dpdk?ref=kreutzer-dev&submodules=1";
+      url = "git+https://github.com/vmuxIO/dpdk?ref=kreutzer-dev-22.11&submodules=1";
       flake = false;
     };
   };
