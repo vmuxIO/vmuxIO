@@ -3,7 +3,7 @@
 , pkgs
 , linux
 }:
-let 
+let
   srcpack = {
     moongen = self.inputs.moongen-lachnit-src;
     libmoon = self.inputs.libmoon-lachnit-src;
@@ -51,8 +51,122 @@ pkgs.stdenv.mkDerivation {
   postPatch = ''
     ls -la ./libmoon
     patchShebangs ./libmoon/build.sh ./build.sh
+
     substituteInPlace ./libmoon/build.sh \
       --replace "./bind-interfaces.sh \''${FLAGS}" "echo skipping bind-interfaces.sh"
+    substituteInPlace ./libmoon/CMakeLists.txt \
+      --replace '{CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/x86_64-native-linux-gcc/include' \
+      '{CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/x86_64-native-linux-gcc/include
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/x86_64-native-linux-gcc
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/config
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/eal/linux/include
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/eal/x86/include
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/net
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/mbuf
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/mempool
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/ring
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/meter
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/security
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/kvargs
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/cryptodev
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/rcu
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/hash
+      ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/lib/pci'
+    substituteInPlace ./CMakeLists.txt \
+      --replace '{CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/librte_ethdev' \
+      '{CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/librte_ethdev
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc/include
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/ethdev
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/config
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/net
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/mbuf
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/mempool
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/ring
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/meter
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/eal/include
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/eal/linux/include
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/lib/eal/x86/include'
+
+    substituteInPlace ./CMakeLists.txt \
+      --replace ' ''${dpdk_STATIC_LDFLAGS}' \
+      ' rte_net      rte_ethdev       rte_distributor    rte_mbuf      rte_net_bond       rte_net_ring     rte_power
+  rte_acl      rte_eal          rte_kvargs     rte_mempool   rte_mempool_ring   rte_net_e1000        rte_net_virtio   rte_ring
+  rte_cfgfile  rte_hash         rte_lpm        rte_meter     rte_net_i40e   rte_net_ice    rte_net_iavf    rte_sched        rte_timer
+  rte_cmdline  rte_ip_frag      rte_pipeline   rte_net_ixgbe rte_mempool_stack  rte_port             rte_table
+        rte_stack          rte_bus_vdev  rte_bus_pci        rte_pci              rte_cryptodev '
+      # ' -lrte_net -lrte_ethdev -lrte_eal -lrte_ring -lrte_mempool -lrte_mbuf -lrte_latencystats -lrte_cmdline -lrte_metrics -lrte_gso -lrte_gro -lrte_bpf -lrte_bitratestats -lbsd -lrte_net_ice -lrte_net_iavf'
+
+    substituteInPlace ./CMakeLists.txt \
+      --replace '{CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc/lib' \
+      '{CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc/lib
+      ''${CMAKE_CURRENT_SOURCE_DIR}/libmoon/deps/dpdk/x86_64-native-linux-gcc/drivers'
+
+    # substituteInPlace ./libmoon/CMakeLists.txt \
+    #   --replace ' ''${dpdk_STATIC_LDFLAGS}' \
+    #   ' -lrte_net_ice -lrte_net '
+    substituteInPlace ./libmoon/CMakeLists.txt \
+      --replace ' ''${dpdk_STATIC_LDFLAGS}' \
+      ' rte_net      rte_ethdev       rte_distributor    rte_mbuf      rte_net_bond       rte_net_ring     rte_power
+  rte_acl      rte_eal          rte_kvargs     rte_mempool   rte_mempool_ring   rte_net_e1000        rte_net_virtio   rte_ring
+  rte_cfgfile  rte_hash         rte_lpm        rte_meter     rte_net_i40e   rte_net_ice    rte_net_iavf    rte_sched        rte_timer
+  rte_cmdline  rte_ip_frag      rte_pipeline   rte_net_ixgbe rte_mempool_stack  rte_port             rte_table
+        rte_stack          rte_bus_vdev  rte_bus_pci        rte_pci              rte_cryptodev '
+    # substituteInPlace ./libmoon/CMakeLists.txt \
+    #   --replace 'TARGET_LINK_LIBRARIES(libmoon' \
+    #   'TARGET_LINK_LIBRARIES('
+    # substituteInPlace ./libmoon/CMakeLists.txt \
+    #   --replace 'rt)' \
+    #   'libmoon rt)'
+    # substituteInPlace ./libmoon/CMakeLists.txt \
+    #   --replace 'ADD_EXECUTABLE(libmoon ''${FILES})' \
+    #   ' '
+    # substituteInPlace ./libmoon/CMakeLists.txt \
+    #   --replace 'rt)' \
+    #   'rt)
+    #   ADD_EXECUTABLE(libmoon ''${FILES})'
+
+    # substituteInPlace ./libmoon/CMakeLists.txt \
+    #   --replace '{dpdk_STATIC_LINK_DIRS}' \
+    #   '{dpdk_STATIC_LINK_DIRS}
+    #   ''${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/x86_64-native-linux-gcc/drivers'
+
+    # substituteInPlace ./libmoon/build.sh \
+    #   --replace 'NUM_CPUS=$(cat /proc/cpuinfo  | grep "processor\\s: " | wc -l)' \
+    #   'NUM_CPUS=1'
+
+    # substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/base/ice_switch.h \
+    #   --replace 'bool ice_is_vsi_valid(struct' \
+    #     'extern bool ice_is_vsi_valid(struct'
+
+    # substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/version.map \
+    #   --replace 'local: *;' \
+    #     'global:
+    # ice_is_vsi_valid;
+    # ice_fill_dflt_direct_cmd_desc;
+    # ice_aq_send_cmd;
+    # ice_get_vsi_ctx;
+    # ice_get_lan_q_ctx;
+    # ice_sched_find_node_by_teid;
+    # ice_logtype_driver;
+    # ice_ptp_init_time;
+    # ice_cfg_q_bw_lmt;
+    # ice_cfg_vsi_bw_lmt_per_tc;
+    #      local: *;'
+
+    # substituteInPlace ./libmoon/deps/dpdk/drivers/net/iavf/version.map \
+    #   --replace 'local: *;' \
+    #     'global:
+    # iavf_config_bw_limit_queue;
+    # iavf_get_ieee1588_tmst;
+    #      local: *;'
+    #
+    # substituteInPlace ./libmoon/deps/dpdk/drivers/net/i40e/version.map \
+    #   --replace 'local: *;' \
+    #     'global:
+    # i40e_aq_get_link_info;
+    #      local: *;'
+
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_DEFAULT "/lib/firmware/intel/ice/ddp/ice.pkg"' \
       '#define ICE_PKG_FILE_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/ice-1.3.26.0.pkg"'
@@ -61,10 +175,14 @@ pkgs.stdenv.mkDerivation {
       '#define ICE_PKG_FILE_SEARCH_PATH_DEFAULT "${linux-firmware-pinned}/lib/firmware/intel/ice/ddp/"'
   '';
 
+  NIX_LDFLAGS = " -yice_is_vsi_valid --verbose ";
 
   buildPhase = ''
-    ./build.sh
+    # export dpdk_STATIC_LDFLAGS=" -lrte_eal -lrte_ring -lrte_mempool -lrte_ethdev -lrte_mbuf -lrte_net -lrte_latencystats -lrte_cmdline -lrte_net_bond -lrte_metrics -lrte_gso -lrte_gro -lrte_net_ixgbe -lrte_net_i40e -lrte_net_bnxt -lrte_net_dpaa -lrte_bpf -lrte_bitratestats -ljansson -lbsd"
+    NIX_DEBUG=1 ./build.sh
   '';
+
+  hardeningDisable = [ "all" ];
 
   installPhase = ''
     mkdir -p $out/bin
