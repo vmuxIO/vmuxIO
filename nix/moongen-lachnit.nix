@@ -27,6 +27,7 @@ pkgs.stdenv.mkDerivation {
   '';
 
   nativeBuildInputs = with pkgs; [
+    pkg-config
     cmake
     ninja
     meson
@@ -82,20 +83,15 @@ pkgs.stdenv.mkDerivation {
     cp -r build/libmoon $out/lib/
     mkdir -p $out/lib/dpdk
     cp -r libmoon/deps/dpdk/x86_64-native-linux-gcc/lib $out/lib/dpdk
-    cp -r libmoon/deps/dpdk/x86_64-native-linux-gcc/drivers $out/lib/dpdk
     mkdir -p $out/lib/luajit
     cp -r libmoon/deps/luajit/usr/local/lib $out/lib/luajit
-    mkdir -p $out/lib/highwayhash
-    cp -r libmoon/deps/highwayhash/lib $out/lib/highwayhash
 
     # autopatchelfHook?
     patchelf --shrink-rpath --allowed-rpath-prefixes /nix/store $out/bin/MoonGen
     patchelf --add-rpath $out/lib/libmoon $out/bin/MoonGen
     patchelf --add-rpath $out/lib/libmoon/tbb_cmake_build/tbb_cmake_build_subdir_release $out/bin/MoonGen
     patchelf --add-rpath $out/lib/dpdk/lib $out/bin/MoonGen
-    patchelf --add-rpath $out/lib/dpdk/drivers $out/bin/MoonGen
     patchelf --add-rpath $out/lib/luajit/usr/local/lib $out/bin/MoonGen
-    patchelf --add-rpath $out/lib/highwayhash/lib $out/bin/MoonGen
   '';
 
   dontFixup = true;

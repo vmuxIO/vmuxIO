@@ -112,20 +112,19 @@
     "libmoon-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1717844644,
-        "narHash": "sha256-X78+YSgY/OeYe9VUZbjlotVbeGzGy3pq3bEERLCZZa8=",
-        "ref": "dpdk-22.11",
-        "rev": "c9397d11ec7a11e6003ed383488a4ce05118b9a6",
-        "revCount": 662,
+        "lastModified": 1734545738,
+        "narHash": "sha256-OGeuFKzPWxFRDMQXnhF7SK99PpjcXzqhFxQIqZi/Rb8=",
+        "ref": "refs/heads/dpdk-22.11",
+        "rev": "579f9e41cec1e86686e9c59a15e386f4b3e3ed5e",
+        "revCount": 663,
         "submodules": true,
         "type": "git",
-        "url": "https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
+        "url": "file:///home/dominik/libmoon-lachnit"
       },
       "original": {
-        "ref": "dpdk-22.11",
         "submodules": true,
         "type": "git",
-        "url": "https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
+        "url": "file:///home/dominik/libmoon-lachnit"
       }
     },
     "libmoon-src": {
