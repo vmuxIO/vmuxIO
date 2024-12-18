@@ -139,33 +139,34 @@ pkgs.stdenv.mkDerivation {
     #   --replace 'bool ice_is_vsi_valid(struct' \
     #     'extern bool ice_is_vsi_valid(struct'
 
-    # substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/version.map \
-    #   --replace 'local: *;' \
-    #     'global:
-    # ice_is_vsi_valid;
-    # ice_fill_dflt_direct_cmd_desc;
-    # ice_aq_send_cmd;
-    # ice_get_vsi_ctx;
-    # ice_get_lan_q_ctx;
-    # ice_sched_find_node_by_teid;
-    # ice_logtype_driver;
-    # ice_ptp_init_time;
-    # ice_cfg_q_bw_lmt;
-    # ice_cfg_vsi_bw_lmt_per_tc;
-    #      local: *;'
+    substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/version.map \
+      --replace 'local: *;' \
+        'global:
+    ice_is_vsi_valid;
+    ice_fill_dflt_direct_cmd_desc;
+    ice_aq_send_cmd;
+    ice_get_vsi_ctx;
+    ice_get_lan_q_ctx;
+    ice_sched_find_node_by_teid;
+    ice_logtype_driver;
+    ice_ptp_init_time;
+    ice_cfg_q_bw_lmt;
+    ice_cfg_vsi_bw_lmt_per_tc;
+         local: *;'
 
-    # substituteInPlace ./libmoon/deps/dpdk/drivers/net/iavf/version.map \
-    #   --replace 'local: *;' \
-    #     'global:
-    # iavf_config_bw_limit_queue;
-    # iavf_get_ieee1588_tmst;
-    #      local: *;'
-    #
-    # substituteInPlace ./libmoon/deps/dpdk/drivers/net/i40e/version.map \
-    #   --replace 'local: *;' \
-    #     'global:
-    # i40e_aq_get_link_info;
-    #      local: *;'
+    substituteInPlace ./libmoon/deps/dpdk/drivers/net/iavf/version.map \
+      --replace 'local: *;' \
+        'global:
+    iavf_config_bw_limit_queue;
+    iavf_get_ieee1588_tmst;
+    iavf_config_bw_limit_port;
+         local: *;'
+
+    substituteInPlace ./libmoon/deps/dpdk/drivers/net/i40e/version.map \
+      --replace 'global:' \
+        'global:
+    i40e_aq_get_link_info;
+         '
 
     substituteInPlace ./libmoon/deps/dpdk/drivers/net/ice/ice_ethdev.h \
       --replace '#define ICE_PKG_FILE_DEFAULT "/lib/firmware/intel/ice/ddp/ice.pkg"' \
@@ -203,8 +204,8 @@ pkgs.stdenv.mkDerivation {
     cp -r libmoon/deps/dpdk/x86_64-native-linux-gcc/drivers $out/lib/dpdk
     mkdir -p $out/lib/luajit
     cp -r libmoon/deps/luajit/usr/local/lib $out/lib/luajit
-    mkdir -p $out/lib/highwayhash
-    cp -r libmoon/deps/highwayhash/lib $out/lib/highwayhash
+    # mkdir -p $out/lib/highwayhash
+    # cp -r libmoon/deps/highwayhash/lib $out/lib/highwayhash
 
     # autopatchelfHook?
     patchelf --shrink-rpath --allowed-rpath-prefixes /nix/store $out/bin/MoonGen
@@ -213,7 +214,7 @@ pkgs.stdenv.mkDerivation {
     patchelf --add-rpath $out/lib/dpdk/lib $out/bin/MoonGen
     patchelf --add-rpath $out/lib/dpdk/drivers $out/bin/MoonGen
     patchelf --add-rpath $out/lib/luajit/usr/local/lib $out/bin/MoonGen
-    patchelf --add-rpath $out/lib/highwayhash/lib $out/bin/MoonGen
+    # patchelf --add-rpath $out/lib/highwayhash/lib $out/bin/MoonGen
   '';
 
   dontFixup = true;
