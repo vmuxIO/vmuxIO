@@ -117,6 +117,7 @@
       dpdk23 = pkgs.callPackage ./nix/dpdk23.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
+        inherit self;
       };
       dpdkdk = pkgs.callPackage ./nix/dpdkdk.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;
