@@ -3,11 +3,11 @@
     "dpdk-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1734621367,
-        "narHash": "sha256-EHAVJgt895uorXq8BK857BQZO+kesr1LeBLeCcV5v84=",
+        "lastModified": 1734625106,
+        "narHash": "sha256-5txMmgOTrjY8Du9gBQ42pSZGOVqBWQPIB7jtmifzTxg=",
         "ref": "refs/heads/v22.11-libmoon",
-        "rev": "c6d4cf19547264b99fadb1ae88a4923daf9df976",
-        "revCount": 34485,
+        "rev": "b10bfaaa76eecfeb0db431f7bebdca54eb9a6587",
+        "revCount": 34493,
         "submodules": true,
         "type": "git",
         "url": "file:///home/dominik/dpdk-lachnit"

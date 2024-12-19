@@ -199,6 +199,7 @@ vm-libvfio-user:
     sudo rm {{qemuMem}} || true
     sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
+        -smp 4 \
         -enable-kvm \
         -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
         -machine q35,accel=kvm,kernel-irqchip=split \
