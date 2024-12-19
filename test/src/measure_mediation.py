@@ -254,7 +254,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
         # interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
-        interfaces = [ Interface.VMUX_MED ]
+        interfaces = [ Interface.VMUX_MED, Interface.VMUX_VDPDK ]
         # interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
         # fastclicks = [ "hardware" ]
@@ -324,7 +324,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         # guest: set up networking
 
                         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                            if interface.guest_driver() == "ice":
+                            if interface.guest_driver() in ["ice", "vfio-pci"]:
                                 guest.bind_test_iface() # bind vfio driver
                             else: # supports software-tap with kernel interfaces only
                                 guest.modprobe_test_iface_drivers(interface=interface)

@@ -59,6 +59,9 @@ class Interface(Enum):
     # vMux e810 emulation to dpdk backend
     VMUX_DPDK_E810 = "vmux-dpdk-e810"
 
+    # vMux vDPDK device to dpdk backend
+    VMUX_VDPDK = "vmux-vdpdk"
+
 
     def needs_br_tap(self) -> bool:
         return self in [ Interface.BRIDGE, Interface.BRIDGE_VHOST, Interface.BRIDGE_E1000, Interface.VMUX_EMU, Interface.VMUX_EMU_E810 ]
@@ -67,10 +70,10 @@ class Interface(Enum):
         return self in [ Interface.MACVTAP ]
 
     def needs_vfio(self) -> bool:
-        return self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]
+        return self in [ Interface.VFIO, Interface.VMUX_PT, Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED, Interface.VMUX_VDPDK ]
 
     def needs_vmux(self) -> bool:
-        return self in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.VMUX_EMU_E810, Interface.VMUX_MED, Interface.VMUX_DPDK_E810 ]
+        return self in [ Interface.VMUX_PT, Interface.VMUX_EMU, Interface.VMUX_DPDK, Interface.VMUX_EMU_E810, Interface.VMUX_MED, Interface.VMUX_DPDK_E810, Interface.VMUX_VDPDK ]
 
     def is_passthrough(self) -> bool:
         return self in [ Interface.VFIO, Interface.VMUX_PT ]
@@ -82,6 +85,8 @@ class Interface(Enum):
             return "e1000"
         if self in [ Interface.BRIDGE, Interface.BRIDGE_VHOST, Interface.MACVTAP ]:
             return "virtio-net"
+        if self == Interface.VMUX_VDPDK:
+            return "vfio-pci"
         raise Exception(f"Dont know which guest driver is used with {self}")
 
     @staticmethod
