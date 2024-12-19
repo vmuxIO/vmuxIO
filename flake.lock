@@ -3,20 +3,19 @@
     "dpdk-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1685445053,
-        "narHash": "sha256-XXrvwLJWAMezo5gdXOrnj6CuC+mRZwHiJ7QoE1tOm5w=",
-        "ref": "v22.11-libmoon",
-        "rev": "870b450187058b6a55a46ac52026d02fa84a64e6",
-        "revCount": 34483,
+        "lastModified": 1734621367,
+        "narHash": "sha256-EHAVJgt895uorXq8BK857BQZO+kesr1LeBLeCcV5v84=",
+        "ref": "refs/heads/v22.11-libmoon",
+        "rev": "c6d4cf19547264b99fadb1ae88a4923daf9df976",
+        "revCount": 34485,
         "submodules": true,
         "type": "git",
-        "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
+        "url": "file:///home/dominik/dpdk-lachnit"
       },
       "original": {
-        "ref": "v22.11-libmoon",
         "submodules": true,
         "type": "git",
-        "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
+        "url": "file:///home/dominik/dpdk-lachnit"
       }
     },
     "dpdk-src": {

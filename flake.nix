@@ -52,7 +52,8 @@
       flake = false;
     };
     dpdk-lachnit-src = {
-      url = "git+https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v22.11-libmoon&submodules=1";
+      url = "git+file:///home/dominik/dpdk-lachnit?submodules=1";
+      # url = "git+https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v22.11-libmoon&submodules=1";
       flake = false;
     };
 
