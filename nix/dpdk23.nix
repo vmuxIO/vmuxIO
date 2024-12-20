@@ -28,7 +28,7 @@
   )
 , dpdkVersion ? "23.07"
 , linux-firmware-pinned
-, self
+, self ? null
 }:
 
 let

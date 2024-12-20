@@ -1,0 +1,73 @@
+From 579f9e41cec1e86686e9c59a15e386f4b3e3ed5e Mon Sep 17 00:00:00 2001
+From: Dominik Kreutzer <kreutzer@in.tum.de>
+Date: Wed, 18 Dec 2024 18:15:38 +0000
+Subject: [PATCH] Fix build script
+
+---
+ CMakeLists.txt | 13 ++++++-------
+ build.sh       |  8 ++++----
+ 2 files changed, 10 insertions(+), 11 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 499c3da..a4a3efe 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1,9 +1,10 @@
+-CMAKE_MINIMUM_REQUIRED(VERSION 2.8...3.18)
++CMAKE_MINIMUM_REQUIRED(VERSION 3.18)
+ PROJECT(libmoon C CXX)
+ 
+ SET(CMAKE_CXX_FLAGS "-fno-stack-protector -Wall -Wextra -Wno-unused-parameter -g -O3 -std=gnu++11 -march=native -msse4.2")
+ SET(CMAKE_C_FLAGS "-fno-stack-protector -Wall -Wextra -Wno-unused-parameter -g -O3 -std=gnu11 -march=native -msse4.2")
+ SET(CMAKE_EXE_LINKER_FLAGS "-rdynamic") # to access functions from luajit
++SET(CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/deps/dpdk/x86_64-native-linux-gcc)
+ 
+ SET(FILES
+ 	src/main.cpp
+@@ -36,10 +37,8 @@ SET(LUAJIT_LIBS
+ 	luajit-5.1
+ )
+ 
+-find_package(PkgConfig QUIET)
+-if(PKG_CONFIG_FOUND)
+-  pkg_check_modules(dpdk IMPORTED_TARGET libdpdk)
+-endif()
++find_package(PkgConfig REQUIRED)
++pkg_check_modules(dpdk REQUIRED IMPORTED_TARGET libdpdk)
+ 
+ SET(ALL_LIBS
+ 	-Wl,--whole-archive
+@@ -77,9 +76,9 @@ IF(LIBMOON_BUILD_LIBRARY)
+ 	ADD_DEFINITIONS(-DLIBMOON_BUILD_LIB)
+ 	# we want libmoon.a, not liblibmoon.a
+ 	ADD_LIBRARY(moon STATIC ${FILES})
+-	TARGET_LINK_LIBRARIES(moon ${ALL_LIBS} -Wl,--start-group ${dpdk_STATIC_LINK_LIBRARIES} ${dpdk_STATIC_LDFLAGS} ${dpdk_STATIC_LDFLAGS_OTHER} numa -Wl,--end-group pthread dl rt)
++	TARGET_LINK_LIBRARIES(moon ${ALL_LIBS} -Wl,--start-group PkgConfig::dpdk numa -Wl,--end-group pthread dl rt)
+ ELSE()
+ 	ADD_EXECUTABLE(libmoon ${FILES})
+-	TARGET_LINK_LIBRARIES(libmoon ${ALL_LIBS} -Wl,--start-group ${dpdk_STATIC_LINK_LIBRARIES} ${dpdk_STATIC_LDFLAGS} ${dpdk_STATIC_LDFLAGS_OTHER} numa -Wl,--end-group pthread dl rt)
++	TARGET_LINK_LIBRARIES(libmoon ${ALL_LIBS} -Wl,--start-group PkgConfig::dpdk numa -Wl,--end-group pthread dl rt)
+ ENDIF()
+ 
+diff --git a/build.sh b/build.sh
+index 568ebd0..8d01333 100755
+--- a/build.sh
++++ b/build.sh
+@@ -79,10 +79,10 @@ if ${INCREASE_MEMORY_LIMITS_DPDK}; then
+ 	grep -q -F "RTE_MAX_MEMSEG_PER_TYPE 524288" ./config/rte_config.h || sed -i 's/RTE_MAX_MEMSEG_PER_TYPE 32768/RTE_MAX_MEMSEG_PER_TYPE 524288/' ./config/rte_config.h
+ 	grep -q -F "RTE_MAX_MEM_MB_PER_TYPE 1048576" ./config/rte_config.h || sed -i 's/RTE_MAX_MEM_MB_PER_TYPE 65536/RTE_MAX_MEM_MB_PER_TYPE 1048576/' ./config/rte_config.h
+ fi
+-CC=gcc meson setup $DEBUG_FLAGS_DPDK -Dmax_lcores=512 -Dtests=false -Ddisable_drivers=$DISABLED_DRIVERS --prefix=$(pwd)/x86_64-native-linux-gcc x86_64-native-linux-gcc
+-grep -q -x -F "#define RTE_LIBRTE_IEEE1588 1" ./x86_64-native-linux-gcc/rte_build_config.h || echo "#define RTE_LIBRTE_IEEE1588 1" >> ./x86_64-native-linux-gcc/rte_build_config.h
+-ninja -C x86_64-native-linux-gcc
+-ninja -C x86_64-native-linux-gcc install
++CC=gcc meson setup $DEBUG_FLAGS_DPDK -Dmax_lcores=512 -Dtests=false -Ddisable_drivers=$DISABLED_DRIVERS --prefix=$(pwd)/x86_64-native-linux-gcc build
++grep -q -x -F "#define RTE_LIBRTE_IEEE1588 1" ./build/rte_build_config.h || echo "#define RTE_LIBRTE_IEEE1588 1" >> ./build/rte_build_config.h
++ninja -C build
++ninja -C build install
+ )
+ 
+ (
+-- 
+2.47.0
+
