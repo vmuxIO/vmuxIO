@@ -86,14 +86,16 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
 void VdpdkDevice::rx_callback_fn(int vm_number) {
   driver->recv(vm_number);
 
-  // We delay loading this until we actually know if packets were received
+  // We delay locking until we actually know if packets were received
   std::shared_lock dma_lock(dma_mutex, std::defer_lock);
-  std::shared_ptr<RxQueue> rxq;
-  size_t ring_size;
-  unsigned char *ring;
 
   bool have_buffers = true;
   for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm && have_buffers; q_idx++) {
+    // We delay loading this until we actually know if packets were received
+    std::shared_ptr<RxQueue> rxq;
+    size_t ring_size;
+    unsigned char *ring;
+
     auto &driver_rxq = driver->get_rx_queue(vm_number, q_idx);
     for (uint16_t i = 0; i < driver_rxq.nb_bufs_used; i++) {
       // If we reach this point, at least one packet was received
@@ -101,7 +103,14 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
 
       // Lock and load rx_queue parameters
       if (!rxq) {
-        rxq = rx_queue.load();
+        size_t rx_queues_idx = (size_t)q_idx % MAX_RX_QUEUES;
+        rxq = rx_queues[rx_queues_idx].load();
+        // If a queue with this index does not exist, fall back to queue 0
+        // TODO: Maybe use a smarter mapping? For example in the case of
+        // splitting 4 queues onto 2 vDPDK queues.
+        if (!rxq) {
+          rxq = rx_queues[0].load();
+        }
         // If no queue was created, we are done
         if (!rxq) {
           have_buffers = false;
@@ -243,7 +252,7 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       if (count != 2) return -1;
       uint16_t queue_idx;
       memcpy(&queue_idx, buf, 2);
-      if (queue_idx != 0) {
+      if (queue_idx >= MAX_RX_QUEUES) {
         printf("RX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
         return count;
       }
@@ -258,7 +267,7 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       rxq->idx_mask = idx_mask;
       rxq->idx = 0;
 
-      rx_queue = rxq;
+      rx_queues[queue_idx] = rxq;
 
       return count;
     }
@@ -267,12 +276,12 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       if (count != 2) return -1;
       uint16_t queue_idx;
       memcpy(&queue_idx, buf, 2);
-      if (queue_idx != 0) {
+      if (queue_idx >= MAX_RX_QUEUES) {
         printf("RX_QUEUE_STOP: Invalid queue idx %d", (int)queue_idx);
         return count;
       }
 
-      rx_queue = nullptr;
+      rx_queues[queue_idx] = nullptr;
       return count;
     }
   }

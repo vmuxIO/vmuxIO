@@ -13,4 +13,6 @@ namespace VDPDK_CONSTS {
 
   constexpr size_t RX_DESC_SIZE = 0x20;
   constexpr uint16_t RX_FLAG_AVAIL = 1;
+
+  constexpr size_t MAX_RX_QUEUES = 4;
 };

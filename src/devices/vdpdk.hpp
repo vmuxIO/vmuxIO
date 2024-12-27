@@ -1,5 +1,6 @@
 #pragma once
 
+#include "devices/vdpdk-consts.hpp"
 #include "drivers/dpdk.hpp"
 #include "src/devices/vmux-device.hpp"
 #include "memfd.hpp"
@@ -32,7 +33,10 @@ private:
     uint16_t idx_mask;
     uint16_t idx;
   };
-  std::atomic<std::shared_ptr<RxQueue>> rx_queue;
+  std::array<
+    std::atomic<std::shared_ptr<RxQueue>>,
+    VDPDK_CONSTS::MAX_RX_QUEUES
+  > rx_queues;
 
   void rx_callback_fn(int vm_number);
   static void rx_callback_static(int vm_number, void *);
