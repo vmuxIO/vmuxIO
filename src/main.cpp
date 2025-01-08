@@ -300,7 +300,8 @@ Result<void> _main(int argc, char **argv) {
       device->driver->mediation_enable(i);
     }
     if (modes[i] == "vdpdk") {
-      device = std::make_shared<VdpdkDevice>(i, drivers[i]);
+      device = std::make_shared<VdpdkDevice>(i, drivers[i], &mac_addr);
+      device->driver->mediation_enable(i);
     }
     if (modes[i] == "e1000-emu") {
 #ifdef BUILD_E1000_EMU

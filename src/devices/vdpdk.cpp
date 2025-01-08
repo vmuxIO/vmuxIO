@@ -20,12 +20,17 @@ enum VDPDK_OFFSET {
 
   RX_QUEUE_START = 0x140,
   RX_QUEUE_STOP = 0x180,
+
+  FLOW_CREATE = 0x200,
+  FLOW_DESTROY = 0x240,
+
 };
 
-VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
+VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6])
 : VmuxDevice(device_id, driver, nullptr),
   txbuf{"vdpdk_tx", REGION_SIZE},
   rxbuf{"vdpdk_rx", REGION_SIZE},
+  flowbuf{"vdpdk_flow", 0x1000},
   dpdk_driver(std::dynamic_pointer_cast<Dpdk>(driver)) {
   if (!dpdk_driver) {
     die("Using vDPDK without the DPDK backend is not supported.");
@@ -33,6 +38,8 @@ VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver)
   if (rte_eal_iova_mode() != RTE_IOVA_VA) {
     die("vDPDK only supports virtual address IOVA mode. (Try using DPDK with --iova-mode=va)");
   }
+
+  memcpy(this->mac_addr, mac_addr, 6);
 
   // TODO figure out appropriate IDs
   this->info.pci_vendor_id = 0x1af4; // Red Hat Virtio Devices
@@ -74,6 +81,14 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
                              rxbuf.fd(), 0);
   if (ret) {
     die("failed to setup BAR2 region (%d)", errno);
+  }
+
+  ret = vfu_setup_region(ctx, VFU_PCI_DEV_BAR3_REGION_IDX,
+                             flowbuf.size(), NULL,
+                             region_flags, NULL, 0,
+                             flowbuf.fd(), 0);
+  if (ret) {
+    die("failed to setup BAR3 region (%d)", errno);
   }
 
   ret = vfu_setup_device_dma(ctx, dma_register_cb_static,
@@ -284,6 +299,15 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       rx_queues[queue_idx] = nullptr;
       return count;
     }
+
+    case FLOW_DESTROY: {
+      if (count != 8) return -1;
+      uint64_t handle;
+      memcpy(&handle, buf, 8);
+
+      // TODO: actually disable rule
+      return count;
+    }
   }
 
   printf("Invalid write offset: %x\n", offset);
@@ -304,15 +328,66 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
     return count;
   }
 
-  // switch (offset) {
-  //   case TX_SIGNAL: {
-  //     uint16_t pkt_len = txbuf[PKT_LEN] | ((uint16_t)txbuf[PKT_LEN + 1] << 8);
-  //     driver->send(device_id, (const char *)txbuf.ptr(), pkt_len);
-  //     memset(buf, 0, count);
-  //     buf[0] = 1;
-  //     return count;
-  //   }
-  // }
+  switch (offset) {
+    case FLOW_CREATE: {
+      if (count != 8) return -1;
+
+      unsigned char *src = flowbuf.ptr();
+      // Skip attr for now
+      src += sizeof(struct rte_flow_attr);
+      uint8_t null_flags = *src++;
+
+      struct rte_flow_item_eth spec = {};
+      if (null_flags & 1) {
+        memcpy(&spec, src, sizeof(spec));
+        src += sizeof(spec);
+      }
+
+      struct rte_flow_item_eth last = {};
+      if (null_flags & 2) {
+        memcpy(&last, src, sizeof(last));
+        src += sizeof(last);
+      }
+
+      struct rte_flow_item_eth mask = {};
+      if (null_flags & 4) {
+        memcpy(&mask, src, sizeof(mask));
+        src += sizeof(mask);
+      }
+
+      null_flags = *src++;
+      struct rte_flow_action_queue action = {};
+      if (null_flags) {
+        memcpy(&action, src, sizeof(action));
+        src += sizeof(action);
+      }
+
+      // TODO: actually look at structs to support more complex rules
+
+      if (mask.type != 0xFFFF) {
+        printf("Invalid eth_flow type mask: %u\n", (unsigned)mask.type);
+        uint64_t ret = -1;
+        memcpy(buf, &ret, 8);
+        return count;
+      }
+
+      if (action.index >= 4) {
+        printf("Invalid queue index: %u\n", (unsigned)action.index);
+        uint64_t ret = -1;
+        memcpy(buf, &ret, 8);
+        return count;
+      }
+
+      uint16_t etype = rte_be_to_cpu_16(spec.type);
+      // Don't need handles for now, because we cannot remove rules, so return dummy value
+      uint64_t ret =
+        driver->add_switch_rule(device_id, mac_addr, etype, action.index)
+        ? 0 : -1;
+      memcpy(buf, &ret, 8);
+
+      return count;
+    }
+  }
 
   printf("Invalid read offset: %x\n", offset);
   return -1;

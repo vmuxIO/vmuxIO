@@ -11,7 +11,7 @@
 
 class VdpdkDevice : public VmuxDevice {
 public:
-  VdpdkDevice(int device_id, std::shared_ptr<Driver> driver);
+  VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6]);
   
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override;
 
@@ -19,8 +19,11 @@ private:
   std::string dbg_string;
   MemFd txbuf;
   MemFd rxbuf;
+  MemFd flowbuf;
 
   std::shared_ptr<Dpdk> dpdk_driver;
+
+  uint8_t mac_addr[6];
 
   // we use this to ensure we don't have to lock the VfuServer for every dma access
   // if we don't lock at all, it's possible that the dma mapping is released while we access it

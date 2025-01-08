@@ -687,6 +687,9 @@ fastclick-reflect:
 fastclick-tap:
   ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/dpdk-tap.click
 
+fastclick-flow:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/mac-switch-hardware.click rules=./test/fastclick/rteflow_etype_rules
+
 pktgen: 
   nix shell .#pktgen
   sudo pktgen -l 0-4 --proc-type auto -- -P -m "[1:3].0, [2:4].1" -f ../Pktgen-DPDK/test/test_seq.lua
