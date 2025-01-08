@@ -107,7 +107,7 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
   bool have_buffers = true;
   for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm && have_buffers; q_idx++) {
     // We delay loading this until we actually know if packets were received
-    std::shared_ptr<RxQueue> rxq;
+    std::shared_ptr<RxQueue> rxq{};
     size_t ring_size;
     unsigned char *ring;
 
@@ -141,6 +141,9 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
           break;
         }
       }
+
+      // if (i == 0)
+      //   printf("recv: %u pkts on queue %u\n", (unsigned)driver_rxq.nb_bufs_used, q_idx);
 
       unsigned char *buf_iova_addr = ring + (size_t)(rxq->idx & rxq->idx_mask) * RX_DESC_SIZE;
       unsigned char *buf_len_addr = buf_iova_addr + 8;
@@ -276,6 +279,9 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       memcpy(&ring_addr, rxbuf.ptr(), 8);
       uint16_t idx_mask;
       memcpy(&idx_mask, rxbuf.ptr() + 8, 2);
+
+      printf("RX_QUEUE_START: idx: %d, ring_addr: %llx, mask: %x\n",
+             (int)queue_idx, (unsigned long long)ring_addr, (unsigned)idx_mask);
 
       auto rxq = std::make_shared<RxQueue>();
       rxq->ring_iova = ring_addr;
