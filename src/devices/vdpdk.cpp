@@ -104,8 +104,7 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
   // We delay locking until we actually know if packets were received
   std::shared_lock dma_lock(dma_mutex, std::defer_lock);
 
-  bool have_buffers = true;
-  for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm && have_buffers; q_idx++) {
+  for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm; q_idx++) {
     // We delay loading this until we actually know if packets were received
     std::shared_ptr<RxQueue> rxq{};
     size_t ring_size;
@@ -128,16 +127,15 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
         }
         // If no queue was created, we are done
         if (!rxq) {
-          have_buffers = false;
           break;
         }
 
-        dma_lock.lock();
+        if (!dma_lock)
+          dma_lock.lock();
         ring_size = ((size_t)rxq->idx_mask + 1) * RX_DESC_SIZE;
         ring = (unsigned char *)vfuServer->dma_local_addr(rxq->ring_iova, ring_size);
         if (!ring) {
           printf("DMA unmapped during RX poll\n");
-          have_buffers = false;
           break;
         }
       }
@@ -152,7 +150,6 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
       uint16_t flags = rte_read16(desc_flags_addr);
       // If next descriptor is not available, we are out of buffers
       if (!(flags & RX_FLAG_AVAIL)) {
-        have_buffers = false;
         break;
       }
 
@@ -164,7 +161,6 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
       void *buf_addr = vfuServer->dma_local_addr(buf_iova, buf_len);
       if (!buf_addr) {
         printf("Invalid packet iova!\n");
-        have_buffers = false;
         break;
       }
 
@@ -173,7 +169,6 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
       uint16_t pkt_len_u16 = pkt_len;
       if (pkt_len > buf_len || pkt_len > pkt_len_u16) {
         printf("Packet too large (%lx > %x)\n", (unsigned long)pkt_len, (unsigned)buf_len);
-        have_buffers = false;
         break;
       }
 
