@@ -47,13 +47,11 @@
       flake = false;
     };
     libmoon-lachnit-src = {
-      url = "git+file:///home/dominik/libmoon-lachnit?submodules=1";
-      # url = "git+https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-22.11&submodules=1";
+      url = "git+https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-22.11&submodules=1";
       flake = false;
     };
     dpdk-lachnit-src = {
-      url = "git+file:///home/dominik/dpdk-lachnit?submodules=1";
-      # url = "git+https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v22.11-libmoon&submodules=1";
+      url = "git+https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v22.11-libmoon-vdpdk&submodules=1";
       flake = false;
     };
 

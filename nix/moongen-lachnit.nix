@@ -49,6 +49,11 @@ pkgs.stdenv.mkDerivation {
 
   dontConfigure = true;
 
+  patches = [
+    ./libmoon-lachnit-fix-build.patch
+  ];
+  patchFlags = [ "-p1" "-d" "libmoon" ];
+
   postPatch = ''
     ls -la ./libmoon
     patchShebangs ./libmoon/build.sh ./build.sh

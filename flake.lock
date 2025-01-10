@@ -3,19 +3,20 @@
     "dpdk-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1736440348,
+        "lastModified": 1736515195,
         "narHash": "sha256-xXDw0sqLYhWhpsHs8CknXtUm6e0KX8SlepNzHZV21DU=",
-        "ref": "refs/heads/v22.11-libmoon",
-        "rev": "ff7bd8dbd5792b7ac04ef224bb61512d171bfbd6",
-        "revCount": 34503,
+        "ref": "v22.11-libmoon-vdpdk",
+        "rev": "1dddffa5bc41f8c795a9a5d3deb59f750429c815",
+        "revCount": 34498,
         "submodules": true,
         "type": "git",
-        "url": "file:///home/dominik/dpdk-lachnit"
+        "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
       },
       "original": {
+        "ref": "v22.11-libmoon-vdpdk",
         "submodules": true,
         "type": "git",
-        "url": "file:///home/dominik/dpdk-lachnit"
+        "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
       }
     },
     "dpdk-src": {
@@ -43,7 +44,7 @@
         "lastModified": 1736439683,
         "narHash": "sha256-rIdYriaFJBSqOw7G55RtpwMjd1LUktmvAQXArk7016M=",
         "ref": "kreutzer-dev-22.11",
-        "rev": "df81b5e33294b2e0546348789d0f3a79e74aa9cc",
+        "rev": "507e967f4f357755ab662afc3ec6d1f0c262128a",
         "revCount": 34489,
         "submodules": true,
         "type": "git",
@@ -111,19 +112,20 @@
     "libmoon-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1734545738,
-        "narHash": "sha256-OGeuFKzPWxFRDMQXnhF7SK99PpjcXzqhFxQIqZi/Rb8=",
-        "ref": "refs/heads/dpdk-22.11",
-        "rev": "579f9e41cec1e86686e9c59a15e386f4b3e3ed5e",
-        "revCount": 663,
+        "lastModified": 1717844644,
+        "narHash": "sha256-X78+YSgY/OeYe9VUZbjlotVbeGzGy3pq3bEERLCZZa8=",
+        "ref": "dpdk-22.11",
+        "rev": "c9397d11ec7a11e6003ed383488a4ce05118b9a6",
+        "revCount": 662,
         "submodules": true,
         "type": "git",
-        "url": "file:///home/dominik/libmoon-lachnit"
+        "url": "https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
       },
       "original": {
+        "ref": "dpdk-22.11",
         "submodules": true,
         "type": "git",
-        "url": "file:///home/dominik/libmoon-lachnit"
+        "url": "https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
       }
     },
     "libmoon-src": {
