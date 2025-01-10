@@ -6,7 +6,7 @@
 }:
 let
   dpdk23Patches = false;
-  dpdk = selfpkgs.dpdk22; # needed for ice package thingy
+  dpdk = selfpkgs.dpdk-vdpdk; # needed for ice package thingy
   # dpdk = self.inputs.nixpkgs.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
   debug = false;
 in
