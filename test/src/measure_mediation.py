@@ -233,6 +233,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [
           Interface.VMUX_MED,
+          Interface.VMUX_VDPDK,
           Interface.VMUX_DPDK_E810,
           Interface.VFIO,
           Interface.VMUX_PT,
@@ -247,7 +248,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             "hardware",
             "software",
             ]
-    vm_nums = [ 1, 2, 4, 8, 16, 32, 64 ] # 2 VMs are currently not supported for VMUX_DPDK*
+    vm_nums = [ 1, 2, 4, 8, 16 ] # 2 VMs are currently not supported for VMUX_DPDK*
     rates = [ 40000 ]
     repetitions = 3
     DURATION_S = 61 if not G.BRIEF else 11
