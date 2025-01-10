@@ -38,7 +38,7 @@
         "url": "https://github.com/vmuxIO/dpdk"
       }
     },
-    "dpdkdk-src": {
+    "dpdk-vdpdk-src": {
       "flake": false,
       "locked": {
         "lastModified": 1736439683,
@@ -326,7 +326,7 @@
       "inputs": {
         "dpdk-lachnit-src": "dpdk-lachnit-src",
         "dpdk-src": "dpdk-src",
-        "dpdkdk-src": "dpdkdk-src",
+        "dpdk-vdpdk-src": "dpdk-vdpdk-src",
         "fastclick-src": "fastclick-src",
         "flake-utils": "flake-utils",
         "libmoon-lachnit-src": "libmoon-lachnit-src",

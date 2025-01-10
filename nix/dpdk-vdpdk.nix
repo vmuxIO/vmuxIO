@@ -36,10 +36,10 @@ let
   debug = false;
 in
 stdenv.mkDerivation {
-  pname = "dpdkdk";
+  pname = "dpdk-vdpdk";
   version = "${dpdkVersion}" + lib.optionalString mod "-${kernel.version}";
 
-  src = self.inputs.dpdkdk-src;
+  src = self.inputs.dpdk-vdpdk-src;
 
   nativeBuildInputs = [
     makeWrapper

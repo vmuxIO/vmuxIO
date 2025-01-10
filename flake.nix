@@ -67,7 +67,7 @@
       url = "git+https://github.com/tbarbette/fastclick.git";
       flake = false;
     };
-    dpdkdk-src = {
+    dpdk-vdpdk-src = {
       url = "git+https://github.com/vmuxIO/dpdk?ref=kreutzer-dev-22.11&submodules=1";
       flake = false;
     };
@@ -118,7 +118,7 @@
         inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
       };
-      dpdkdk = pkgs.callPackage ./nix/dpdkdk.nix {
+      dpdk-vdpdk = pkgs.callPackage ./nix/dpdk-vdpdk.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
         inherit self;
