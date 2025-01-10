@@ -972,7 +972,7 @@ class Server(ABC):
                          ' | grep inet | awk "{print \\$2}"')
 
         if "does not exist" in result:
-            debug("Interface {iface} does not exist!")
+            debug(f"Interface {iface} does not exist!")
             return []
 
         else:
@@ -1813,7 +1813,7 @@ class Host(Server):
             # num_vms is also vm_number, because with passthrough there is only one
             vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, num_vms)}"
             args = f' -s {vmux_socket} -d {self.test_iface_addr}'
-        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]:
+        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED, Interface.VMUX_VDPDK ]:
             dpdk_args += f" -u -- -l {self.cpupinner.vmux_main()}"
         if interface.guest_driver() == "ice":
             vmux_mode = "emulation"
@@ -1821,6 +1821,8 @@ class Host(Server):
             vmux_mode = "e1000-emu"
         if interface == Interface.VMUX_MED:
             vmux_mode = "mediation"
+        if interface == Interface.VMUX_VDPDK:
+            vmux_mode = "vdpdk"
         if not interface.is_passthrough():
             if num_vms == 0:
                 args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(1)} -f {self.cpupinner.vmux_runner(1)}'

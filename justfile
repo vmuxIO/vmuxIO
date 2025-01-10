@@ -639,8 +639,17 @@ dpdk_helloworld: dpdk-setup
   meson configure -Denable_kmods=true
   meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
 
-fastclick: 
-  sudo ./fastclick/bin/click --dpdk "-l 2-10" -- ./test/fastclick/dpdk-flow-parser.click
+fastclick-gen:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/pktgen-l2.click
+
+fastclick-reflect:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/dpdk-bounce.click
+
+fastclick-tap:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/dpdk-tap.click
+
+fastclick-flow:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/mac-switch-hardware.click rules=./test/fastclick/rteflow_etype_rules
 
 pktgen: 
   nix shell .#pktgen

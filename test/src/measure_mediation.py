@@ -233,6 +233,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     # set up test plan
     interfaces = [
           Interface.VMUX_MED,
+          Interface.VMUX_VDPDK,
           Interface.VMUX_DPDK_E810,
           Interface.VFIO,
           Interface.VMUX_PT,
@@ -247,14 +248,14 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             "hardware",
             "software",
             ]
-    vm_nums = [ 1, 2, 4, 8, 16, 32, 64 ] # 2 VMs are currently not supported for VMUX_DPDK*
+    vm_nums = [ 1, 2, 4, 8, 16 ] # 2 VMs are currently not supported for VMUX_DPDK*
     rates = [ 40000 ]
     repetitions = 3
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ] # dpdk doesnt bind (not sure why)
         # interfaces = [ Interface.BRIDGE ] # doesnt work with click-dpdk (RSS init fails)
-        interfaces = [ Interface.VMUX_MED ]
+        interfaces = [ Interface.VMUX_MED, Interface.VMUX_VDPDK ]
         # interfaces = [ Interface.VMUX_DPDK_E810 ]
         # interfaces = [ Interface.VMUX_PT ]
         # fastclicks = [ "hardware" ]
@@ -324,7 +325,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                         # guest: set up networking
 
                         def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
-                            if interface.guest_driver() == "ice":
+                            if interface.guest_driver() in ["ice", "vfio-pci"]:
                                 guest.bind_test_iface() # bind vfio driver
                             else: # supports software-tap with kernel interfaces only
                                 guest.modprobe_test_iface_drivers(interface=interface)
