@@ -3,11 +3,11 @@
     "dpdk-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1734625106,
-        "narHash": "sha256-5txMmgOTrjY8Du9gBQ42pSZGOVqBWQPIB7jtmifzTxg=",
+        "lastModified": 1736440348,
+        "narHash": "sha256-xXDw0sqLYhWhpsHs8CknXtUm6e0KX8SlepNzHZV21DU=",
         "ref": "refs/heads/v22.11-libmoon",
-        "rev": "b10bfaaa76eecfeb0db431f7bebdca54eb9a6587",
-        "revCount": 34493,
+        "rev": "ff7bd8dbd5792b7ac04ef224bb61512d171bfbd6",
+        "revCount": 34503,
         "submodules": true,
         "type": "git",
         "url": "file:///home/dominik/dpdk-lachnit"
@@ -40,11 +40,11 @@
     "dpdkdk-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1736437366,
-        "narHash": "sha256-P/HbNOiFf5NAeJxuJZxdHPTR2smVXkDDTNkKcaauGJg=",
+        "lastModified": 1736439683,
+        "narHash": "sha256-rIdYriaFJBSqOw7G55RtpwMjd1LUktmvAQXArk7016M=",
         "ref": "kreutzer-dev-22.11",
-        "rev": "d813632d6a7ccaea49339fcfca252336366c70f2",
-        "revCount": 34486,
+        "rev": "df81b5e33294b2e0546348789d0f3a79e74aa9cc",
+        "revCount": 34489,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/dpdk"

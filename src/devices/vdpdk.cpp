@@ -224,29 +224,6 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       return count;
     }
 
-    case TX_QUEUE_START: {
-      if (count != 2) return -1;
-      uint16_t queue_idx;
-      memcpy(&queue_idx, buf, 2);
-      if (queue_idx != 0) {
-        printf("TX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
-        return count;
-      }
-
-      uint64_t ring_addr;
-      memcpy(&ring_addr, txbuf.ptr(), 8);
-      uint16_t idx_mask;
-      memcpy(&idx_mask, txbuf.ptr() + 8, 2);
-
-      // Stop left-over polling thread
-      tx_poll_thread = {};
-      // Start polling
-      tx_poll_thread = std::jthread{[this, ring_addr, idx_mask](std::stop_token stop){
-        this->tx_poll(std::move(stop), ring_addr, idx_mask);
-      }};
-      return count;
-    }
-
     case TX_QUEUE_STOP: {
       if (count != 2) return -1;
       uint16_t queue_idx;
@@ -258,33 +235,6 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
 
       // Stop polling
       tx_poll_thread = std::jthread{};
-      return count;
-    }
-
-    case RX_QUEUE_START: {
-      if (count != 2) return -1;
-      uint16_t queue_idx;
-      memcpy(&queue_idx, buf, 2);
-      if (queue_idx >= MAX_RX_QUEUES) {
-        printf("RX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
-        return count;
-      }
-
-      uint64_t ring_addr;
-      memcpy(&ring_addr, rxbuf.ptr(), 8);
-      uint16_t idx_mask;
-      memcpy(&idx_mask, rxbuf.ptr() + 8, 2);
-
-      printf("RX_QUEUE_START: idx: %d, ring_addr: %llx, mask: %x\n",
-             (int)queue_idx, (unsigned long long)ring_addr, (unsigned)idx_mask);
-
-      auto rxq = std::make_shared<RxQueue>();
-      rxq->ring_iova = ring_addr;
-      rxq->idx_mask = idx_mask;
-      rxq->idx = 0;
-
-      rx_queues[queue_idx] = rxq;
-
       return count;
     }
 
@@ -330,6 +280,61 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
   }
 
   switch (offset) {
+    case TX_QUEUE_START: {
+      if (count != 1) return -1;
+      uint16_t queue_idx;
+      memcpy(&queue_idx, txbuf.ptr() + 10, 2);
+      if (queue_idx != 0) {
+        printf("TX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
+        *buf = 1;
+        return count;
+      }
+
+      uint64_t ring_addr;
+      memcpy(&ring_addr, txbuf.ptr(), 8);
+      uint16_t idx_mask;
+      memcpy(&idx_mask, txbuf.ptr() + 8, 2);
+
+      // Stop left-over polling thread
+      tx_poll_thread = {};
+      // Start polling
+      tx_poll_thread = std::jthread{[this, ring_addr, idx_mask](std::stop_token stop){
+        this->tx_poll(std::move(stop), ring_addr, idx_mask);
+      }};
+
+      *buf = 0;
+      return count;
+    }
+
+    case RX_QUEUE_START: {
+      if (count != 1) return -1;
+      uint16_t queue_idx;
+      memcpy(&queue_idx, rxbuf.ptr() + 10, 2);
+      if (queue_idx >= MAX_RX_QUEUES) {
+        printf("RX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
+        *buf = 1;
+        return count;
+      }
+
+      uint64_t ring_addr;
+      memcpy(&ring_addr, rxbuf.ptr(), 8);
+      uint16_t idx_mask;
+      memcpy(&idx_mask, rxbuf.ptr() + 8, 2);
+
+      printf("RX_QUEUE_START: idx: %d, ring_addr: %llx, mask: %x\n",
+             (int)queue_idx, (unsigned long long)ring_addr, (unsigned)idx_mask);
+
+      auto rxq = std::make_shared<RxQueue>();
+      rxq->ring_iova = ring_addr;
+      rxq->idx_mask = idx_mask;
+      rxq->idx = 0;
+
+      rx_queues[queue_idx] = rxq;
+
+      *buf = 0;
+      return count;
+    }
+
     case FLOW_CREATE: {
       if (count != 8) return -1;
 
