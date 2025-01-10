@@ -8,6 +8,24 @@ IdentityAgent=/dev/null
 StrictHostKeyChecking=no
 LogLevel=ERROR
 
+Host graham.christina
+Hostname graham.dos.cit.tum.de
+IdentityFile /root/.ssh/lawful_access
+StrictHostKeyChecking=no
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
+StrictHostKeyChecking=no
+LogLevel=ERROR
+
+Host jackson.christina
+Hostname jackson.dos.cit.tum.de
+IdentityFile /root/.ssh/lawful_access
+StrictHostKeyChecking=no
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
+StrictHostKeyChecking=no
+LogLevel=ERROR
+
 Host rose.christina
 Hostname rose.dos.cit.tum.de
 IdentityFile /root/.ssh/lawful_access
@@ -38,6 +56,15 @@ Host amy.christina
 Hostname amy.dos.cit.tum.de
 IdentityFile /root/.ssh/lawful_access
 StrictHostKeyChecking=no
+UserKnownHostsFile=/dev/null
+IdentityAgent=/dev/null
+LogLevel=ERROR
+
+Host vm*.graham.christina
+ProxyJump graham.christina
+User root
+StrictHostKeyChecking=no
+IdentityFile /scratch/okelmann/vmuxIO/nix/ssh_key
 UserKnownHostsFile=/dev/null
 IdentityAgent=/dev/null
 LogLevel=ERROR
