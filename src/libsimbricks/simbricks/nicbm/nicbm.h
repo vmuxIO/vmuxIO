@@ -244,6 +244,17 @@ class CallbackAdaptor {
       this->device->driver->send(this->device->device_id, (char*)data, len);
     }
 
+    bool EthSendTso(const void *data, size_t len, bool end_of_packet,
+                    uint64_t l2_len, uint64_t l3_len, uint64_t l4_len,
+                    uint64_t tso_segsz) {
+      if_log_level(LOG_DEBUG,
+        printf("CallbackAdaptor::EthSendTso(len=%zu, eop=%d)\n", len, end_of_packet)
+      );
+      return this->device->driver->send_tso(
+        this->device->device_id, (const char *)data, len, end_of_packet,
+        l2_len, l3_len, l4_len, tso_segsz);
+    }
+
     void EventSchedule(nicbm::TimedEvent &evt) {
       printf("CallbackAdaptor::EventSchedule\n");
       die("not implemented");
