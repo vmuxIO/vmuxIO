@@ -413,12 +413,13 @@ Result<void> _main(int argc, char **argv) {
 void signal_handler(int) { quit.store(true); }
 
 int main(int argc, char **argv) {
-  // register signal handler to handle SIGINT gracefully to call destructors
+  // register signal handler to handle signals gracefully to call destructors
   struct sigaction sa;
   memset(&sa, 0, sizeof(sa));
   sa.sa_handler = signal_handler;
   sigfillset(&sa.sa_mask);
   sigaction(SIGINT, &sa, NULL);
+  sigaction(SIGTERM, &sa, NULL);
 
   if (outcome::result<void, std::string> res = _main(argc, argv)) {
     return EXIT_SUCCESS;

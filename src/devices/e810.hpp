@@ -129,10 +129,10 @@ public:
 
     // receive our packets
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
-    // for (uint16_t ) {}
-		for (int q_idx = 0; q_idx < 4; q_idx++) { // TODO hardcoded max_queues_per_vm
-			int queue_id = vm_number * 4 + q_idx;// TODO this_->get_rx_queue_id(vm_id, q_idx);
-			for (uint16_t i = queue_id * 32; i < (queue_id * 32+ this_->driver->nb_bufs_used[queue_id]); i++) { // TODO 32 = BURST_SIZE
+    for (unsigned q_idx = 0; q_idx < this_->driver->max_queues_per_vm; q_idx++) {
+      auto &rxq = this_->driver->get_rx_queue(vm_number, q_idx);
+      for (uint16_t i = 0; i < rxq.nb_bufs_used; i++) {
+        auto &rxBuf = rxq.rxBufs[i];
 
         // handle PTP mediation
         if (ptp_target_vm != -1) { // we are default queue and PTP mediation is enabled
@@ -140,8 +140,8 @@ public:
           // TODO avoid this overhead by using queue 0 for the last available VM
 
           // check rx packets for PTP multicasts
-          char* packet = this_->driver->rxBufs[i];
-          auto len = this_->driver->rxBuf_used[i];
+          char* packet = rxBuf.data;
+          auto len = rxBuf.used;
           if (len >= sizeof(struct ether_header)) {
             struct ethhdr* packet_hdr = (struct ethhdr*) packet;
             uint64_t dst_mac = 0xFFFFFFFFFFFF & *(uint64_t*)(packet_hdr->h_dest);
@@ -163,7 +163,7 @@ public:
 
         // normal case (process rx for our VM)
         this_->vfu_ctx_mutex.lock();
-        this_->model->EthRx(0, this_->driver->rxBuf_queue[i], this_->driver->rxBufs[i], this_->driver->rxBuf_used[i]); // hardcode port 0
+        this_->model->EthRx(0, rxBuf.queue, rxBuf.data, rxBuf.used); // hardcode port 0
         this_->vfu_ctx_mutex.unlock();
 
 			}

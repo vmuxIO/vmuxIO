@@ -161,7 +161,7 @@ void lan::packet_received(const void *data, size_t len, std::optional<uint16_t> 
   } else {
     this->dev.bcam.select_queue(data, len, &queue);
   }
-  rss_steering(data, len, queue, hash);
+  // rss_steering(data, len, queue, hash);
   if (!rxqs[queue]->is_enabled()) {
     // if we receive on uninitialized queues, we throw errors
     #ifdef DEBUG_LAN
