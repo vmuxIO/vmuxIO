@@ -77,6 +77,10 @@ vmuxDpdkE810:
 vmuxMed:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1
 
+vmuxVdpdk:
+  # sudo gdb -ex "handle SIGTERM nostop print pass" --args {{proot}}/build/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 --log-level "pmd.net.ice*:debug"
+  sudo {{proot}}/build_release/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
+
 vmuxDpdkE810Gdb:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
 
