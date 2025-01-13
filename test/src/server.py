@@ -2035,6 +2035,9 @@ class Guest(Server):
         self.start_fastclick(fastclick_program, "/tmp/fastclick_dpdk_tap.log", script_args=fastclick_args)
         # wait until interface is ready
         self.wait_for_success(f'cat /sys/class/net/{self.test_iface}/operstate')
+        # Ensure we actually use the right MAC address
+        sleep(1)
+        self.wait_for_success(f'sudo ip link set {self.test_iface} address {self.test_iface_mac}')
 
     def start_iperf_server(self, server_hostname: str):
         """
