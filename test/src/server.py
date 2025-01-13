@@ -1994,6 +1994,8 @@ class Guest(Server):
         guest.fqdn = MultiHost.ssh_hostname(guest.fqdn, vm_number)
         if guest.test_iface_ip_net is not None:
             guest.test_iface_ip_net = MultiHost.ip(guest.test_iface_ip_net, vm_number)
+        if guest.test_iface_mac is not None:
+            guest.test_iface_mac = MultiHost.mac(guest.test_iface_mac, vm_number)
         return guest
 
     def setup_test_iface_ip_net(self: 'Guest'):
@@ -2009,6 +2011,30 @@ class Guest(Server):
         # sometimes the VM needs a bit of extra time until it can assign an IP
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
         self.exec(f'sudo ip link set {self.test_iface} up')
+
+    def setup_test_iface_dpdk_tap(self: 'Guest'):
+        """
+        Use fastclick to forward between a DPDK device and TAP interface.
+        Assign ip address and netmask to the TAP interface.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        warning("Using test interface via fastlick tap forwarding.")
+        self.bind_test_iface()
+        fastclick_program = "test/fastclick/dpdk-tap.click"
+        fastclick_args = {
+            'ifacePCI0': self.test_iface_addr,
+            'macAddress': self.test_iface_mac,
+            'ipAddress': self.test_iface_ip_net,
+            'devName': self.test_iface,
+        }
+        self.start_fastclick(fastclick_program, "/tmp/fastclick_dpdk_tap.log", script_args=fastclick_args)
+        # wait until interface is ready
+        self.wait_for_success(f'cat /sys/class/net/{self.test_iface}/operstate')
 
     def start_iperf_server(self, server_hostname: str):
         """
