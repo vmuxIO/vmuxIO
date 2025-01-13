@@ -230,6 +230,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.BRIDGE_VHOST,
         Interface.VMUX_DPDK_E810,
         Interface.VMUX_MED,
+        Interface.VMUX_VDPKD,
         ]
     rpsList = {
             'hotelReservation': [ 16, 32, 64, 128, 256, 512, 1024 ],
