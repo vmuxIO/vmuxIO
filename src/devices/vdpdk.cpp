@@ -51,7 +51,7 @@ VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const ui
   this->info.pci_subclass = 0;
   this->info.pci_revision = 1;
 
-  this->rx_callback = rx_callback_static;
+  // this->rx_callback = rx_callback_static;
 }
 
 void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
@@ -98,11 +98,9 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   }
 }
 
-void VdpdkDevice::rx_callback_fn(int vm_number) {
+void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
+  int vm_number = device_id;
   driver->recv(vm_number);
-
-  // We delay locking until we actually know if packets were received
-  std::shared_lock dma_lock(dma_mutex, std::defer_lock);
 
   for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm; q_idx++) {
     // We delay loading this until we actually know if packets were received
@@ -130,8 +128,6 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
           break;
         }
 
-        if (!dma_lock)
-          dma_lock.lock();
         ring_size = ((size_t)rxq->idx_mask + 1) * RX_DESC_SIZE;
         ring = (unsigned char *)vfuServer->dma_local_addr(rxq->ring_iova, ring_size);
         if (!ring) {
@@ -189,10 +185,10 @@ void VdpdkDevice::rx_callback_fn(int vm_number) {
   driver->recv_consumed(vm_number);
 }
 
-void VdpdkDevice::rx_callback_static(int vm_number, void *this__) {
-  VdpdkDevice *this_ = (VdpdkDevice *)this__;
-  this_->rx_callback_fn(vm_number);
-}
+// void VdpdkDevice::rx_callback_static(int vm_number, void *this__) {
+//   VdpdkDevice *this_ = (VdpdkDevice *)this__;
+//   this_->rx_callback_fn(vm_number);
+// }
 
 ssize_t VdpdkDevice::region_access_cb(char *buf, size_t count, loff_t offset, bool is_write) {
   // printf("Region access: count %zx, offset %lx, is_write %d\n", count, (long)offset, (int)is_write);
@@ -234,7 +230,7 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       }
 
       // Stop polling
-      tx_poll_thread = std::jthread{};
+      tx_queue = nullptr;
       return count;
     }
 
@@ -295,12 +291,17 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
       uint16_t idx_mask;
       memcpy(&idx_mask, txbuf.ptr() + 8, 2);
 
-      // Stop left-over polling thread
-      tx_poll_thread = {};
-      // Start polling
-      tx_poll_thread = std::jthread{[this, ring_addr, idx_mask](std::stop_token stop){
-        this->tx_poll(std::move(stop), ring_addr, idx_mask);
-      }};
+      printf("TX_QUEUE_START: idx: %d, ring_addr: %llx, mask: %x\n",
+             (int)queue_idx, (unsigned long long)ring_addr, (unsigned)idx_mask);
+
+      auto txq = std::make_shared<TxQueue>();
+      txq->ring_iova = ring_addr;
+      txq->idx_mask = idx_mask;
+      txq->front_idx = 0;
+      txq->back_idx = 0;
+      txq->ring = NULL;
+
+      tx_queue = txq;
 
       *buf = 0;
       return count;
@@ -399,91 +400,72 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
   return -1;
 }
 
-void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t idx_mask) {
+void VdpdkDevice::tx_poll(bool dma_invalidated) {
   constexpr bool DEBUG_OUTPUT = false;
   constexpr bool ZERO_COPY = false;
 
+  std::shared_ptr<TxQueue> queue_data = tx_queue.load();
+  if (!queue_data) {
+    return;
+  }
+
+  uint16_t &idx = queue_data->back_idx;
+  const uint16_t &idx_mask = queue_data->idx_mask;
+
   size_t ring_size = ((size_t)idx_mask + 1) * TX_DESC_SIZE;
 
-  puts(std::format("Start TX polling with iova {:#x}, mask {:#x}, size {:#x}", ring_iova, idx_mask, ring_size).c_str());
-
-  std::shared_lock dma_lock(dma_mutex);
-  unsigned char *ring = (unsigned char *)vfuServer->dma_local_addr(ring_iova, ring_size);
-  if (!ring) {
-    printf("Invalid ring_iova\n");
-    return;
+  if (dma_invalidated || !queue_data->ring) {
+    unsigned char *ring = (unsigned char *)vfuServer->dma_local_addr(queue_data->ring_iova, ring_size);
+    queue_data->ring = ring;
+    if (!ring) {
+      printf("Invalid ring_iova\n");
+      tx_queue = nullptr;
+      return;
+    }
   }
 
   uint16_t queue_idx = dpdk_driver->get_tx_queue_id(device_id, 0);
   struct rte_mempool *pool = dpdk_driver->tx_mbuf_pools[queue_idx];
-  assert(rte_pktmbuf_priv_size(pool) >= sizeof(struct rte_mbuf_ext_shared_info) + TX_DESC_SIZE);
+  // assert(rte_pktmbuf_priv_size(pool) >= sizeof(struct rte_mbuf_ext_shared_info) + TX_DESC_SIZE);
 
   constexpr unsigned burst_size = 128;
   struct rte_mbuf *mbufs[burst_size];
   unsigned nb_mbufs_used = 0;
 
-  struct queue_data {
-    unsigned char *ring;
-    uint16_t front_idx, back_idx;
-    uint16_t idx_mask;
-  } queue_data = {};
-  queue_data.ring = ring;
-  queue_data.idx_mask = idx_mask;
+  rte_mbuf_extbuf_free_callback_t free_cb;
+  if constexpr (ZERO_COPY) {
+    free_cb = [](void *addr, void *opaque) {
+      // opaque points to the copied descriptor, with the dma address replaced
+      // with a pointer to the queue data;
+      uintptr_t uptr;
+      TxQueue *queue_data;
+      memcpy(&uptr, opaque, sizeof(uptr));
+      queue_data = (TxQueue *)uptr;
 
-  uint16_t &idx = queue_data.back_idx;
+      unsigned char *desc_addr = queue_data->ring +
+                                 (size_t)(queue_data->front_idx & queue_data->idx_mask) * TX_DESC_SIZE;
+      // TODO: can be removed
+      // It should be impossible that a buffer is freed without a corresponding available descriptor
+      uint16_t flags = rte_read16_relaxed(desc_addr + 10);
+      assert(flags & TX_FLAG_AVAIL);
 
-  rte_mbuf_extbuf_free_callback_t free_cb = [](void *addr, void *opaque) {
-    // opaque points to the copied descriptor, with the dma address replaced
-    // with a pointer to the queue data;
-    uintptr_t uptr;
-    struct queue_data *queue_data;
-    memcpy(&uptr, opaque, sizeof(uptr));
-    queue_data = (struct queue_data *)uptr;
+      // Copy descriptor into ring, skipping the dma/queue pointer
+      rte_memcpy(desc_addr + 8, (char *)opaque + 8, TX_DESC_SIZE - 8);
+      // Unset FLAG_AVAIL to return buffer to guest
+      memcpy(&flags, (char *)opaque + 10, 2);
+      flags &= ~TX_FLAG_AVAIL;
+      rte_write16(flags, (char *)desc_addr + 10);
 
-    unsigned char *desc_addr = queue_data->ring +
-                               (size_t)(queue_data->front_idx & queue_data->idx_mask) * TX_DESC_SIZE;
-    // TODO: can be removed
-    // It should be impossible that a buffer is freed without a corresponding available descriptor
-    uint16_t flags = rte_read16_relaxed(desc_addr + 10);
-    assert(flags & TX_FLAG_AVAIL);
-
-    // Copy descriptor into ring, skipping the dma/queue pointer
-    rte_memcpy(desc_addr + 8, (char *)opaque + 8, TX_DESC_SIZE - 8);
-    // Unset FLAG_AVAIL to return buffer to guest
-    memcpy(&flags, (char *)opaque + 10, 2);
-    flags &= ~TX_FLAG_AVAIL;
-    rte_write16(flags, (char *)desc_addr + 10);
-
-    queue_data->front_idx++;
-  };
+      queue_data->front_idx++;
+    };
+  }
 
   constexpr unsigned debug_interval = 10000000;
-  unsigned debug_counter = debug_interval;
-  unsigned nb_cleanup_calls = 0;
-  int last_cleanup_result = 0xFFFFFF;
+  thread_local unsigned debug_counter = debug_interval;
+  thread_local unsigned nb_cleanup_calls = 0;
+  thread_local int last_cleanup_result = 0xFFFFFF;
 
-  while (true) {
-    // Check if stop requested
-    if (stop.stop_requested()) {
-      break;
-    }
-
-    // Check if DMA mapping wants to change
-    if (dma_flag.test()) {
-      // Release lock
-      dma_lock.unlock();
-      // Wait until vfio-user thread holds mutex
-      while (dma_flag.test());
-      // Re-aquire lock
-      dma_lock.lock();
-      // Ensure ring address is still valid
-      ring = (unsigned char *)vfuServer->dma_local_addr(ring_iova, ring_size);
-      if (!ring) {
-        printf("DMA unmapped during TX poll\n");
-        break;
-      }
-    }
-
+  while (nb_mbufs_used < burst_size) {
     // Debug output
     if constexpr (DEBUG_OUTPUT) {
       if (--debug_counter == 0) {
@@ -494,7 +476,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
         printf("\nTX RING REPORT\n");
         for (uint16_t idx = 0; idx <= idx_mask + 1; idx++) {
           if (idx <= idx_mask) {
-            auto flags_addr = ring + (size_t)idx * TX_DESC_SIZE + 10;
+            auto flags_addr = queue_data->ring + (size_t)idx * TX_DESC_SIZE + 10;
             memcpy(&flags, flags_addr, 2);
           }
           if ((flags != last_flags && idx != 0) || idx == idx_mask + 1) {
@@ -514,7 +496,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
           }
           last_flags = flags;
         }
-        printf("front: %x, back %x\n", queue_data.front_idx, queue_data.back_idx);
+        printf("front: %x, back %x\n", queue_data->front_idx, queue_data->back_idx);
 
         printf("\nTX MBUF REPORT\n");
         unsigned mbuf_avail = rte_mempool_avail_count(pool);
@@ -529,26 +511,14 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
       }
     }
 
-    unsigned char *buf_iova_addr = ring + (size_t)(idx & idx_mask) * TX_DESC_SIZE;
+    unsigned char *buf_iova_addr = queue_data->ring + (size_t)(idx & idx_mask) * TX_DESC_SIZE;
     unsigned char *buf_len_addr = buf_iova_addr + 8;
     unsigned char *desc_flags_addr = buf_len_addr + 2;
 
-    uint16_t flags = rte_read16(desc_flags_addr);
-    // Send packets in burst if buffer is full or no more packets are available
-    if (nb_mbufs_used == burst_size || !(flags & TX_FLAG_AVAIL)) {
-      uint16_t nb_tx = rte_eth_tx_burst(0, queue_idx, mbufs, nb_mbufs_used);
-      if (nb_tx < nb_mbufs_used) {
-        // Drop packets we couldn't send
-        rte_pktmbuf_free_bulk(mbufs + nb_tx, nb_mbufs_used - nb_tx);
-      }
-      nb_mbufs_used = 0;
-      // Flags were possibly changed during tx if buffers were freed.
-      flags = rte_read16(desc_flags_addr);
-    }
-
     // If next descriptor is not available, try again
+    uint16_t flags = rte_read16(desc_flags_addr);
     if (!(flags & TX_FLAG_AVAIL)) {
-      continue;
+      break;
     }
 
     if constexpr (ZERO_COPY) {
@@ -560,7 +530,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
           nb_cleanup_calls++;
           last_cleanup_result = freed;
         }
-        continue;
+        break;
       }
     }
 
@@ -572,6 +542,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     void *buf_addr = vfuServer->dma_local_addr(buf_iova, buf_len);
     if (!buf_addr) {
       printf("Invalid packet iova!\n");
+      tx_queue = nullptr;
       return;
     }
 
@@ -586,7 +557,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
         nb_cleanup_calls++;
         last_cleanup_result = freed;
       }
-      continue;
+      break;
     }
     if (rte_pktmbuf_tailroom(mbuf) < buf_len) {
       // Packet too large, drop it
@@ -602,7 +573,7 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
         rte_mbuf_ext_refcnt_set(shinfo, 1);
         memcpy(mbuf_desc + 8, buf_iova_addr + 8, TX_DESC_SIZE - 8);
         // We also need to pass a pointer to the queue data to the free callback
-        uintptr_t uptr = (uintptr_t)&queue_data;
+        uintptr_t uptr = (uintptr_t)queue_data.get();
         memcpy(mbuf_desc, &uptr, sizeof(uintptr_t));
 
         // We use IOVA as VA mode, so we can simply pass the buf_addr for buf_iova.
@@ -634,9 +605,14 @@ void VdpdkDevice::tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t id
     idx++;
   }
 
-  // Try cleaning up to refill mempool
-  // TODO: consider simply freeing and allocating a new mempool
-  rte_pktmbuf_free_bulk(mbufs, nb_mbufs_used);
+  // Send packets in burst if buffer is full or no more packets are available
+    if (nb_mbufs_used > 0) {
+    uint16_t nb_tx = rte_eth_tx_burst(0, queue_idx, mbufs, nb_mbufs_used);
+    if (nb_tx < nb_mbufs_used) {
+      // Drop packets we couldn't send
+      rte_pktmbuf_free_bulk(mbufs + nb_tx, nb_mbufs_used - nb_tx);
+    }
+  }
 }
 
 void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
@@ -663,6 +639,237 @@ void VdpdkDevice::dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
 void VdpdkDevice::dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
   VdpdkDevice *this_ = (VdpdkDevice *)vfu_get_private(ctx);
   return this_->dma_unregister_cb(ctx, info);
+}
+
+void VdpdkThreads::tx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev) {
+  std::shared_lock dma_lock(dev->dma_mutex);
+
+  while (true) {
+    // Check if stop requested
+    if (stop.stop_requested()) {
+      break;
+    }
+
+    bool dma_invalidated = false;
+    // Check if DMA mapping wants to change
+    if (dev->dma_flag.test()) {
+      // Release lock
+      dma_lock.unlock();
+      // Wait until vfio-user thread holds mutex
+      while (dev->dma_flag.test());
+      // Re-aquire lock
+      dma_lock.lock();
+
+      // Tell vdpdk to look-up addresses again
+      dma_invalidated = true;
+    }
+
+    dev->tx_poll(dma_invalidated);
+  }
+}
+
+void VdpdkThreads::rx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev) {
+  std::shared_lock dma_lock(dev->dma_mutex);
+
+  while (true) {
+    // Check if stop requested
+    if (stop.stop_requested()) {
+      break;
+    }
+
+    bool dma_invalidated = false;
+    // Check if DMA mapping wants to change
+    if (dev->dma_flag.test()) {
+      // Release lock
+      dma_lock.unlock();
+      // Wait until vfio-user thread holds mutex
+      while (dev->dma_flag.test());
+      // Re-aquire lock
+      dma_lock.lock();
+
+      // Tell vdpdk to look-up addresses again
+      dma_invalidated = true;
+    }
+
+    dev->rx_callback_fn(dma_invalidated);
+  }
+}
+
+void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2) {
+  std::shared_lock dma_lock1(dev1->dma_mutex);
+  std::shared_lock dma_lock2(dev2->dma_mutex);
+
+  while (true) {
+    // Check if stop requested
+    if (stop.stop_requested()) {
+      break;
+    }
+
+    bool dma_invalidated = false;
+    // Check if DMA mapping wants to change
+    if (dev1->dma_flag.test()) {
+      // Release lock
+      dma_lock1.unlock();
+      // Wait until vfio-user thread holds mutex
+      while (dev1->dma_flag.test());
+      // Re-aquire lock
+      dma_lock1.lock();
+
+      // Tell vdpdk to look-up addresses again
+      dma_invalidated = true;
+    }
+
+    dev1->tx_poll(dma_invalidated);
+
+    dma_invalidated = false;
+    // Check if DMA mapping wants to change
+    if (dev2->dma_flag.test()) {
+      // Release lock
+      dma_lock2.unlock();
+      // Wait until vfio-user thread holds mutex
+      while (dev2->dma_flag.test());
+      // Re-aquire lock
+      dma_lock2.lock();
+
+      // Tell vdpdk to look-up addresses again
+      dma_invalidated = true;
+    }
+
+    dev2->tx_poll(dma_invalidated);
+  }
+}
+
+void VdpdkThreads::rx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2) {
+  std::shared_lock dma_lock1(dev1->dma_mutex);
+  std::shared_lock dma_lock2(dev2->dma_mutex);
+
+  while (true) {
+    // Check if stop requested
+    if (stop.stop_requested()) {
+      break;
+    }
+
+    bool dma_invalidated = false;
+    // Check if DMA mapping wants to change
+    if (dev1->dma_flag.test()) {
+      // Release lock
+      dma_lock1.unlock();
+      // Wait until vfio-user thread holds mutex
+      while (dev1->dma_flag.test());
+      // Re-aquire lock
+      dma_lock1.lock();
+
+      // Tell vdpdk to look-up addresses again
+      dma_invalidated = true;
+    }
+
+    dev1->rx_callback_fn(dma_invalidated);
+
+    dma_invalidated = false;
+    // Check if DMA mapping wants to change
+    if (dev2->dma_flag.test()) {
+      // Release lock
+      dma_lock2.unlock();
+      // Wait until vfio-user thread holds mutex
+      while (dev2->dma_flag.test());
+      // Re-aquire lock
+      dma_lock2.lock();
+
+      // Tell vdpdk to look-up addresses again
+      dma_invalidated = true;
+    }
+
+    dev2->rx_callback_fn(dma_invalidated);
+  }
+}
+
+VdpdkThreads::VdpdkThreads(size_t sharing_thresh) : sharing_thresh(sharing_thresh) {}
+
+void VdpdkThreads::add_device(std::shared_ptr<VdpdkDevice> dev, cpu_set_t rx_pin, cpu_set_t tx_pin) {
+  Info info {
+    .dev = std::move(dev),
+    .rx_pin = rx_pin,
+    .tx_pin = tx_pin,
+  };
+  start_info.push_back(info);
+}
+
+static void pin_thread(std::jthread &jt, const char *name, cpu_set_t set) {
+  pthread_t t = jt.native_handle();
+  pthread_setname_np(t, name);
+  int ret = pthread_setaffinity_np(t, sizeof(set), &set);
+  if (ret != 0) {
+    die("failed to set pthread cpu affinity");
+  }
+}
+
+void VdpdkThreads::start() {
+  // Share polling threads between VMs
+  if (start_info.size() > sharing_thresh) {
+    size_t end = start_info.size();
+    size_t mid = end / 2;
+    for (size_t i = 0; i < mid; i++) {
+      auto dev1 = start_info[i].dev;
+      auto dev2 = start_info[end - i].dev;
+      std::jthread rxthread{[dev1, dev2](std::stop_token stop) {
+        rx_poll_thread_double(stop, dev1, dev2);
+      }};
+      std::jthread txthread{[dev1, dev2](std::stop_token stop) {
+        tx_poll_thread_double(stop, dev1, dev2);
+      }};
+
+      // We use pinning information of the first VM
+      auto &info = start_info[i];
+
+      // Pin RX thread
+      pin_thread(rxthread, std::format("vdpdkRx{}_{}", dev1->device_id, dev2->device_id).c_str(), info.rx_pin);
+
+      // Pin TX thread
+      pin_thread(txthread, std::format("vdpdkTx{}_{}", dev1->device_id, dev2->device_id).c_str(), info.tx_pin);
+
+      threads.push_back(std::move(rxthread));
+      threads.push_back(std::move(txthread));
+    }
+
+    if (end % 2 != 0) {
+      auto &info = start_info[mid];
+      auto dev = info.dev;
+      std::jthread rxthread{[dev](std::stop_token stop) {
+        rx_poll_thread_single(stop, dev);
+      }};
+      std::jthread txthread{[dev](std::stop_token stop) {
+        tx_poll_thread_single(stop, dev);
+      }};
+
+      // Pin RX thread
+      pin_thread(rxthread, std::format("vdpdkRx{}", info.dev->device_id).c_str(), info.rx_pin);
+
+      // Pin TX thread
+      pin_thread(txthread, std::format("vdpdkTx{}", info.dev->device_id).c_str(), info.tx_pin);
+
+      threads.push_back(std::move(rxthread));
+      threads.push_back(std::move(txthread));
+    }
+    return;
+  }
+  for (auto &info: start_info) {
+    auto dev = info.dev;
+    std::jthread rxthread{[dev](std::stop_token stop) {
+      rx_poll_thread_single(stop, dev);
+    }};
+    std::jthread txthread{[dev](std::stop_token stop) {
+      tx_poll_thread_single(stop, dev);
+    }};
+
+    // Pin RX thread
+    pin_thread(rxthread, std::format("vdpdkRx{}", info.dev->device_id).c_str(), info.rx_pin);
+
+    // Pin TX thread
+    pin_thread(txthread, std::format("vdpdkTx{}", info.dev->device_id).c_str(), info.tx_pin);
+
+    threads.push_back(std::move(rxthread));
+    threads.push_back(std::move(txthread));
+  }
 }
 
 // TX MEMPOOL ADAPTER

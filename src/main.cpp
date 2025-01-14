@@ -115,6 +115,7 @@ Result<void> _main(int argc, char **argv) {
   std::vector<std::string> modes;
   std::vector<cpu_set_t> rxThreadCpus;
   std::vector<cpu_set_t> runnerThreadCpus;
+  std::unique_ptr<VdpdkThreads> vdpdkThreads;
   cpu_set_t default_cpuset;
   Util::parse_cpuset("0-6", default_cpuset);
   bool useDpdk = false;
@@ -280,6 +281,7 @@ Result<void> _main(int argc, char **argv) {
   // create devices
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     std::shared_ptr<VmuxDevice> device = NULL;
+    bool noRxThread = false;
 
     // increment base_mac
     memcpy(mac_addr, base_mac, sizeof(mac_addr));
@@ -300,8 +302,16 @@ Result<void> _main(int argc, char **argv) {
       device->driver->mediation_enable(i);
     }
     if (modes[i] == "vdpdk") {
-      device = std::make_shared<VdpdkDevice>(i, drivers[i], &mac_addr);
+      auto vdpdk_device = std::make_shared<VdpdkDevice>(i, drivers[i], &mac_addr);
+      device = vdpdk_device;
       device->driver->mediation_enable(i);
+      if (!vdpdkThreads) {
+        // Parameter is threshold of number of VMs above which two VMs will share one polling thread
+        vdpdkThreads = std::make_unique<VdpdkThreads>(2);
+      }
+      // We pin the TX thread to the runnerThreadCpus, as the runner thread is rarely used in vDPDK
+      vdpdkThreads->add_device(vdpdk_device, rxThreadCpus[i], runnerThreadCpus[i]);
+      noRxThread = true;
     }
     if (modes[i] == "e1000-emu") {
 #ifdef BUILD_E1000_EMU
@@ -314,11 +324,15 @@ Result<void> _main(int argc, char **argv) {
     if (device == NULL)
       die("Unknown mode specified: %s\n", modes[i].c_str());
     devices.push_back(device);
-    if (useDpdk && pollInMainThread)
+    if (!noRxThread && useDpdk && pollInMainThread)
       mainThreadPolling.push_back(device);
     if (useDpdk && !pollInMainThread) {
-      pollingThreads.push_back(std::make_unique<RxThread>(device, rxThreadCpus[i]));
-    broadcast_destinations->push_back(device);
+      if (noRxThread) {
+        pollingThreads.push_back(nullptr);
+      } else {
+        pollingThreads.push_back(std::make_unique<RxThread>(device, rxThreadCpus[i]));
+      }
+      broadcast_destinations->push_back(device);
     }
   }
 
@@ -349,8 +363,13 @@ Result<void> _main(int argc, char **argv) {
     }
   }
 
+  if (vdpdkThreads) {
+    vdpdkThreads->start();
+  }
+
   for (auto &pollingThread : pollingThreads) {
-    pollingThread->start();
+    if (pollingThread)
+      pollingThread->start();
   }
 
   // printf("pfd->revents & POLLIN: %d\n",
@@ -395,7 +414,8 @@ Result<void> _main(int argc, char **argv) {
 
   for (size_t i = 0; i < pciAddresses.size(); i++) {
     runner[i]->stop();
-    pollingThreads[i]->stop();
+    if (pollingThreads[i])
+      pollingThreads[i]->stop();
   }
 
   Result<void> res = Ok();
@@ -404,9 +424,11 @@ Result<void> _main(int argc, char **argv) {
       printf("Runner thread %zu failed: %s\n", i, e.error().c_str());
       res = Err("Terminating because a thread failed.");
     }
-    if (Result<void> e = pollingThreads[i]->join()) {} else {
-      printf("Poling rx thread %zu failed: %s\n", i, e.error().c_str());
-      res = Err("Terminating because a thread failed.");
+    if(pollingThreads[i]) {
+      if (Result<void> e = pollingThreads[i]->join()) {} else {
+        printf("Poling rx thread %zu failed: %s\n", i, e.error().c_str());
+        res = Err("Terminating because a thread failed.");
+      }
     }
   }
 
