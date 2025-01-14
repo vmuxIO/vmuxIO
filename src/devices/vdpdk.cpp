@@ -806,11 +806,11 @@ static void pin_thread(std::jthread &jt, const char *name, cpu_set_t set) {
 void VdpdkThreads::start() {
   // Share polling threads between VMs
   if (start_info.size() > sharing_thresh) {
-    size_t end = start_info.size();
-    size_t mid = end / 2;
+    size_t count = start_info.size();
+    size_t mid = count / 2;
     for (size_t i = 0; i < mid; i++) {
       auto dev1 = start_info[i].dev;
-      auto dev2 = start_info[end - i].dev;
+      auto dev2 = start_info[count - i - 1].dev;
       std::jthread rxthread{[dev1, dev2](std::stop_token stop) {
         rx_poll_thread_double(stop, dev1, dev2);
       }};
@@ -831,7 +831,7 @@ void VdpdkThreads::start() {
       threads.push_back(std::move(txthread));
     }
 
-    if (end % 2 != 0) {
+    if (count % 2 != 0) {
       auto &info = start_info[mid];
       auto dev = info.dev;
       std::jthread rxthread{[dev](std::stop_token stop) {
