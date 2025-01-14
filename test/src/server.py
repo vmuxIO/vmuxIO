@@ -1592,6 +1592,7 @@ class Host(Server):
                   tx_queue_size: int = 256,
                   vm_number: int = 0,
                   extkern: Optional[str] = None,
+                  pin_vm_number: int = 0,
                   ) -> None:
         # TODO this function should get a Guest object as argument
         """
@@ -1629,6 +1630,8 @@ class Host(Server):
             If not set to 0, will start VM in a way that other VMs with different vm_number can be started at the same time.
         extkern: Optional[str]
             If not None, another root_disk will be booted with an external kernel which allows us to append str to the kernel command line.
+        pin_vm_number: Optional[str]
+            If not set to 0, will pin the VM to the same CPUs as the VM with number pin_vm_number
 
 
         Returns
@@ -1736,7 +1739,9 @@ class Host(Server):
 
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
         nix_shell = f"nix shell --inputs-from {project_root} nixpkgs#numactl --command"
-        numactl = f"numactl -C {self.cpupinner.qemu(vm_number)}"
+        if pin_vm_number == 0:
+            pin_vm_number = vm_number
+        numactl = f"numactl -C {self.cpupinner.qemu(pin_vm_number)}"
         # numactl = ""
 
         self.tmux_new(

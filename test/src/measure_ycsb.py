@@ -199,8 +199,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_VHOST, Interface.VMUX_DPDK_E810 ]
-        interfaces = [ Interface.VMUX_VDPDK, Interface.VMUX_DPDK_E810 ]
-        # interfaces = [ Interface.VMUX_VDPDK ]
+        # interfaces = [ Interface.VMUX_VDPDK, Interface.VMUX_DPDK_E810 ]
+        interfaces = [ Interface.VMUX_VDPDK ]
         # interfaces = [ Interface.VFIO ]
         # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
         rpsList = [ -1 ]
