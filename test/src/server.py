@@ -1630,7 +1630,7 @@ class Host(Server):
             If not set to 0, will start VM in a way that other VMs with different vm_number can be started at the same time.
         extkern: Optional[str]
             If not None, another root_disk will be booted with an external kernel which allows us to append str to the kernel command line.
-        pin_vm_number: Optional[str]
+        pin_vm_number: int
             If not set to 0, will pin the VM to the same CPUs as the VM with number pin_vm_number
 
 
