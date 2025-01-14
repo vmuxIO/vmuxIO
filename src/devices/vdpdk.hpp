@@ -5,6 +5,7 @@
 #include "src/devices/vmux-device.hpp"
 #include "memfd.hpp"
 #include <atomic>
+#include <vector>
 #include <shared_mutex>
 #include <string>
 #include <thread>
@@ -41,8 +42,16 @@ private:
     VDPDK_CONSTS::MAX_RX_QUEUES
   > rx_queues;
 
-  void rx_callback_fn(int vm_number);
-  static void rx_callback_static(int vm_number, void *);
+  struct TxQueue {
+    uintptr_t ring_iova;
+    unsigned char *ring;
+    uint16_t idx_mask;
+    uint16_t front_idx, back_idx;
+  };
+  std::atomic<std::shared_ptr<TxQueue>> tx_queue;
+
+  void rx_callback_fn(bool dma_invalidated);
+  // static void rx_callback_static(int vm_number, void *);
 
   ssize_t region_access_cb(char *buf, size_t count, loff_t offset, bool is_write);
   static ssize_t region_access_cb_static(vfu_ctx_t *ctx, char *buf, size_t count,
@@ -55,7 +64,29 @@ private:
   void dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info);
   static void dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info);
 
-  // declare this last, so it is destroyed first
-  std::jthread tx_poll_thread;
-  void tx_poll(std::stop_token stop, uintptr_t ring_iova, uint16_t idx_mask);
+  void tx_poll(bool dma_invalidated);
+
+  friend class VdpdkThreads;
+};
+
+class VdpdkThreads {
+public:
+  explicit VdpdkThreads(size_t sharing_thresh);
+  void add_device(std::shared_ptr<VdpdkDevice>, cpu_set_t rx_pin, cpu_set_t tx_pin);
+  void start();
+
+private:
+  size_t sharing_thresh;
+  struct Info {
+    std::shared_ptr<VdpdkDevice> dev;
+    cpu_set_t rx_pin;
+    cpu_set_t tx_pin;
+  };
+  std::vector<Info> start_info;
+  std::vector<std::jthread> threads;
+
+  static void tx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev);
+  static void rx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev);
+  static void tx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2);
+  static void rx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2);
 };
