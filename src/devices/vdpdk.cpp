@@ -14,6 +14,7 @@
 using namespace VDPDK_CONSTS;
 
 enum VDPDK_OFFSET {
+  // Signal BAR
   DEBUG_STRING = 0x0,
   TX_QUEUE_START = 0x40,
   TX_QUEUE_STOP = 0x80,
@@ -24,7 +25,14 @@ enum VDPDK_OFFSET {
   FLOW_CREATE = 0x200,
   FLOW_DESTROY = 0x240,
 
+  EVENT_TX = 0x300,
+
+  // TX BAR
+  // 0x00 - 0xFF: Reserved for queue setup
+  TX_WANT_SIGNAL = 0x100,
 };
+
+constexpr uint64_t MAX_EMPTY_POLLS = 1000;
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6])
 : VmuxDevice(device_id, driver, nullptr),
@@ -95,6 +103,13 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
                              dma_unregister_cb_static);
   if (ret) {
     die("failed to setup device dma (%d)", errno);
+  }
+
+  ret = vfu_create_ioeventfd(ctx, VFU_PCI_DEV_BAR0_REGION_IDX,
+                             tx_event_fd.fd(), EVENT_TX, 8,
+                             0, 0, -1, -1);
+  if (ret) {
+    die("failed to setup tx eventfd");
   }
 }
 
@@ -255,6 +270,12 @@ ssize_t VdpdkDevice::region_access_write(char *buf, size_t count, unsigned offse
       // TODO: actually disable rule
       return count;
     }
+
+    // Fall-back if ioeventfd is not supported
+    case EVENT_TX: {
+      tx_event_fd.signal();
+      return count;
+    }
   }
 
   printf("Invalid write offset: %x\n", offset);
@@ -296,6 +317,7 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
 
       auto txq = std::make_shared<TxQueue>();
       txq->ring_iova = ring_addr;
+      txq->signal_counter = MAX_EMPTY_POLLS;
       txq->idx_mask = idx_mask;
       txq->front_idx = 0;
       txq->back_idx = 0;
@@ -424,6 +446,24 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
     }
   }
 
+  constexpr unsigned debug_interval = 10000000;
+  thread_local unsigned debug_counter = debug_interval;
+  thread_local unsigned nb_cleanup_calls = 0;
+  thread_local int last_cleanup_result = 0xFFFFFF;
+
+  // Check if we want to enable TX signalling
+  // We do this before polling to avoid a race condition when the guest
+  // transmits a packet right before we enable signalling.
+  if (queue_data->signal_counter == 0 && !tx_event_active) {
+    if constexpr (DEBUG_OUTPUT) {
+      printf("TX enable signalling\n");
+      // Force debug output on this loops
+      debug_counter = 1;
+    }
+    rte_write8(1, txbuf.ptr() + TX_WANT_SIGNAL);
+    tx_event_active = true;
+  }
+
   uint16_t queue_idx = dpdk_driver->get_tx_queue_id(device_id, 0);
   struct rte_mempool *pool = dpdk_driver->tx_mbuf_pools[queue_idx];
   // assert(rte_pktmbuf_priv_size(pool) >= sizeof(struct rte_mbuf_ext_shared_info) + TX_DESC_SIZE);
@@ -459,11 +499,6 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
       queue_data->front_idx++;
     };
   }
-
-  constexpr unsigned debug_interval = 10000000;
-  thread_local unsigned debug_counter = debug_interval;
-  thread_local unsigned nb_cleanup_calls = 0;
-  thread_local int last_cleanup_result = 0xFFFFFF;
 
   while (nb_mbufs_used < burst_size) {
     // Debug output
@@ -606,11 +641,25 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
   }
 
   // Send packets in burst if buffer is full or no more packets are available
-    if (nb_mbufs_used > 0) {
+  if (nb_mbufs_used > 0) {
     uint16_t nb_tx = rte_eth_tx_burst(0, queue_idx, mbufs, nb_mbufs_used);
     if (nb_tx < nb_mbufs_used) {
       // Drop packets we couldn't send
       rte_pktmbuf_free_bulk(mbufs + nb_tx, nb_mbufs_used - nb_tx);
+    }
+    // Disable signalling, because packets were transmitted
+    if (tx_event_active) {
+      if constexpr (DEBUG_OUTPUT) {
+        printf("TX disable signalling\n");
+      }
+      rte_write8(0, txbuf.ptr() + TX_WANT_SIGNAL);
+      tx_event_active = false;
+    }
+    queue_data->signal_counter = MAX_EMPTY_POLLS;
+  } else {
+    // No packets were transmitted, reduce counter to eventually enter signalling mode
+    if (queue_data->signal_counter > 0) {
+      queue_data->signal_counter--;
     }
   }
 }
@@ -642,6 +691,9 @@ void VdpdkDevice::dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info)
 }
 
 void VdpdkThreads::tx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev) {
+  EventFdWaiter event_waiter;
+  event_waiter.add(dev->tx_event_fd);
+
   std::shared_lock dma_lock(dev->dma_mutex);
 
   while (true) {
@@ -651,6 +703,18 @@ void VdpdkThreads::tx_poll_thread_single(std::stop_token stop, std::shared_ptr<V
     }
 
     bool dma_invalidated = false;
+
+    // Wait if TX is in signalling mode
+    if (dev->tx_event_active) {
+      dma_lock.unlock();
+
+      event_waiter.wait(1000);
+      dev->tx_event_fd.reset();
+
+      dma_lock.lock();
+      dma_invalidated = true;
+    }
+
     // Check if DMA mapping wants to change
     if (dev->dma_flag.test()) {
       // Release lock
@@ -696,6 +760,10 @@ void VdpdkThreads::rx_poll_thread_single(std::stop_token stop, std::shared_ptr<V
 }
 
 void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2) {
+  EventFdWaiter event_waiter;
+  event_waiter.add(dev1->tx_event_fd);
+  event_waiter.add(dev2->tx_event_fd);
+
   std::shared_lock dma_lock1(dev1->dma_mutex);
   std::shared_lock dma_lock2(dev2->dma_mutex);
 
@@ -705,7 +773,24 @@ void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
       break;
     }
 
-    bool dma_invalidated = false;
+    bool dma_invalidated1 = false;
+    bool dma_invalidated2 = false;
+
+    // Wait if TX is in signalling mode
+    if (dev1->tx_event_active && dev2->tx_event_active) {
+      dma_lock1.unlock();
+      dma_lock2.unlock();
+
+      event_waiter.wait(1000);
+      dev1->tx_event_fd.reset();
+      dev2->tx_event_fd.reset();
+
+      dma_lock1.lock();
+      dma_lock2.lock();
+      dma_invalidated1 = true;
+      dma_invalidated2 = true;
+    }
+
     // Check if DMA mapping wants to change
     if (dev1->dma_flag.test()) {
       // Release lock
@@ -716,12 +801,11 @@ void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
       dma_lock1.lock();
 
       // Tell vdpdk to look-up addresses again
-      dma_invalidated = true;
+      dma_invalidated1 = true;
     }
 
-    dev1->tx_poll(dma_invalidated);
+    dev1->tx_poll(dma_invalidated1);
 
-    dma_invalidated = false;
     // Check if DMA mapping wants to change
     if (dev2->dma_flag.test()) {
       // Release lock
@@ -732,10 +816,10 @@ void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
       dma_lock2.lock();
 
       // Tell vdpdk to look-up addresses again
-      dma_invalidated = true;
+      dma_invalidated2 = true;
     }
 
-    dev2->tx_poll(dma_invalidated);
+    dev2->tx_poll(dma_invalidated2);
   }
 }
 

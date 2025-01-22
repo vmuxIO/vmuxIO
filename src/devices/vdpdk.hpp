@@ -4,6 +4,7 @@
 #include "drivers/dpdk.hpp"
 #include "src/devices/vmux-device.hpp"
 #include "memfd.hpp"
+#include "eventfd.hpp"
 #include <atomic>
 #include <vector>
 #include <shared_mutex>
@@ -45,10 +46,13 @@ private:
   struct TxQueue {
     uintptr_t ring_iova;
     unsigned char *ring;
+    uint64_t signal_counter;
     uint16_t idx_mask;
     uint16_t front_idx, back_idx;
   };
   std::atomic<std::shared_ptr<TxQueue>> tx_queue;
+  EventFd tx_event_fd;
+  bool tx_event_active = false;
 
   void rx_callback_fn(bool dma_invalidated);
   // static void rx_callback_static(int vm_number, void *);
