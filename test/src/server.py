@@ -15,6 +15,7 @@ from util import strip_subnet_mask
 import copy
 import base64
 import cpupinning
+import shlex
 
 BRIDGE_QUEUES: int = 0; # legacy default: 4
 MAX_VMS: int = 35; # maximum number of VMs expected (usually for cleanup functions that dont know what to clean up)
@@ -223,7 +224,9 @@ class Server(ABC):
         if self.ssh_as_root == True:
             sudo = "sudo "
 
-        return check_output(f"{sudo}ssh{options} {self.fqdn} '{command}'"
+        # oof double quote, one layer removed by local shell, one by remote bash
+        command = shlex.quote(shlex.quote(command))
+        return check_output(f"{sudo}ssh{options} {self.fqdn} bash -c {command}"
                             # + " 2>&1 | tee /tmp/foo"
                             , stderr=STDOUT, shell=True).decode('utf-8')
 
@@ -972,7 +975,7 @@ class Server(ABC):
                          ' | grep inet | awk "{print \\$2}"')
 
         if "does not exist" in result:
-            debug("Interface {iface} does not exist!")
+            debug(f"Interface {iface} does not exist!")
             return []
 
         else:
@@ -1589,6 +1592,7 @@ class Host(Server):
                   tx_queue_size: int = 256,
                   vm_number: int = 0,
                   extkern: Optional[str] = None,
+                  pin_vm_number: int = 0,
                   ) -> None:
         # TODO this function should get a Guest object as argument
         """
@@ -1626,6 +1630,8 @@ class Host(Server):
             If not set to 0, will start VM in a way that other VMs with different vm_number can be started at the same time.
         extkern: Optional[str]
             If not None, another root_disk will be booted with an external kernel which allows us to append str to the kernel command line.
+        pin_vm_number: Optional[str]
+            If not set to 0, will pin the VM to the same CPUs as the VM with number pin_vm_number
 
 
         Returns
@@ -1733,7 +1739,9 @@ class Host(Server):
 
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
         nix_shell = f"nix shell --inputs-from {project_root} nixpkgs#numactl --command"
-        numactl = f"numactl -C {self.cpupinner.qemu(vm_number)}"
+        if pin_vm_number == 0:
+            pin_vm_number = vm_number
+        numactl = f"numactl -C {self.cpupinner.qemu(pin_vm_number)}"
         # numactl = ""
 
         self.tmux_new(
@@ -1813,7 +1821,7 @@ class Host(Server):
             # num_vms is also vm_number, because with passthrough there is only one
             vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, num_vms)}"
             args = f' -s {vmux_socket} -d {self.test_iface_addr}'
-        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED ]:
+        if interface in [ Interface.VMUX_DPDK, Interface.VMUX_DPDK_E810, Interface.VMUX_MED, Interface.VMUX_VDPDK ]:
             dpdk_args += f" -u -- -l {self.cpupinner.vmux_main()}"
         if interface.guest_driver() == "ice":
             vmux_mode = "emulation"
@@ -1821,6 +1829,8 @@ class Host(Server):
             vmux_mode = "e1000-emu"
         if interface == Interface.VMUX_MED:
             vmux_mode = "mediation"
+        if interface == Interface.VMUX_VDPDK:
+            vmux_mode = "vdpdk"
         if not interface.is_passthrough():
             if num_vms == 0:
                 args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(1)} -f {self.cpupinner.vmux_runner(1)}'
@@ -1989,6 +1999,8 @@ class Guest(Server):
         guest.fqdn = MultiHost.ssh_hostname(guest.fqdn, vm_number)
         if guest.test_iface_ip_net is not None:
             guest.test_iface_ip_net = MultiHost.ip(guest.test_iface_ip_net, vm_number)
+        if guest.test_iface_mac is not None:
+            guest.test_iface_mac = MultiHost.mac(guest.test_iface_mac, vm_number)
         return guest
 
     def setup_test_iface_ip_net(self: 'Guest'):
@@ -2004,6 +2016,33 @@ class Guest(Server):
         # sometimes the VM needs a bit of extra time until it can assign an IP
         self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
         self.exec(f'sudo ip link set {self.test_iface} up')
+
+    def setup_test_iface_dpdk_tap(self: 'Guest'):
+        """
+        Use fastclick to forward between a DPDK device and TAP interface.
+        Assign ip address and netmask to the TAP interface.
+
+        Parameters
+        ----------
+
+        Returns
+        -------
+        """
+        warning("Using test interface via fastlick tap forwarding.")
+        self.bind_test_iface()
+        fastclick_program = "test/fastclick/dpdk-tap.click"
+        fastclick_args = {
+            'ifacePCI0': self.test_iface_addr,
+            'macAddress': self.test_iface_mac,
+            'ipAddress': self.test_iface_ip_net,
+            'devName': self.test_iface,
+        }
+        self.start_fastclick(fastclick_program, "/tmp/fastclick_dpdk_tap.log", script_args=fastclick_args)
+        # wait until interface is ready
+        self.wait_for_success(f'cat /sys/class/net/{self.test_iface}/operstate')
+        # Ensure we actually use the right MAC address
+        sleep(1)
+        self.wait_for_success(f'sudo ip link set {self.test_iface} address {self.test_iface_mac}')
 
     def start_iperf_server(self, server_hostname: str):
         """

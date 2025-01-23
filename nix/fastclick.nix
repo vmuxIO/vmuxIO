@@ -5,7 +5,8 @@
 , ...
 }:
 let
-  dpdk = selfpkgs.dpdk23; # needed for ice package thingy
+  dpdk23Patches = false;
+  dpdk = selfpkgs.dpdk-vdpdk; # needed for ice package thingy
   # dpdk = self.inputs.nixpkgs.legacyPackages.x86_64-linux.dpdk; # needed to build with flow-api
   debug = false;
 in
@@ -37,6 +38,7 @@ pkgs.stdenv.mkDerivation {
 
   patches = [
     ./fastclick.per-thread-counter.patch
+  ] ++ pkgs.lib.optionals dpdk23Patches [
     ./fastclick.dpdk23.patch # patch needed for FromDPDKDevice(FLOW_RULES_FILE) with dpdk 23
   ];
 
@@ -60,14 +62,15 @@ pkgs.stdenv.mkDerivation {
     cp -r ${dpdk}/* /build/rte_sdk
 
     # fastlick FromDPDKDevice(FLOW_RULES_FILE) requires dpdk 21.11 or older.
-    # We attempt to patch fastclick for dpdk 22. 
+    # We attempt to patch fastclick for dpdk 22.
     substituteInPlace ./include/click/flowruleparser.hh \
       --replace "main_ctx" "builtin_ctx"
+  '' + (pkgs.lib.optionalString dpdk23Patches ''
     # patch needed for dpdk 23.
     substituteInPlace ./lib/flowrulemanager.cc \
       --replace "(const uint32_t *) int_rule_ids" "(const uint64_t *) int_rule_ids, true"
 
-  '';
+  '');
 
   RTE_SDK = "/build/rte_sdk";
   # RTE_KERNELDIR = "${pkgs.linux.dev}/lib/modules/${pkgs.linux.modDirVersion}/build";

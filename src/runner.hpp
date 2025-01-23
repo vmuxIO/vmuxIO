@@ -81,7 +81,7 @@ private:
 
   void set_failed(std::string error) {
     this->termination_error = error;
-    raise(SIGINT); // signal abortion to main thread
+    raise(SIGTERM); // signal abortion to main thread
   }
 
   void run() {

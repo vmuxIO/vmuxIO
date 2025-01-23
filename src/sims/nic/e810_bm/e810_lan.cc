@@ -161,7 +161,7 @@ void lan::packet_received(const void *data, size_t len, std::optional<uint16_t> 
   } else {
     this->dev.bcam.select_queue(data, len, &queue);
   }
-  rss_steering(data, len, queue, hash);
+  // rss_steering(data, len, queue, hash);
   if (!rxqs[queue]->is_enabled()) {
     // if we receive on uninitialized queues, we throw errors
     #ifdef DEBUG_LAN
@@ -657,6 +657,31 @@ bool lan_queue_tx::trigger_tx_packet() {
 #else
   (void)iipt;
 #endif
+
+  // try utilizing hardware tso
+  if (tso && tso_len == 0 && tso_off == 0) {
+    bool hardware_tso_success = true;
+    // try to send all segments
+    for (size_t i = d_skip; i < dcnt; i++) {
+      tx_desc_ctx *rd = ready_segments.at(i);
+      d1 = rd->d->cmd_type_offset_bsz;
+      uint16_t pkt_len =
+          (d1) >> ICE_TXD_QW1_TX_BUF_SZ_S;
+      if (!dev.vmux->EthSendTso(rd->data, pkt_len, i + 1 == dcnt, maclen, iplen,
+                                l4len, tso_mss)) {
+        hardware_tso_success = false;
+        break;
+      }
+    }
+    // if success, we are done, otherwise, fall-back to software tso
+    if (hardware_tso_success) {
+      while (dcnt-- > 0) {
+        ready_segments.front()->processed();
+        ready_segments.pop_front();
+      }
+      return true;
+    }
+  }
 
   // copy data for this segment
   uint32_t off = 0;

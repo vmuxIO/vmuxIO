@@ -42,7 +42,7 @@ generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
  */
 
 /* Function responsible for creating the flow rule. 8< */
-struct rte_flow *
+inline struct rte_flow *
 generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
 		uint32_t src_ip, uint32_t src_mask,
 		uint32_t dest_ip, uint32_t dest_mask,
@@ -117,7 +117,7 @@ generate_ipv4_flow(uint16_t port_id, uint16_t rx_q,
 }
 /* >8 End of function responsible for creating the flow rule. */
 
-struct rte_flow *
+inline struct rte_flow *
 generate_eth_flow(uint16_t port_id, uint16_t rx_q,
 		const struct rte_ether_addr *src_mac, const struct rte_ether_addr *src_mask,
 		const struct rte_ether_addr *dest_mac, const struct rte_ether_addr *dest_mask,

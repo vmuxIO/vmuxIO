@@ -2,6 +2,12 @@ rose_cluster_size = 6 # shares L3 cache
 rose_hyperthreads = 2
 wilfred_hyperthreads = 2
 
+"""
+Important is that all threads around a VM are in the same "cluster" (share an L3 cache)
+
+Once all clusters have a VM, we wrap around and start putting vMuxes/VMs to the first cluster again. But on the secondary hyperthread and another core. At some point, both hyperthreads and all cores of each cluster are used for different VMs.
+"""
+
 class CpuPinner:
     """
     Functions that return ranges like 1-2 of cpus to pin certain tasks to.

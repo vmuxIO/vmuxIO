@@ -43,16 +43,15 @@
     };
 
     moongen-lachnit-src = {
-      url = "git+https://vmux-public-03:glpat-mzjPaHL4HHd6wmY1Ln-y@gitlab.lrz.de/okelmann/moongen-lachnit.git?ref=master&submodules=1";
+      url = "git+https://vmux-public-03:glpat-mzjPaHL4HHd6wmY1Ln-y@gitlab.lrz.de/okelmann/moongen-lachnit.git?ref=dpdk-22.11&submodules=1";
       flake = false;
     };
     libmoon-lachnit-src = {
-      #url = "git+file:///home/okelmann/idp-lachnit/moongen/libmoon";
-      url = "git+https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-21.11&submodules=1";
+      url = "git+https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-22.11&submodules=1";
       flake = false;
     };
     dpdk-lachnit-src = {
-      url = "git+https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v21.11-libmoon&submodules=1";
+      url = "git+https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v22.11-libmoon-vdpdk&submodules=1";
       flake = false;
     };
 
@@ -66,6 +65,10 @@
     };
     fastclick-src = {
       url = "git+https://github.com/tbarbette/fastclick.git";
+      flake = false;
+    };
+    dpdk-vdpdk-src = {
+      url = "git+https://github.com/vmuxIO/dpdk?ref=kreutzer-dev-22.11&submodules=1";
       flake = false;
     };
   };
@@ -113,11 +116,18 @@
       dpdk23 = pkgs.callPackage ./nix/dpdk23.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
+        inherit self;
+      };
+      dpdk-vdpdk = pkgs.callPackage ./nix/dpdk-vdpdk.nix {
+        kernel = pkgs.linuxPackages_5_10.kernel;
+        inherit (flakepkgs) linux-firmware-pinned;
+        inherit self;
       };
       dpdk22 = pkgs.callPackage ./nix/dpdk23.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
         dpdkVersion = "22.11";
+        inherit self;
       };
       dpdk = pkgs.callPackage ./nix/dpdk.nix {
         kernel = pkgs.linuxPackages_5_10.kernel;

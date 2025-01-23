@@ -230,6 +230,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.BRIDGE_VHOST,
         Interface.VMUX_DPDK_E810,
         Interface.VMUX_MED,
+        Interface.VMUX_VDPDK,
         ]
     rpsList = {
             'hotelReservation': [ 16, 32, 64, 128, 256, 512, 1024 ],
@@ -240,7 +241,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     repetitions = 4
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
-        interfaces = [ Interface.BRIDGE_E1000 ]
+        # interfaces = [ Interface.BRIDGE_E1000 ]
+        interfaces = [ Interface.VMUX_VDPDK ]
         # interfaces = [ Interface.VMUX_EMU ]
         rps = [ 10 ]
         rpsList = { 'hotelReservation': rps, 'socialNetwork': rps, 'mediaMicroservices': rps }
@@ -306,7 +308,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
-                    guest.setup_test_iface_ip_net()
+                    if interface.guest_driver() == "vfio-pci":
+                        guest.setup_test_iface_dpdk_tap()
+                    else:
+                        guest.setup_test_iface_ip_net()
                     # install inter-VM ARP rules (except the host i that we install it on)
                     guest.add_arp_entries({ i_:guest_ for i_, guest_ in guests.items() if i_ != i })
                     # workaround for ARP being broken in vMux: ping the loadgen once

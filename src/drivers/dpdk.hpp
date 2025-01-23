@@ -4,12 +4,16 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <format>
 #include <fcntl.h>
+#include <rte_ip.h>
+#include <rte_mbuf_core.h>
 #include <rte_mbuf_ptype.h>
 #include <rte_memcpy.h>
+#include <rte_tcp.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -22,6 +26,7 @@
 #include "src/util.hpp"
 #include "src/drivers/driver.hpp"
 #include "src/drivers/flow_blocks.hpp"
+#include "src/devices/vdpdk-consts.hpp"
 #include <unistd.h>
 
 #define RX_RING_SIZE 1024
@@ -71,7 +76,7 @@ copy_buf_to_pkt(void *buf, unsigned len, struct rte_mbuf *pkt, unsigned offset)
 
 /* Port initialization used in flow filtering. 8< */
 static void
-filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte_mempool*> &rx_mbuf_pools, std::vector<struct rte_mempool*> &tx_mbuf_pools)
+filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte_mempool*> &rx_mbuf_pools, std::vector<struct rte_mempool*> &tx_mbuf_pools, bool &tso_supported)
 {
 	int ret;
 	uint16_t i;
@@ -105,6 +110,7 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 			port_id, strerror(-ret));
 
 	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
+	tso_supported = port_conf.txmode.offloads & RTE_ETH_TX_OFFLOAD_TCP_TSO;
 	printf(":: initializing port: %d\n", port_id);
 	ret = rte_eth_dev_configure(port_id,
 				nr_queues, nr_queues, &port_conf);
@@ -146,10 +152,12 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 
 	struct rte_mempool *tx_pool;
 	for (i = 0; i < nr_queues; i++) {
-		size_t tx_buffers = NUM_MBUFS; // TODO
 		// TODO allocate these elsewhere
-		tx_pool = rte_pktmbuf_pool_create(std::format("TX_MBUF_POOL_{}", i).c_str(), tx_buffers ,
-			64, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id()); // TODO constant for cache
+		size_t buffer_size = tso_supported ? (4096 * 4 + RTE_PKTMBUF_HEADROOM) : RTE_MBUF_DEFAULT_BUF_SIZE;
+		// Private data is used by Vdpdk
+		size_t priv_size = sizeof(struct rte_mbuf_ext_shared_info) + VDPDK_CONSTS::TX_DESC_SIZE;
+		tx_pool = rte_pktmbuf_pool_create(std::format("TX_MBUF_POOL_{}", i).c_str(), NUM_MBUFS * 2,
+			64, priv_size, buffer_size, rte_socket_id()); // TODO constant for cache
 		if (tx_pool == NULL)
 			rte_exit(EXIT_FAILURE, "Cannot create tx mbuf pool %d\n", i);
 		tx_mbuf_pools.push_back(tx_pool);
@@ -346,7 +354,7 @@ static void lcore_init_checks() {
 
 class Dpdk : public Driver {
 private:
-	const static uint16_t max_queues_per_vm = 4;
+	static constexpr uint16_t MAX_QUEUES_PER_VM = 4;
 
 	// struct rte_mempool *mbuf_pool;
 	std::vector<struct rte_mempool*> tx_mbuf_pools;
@@ -355,20 +363,26 @@ private:
 	uint16_t port_id;
 	std::vector<bool> mediate; // per VM
 
+	bool tso_supported = false;
+	// list of current tso buffers
+	// one per queue
+	struct rte_mbuf **tso_seg = nullptr;
+
+	friend class VdpdkDevice;
 
 	// get queue id of native queue
 	uint16_t get_rx_queue_id(int vm, int queue) {
-		return vm * this->max_queues_per_vm + queue;
+		return vm * MAX_QUEUES_PER_VM + queue;
 	}
 
 	uint16_t get_tx_queue_id(int vm, int queue) {
-		return vm * this->max_queues_per_vm + queue;
+		return vm * MAX_QUEUES_PER_VM + queue;
 	}
 
 public:
 	Dpdk(int num_vms, const uint8_t (*mac_addr)[6], int argc, char *argv[]) {
-		this->alloc_rx_lists(this->max_queues_per_vm * num_vms, BURST_SIZE);
-    this->bufs = (struct rte_mbuf **) malloc(this->max_queues_per_vm * BURST_SIZE * num_vms * sizeof(struct rte_mbuf*));
+		this->alloc_rx_lists(MAX_QUEUES_PER_VM * num_vms, BURST_SIZE, MAX_QUEUES_PER_VM, MAX_QUEUES_PER_VM);
+    this->bufs = (struct rte_mbuf **) malloc(MAX_QUEUES_PER_VM * BURST_SIZE * num_vms * sizeof(struct rte_mbuf*));
 		this->mediate = std::vector<bool>(num_vms, false);
 
 		/*
@@ -396,7 +410,7 @@ public:
 		/* Creates a new mempool in memory to hold the mbufs. */
 
 		// /* Allocates mempool to hold the mbufs. 8< */
-		// size_t rx_buffers = NUM_MBUFS * nb_ports * num_vms * this->max_queues_per_vm;
+		// size_t rx_buffers = NUM_MBUFS * nb_ports * num_vms * MAX_QUEUES_PER_VM;
 		// size_t tx_buffers = rx_buffers; // TODO remove
 		// mbuf_pool = rte_pktmbuf_pool_create("MBUF_POOL", rx_buffers + tx_buffers ,
 		// 	MBUF_CACHE_SIZE, 0, RTE_MBUF_DEFAULT_BUF_SIZE, rte_socket_id());
@@ -407,13 +421,16 @@ public:
 		// 	rte_exit(EXIT_FAILURE, "Cannot create mbuf pool\n");
 
 		static uint16_t port_id = 0;
-		static uint16_t nr_queues = num_vms * this->max_queues_per_vm;
+		static uint16_t nr_queues = num_vms * MAX_QUEUES_PER_VM;
 		struct rte_flow *flow;
 		struct rte_flow_error error;
 		this->port_id = port_id;
 
 		/* Initializing all ports. 8< */
-		filtering_init_port(port_id, nr_queues, this->rx_mbuf_pools, this->tx_mbuf_pools);
+		filtering_init_port(port_id, nr_queues, this->rx_mbuf_pools, this->tx_mbuf_pools, this->tso_supported);
+		if (this->tso_supported) {
+			this->tso_seg = (struct rte_mbuf **) calloc(nr_queues, sizeof(struct rte_mbuf *));
+		}
 		// RTE_ETH_FOREACH_DEV(portid)
 		// 	if (port_init(portid, mbuf_pool) != 0)
 		// 		rte_exit(EXIT_FAILURE, "Cannot init port %" PRIu16 "\n",
@@ -515,7 +532,7 @@ public:
 			pkt->nb_segs = 1;
 
 			// TODO	
-			pkt->ol_flags |= RTE_MBUF_F_TX_IEEE1588_TMST; 
+			pkt->ol_flags = RTE_MBUF_F_TX_IEEE1588_TMST;
 		
 			copy_buf_to_pkt((void*)buf, len, pkt, 0);
 			
@@ -524,13 +541,107 @@ public:
 					&pkt, 1);
 			if (nb_tx != 1) {
 				printf("\nWARNING: Sending packet failed. \n");
+				rte_pktmbuf_free(pkt);
 			}
 			if_log_level(LOG_DEBUG, printf("send: "));
 			if_log_level(LOG_DEBUG, Util::dump_pkt((void*)buf, len));
-
-			/* Free packets. */
-			rte_pktmbuf_free(pkt);
 		}
+	}
+
+	virtual bool send_tso(int vm_id, const char *buf, const size_t len,
+	                      const bool end_of_packet, uint64_t l2_len,
+	                      uint64_t l3_len, uint64_t l4_len, uint64_t tso_segsz) {
+		if (!tso_supported) return false;
+
+		uint16_t queue = this->get_tx_queue_id(vm_id, 0);
+		struct rte_mbuf *tso_first = this->tso_seg[queue];
+
+		// allocate and initialize first segment
+		if (tso_first == nullptr) {
+			tso_first = rte_pktmbuf_alloc(this->tx_mbuf_pools[queue]);
+			if (tso_first == nullptr) {
+				printf("WARN: Dpdk::send_tso: alloc failed\n");
+				return false;
+			}
+			tso_first->nb_segs = 1;
+			tso_first->pkt_len = 0;
+			tso_first->data_len = 0;
+		}
+		struct rte_mbuf *tso_last = rte_pktmbuf_lastseg(tso_first);
+
+		// copy data into dpdk buffers
+		for (size_t copied = 0; copied < len; ) {
+			size_t tailroom = rte_pktmbuf_tailroom(tso_last);
+			// allocate another segment if needed
+			if (tailroom == 0) {
+				struct rte_mbuf *newseg = rte_pktmbuf_alloc(this->tx_mbuf_pools[queue]);
+				if (newseg == nullptr) {
+					printf("WARN: Dpdk::send_tso: alloc failed\n");
+					this->tso_seg[queue] = nullptr;
+					rte_pktmbuf_free(tso_first);
+					return false;
+				}
+				tso_last->next = newseg;
+				tso_first->nb_segs++;
+				tso_last = newseg;
+				tailroom = rte_pktmbuf_tailroom(tso_last);
+			}
+
+			// fill segment
+			size_t copy_n = std::min(tailroom, len - copied);
+			rte_memcpy(rte_pktmbuf_mtod_offset(tso_last, char *, tso_last->data_len),
+			           buf + copied, copy_n);
+			tso_last->data_len += copy_n;
+			tso_first->pkt_len += copy_n;
+			copied += copy_n;
+		}
+
+		if (!end_of_packet) {
+			this->tso_seg[queue] = tso_first;
+			return true;
+		}
+
+		// sanity check: headers should all be in first segment
+		if (l2_len + l3_len + l4_len > tso_first->data_len) {
+				printf("WARN: Dpdk::send_tso: headers too large\n");
+				this->tso_seg[queue] = nullptr;
+				rte_pktmbuf_free(tso_first);
+				return false;
+		}
+
+		tso_first->ol_flags = RTE_MBUF_F_TX_IEEE1588_TMST;
+		tso_first->ol_flags |= RTE_MBUF_F_TX_TCP_SEG;
+		tso_first->ol_flags |= RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM;
+		tso_first->l2_len = l2_len;
+		tso_first->l3_len = l3_len;
+		tso_first->l4_len = l4_len;
+		tso_first->tso_segsz = tso_segsz;
+
+		struct rte_ipv4_hdr *ipv4_hdr;
+		struct rte_tcp_hdr *tcp_hdr;
+		ipv4_hdr = rte_pktmbuf_mtod_offset(tso_first, struct rte_ipv4_hdr *, l2_len);
+		tcp_hdr = rte_pktmbuf_mtod_offset(tso_first, struct rte_tcp_hdr *, l2_len + l3_len);
+		ipv4_hdr->hdr_checksum = 0;
+		tcp_hdr->cksum = rte_ipv4_phdr_cksum(ipv4_hdr, tso_first->ol_flags);
+
+		uint16_t port;
+		RTE_ETH_FOREACH_DEV(port) {
+			const uint16_t nb_tx = rte_eth_tx_burst(port, queue,
+					&tso_first, 1);
+			if (nb_tx != 1) {
+				printf("\nWARNING: Sending tso packet failed. \n");
+				rte_pktmbuf_free(tso_first);
+				this->tso_seg[queue] = nullptr;
+				return false;
+			}
+		}
+
+		// sent packet successfully
+		if_log_level(LOG_DEBUG,
+			printf("send_tso: %zu\n", (size_t)tso_first->pkt_len)
+		);
+		this->tso_seg[queue] = nullptr;
+		return true;
 	}
 
 	// each recv(vm) call must be followed up with a recv_consumed(vm) call. No other VMs may receive in between. Otherwise it is unclear which VM owns which buffers
@@ -542,7 +653,7 @@ public:
 	 	 * Receive packets on a port and forward them on the same
 	 	 * port.
 	 	 */
-		for (int q_idx = 0; q_idx < this->max_queues_per_vm; q_idx++) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
 			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
 
 			/* Get burst of RX packets, from first port of pair. */
@@ -554,37 +665,40 @@ public:
 				// continue;
 
 			// pass pointers to packet buffers via rxBufs to behavioral model
-			for (uint16_t i = queue_id * BURST_SIZE; i < (queue_id * BURST_SIZE + nb_rx); i++) {
-				struct rte_mbuf* buf = this->bufs[i]; // we checked before that there is at least one packet
+			auto &rxq = get_rx_queue(vm_id, q_idx);
+			for (uint16_t i = 0; i < nb_rx; i++) {
+				struct rte_mbuf* buf = this->bufs[queue_id * BURST_SIZE + i]; // we checked before that there is at least one packet
 				char* pkt = rte_pktmbuf_mtod(buf, char*);
 				if (buf->nb_segs != 1)
 					die("This rx buffer has multiple segments. Unimplemented.");
 				if (buf->pkt_len >= this->MAX_BUF)
 					die("Cant handle packets of size %d", buf->pkt_len);
 				// rte_memcpy(this->rxBufs[i], pkt, buf->pkt_len);
-				this->rxBufs[i] = pkt;
-				this->rxBuf_used[i] = buf->pkt_len;
+				auto &rxBuf = rxq.rxBufs[i];
+				rxBuf.data = pkt;
+				rxBuf.used = buf->pkt_len;
 				if (this->mediate[vm_id]) {
-					this->rxBuf_queue[i] = q_idx;
+					rxBuf.queue = q_idx;
 				} else {
 					// make the behavioral model emulate the switching
-					this->rxBuf_queue[i] = {};
+					rxBuf.queue = {};
 				}
 				if_log_level(LOG_DEBUG, printf("recv queue %d: ", queue_id));
-				if_log_level(LOG_DEBUG, Util::dump_pkt(this->rxBufs[i], this->rxBuf_used[i]));
+				if_log_level(LOG_DEBUG, Util::dump_pkt(rxBuf.data, rxBuf.used));
 			}
-			this->nb_bufs_used[queue_id] = nb_rx;
+			rxq.nb_bufs_used = nb_rx;
 		}
   }
 
   virtual void recv_consumed(int vm_id) {
     // free pkt
-		for (int q_idx = 0; q_idx < this->max_queues_per_vm; q_idx++) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
 			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
-			for (uint16_t i = queue_id * BURST_SIZE; i < (queue_id * BURST_SIZE + this->nb_bufs_used[queue_id]); i++) {
+			auto &nb_bufs_used = get_rx_queue(vm_id, q_idx).nb_bufs_used;
+			for (uint16_t i = queue_id * BURST_SIZE; i < (queue_id * BURST_SIZE + nb_bufs_used); i++) {
 				rte_pktmbuf_free(this->bufs[i]);
 			}
-			this->nb_bufs_used[queue_id] = 0;
+			nb_bufs_used = 0;
 		}
   }
  

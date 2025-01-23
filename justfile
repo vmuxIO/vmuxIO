@@ -77,6 +77,10 @@ vmuxDpdkE810:
 vmuxMed:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1
 
+vmuxVdpdk:
+  # sudo gdb -ex "handle SIGTERM nostop print pass" --args {{proot}}/build/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 --log-level "pmd.net.ice*:debug"
+  sudo {{proot}}/build_release/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
+
 vmuxDpdkE810Gdb:
   sudo gdb --args {{proot}}/build/vmux -u -q -d none -m emulation -s {{vmuxSock}} -- -l 1 -n 1
 
@@ -152,10 +156,11 @@ qemu-virtionet:
   sudo ip link del tap0
 
 
-vm-libvfio-user:
+vm-libvfio-user SMP="1":
     sudo rm {{qemuMem}} || true
     sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
+        -smp {{SMP}} \
         -enable-kvm \
         -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
         -machine q35,accel=kvm,kernel-irqchip=split \
@@ -634,8 +639,17 @@ dpdk_helloworld: dpdk-setup
   meson configure -Denable_kmods=true
   meson configure -Dkernel_dir=/nix/store/2g9vnkxppkx21jgkf08khkbaxpfxmj1s-linux-5.10.110-dev/lib/modules/5.10.110/build
 
-fastclick: 
-  sudo ./fastclick/bin/click --dpdk "-l 2-10" -- ./test/fastclick/dpdk-flow-parser.click
+fastclick-gen:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/pktgen-l2.click
+
+fastclick-reflect:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/dpdk-bounce.click
+
+fastclick-tap:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/dpdk-tap.click
+
+fastclick-flow:
+  ./fastclick/bin/click --dpdk -l 0 -a 0000:00:06.0 --log-level "pmd.net.vdpdk*:debug" -- ./test/fastclick/mac-switch-hardware.click rules=./test/fastclick/rteflow_etype_rules
 
 pktgen: 
   nix shell .#pktgen

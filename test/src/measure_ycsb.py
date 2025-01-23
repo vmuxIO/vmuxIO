@@ -56,7 +56,10 @@ class YcsbTest(AbstractBenchTest):
     def parse_results(self, repetition: int) -> DataFrame:
         df = DataFrame()
         for vm_number in MultiHost.range(self.num_vms):
-            df = pd.concat([df, self.parse_result(repetition, vm_number)])
+            try:
+                df = pd.concat([df, self.parse_result(repetition, vm_number)])
+            except Exception as e:
+                pass
         return df
 
     def parse_result(self, repetition: int, vm_number: int) -> DataFrame:
@@ -191,6 +194,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.BRIDGE_VHOST,
         Interface.VMUX_DPDK_E810,
         Interface.VMUX_MED,
+        Interface.VMUX_VDPDK,
         ]
     rpsList = [ -1 ]
     vm_nums = [ 1, 2, 4, 8 , 16, 32, 64 ]
@@ -198,13 +202,14 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_VHOST, Interface.VMUX_DPDK_E810 ]
-        interfaces = [ Interface.VMUX_DPDK_E810 ]
+        # interfaces = [ Interface.VMUX_VDPDK, Interface.VMUX_DPDK_E810 ]
+        interfaces = [ Interface.VMUX_VDPDK ]
         # interfaces = [ Interface.VFIO ]
         # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
         rpsList = [ -1 ]
         repetitions = 1
-        DURATION_S = 300
-        vm_nums = [ 32 ]
+        # DURATION_S = 300
+        vm_nums = [ 16 ]
 
     # test = YcsbTest(
     #         repetitions=1,
@@ -261,7 +266,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
-                    guest.setup_test_iface_ip_net()
+                    if interface.guest_driver() == "vfio-pci":
+                        guest.setup_test_iface_dpdk_tap()
+                    else:
+                        guest.setup_test_iface_ip_net()
                     # workaround for ARP being broken in vMux: ping the loadgen once
                     guest.wait_for_success(f"ping -c 1 -W 1 {strip_subnet_mask(loadgen.test_iface_ip_net)}")
                 end_foreach(guests, foreach_parallel)

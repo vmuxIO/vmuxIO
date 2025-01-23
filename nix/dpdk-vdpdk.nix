@@ -26,9 +26,9 @@
     else if stdenv.isAarch64 then "generic"
     else null
   )
-, dpdkVersion ? "23.07"
+, dpdkVersion ? "22.11"
 , linux-firmware-pinned
-, self ? null
+, self
 }:
 
 let
@@ -36,16 +36,10 @@ let
   debug = false;
 in
 stdenv.mkDerivation {
-  pname = "dpdk";
+  pname = "dpdk-vdpdk";
   version = "${dpdkVersion}" + lib.optionalString mod "-${kernel.version}";
 
-  src = if dpdkVersion == "22.11" then
-          self.inputs.dpdk-lachnit-src else
-          fetchurl {
-            url = "https://fast.dpdk.org/rel/dpdk-${dpdkVersion}.tar.xz";
-            sha256 = if dpdkVersion == "23.07" then "sha256-4IYU6K65KUB9c9cWmZKJpE70A0NSJx8JOX7vkysjs9Y=" else
-                    if dpdkVersion == "22.11" then "sha256-ju/Maa+ofcyvjXMNgF3tcPuLZJBSldY5aXfBMi5Z6ts=" else "";
-          };
+  src = self.inputs.dpdk-vdpdk-src;
 
   nativeBuildInputs = [
     makeWrapper
