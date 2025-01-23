@@ -13,13 +13,13 @@
 class VdpdkDevice : public VmuxDevice {
 public:
   VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6]);
-  
+
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override;
 
 private:
   std::string dbg_string;
-  MemFd txbuf;
-  MemFd rxbuf;
+  MemFd txCtl;
+  MemFd rxCtl;
   MemFd flowbuf;
 
   std::shared_ptr<Dpdk> dpdk_driver;

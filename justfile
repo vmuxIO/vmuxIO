@@ -156,11 +156,11 @@ qemu-virtionet:
   sudo ip link del tap0
 
 
-vm-libvfio-user:
+vm-libvfio-user SMP="1":
     sudo rm {{qemuMem}} || true
     sudo qemu/bin/qemu-system-x86_64 \
         -cpu host \
-        -smp 4 \
+        -smp {{SMP}} \
         -enable-kvm \
         -m 16G -object memory-backend-file,mem-path={{qemuMem}},prealloc=yes,id=bm,size=16G,share=on -numa node,memdev=bm \
         -machine q35,accel=kvm,kernel-irqchip=split \
