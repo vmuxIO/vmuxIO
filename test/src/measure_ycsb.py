@@ -56,7 +56,10 @@ class YcsbTest(AbstractBenchTest):
     def parse_results(self, repetition: int) -> DataFrame:
         df = DataFrame()
         for vm_number in MultiHost.range(self.num_vms):
-            df = pd.concat([df, self.parse_result(repetition, vm_number)])
+            try:
+                df = pd.concat([df, self.parse_result(repetition, vm_number)])
+            except Exception as e:
+                pass
         return df
 
     def parse_result(self, repetition: int, vm_number: int) -> DataFrame:
@@ -194,7 +197,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         Interface.VMUX_VDPDK,
         ]
     rpsList = [ -1 ]
-    vm_nums = [ 1, 2, 4, 8 , 16 ]
+    vm_nums = [ 1, 2, 4, 8 , 16, 32, 64 ]
     repetitions = 2
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
