@@ -460,7 +460,7 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
       // Force debug output on this loops
       debug_counter = 1;
     }
-    rte_write8(1, txbuf.ptr() + TX_WANT_SIGNAL);
+    rte_write8(1, txCtl.ptr() + TX_WANT_SIGNAL);
     tx_event_active = true;
   }
 
@@ -652,7 +652,7 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
       if constexpr (DEBUG_OUTPUT) {
         printf("TX disable signalling\n");
       }
-      rte_write8(0, txbuf.ptr() + TX_WANT_SIGNAL);
+      rte_write8(0, txCtl.ptr() + TX_WANT_SIGNAL);
       tx_event_active = false;
     }
     queue_data->signal_counter = MAX_EMPTY_POLLS;
