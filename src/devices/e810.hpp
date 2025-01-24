@@ -129,10 +129,10 @@ public:
 
     // receive our packets
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
-		for (unsigned q_idx = 0; q_idx < this_->driver->max_queues_per_vm; q_idx++) {
-		  auto &rxq = this_->driver->get_rx_queue(vm_number, q_idx);
-			for (uint16_t i = 0; i < rxq.nb_bufs_used; i++) {
-			  auto &rxBuf = rxq.rxBufs[i];
+    for (unsigned q_idx = 0; q_idx < this_->driver->max_queues_per_vm; q_idx++) {
+      auto &rxq = this_->driver->get_rx_queue(vm_number, q_idx);
+      for (uint16_t i = 0; i < rxq.nb_bufs_used; i++) {
+        auto &rxBuf = rxq.rxBufs[i];
 
         // handle PTP mediation
         if (ptp_target_vm != -1) { // we are default queue and PTP mediation is enabled

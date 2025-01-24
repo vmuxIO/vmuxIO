@@ -56,7 +56,10 @@ class YcsbTest(AbstractBenchTest):
     def parse_results(self, repetition: int) -> DataFrame:
         df = DataFrame()
         for vm_number in MultiHost.range(self.num_vms):
-            df = pd.concat([df, self.parse_result(repetition, vm_number)])
+            try:
+                df = pd.concat([df, self.parse_result(repetition, vm_number)])
+            except Exception as e:
+                pass
         return df
 
     def parse_result(self, repetition: int, vm_number: int) -> DataFrame:

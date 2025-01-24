@@ -91,10 +91,10 @@ public:
     }
 
     this_->driver->recv(vm_number); // recv assumes the Device does not handle packet of other VMs until recv_consumed()!
-		for (unsigned q_idx = 0; q_idx < this_->driver->max_queues_per_vm; q_idx++) {
-		  auto &rxq = this_->driver->get_rx_queue(vm_number, q_idx);
-			for (uint16_t i = 0; i < rxq.nb_bufs_used; i++) {
-			  auto &rxBuf = rxq.rxBufs[i];
+    for (unsigned q_idx = 0; q_idx < this_->driver->max_queues_per_vm; q_idx++) {
+      auto &rxq = this_->driver->get_rx_queue(vm_number, q_idx);
+      for (uint16_t i = 0; i < rxq.nb_bufs_used; i++) {
+        auto &rxBuf = rxq.rxBufs[i];
         while(!e1000_rx_is_ready(this_->e1000)) {
           // blocking pause to reduce memory contention while spinning.
           // 100us seem to yield good results.
@@ -103,8 +103,8 @@ public:
         this_->vfu_ctx_mutex.lock();
         this_->ethRx(rxBuf.data, rxBuf.used);
         this_->vfu_ctx_mutex.unlock();
-			}
-		}
+      }
+    }
     this_->driver->recv_consumed(vm_number);
     // printf("interrupt_throtteling register: %d\n", e1000_interrupt_throtteling_reg(this_->e1000, -1));
   }

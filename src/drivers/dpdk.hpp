@@ -532,7 +532,7 @@ public:
 			pkt->nb_segs = 1;
 
 			// TODO	
-			pkt->ol_flags = RTE_MBUF_F_TX_IEEE1588_TMST; 
+			pkt->ol_flags = RTE_MBUF_F_TX_IEEE1588_TMST;
 		
 			copy_buf_to_pkt((void*)buf, len, pkt, 0);
 			
@@ -552,7 +552,7 @@ public:
 	                      const bool end_of_packet, uint64_t l2_len,
 	                      uint64_t l3_len, uint64_t l4_len, uint64_t tso_segsz) {
 		if (!tso_supported) return false;
-		
+
 		uint16_t queue = this->get_tx_queue_id(vm_id, 0);
 		struct rte_mbuf *tso_first = this->tso_seg[queue];
 
@@ -608,8 +608,8 @@ public:
 				rte_pktmbuf_free(tso_first);
 				return false;
 		}
-		
-		tso_first->ol_flags = RTE_MBUF_F_TX_IEEE1588_TMST; 
+
+		tso_first->ol_flags = RTE_MBUF_F_TX_IEEE1588_TMST;
 		tso_first->ol_flags |= RTE_MBUF_F_TX_TCP_SEG;
 		tso_first->ol_flags |= RTE_MBUF_F_TX_IPV4 | RTE_MBUF_F_TX_IP_CKSUM;
 		tso_first->l2_len = l2_len;

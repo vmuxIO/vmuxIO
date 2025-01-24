@@ -36,8 +36,8 @@ constexpr uint64_t MAX_EMPTY_POLLS = 100000;
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6])
 : VmuxDevice(device_id, driver, nullptr),
-  txbuf{"vdpdk_tx", REGION_SIZE},
-  rxbuf{"vdpdk_rx", REGION_SIZE},
+  txCtl{"vdpdk_tx", REGION_SIZE},
+  rxCtl{"vdpdk_rx", REGION_SIZE},
   flowbuf{"vdpdk_flow", 0x1000},
   dpdk_driver(std::dynamic_pointer_cast<Dpdk>(driver)) {
   if (!dpdk_driver) {
@@ -76,17 +76,17 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   }
 
   ret = vfu_setup_region(ctx, VFU_PCI_DEV_BAR1_REGION_IDX,
-                             txbuf.size(), NULL,
+                             txCtl.size(), NULL,
                              region_flags, NULL, 0,
-                             txbuf.fd(), 0);
+                             txCtl.fd(), 0);
   if (ret) {
     die("failed to setup BAR1 region (%d)", errno);
   }
 
   ret = vfu_setup_region(ctx, VFU_PCI_DEV_BAR2_REGION_IDX,
-                             rxbuf.size(), NULL,
+                             rxCtl.size(), NULL,
                              region_flags, NULL, 0,
-                             rxbuf.fd(), 0);
+                             rxCtl.fd(), 0);
   if (ret) {
     die("failed to setup BAR2 region (%d)", errno);
   }
@@ -214,7 +214,7 @@ ssize_t VdpdkDevice::region_access_cb(char *buf, size_t count, loff_t offset, bo
   if (is_write) {
     return region_access_write(buf, count, offset);
   }
-  
+
   return region_access_read(buf, count, offset);
 }
 
@@ -300,7 +300,7 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
     case TX_QUEUE_START: {
       if (count != 1) return -1;
       uint16_t queue_idx;
-      memcpy(&queue_idx, txbuf.ptr() + 10, 2);
+      memcpy(&queue_idx, txCtl.ptr() + 10, 2);
       if (queue_idx != 0) {
         printf("TX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
         *buf = 1;
@@ -308,9 +308,9 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
       }
 
       uint64_t ring_addr;
-      memcpy(&ring_addr, txbuf.ptr(), 8);
+      memcpy(&ring_addr, txCtl.ptr(), 8);
       uint16_t idx_mask;
-      memcpy(&idx_mask, txbuf.ptr() + 8, 2);
+      memcpy(&idx_mask, txCtl.ptr() + 8, 2);
 
       printf("TX_QUEUE_START: idx: %d, ring_addr: %llx, mask: %x\n",
              (int)queue_idx, (unsigned long long)ring_addr, (unsigned)idx_mask);
@@ -332,7 +332,7 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
     case RX_QUEUE_START: {
       if (count != 1) return -1;
       uint16_t queue_idx;
-      memcpy(&queue_idx, rxbuf.ptr() + 10, 2);
+      memcpy(&queue_idx, rxCtl.ptr() + 10, 2);
       if (queue_idx >= MAX_RX_QUEUES) {
         printf("RX_QUEUE_START: Invalid queue idx %d", (int)queue_idx);
         *buf = 1;
@@ -340,9 +340,9 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
       }
 
       uint64_t ring_addr;
-      memcpy(&ring_addr, rxbuf.ptr(), 8);
+      memcpy(&ring_addr, rxCtl.ptr(), 8);
       uint16_t idx_mask;
-      memcpy(&idx_mask, rxbuf.ptr() + 8, 2);
+      memcpy(&idx_mask, rxCtl.ptr() + 8, 2);
 
       printf("RX_QUEUE_START: idx: %d, ring_addr: %llx, mask: %x\n",
              (int)queue_idx, (unsigned long long)ring_addr, (unsigned)idx_mask);
