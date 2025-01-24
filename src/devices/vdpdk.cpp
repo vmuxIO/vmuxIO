@@ -32,7 +32,7 @@ enum VDPDK_OFFSET {
   TX_WANT_SIGNAL = 0x100,
 };
 
-constexpr uint64_t MAX_EMPTY_POLLS = 1000;
+constexpr uint64_t MAX_EMPTY_POLLS = 100000;
 
 VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6])
 : VmuxDevice(device_id, driver, nullptr),
