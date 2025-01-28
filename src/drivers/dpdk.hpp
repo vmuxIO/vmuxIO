@@ -22,6 +22,7 @@
 #include <rte_cycles.h>
 #include <rte_lcore.h>
 #include <rte_mbuf.h>
+#include "eventfd.hpp"
 #include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/util.hpp"
 #include "src/drivers/driver.hpp"
@@ -96,8 +97,9 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 				RTE_ETH_TX_OFFLOAD_TCP_TSO	   |
 				RTE_ETH_TX_OFFLOAD_MULTI_SEGS, 
 		},
-
-
+		.intr_conf = {
+			.rxq = 1,
+		},
 	};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
@@ -700,7 +702,43 @@ public:
 			}
 			nb_bufs_used = 0;
 		}
-  }
+	}
+
+	void add_rx_epoll(int vm_id, Epoll &epoll) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
+			if (rte_eth_dev_rx_intr_ctl_q(0, queue_id, epoll.fd(), RTE_INTR_EVENT_ADD, NULL) != 0) {
+				die("rte_eth_dev_rx_intr_ctl_q add failed");
+			}
+		}
+	}
+
+	void remove_rx_epoll(int vm_id, Epoll &epoll) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
+			if (rte_eth_dev_rx_intr_ctl_q(0, queue_id, epoll.fd(), RTE_INTR_EVENT_DEL, NULL) != 0) {
+				die("rte_eth_dev_rx_intr_ctl_q del failed");
+			}
+		}
+	}
+
+	void enable_rx_intr(int vm_id) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
+			if (rte_eth_dev_rx_intr_enable(0, queue_id) != 0) {
+				die("rte_eth_dev_rx_intr_enable failed");
+			}
+		}
+	}
+
+	void disable_rx_intr(int vm_id) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
+			if (rte_eth_dev_rx_intr_disable(0, queue_id) != 0) {
+				die("rte_eth_dev_rx_intr_enable failed");
+			}
+		}
+	}
  
   /* Enables Timesync / PTP */
   virtual void enableTimesync(uint16_t port) {

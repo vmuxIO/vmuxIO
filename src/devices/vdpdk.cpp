@@ -59,6 +59,14 @@ VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const ui
   this->info.pci_subclass = 0;
   this->info.pci_revision = 1;
 
+  // Start in signalling mode to prevent polling before queue setup
+  rte_write8(1, txCtl.ptr() + TX_WANT_SIGNAL);
+  tx_event_active = true;
+  tx_signal_counter = 0;
+
+  rx_event_active = true;
+  rx_signal_counter = 0;
+
   // this->rx_callback = rx_callback_static;
 }
 
@@ -116,6 +124,7 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
 void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
   int vm_number = device_id;
   driver->recv(vm_number);
+  unsigned rx_count = 0;
 
   for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm; q_idx++) {
     // We delay loading this until we actually know if packets were received
@@ -126,6 +135,7 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
     auto &driver_rxq = driver->get_rx_queue(vm_number, q_idx);
     for (uint16_t i = 0; i < driver_rxq.nb_bufs_used; i++) {
       // If we reach this point, at least one packet was received
+      rx_count += driver_rxq.nb_bufs_used;
       auto &driver_rxBuf = driver_rxq.rxBufs[i];
 
       // Lock and load rx_queue parameters
@@ -198,6 +208,18 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
   }
 
   driver->recv_consumed(vm_number);
+
+  if (rx_count > 0) {
+    rx_event_active = false;
+    rx_signal_counter = MAX_EMPTY_POLLS;
+  } else {
+    if (rx_signal_counter > 0) {
+      rx_signal_counter--;
+    }
+    if (rx_signal_counter == 0) {
+      rx_event_active = true;
+    }
+  }
 }
 
 // void VdpdkDevice::rx_callback_static(int vm_number, void *this__) {
@@ -317,7 +339,6 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
 
       auto txq = std::make_shared<TxQueue>();
       txq->ring_iova = ring_addr;
-      txq->signal_counter = MAX_EMPTY_POLLS;
       txq->idx_mask = idx_mask;
       txq->front_idx = 0;
       txq->back_idx = 0;
@@ -454,7 +475,7 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
   // Check if we want to enable TX signalling
   // We do this before polling to avoid a race condition when the guest
   // transmits a packet right before we enable signalling.
-  if (queue_data->signal_counter == 0 && !tx_event_active) {
+  if (tx_signal_counter == 0 && !tx_event_active) {
     if constexpr (DEBUG_OUTPUT) {
       printf("TX enable signalling\n");
       // Force debug output on this loops
@@ -655,11 +676,11 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
       rte_write8(0, txCtl.ptr() + TX_WANT_SIGNAL);
       tx_event_active = false;
     }
-    queue_data->signal_counter = MAX_EMPTY_POLLS;
+    tx_signal_counter = MAX_EMPTY_POLLS;
   } else {
     // No packets were transmitted, reduce counter to eventually enter signalling mode
-    if (queue_data->signal_counter > 0) {
-      queue_data->signal_counter--;
+    if (tx_signal_counter > 0) {
+      tx_signal_counter--;
     }
   }
 }
@@ -691,7 +712,7 @@ void VdpdkDevice::dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info)
 }
 
 void VdpdkThreads::tx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev) {
-  EventFdWaiter event_waiter;
+  Epoll event_waiter;
   event_waiter.add(dev->tx_event_fd);
 
   std::shared_lock dma_lock(dev->dma_mutex);
@@ -733,7 +754,11 @@ void VdpdkThreads::tx_poll_thread_single(std::stop_token stop, std::shared_ptr<V
 }
 
 void VdpdkThreads::rx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev) {
+  Epoll intr_waiter;
+  int vm_id = dev->device_id;
+  dev->dpdk_driver->add_rx_epoll(vm_id, intr_waiter);
   std::shared_lock dma_lock(dev->dma_mutex);
+  bool dma_invalidated = false;
 
   while (true) {
     // Check if stop requested
@@ -741,7 +766,13 @@ void VdpdkThreads::rx_poll_thread_single(std::stop_token stop, std::shared_ptr<V
       break;
     }
 
-    bool dma_invalidated = false;
+    // Enable RX interrupts before polling one last time
+    bool rx_intr_enabled = false;
+    if (dev->rx_event_active) {
+      dev->dpdk_driver->enable_rx_intr(vm_id);
+      rx_intr_enabled = true;
+    }
+
     // Check if DMA mapping wants to change
     if (dev->dma_flag.test()) {
       // Release lock
@@ -756,11 +787,24 @@ void VdpdkThreads::rx_poll_thread_single(std::stop_token stop, std::shared_ptr<V
     }
 
     dev->rx_callback_fn(dma_invalidated);
+    dma_invalidated = false;
+
+    if (rx_intr_enabled) {
+      if (dev->rx_event_active) {
+        // If RX interrupts are enabled and dev still wants signalling RX, wait
+        dma_lock.unlock();
+        intr_waiter.wait(1000);
+        dma_lock.lock();
+        dma_invalidated = true;
+      }
+      // No matter if we waited or not, disable interrupts here
+      dev->dpdk_driver->disable_rx_intr(vm_id);
+    }
   }
 }
 
 void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2) {
-  EventFdWaiter event_waiter;
+  Epoll event_waiter;
   event_waiter.add(dev1->tx_event_fd);
   event_waiter.add(dev2->tx_event_fd);
 
@@ -824,8 +868,15 @@ void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
 }
 
 void VdpdkThreads::rx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2) {
+  Epoll intr_waiter;
+  int vm_id1 = dev1->device_id;
+  int vm_id2 = dev2->device_id;
+  dev1->dpdk_driver->add_rx_epoll(vm_id1, intr_waiter);
+  dev2->dpdk_driver->add_rx_epoll(vm_id2, intr_waiter);
   std::shared_lock dma_lock1(dev1->dma_mutex);
   std::shared_lock dma_lock2(dev2->dma_mutex);
+  bool dma_invalidated1 = false;
+  bool dma_invalidated2 = false;
 
   while (true) {
     // Check if stop requested
@@ -833,7 +884,13 @@ void VdpdkThreads::rx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
       break;
     }
 
-    bool dma_invalidated = false;
+    bool rx_intr_enabled = false;
+    if (dev1->rx_event_active && dev2->rx_event_active) {
+      dev1->dpdk_driver->enable_rx_intr(vm_id1);
+      dev2->dpdk_driver->enable_rx_intr(vm_id2);
+      rx_intr_enabled = true;
+    }
+
     // Check if DMA mapping wants to change
     if (dev1->dma_flag.test()) {
       // Release lock
@@ -844,12 +901,12 @@ void VdpdkThreads::rx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
       dma_lock1.lock();
 
       // Tell vdpdk to look-up addresses again
-      dma_invalidated = true;
+      dma_invalidated1 = true;
     }
 
-    dev1->rx_callback_fn(dma_invalidated);
+    dev1->rx_callback_fn(dma_invalidated1);
+    dma_invalidated1 = false;
 
-    dma_invalidated = false;
     // Check if DMA mapping wants to change
     if (dev2->dma_flag.test()) {
       // Release lock
@@ -860,10 +917,25 @@ void VdpdkThreads::rx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
       dma_lock2.lock();
 
       // Tell vdpdk to look-up addresses again
-      dma_invalidated = true;
+      dma_invalidated2 = true;
     }
 
-    dev2->rx_callback_fn(dma_invalidated);
+    dev2->rx_callback_fn(dma_invalidated2);
+    dma_invalidated2 = false;
+
+    if (rx_intr_enabled) {
+      if (dev1->rx_event_active && dev2->rx_event_active) {
+        dma_lock1.unlock();
+        dma_lock2.unlock();
+        intr_waiter.wait(1000);
+        dma_lock1.lock();
+        dma_lock2.lock();
+        dma_invalidated1 = true;
+        dma_invalidated2 = true;
+      }
+      dev1->dpdk_driver->disable_rx_intr(vm_id1);
+      dev2->dpdk_driver->disable_rx_intr(vm_id2);
+    }
   }
 }
 

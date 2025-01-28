@@ -42,17 +42,19 @@ private:
     std::atomic<std::shared_ptr<RxQueue>>,
     VDPDK_CONSTS::MAX_RX_QUEUES
   > rx_queues;
+  bool rx_event_active;
+  uint64_t rx_signal_counter;
 
   struct TxQueue {
     uintptr_t ring_iova;
     unsigned char *ring;
-    uint64_t signal_counter;
     uint16_t idx_mask;
     uint16_t front_idx, back_idx;
   };
   std::atomic<std::shared_ptr<TxQueue>> tx_queue;
   EventFd tx_event_fd;
-  bool tx_event_active = false;
+  bool tx_event_active;
+  uint64_t tx_signal_counter;
 
   void rx_callback_fn(bool dma_invalidated);
   // static void rx_callback_static(int vm_number, void *);

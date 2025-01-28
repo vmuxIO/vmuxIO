@@ -36,28 +36,32 @@ void EventFd::signal() {
   }
 }
 
-EventFdWaiter::EventFdWaiter() {
+Epoll::Epoll() {
   epoll_fd = epoll_create1(EPOLL_CLOEXEC);
   if (epoll_fd == -1) {
     die("epoll_create failed");
   }
 }
 
-EventFdWaiter::~EventFdWaiter() {
+Epoll::~Epoll() {
   close(epoll_fd);
 }
 
-void EventFdWaiter::add(const EventFd &eventfd) {
+void Epoll::add(const EventFd &eventfd) {
+  add(eventfd.fd());
+}
+
+void Epoll::add(int fd) {
   struct epoll_event evt = {
     .events = EPOLLIN
   };
-  int ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, eventfd.fd(), &evt);
+  int ret = epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &evt);
   if (ret != 0) {
     die("epoll_ctl failed");
   }
 }
 
-void EventFdWaiter::wait(int timeout_ms) {
+void Epoll::wait(int timeout_ms) {
   struct epoll_event dummy;
   int ret = epoll_wait(epoll_fd, &dummy, 1, timeout_ms);
   if (ret == -1 && errno != EINTR) {

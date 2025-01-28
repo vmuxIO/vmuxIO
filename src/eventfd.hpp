@@ -18,16 +18,19 @@ public:
   void signal();
 };
 
-class EventFdWaiter {
+class Epoll {
   int epoll_fd;
 
 public:
-  EventFdWaiter();
-  ~EventFdWaiter();
+  Epoll();
+  ~Epoll();
 
-  EventFdWaiter(const EventFdWaiter &) = delete;
-  const EventFdWaiter &operator=(const EventFdWaiter &) = delete;
+  Epoll(const Epoll &) = delete;
+  const Epoll &operator=(const Epoll &) = delete;
 
   void add(const EventFd &);
+  void add(int fd);
   void wait(int timeout_ms = -1);
+
+  int fd() const { return epoll_fd; }
 };
