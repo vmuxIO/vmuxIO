@@ -1881,6 +1881,7 @@ class Host(Server):
         self.modprobe_test_iface_drivers()
         self.release_test_iface()
         self.stop_xdp_reflector(self.test_iface)
+        self.stop_xdp_pure_reflector()
         self.destroy_test_br_tap()
         self.destroy_test_macvtap()
         # TODO destroy admin interfaces!
@@ -2057,6 +2058,13 @@ class Guest(Server):
         Kills the iperf server process
         """
         self.tmux_kill("iperf3-server")
+
+    def docker_cleanup(self):
+        """
+        Docker brings stuff back up even after VM reboots. Prevent this.
+        """
+        # by convention, our docker-compose files are in the default exec/login directory
+        self.exec("docker-compose down || true")
 
 
 class LoadGen(Server):
