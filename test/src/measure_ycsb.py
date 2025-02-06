@@ -177,8 +177,8 @@ class Ycsb():
 
 
 def exclude_test(test: YcsbTest) -> bool:
-    return (Interface(test.interface).is_passthrough() and test.num_vms > 1) or \
-              (Interface(test.interface) == Interface.VMUX_VDPDK and test.num_vms > 48) # Fastclicks polling leads to VM timeouts with more VMs than CPUs
+    return (Interface(test.interface).is_passthrough() and test.num_vms > 1)
+
 
 def main(measurement: Measurement, plan_only: bool = False) -> None:
     # general measure init
