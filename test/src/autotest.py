@@ -419,13 +419,21 @@ def setup_and_parse_config(args: Namespace) -> ConfigParser:
     >>> setup_and_parse_config(args)
     ConfigParser(...)
     """
-    conf = default_config_parser()
-    conf.read(args.config.name)
+    conf = setup_and_parse_config_file(args.config.name)
     debug(f'configuration read from config file: {conf._sections}')
     return conf
 
 
+def setup_and_parse_config_file(config_file: str) -> ConfigParser:
+    conf = default_config_parser()
+    conf.read(config_file)
+    return conf
+
+
 def setup_logging(args: Namespace) -> None:
+    setup_logging2(args.verbosity)
+
+def setup_logging2(verbosity: int) -> None:
     """
     Setup the logging.
 
@@ -464,7 +472,7 @@ def setup_logging(args: Namespace) -> None:
     handler.setFormatter(formatter)
     logger = getLogger()
     logger.addHandler(handler)
-    logger.setLevel(LOG_LEVELS[args.verbosity])
+    logger.setLevel(LOG_LEVELS[verbosity])
 
 
 def create_servers(conf: ConfigParser,

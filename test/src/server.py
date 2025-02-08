@@ -1208,6 +1208,14 @@ class Server(ABC):
         self.tmux_kill("ptpclient")
 
 
+    def uptime(self) -> float:
+        """
+        return uptime in seconds
+        """
+        output = self.exec("cat /proc/uptime").strip()
+        return float(output.split(" ")[0])
+
+
 
 class BatchExec:
     """
