@@ -41,11 +41,11 @@
     "dpdk-vdpdk-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1737559529,
-        "narHash": "sha256-mXdXSEy8ocWVwIr4lud/pCghJF8aCsaFZmugB6btuSY=",
+        "lastModified": 1739128275,
+        "narHash": "sha256-o3iB5htyJTx6dBTQDpX3XeXnlm8pcQxPToZpp0exHag=",
         "ref": "kreutzer-dev-22.11",
-        "rev": "b76dfa8fbb83d3ae7e7547bbf38b2c38a088d885",
-        "revCount": 34492,
+        "rev": "8c6b80e134f388797f2fa24f6ed481e1c81f23a2",
+        "revCount": 34493,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/dpdk"

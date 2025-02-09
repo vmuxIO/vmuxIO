@@ -30,6 +30,9 @@ enum VDPDK_OFFSET {
   // TX BAR
   // 0x00 - 0xFF: Reserved for queue setup
   TX_WANT_SIGNAL = 0x100,
+
+  // 0x100 - 0x1FF: intr flags
+  RX_WANT_INTR = 0x100, // 0x40 per queue
 };
 
 constexpr uint64_t MAX_EMPTY_POLLS = 100000;
@@ -119,12 +122,18 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   if (ret) {
     die("failed to setup tx eventfd");
   }
+
+  ret = vfu_setup_device_nr_irqs(ctx, VFU_DEV_MSIX_IRQ, MAX_RX_QUEUES);
+  if (ret) {
+    die("failed to setup irqs");
+  }
 }
 
 void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
   int vm_number = device_id;
   driver->recv(vm_number);
-  unsigned rx_count = 0;
+  bool queue_rcvd[MAX_RX_QUEUES] = {};
+  bool any_rcvd = false;
 
   for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm; q_idx++) {
     // We delay loading this until we actually know if packets were received
@@ -135,7 +144,7 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
     auto &driver_rxq = driver->get_rx_queue(vm_number, q_idx);
     for (uint16_t i = 0; i < driver_rxq.nb_bufs_used; i++) {
       // If we reach this point, at least one packet was received
-      rx_count += driver_rxq.nb_bufs_used;
+      any_rcvd = true;
       auto &driver_rxBuf = driver_rxq.rxBufs[i];
 
       // Lock and load rx_queue parameters
@@ -147,10 +156,14 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
         // splitting 4 queues onto 2 vDPDK queues.
         if (!rxq) {
           rxq = rx_queues[0].load();
+        } else {
+          queue_rcvd[rx_queues_idx] = true;
         }
         // If no queue was created, we are done
         if (!rxq) {
           break;
+        } else {
+          queue_rcvd[0] = true;
         }
 
         ring_size = ((size_t)rxq->idx_mask + 1) * RX_DESC_SIZE;
@@ -209,7 +222,20 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
 
   driver->recv_consumed(vm_number);
 
-  if (rx_count > 0) {
+  // Send guest interrupts
+  {
+    std::unique_lock vfu_lock{this->vfu_ctx_mutex, std::defer_lock};
+    for (unsigned i = 0; i < MAX_RX_QUEUES; i++) {
+      if (!queue_rcvd[i]) continue;
+      if (!rte_read8(rxCtl.ptr() + RX_WANT_INTR + 0x40 * i)) continue;
+      if (!vfu_lock.owns_lock())
+        vfu_lock.lock();
+      vfu_irq_trigger(this->vfuServer->vfu_ctx, i);
+    }
+  }
+
+  //  Enable/disable host dpdk interrupts
+  if (any_rcvd) {
     rx_event_active = false;
     rx_signal_counter = MAX_EMPTY_POLLS;
   } else {
