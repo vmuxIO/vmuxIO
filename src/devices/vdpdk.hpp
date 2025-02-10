@@ -77,22 +77,25 @@ private:
 
 class VdpdkThreads {
 public:
-  explicit VdpdkThreads(size_t sharing_thresh);
-  void add_device(std::shared_ptr<VdpdkDevice>, cpu_set_t rx_pin, cpu_set_t tx_pin);
+  void add_device(std::shared_ptr<VdpdkDevice>, cpu_set_t rx_pin, cpu_set_t tx_pin, cpu_set_t vm_cluster);
   void start();
 
 private:
-  size_t sharing_thresh;
   struct Info {
     std::shared_ptr<VdpdkDevice> dev;
     cpu_set_t rx_pin;
     cpu_set_t tx_pin;
   };
-  std::vector<Info> start_info;
+  struct Cluster {
+    cpu_set_t vm_cluster;
+    std::vector<Info> devs;
+  };
+  std::vector<Cluster> clusters;
   std::vector<std::jthread> threads;
 
   static void tx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev);
   static void rx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev);
-  static void tx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2);
-  static void rx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2);
+  static void tx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs);
+  static void rx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs);
+  static void rxtx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs);
 };

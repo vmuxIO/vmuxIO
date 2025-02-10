@@ -829,13 +829,20 @@ void VdpdkThreads::rx_poll_thread_single(std::stop_token stop, std::shared_ptr<V
   }
 }
 
-void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2) {
+void VdpdkThreads::tx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs) {
   Epoll event_waiter;
-  event_waiter.add(dev1->tx_event_fd);
-  event_waiter.add(dev2->tx_event_fd);
+  for (const auto &dev : devs) {
+    event_waiter.add(dev->tx_event_fd);
+  }
 
-  std::shared_lock dma_lock1(dev1->dma_mutex);
-  std::shared_lock dma_lock2(dev2->dma_mutex);
+  std::vector<std::shared_lock<std::shared_mutex>> dma_locks;
+  dma_locks.reserve(devs.size());
+  for (auto &dev : devs) {
+    dma_locks.emplace_back(dev->dma_mutex);
+  }
+
+  std::vector<bool> dma_invalidated_flags(devs.size(), false);
+  bool eventing_active = false;
 
   while (true) {
     // Check if stop requested
@@ -843,66 +850,62 @@ void VdpdkThreads::tx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
       break;
     }
 
-    bool dma_invalidated1 = false;
-    bool dma_invalidated2 = false;
-
     // Wait if TX is in signalling mode
-    if (dev1->tx_event_active && dev2->tx_event_active) {
-      dma_lock1.unlock();
-      dma_lock2.unlock();
+    if (eventing_active) {
+      for (auto &dma_lock : dma_locks) {
+        dma_lock.unlock();
+      }
 
       event_waiter.wait(1000);
-      dev1->tx_event_fd.reset();
-      dev2->tx_event_fd.reset();
+      for (auto &dev : devs) {
+        dev->tx_event_fd.reset();
+      }
 
-      dma_lock1.lock();
-      dma_lock2.lock();
-      dma_invalidated1 = true;
-      dma_invalidated2 = true;
+      for (auto &dma_lock : dma_locks) {
+        dma_lock.lock();
+      }
+      for (auto &&dma_invalidated : dma_invalidated_flags) {
+        dma_invalidated = true;
+      }
     }
 
-    // Check if DMA mapping wants to change
-    if (dev1->dma_flag.test()) {
-      // Release lock
-      dma_lock1.unlock();
-      // Wait until vfio-user thread holds mutex
-      while (dev1->dma_flag.test());
-      // Re-aquire lock
-      dma_lock1.lock();
+    eventing_active = true;
+    for (size_t i = 0; i < devs.size(); i++) {
+      auto &dev = devs[i];
+      // Check if DMA mapping wants to change
+      if (dev->dma_flag.test()) {
+        // Release lock
+        dma_locks[i].unlock();
+        // Wait until vfio-user thread holds mutex
+        while (dev->dma_flag.test());
+        // Re-aquire lock
+        dma_locks[i].lock();
 
-      // Tell vdpdk to look-up addresses again
-      dma_invalidated1 = true;
+        // Tell vdpdk to look-up addresses again
+        dma_invalidated_flags[i] = true;
+      }
+
+      dev->tx_poll(dma_invalidated_flags[i]);
+      dma_invalidated_flags[i] = false;
+      if (!dev->tx_event_active) eventing_active = false;
     }
-
-    dev1->tx_poll(dma_invalidated1);
-
-    // Check if DMA mapping wants to change
-    if (dev2->dma_flag.test()) {
-      // Release lock
-      dma_lock2.unlock();
-      // Wait until vfio-user thread holds mutex
-      while (dev2->dma_flag.test());
-      // Re-aquire lock
-      dma_lock2.lock();
-
-      // Tell vdpdk to look-up addresses again
-      dma_invalidated2 = true;
-    }
-
-    dev2->tx_poll(dma_invalidated2);
   }
 }
 
-void VdpdkThreads::rx_poll_thread_double(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev1, std::shared_ptr<VdpdkDevice> dev2) {
+void VdpdkThreads::rx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs) {
   Epoll intr_waiter;
-  int vm_id1 = dev1->device_id;
-  int vm_id2 = dev2->device_id;
-  dev1->dpdk_driver->add_rx_epoll(vm_id1, intr_waiter);
-  dev2->dpdk_driver->add_rx_epoll(vm_id2, intr_waiter);
-  std::shared_lock dma_lock1(dev1->dma_mutex);
-  std::shared_lock dma_lock2(dev2->dma_mutex);
-  bool dma_invalidated1 = false;
-  bool dma_invalidated2 = false;
+  for (auto &dev : devs) {
+    dev->dpdk_driver->add_rx_epoll(dev->device_id, intr_waiter);
+  }
+
+  std::vector<std::shared_lock<std::shared_mutex>> dma_locks;
+  dma_locks.reserve(devs.size());
+  for (auto &dev : devs) {
+    dma_locks.emplace_back(dev->dma_mutex);
+  }
+
+  std::vector<bool> dma_invalidated_flags(devs.size(), false);
+  bool eventing_active = false;
 
   while (true) {
     // Check if stop requested
@@ -911,69 +914,148 @@ void VdpdkThreads::rx_poll_thread_double(std::stop_token stop, std::shared_ptr<V
     }
 
     bool rx_intr_enabled = false;
-    if (dev1->rx_event_active && dev2->rx_event_active) {
-      dev1->dpdk_driver->enable_rx_intr(vm_id1);
-      dev2->dpdk_driver->enable_rx_intr(vm_id2);
+    if (eventing_active) {
+      for (auto &dev : devs) {
+        dev->dpdk_driver->enable_rx_intr(dev->device_id);
+      }
       rx_intr_enabled = true;
     }
 
-    // Check if DMA mapping wants to change
-    if (dev1->dma_flag.test()) {
-      // Release lock
-      dma_lock1.unlock();
-      // Wait until vfio-user thread holds mutex
-      while (dev1->dma_flag.test());
-      // Re-aquire lock
-      dma_lock1.lock();
+    eventing_active = true;
+    for (size_t i = 0; i < devs.size(); i++) {
+      auto &dev = devs[i];
+      // Check if DMA mapping wants to change
+      if (dev->dma_flag.test()) {
+        // Release lock
+        dma_locks[i].unlock();
+        // Wait until vfio-user thread holds mutex
+        while (dev->dma_flag.test());
+        // Re-aquire lock
+        dma_locks[i].lock();
 
-      // Tell vdpdk to look-up addresses again
-      dma_invalidated1 = true;
+        // Tell vdpdk to look-up addresses again
+        dma_invalidated_flags[i] = true;
+      }
+
+      dev->rx_callback_fn(dma_invalidated_flags[i]);
+      dma_invalidated_flags[i] = false;
+      if (!dev->rx_event_active) eventing_active = false;
     }
-
-    dev1->rx_callback_fn(dma_invalidated1);
-    dma_invalidated1 = false;
-
-    // Check if DMA mapping wants to change
-    if (dev2->dma_flag.test()) {
-      // Release lock
-      dma_lock2.unlock();
-      // Wait until vfio-user thread holds mutex
-      while (dev2->dma_flag.test());
-      // Re-aquire lock
-      dma_lock2.lock();
-
-      // Tell vdpdk to look-up addresses again
-      dma_invalidated2 = true;
-    }
-
-    dev2->rx_callback_fn(dma_invalidated2);
-    dma_invalidated2 = false;
 
     if (rx_intr_enabled) {
-      if (dev1->rx_event_active && dev2->rx_event_active) {
-        dma_lock1.unlock();
-        dma_lock2.unlock();
+      if (eventing_active) {
+        for (auto &dma_lock : dma_locks) {
+          dma_lock.unlock();
+        }
         intr_waiter.wait(1000);
-        dma_lock1.lock();
-        dma_lock2.lock();
-        dma_invalidated1 = true;
-        dma_invalidated2 = true;
+        for (auto &dma_lock : dma_locks) {
+          dma_lock.lock();
+        }
+        for (auto &&dma_invalidated : dma_invalidated_flags) {
+          dma_invalidated = true;
+        }
       }
-      dev1->dpdk_driver->disable_rx_intr(vm_id1);
-      dev2->dpdk_driver->disable_rx_intr(vm_id2);
+      for (auto &dev : devs) {
+        dev->dpdk_driver->disable_rx_intr(dev->device_id);
+      }
     }
   }
 }
 
-VdpdkThreads::VdpdkThreads(size_t sharing_thresh) : sharing_thresh(sharing_thresh) {}
+void VdpdkThreads::rxtx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs) {
+  Epoll event_waiter;
+  for (auto &dev : devs) {
+    dev->dpdk_driver->add_rx_epoll(dev->device_id, event_waiter);
+    event_waiter.add(dev->tx_event_fd);
+  }
 
-void VdpdkThreads::add_device(std::shared_ptr<VdpdkDevice> dev, cpu_set_t rx_pin, cpu_set_t tx_pin) {
+  std::vector<std::shared_lock<std::shared_mutex>> dma_locks;
+  dma_locks.reserve(devs.size());
+  for (auto &dev : devs) {
+    dma_locks.emplace_back(dev->dma_mutex);
+  }
+
+  std::vector<bool> dma_invalidated_flags(devs.size(), false);
+  bool eventing_active = false;
+
+  while (true) {
+    // Check if stop requested
+    if (stop.stop_requested()) {
+      break;
+    }
+
+    bool rx_intr_enabled = false;
+    if (eventing_active) {
+      for (auto &dev : devs) {
+        dev->dpdk_driver->enable_rx_intr(dev->device_id);
+      }
+      rx_intr_enabled = true;
+    }
+
+    eventing_active = true;
+    for (size_t i = 0; i < devs.size(); i++) {
+      auto &dev = devs[i];
+      // Check if DMA mapping wants to change
+      if (dev->dma_flag.test()) {
+        // Release lock
+        dma_locks[i].unlock();
+        // Wait until vfio-user thread holds mutex
+        while (dev->dma_flag.test());
+        // Re-aquire lock
+        dma_locks[i].lock();
+
+        // Tell vdpdk to look-up addresses again
+        dma_invalidated_flags[i] = true;
+      }
+
+      dev->rx_callback_fn(dma_invalidated_flags[i]);
+      dev->tx_poll(dma_invalidated_flags[i]);
+      dma_invalidated_flags[i] = false;
+      if (!dev->rx_event_active || !dev->tx_event_active) eventing_active = false;
+    }
+
+    if (eventing_active) {
+      for (auto &dma_lock : dma_locks) {
+        dma_lock.unlock();
+      }
+
+      event_waiter.wait(1000);
+      for (auto &dev : devs) {
+        dev->tx_event_fd.reset();
+      }
+
+      for (auto &dma_lock : dma_locks) {
+        dma_lock.lock();
+      }
+      for (auto &&dma_invalidated : dma_invalidated_flags) {
+        dma_invalidated = true;
+      }
+    }
+    if (rx_intr_enabled) {
+      for (auto &dev : devs) {
+        dev->dpdk_driver->disable_rx_intr(dev->device_id);
+      }
+    }
+  }
+}
+
+void VdpdkThreads::add_device(std::shared_ptr<VdpdkDevice> dev, cpu_set_t rx_pin, cpu_set_t tx_pin, cpu_set_t vm_cluster) {
   Info info {
     .dev = std::move(dev),
     .rx_pin = rx_pin,
     .tx_pin = tx_pin,
   };
-  start_info.push_back(info);
+  for (auto &cluster : clusters) {
+    if (CPU_EQUAL(&vm_cluster, &cluster.vm_cluster)) {
+      cluster.devs.push_back(std::move(info));
+      return;
+    }
+  }
+  Cluster cluster {
+    .vm_cluster = vm_cluster,
+    .devs = {std::move(info)},
+  };
+  clusters.push_back(std::move(cluster));
 }
 
 static void pin_thread(std::jthread &jt, const char *name, cpu_set_t set) {
@@ -985,36 +1067,21 @@ static void pin_thread(std::jthread &jt, const char *name, cpu_set_t set) {
   }
 }
 
+static std::string fmt_thread_name(const char *prefix, std::span<std::shared_ptr<VdpdkDevice>> devs) {
+  std::string result{prefix};
+  for (size_t i = 0; i < devs.size(); i++) {
+    if (i != 0) result.push_back('_');
+    std::format_to(std::back_inserter(result), "{}", devs[i]->device_id);
+  }
+  return result;
+}
+
 void VdpdkThreads::start() {
-  // Share polling threads between VMs
-  if (start_info.size() > sharing_thresh) {
-    size_t count = start_info.size();
-    size_t mid = count / 2;
-    for (size_t i = 0; i < mid; i++) {
-      auto dev1 = start_info[i].dev;
-      auto dev2 = start_info[count - i - 1].dev;
-      std::jthread rxthread{[dev1, dev2](std::stop_token stop) {
-        rx_poll_thread_double(stop, dev1, dev2);
-      }};
-      std::jthread txthread{[dev1, dev2](std::stop_token stop) {
-        tx_poll_thread_double(stop, dev1, dev2);
-      }};
-
-      // We use pinning information of the first VM
-      auto &info = start_info[i];
-
-      // Pin RX thread
-      pin_thread(rxthread, std::format("vdpdkRx{}_{}", dev1->device_id, dev2->device_id).c_str(), info.rx_pin);
-
-      // Pin TX thread
-      pin_thread(txthread, std::format("vdpdkTx{}_{}", dev1->device_id, dev2->device_id).c_str(), info.tx_pin);
-
-      threads.push_back(std::move(rxthread));
-      threads.push_back(std::move(txthread));
-    }
-
-    if (count % 2 != 0) {
-      auto &info = start_info[mid];
+  for (const auto &cluster: clusters) {
+    // If exactly one VM in cluster
+    if (cluster.devs.size() == 1) {
+      // Single VM per thread
+      const auto &info = cluster.devs[0];
       auto dev = info.dev;
       std::jthread rxthread{[dev](std::stop_token stop) {
         rx_poll_thread_single(stop, dev);
@@ -1023,31 +1090,44 @@ void VdpdkThreads::start() {
         tx_poll_thread_single(stop, dev);
       }};
 
-      // Pin RX thread
       pin_thread(rxthread, std::format("vdpdkRx{}", info.dev->device_id).c_str(), info.rx_pin);
-
-      // Pin TX thread
       pin_thread(txthread, std::format("vdpdkTx{}", info.dev->device_id).c_str(), info.tx_pin);
 
       threads.push_back(std::move(rxthread));
       threads.push_back(std::move(txthread));
+
+      continue;
     }
-    return;
-  }
-  for (auto &info: start_info) {
-    auto dev = info.dev;
-    std::jthread rxthread{[dev](std::stop_token stop) {
-      rx_poll_thread_single(stop, dev);
+
+    std::vector<std::shared_ptr<VdpdkDevice>> devs;
+    for (auto &dev : cluster.devs) {
+      devs.push_back(dev.dev);
+    }
+
+    int approx_free_cpus = CPU_COUNT(&cluster.vm_cluster) - (int)cluster.devs.size();
+    // If we're running out of CPUs
+    if (approx_free_cpus < 2) {
+      // Poll RX and TX on single thread for multiple VMs
+      std::jthread rxtxthread{[devs](std::stop_token stop) {
+        rxtx_poll_thread_multi(stop, std::move(devs));
+      }};
+
+      pin_thread(rxtxthread, fmt_thread_name("vdpdkRxTx", devs).c_str(), cluster.vm_cluster);
+
+      threads.push_back(std::move(rxtxthread));
+      continue;
+    }
+
+    // Create single RX and TX thread for all VMs in this cluster
+    std::jthread rxthread{[devs](std::stop_token stop) {
+      rx_poll_thread_multi(stop, std::move(devs));
     }};
-    std::jthread txthread{[dev](std::stop_token stop) {
-      tx_poll_thread_single(stop, dev);
+    std::jthread txthread{[devs](std::stop_token stop) {
+      tx_poll_thread_multi(stop, std::move(devs));
     }};
 
-    // Pin RX thread
-    pin_thread(rxthread, std::format("vdpdkRx{}", info.dev->device_id).c_str(), info.rx_pin);
-
-    // Pin TX thread
-    pin_thread(txthread, std::format("vdpdkTx{}", info.dev->device_id).c_str(), info.tx_pin);
+    pin_thread(rxthread, fmt_thread_name("vdpdkRx", devs).c_str(), cluster.vm_cluster);
+    pin_thread(txthread, fmt_thread_name("vdpdkTx", devs).c_str(), cluster.vm_cluster);
 
     threads.push_back(std::move(rxthread));
     threads.push_back(std::move(txthread));
