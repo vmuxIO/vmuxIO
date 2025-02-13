@@ -1119,7 +1119,7 @@ void VdpdkThreads::start() {
         rxtx_poll_thread_multi(stop, std::move(devs));
       }};
 
-      pin_thread(rxtxthread, fmt_thread_name("vdpdkRxTx", devs).c_str(), cluster.vm_cluster);
+      pin_thread(rxtxthread, fmt_thread_name("RxTx", devs).c_str(), cluster.vm_cluster);
 
       threads.push_back(std::move(rxtxthread));
       continue;
@@ -1133,8 +1133,8 @@ void VdpdkThreads::start() {
       tx_poll_thread_multi(stop, std::move(devs));
     }};
 
-    pin_thread(rxthread, fmt_thread_name("vdpdkRx", devs).c_str(), cluster.vm_cluster);
-    pin_thread(txthread, fmt_thread_name("vdpdkTx", devs).c_str(), cluster.vm_cluster);
+    pin_thread(rxthread, fmt_thread_name("Rx", devs).c_str(), cluster.vm_cluster);
+    pin_thread(txthread, fmt_thread_name("Tx", devs).c_str(), cluster.vm_cluster);
 
     threads.push_back(std::move(rxthread));
     threads.push_back(std::move(txthread));
