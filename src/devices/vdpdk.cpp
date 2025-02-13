@@ -73,6 +73,8 @@ VdpdkDevice::VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const ui
   // this->rx_callback = rx_callback_static;
 }
 
+static void dummy_irq_callback(vfu_ctx_t *, uint32_t, uint32_t, bool) {}
+
 void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   this->vfuServer = std::move(vfu);
   auto ctx = this->vfuServer->vfu_ctx;
@@ -126,6 +128,11 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   ret = vfu_setup_device_nr_irqs(ctx, VFU_DEV_MSIX_IRQ, MAX_RX_QUEUES);
   if (ret) {
     die("failed to setup irqs");
+  }
+
+  ret = vfu_setup_irq_state_callback(ctx, VFU_DEV_MSIX_IRQ, dummy_irq_callback);
+  if (ret) {
+    die("failed to setup irq callback");
   }
 }
 
