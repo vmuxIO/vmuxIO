@@ -1833,11 +1833,11 @@ class Host(Server):
             vmux_mode = "vdpdk"
         if not interface.is_passthrough():
             if num_vms == 0:
-                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(1)} -f {self.cpupinner.vmux_runner(1)}'
+                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode} -c {self.cpupinner.qemu(1)} -e {self.cpupinner.vmux_rx(1)} -f {self.cpupinner.vmux_runner(1)}'
             else:
                 for vm_number in MultiHost.range(num_vms):
                     vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, vm_number)}"
-                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(vm_number)} -f {self.cpupinner.vmux_runner(vm_number)}'
+                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode} -c {self.cpupinner.qemu(vm_number)} -e {self.cpupinner.vmux_rx(vm_number)} -f {self.cpupinner.vmux_runner(vm_number)}'
 
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
