@@ -27,6 +27,10 @@ private:
 
   uint8_t mac_addr[6];
 
+  struct sgl_deleter {
+    void operator()(dma_sg_t *p) { std::free(p); }
+  };
+
   // we use this to ensure we don't have to lock the VfuServer for every dma access
   // if we don't lock at all, it's possible that the dma mapping is released while we access it
   std::shared_mutex dma_mutex;
@@ -35,6 +39,8 @@ private:
 
   struct RxQueue {
     uintptr_t ring_iova;
+    std::unique_ptr<dma_sg_t, sgl_deleter> ring_sgl;
+    std::unique_ptr<dma_sg_t, sgl_deleter> tmp_sgl;
     uint16_t idx_mask;
     uint16_t idx;
   };
@@ -47,6 +53,8 @@ private:
 
   struct TxQueue {
     uintptr_t ring_iova;
+    std::unique_ptr<dma_sg_t, sgl_deleter> ring_sgl;
+    std::unique_ptr<dma_sg_t, sgl_deleter> tmp_sgl;
     unsigned char *ring;
     uint16_t idx_mask;
     uint16_t front_idx, back_idx;

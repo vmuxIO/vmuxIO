@@ -141,11 +141,13 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
   driver->recv(vm_number);
   bool queue_rcvd[MAX_RX_QUEUES] = {};
   bool any_rcvd = false;
+  vfu_ctx_t *vfu_ctx = vfuServer->vfu_ctx;
 
   for (unsigned q_idx = 0; q_idx < driver->max_queues_per_vm; q_idx++) {
     // We delay loading this until we actually know if packets were received
     std::shared_ptr<RxQueue> rxq{};
     size_t ring_size;
+    struct iovec ring_iovec{};
     unsigned char *ring;
 
     auto &driver_rxq = driver->get_rx_queue(vm_number, q_idx);
@@ -163,22 +165,34 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
         // splitting 4 queues onto 2 vDPDK queues.
         if (!rxq) {
           rxq = rx_queues[0].load();
+          if (rxq) {
+            queue_rcvd[0] = true;
+          }
         } else {
           queue_rcvd[rx_queues_idx] = true;
         }
         // If no queue was created, we are done
         if (!rxq) {
           break;
-        } else {
-          queue_rcvd[0] = true;
         }
 
         ring_size = ((size_t)rxq->idx_mask + 1) * RX_DESC_SIZE;
-        ring = (unsigned char *)vfuServer->dma_local_addr(rxq->ring_iova, ring_size);
-        if (!ring) {
-          printf("DMA unmapped during RX poll\n");
+        if (dma_invalidated || !rxq->ring_sgl) {
+          if (!rxq->ring_sgl) {
+            rxq->ring_sgl = std::unique_ptr<dma_sg_t, sgl_deleter>{(dma_sg_t *)std::calloc(1, dma_sg_size())};
+          }
+          int res = vfu_addr_to_sgl(vfu_ctx, (vfu_dma_addr_t)rxq->ring_iova, ring_size, rxq->ring_sgl.get(), 1, PROT_READ | PROT_WRITE);
+          if (res < 0) {
+            printf("Invalid RX ring_iova\n");
+            break;
+          }
+        }
+        int res = vfu_sgl_get(vfu_ctx, rxq->ring_sgl.get(), &ring_iovec, 1, 0);
+        if (res < 0) {
+          printf("Invalid RX ring_iova\n");
           break;
         }
+        ring = (unsigned char *)ring_iovec.iov_base;
       }
 
       // if (i == 0)
@@ -199,10 +213,20 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
       memcpy(&buf_iova, buf_iova_addr, 8);
       uint16_t buf_len;
       memcpy(&buf_len, buf_len_addr, 2);
-      void *buf_addr = vfuServer->dma_local_addr(buf_iova, buf_len);
-      if (!buf_addr) {
-        printf("Invalid packet iova!\n");
-        break;
+      struct iovec buf_iovec;
+      void *buf_addr;
+      {
+        int res = vfu_addr_to_sgl(vfu_ctx, (vfu_dma_addr_t)buf_iova, buf_len, rxq->tmp_sgl.get(), 1, PROT_WRITE);
+        if (res < 0) {
+          printf("Invalid packet iova!\n");
+          break;
+        }
+        res = vfu_sgl_get(vfu_ctx, rxq->tmp_sgl.get(), &buf_iovec, 1, 0);
+        if (res < 0) {
+          printf("Invalid packet iova!\n");
+          break;
+        }
+        buf_addr = buf_iovec.iov_base;
       }
 
       // Check sizes
@@ -216,6 +240,7 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
       // Copy data
       memcpy(buf_addr, driver_rxBuf.data, pkt_len);
       memcpy(buf_len_addr, &pkt_len_u16, 2);
+      vfu_sgl_put(vfu_ctx, rxq->tmp_sgl.get(), &buf_iovec, 1);
 
       // Release buffer back to VM
       flags &= ~RX_FLAG_AVAIL;
@@ -224,6 +249,10 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
       // Go to next descriptor
       // Index wraps naturally on overflow
       rxq->idx++;
+    }
+
+    if (rxq && ring_iovec.iov_base != NULL) {
+      vfu_sgl_put(vfu_ctx, rxq->ring_sgl.get(), &ring_iovec, 1);
     }
   }
 
@@ -375,7 +404,8 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
       txq->idx_mask = idx_mask;
       txq->front_idx = 0;
       txq->back_idx = 0;
-      txq->ring = NULL;
+      txq->ring_sgl = {};
+      txq->tmp_sgl = std::unique_ptr<dma_sg_t, sgl_deleter>{(dma_sg_t *)std::calloc(1, dma_sg_size())};
 
       tx_queue = txq;
 
@@ -403,8 +433,10 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
 
       auto rxq = std::make_shared<RxQueue>();
       rxq->ring_iova = ring_addr;
+      rxq->ring_sgl = {};
       rxq->idx_mask = idx_mask;
       rxq->idx = 0;
+      rxq->tmp_sgl = std::unique_ptr<dma_sg_t, sgl_deleter>{(dma_sg_t *)std::calloc(1, dma_sg_size())};
 
       rx_queues[queue_idx] = rxq;
 
@@ -489,15 +521,29 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
   const uint16_t &idx_mask = queue_data->idx_mask;
 
   size_t ring_size = ((size_t)idx_mask + 1) * TX_DESC_SIZE;
+  vfu_ctx_t *vfu_ctx = vfuServer->vfu_ctx;
 
-  if (dma_invalidated || !queue_data->ring) {
-    unsigned char *ring = (unsigned char *)vfuServer->dma_local_addr(queue_data->ring_iova, ring_size);
-    queue_data->ring = ring;
-    if (!ring) {
+  if (dma_invalidated || !queue_data->ring_sgl) {
+    if (!queue_data->ring_sgl) {
+      queue_data->ring_sgl = std::unique_ptr<dma_sg_t, sgl_deleter>{(dma_sg_t *)std::calloc(1, dma_sg_size())};
+    }
+    int res = vfu_addr_to_sgl(vfu_ctx, (vfu_dma_addr_t)queue_data->ring_iova, ring_size, queue_data->ring_sgl.get(), 1, PROT_READ | PROT_WRITE);
+    if (res < 0) {
       printf("Invalid ring_iova\n");
       tx_queue = nullptr;
       return;
     }
+  }
+
+  struct iovec ring_iovec;
+  {
+    int res = vfu_sgl_get(vfu_ctx, queue_data->ring_sgl.get(), &ring_iovec, 1, 0);
+    if (res < 0) {
+      printf("Invalid ring_iova\n");
+      tx_queue = nullptr;
+      return;
+    }
+    queue_data->ring = (unsigned char *)ring_iovec.iov_base;
   }
 
   constexpr unsigned debug_interval = 10000000;
@@ -628,11 +674,20 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
     memcpy(&buf_iova, buf_iova_addr, 8);
     uint16_t buf_len;
     memcpy(&buf_len, buf_len_addr, 2);
-    void *buf_addr = vfuServer->dma_local_addr(buf_iova, buf_len);
-    if (!buf_addr) {
-      printf("Invalid packet iova!\n");
-      tx_queue = nullptr;
-      return;
+    struct iovec buf_iovec;
+    void *buf_addr;
+    {
+      int res = vfu_addr_to_sgl(vfu_ctx, (vfu_dma_addr_t)buf_iova, buf_len, queue_data->tmp_sgl.get(), 1, PROT_READ);
+      if (res < 0) {
+        printf("Invalid packet iova!\n");
+        break;
+      }
+      res = vfu_sgl_get(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1, 0);
+      if (res < 0) {
+        printf("Invalid packet iova!\n");
+        break;
+      }
+      buf_addr = buf_iovec.iov_base;
     }
 
     // Create pktmbuf
@@ -677,6 +732,10 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
       mbufs[nb_mbufs_used++] = mbuf;
     }
 
+    // Technically not correct in case of zero-copy,
+    // but the whole sgl put/get API is a pain for that anyway and likely unnecessary for us
+    vfu_sgl_put(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1);
+
     if constexpr (ZERO_COPY) {
       // Mark buffer as attached
       flags |= TX_FLAG_ATTACHED;
@@ -716,14 +775,16 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
       tx_signal_counter--;
     }
   }
+
+  vfu_sgl_put(vfu_ctx, queue_data->ring_sgl.get(), &ring_iovec, 1);
 }
 
 void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
   dma_flag.test_and_set();
   std::lock_guard guard(dma_mutex);
   dma_flag.clear();
-  uint32_t flags = 0;
-  VfioUserServer::map_dma_here(ctx, vfuServer.get(), info, &flags);
+  // uint32_t flags = 0;
+  // VfioUserServer::map_dma_here(ctx, vfuServer.get(), info, &flags);
 }
 
 void VdpdkDevice::dma_register_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
@@ -735,8 +796,8 @@ void VdpdkDevice::dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
   dma_flag.test_and_set();
   std::lock_guard guard(dma_mutex);
   dma_flag.clear();
-  uint32_t flags = 0;
-  VfioUserServer::unmap_dma_here(ctx, vfuServer.get(), info);
+  // uint32_t flags = 0;
+  // VfioUserServer::unmap_dma_here(ctx, vfuServer.get(), info);
 }
 
 void VdpdkDevice::dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
