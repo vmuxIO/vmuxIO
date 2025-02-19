@@ -10,6 +10,7 @@ from server import Server, Host, Guest, LoadGen
 from typing import List, Tuple, Callable
 import time
 import datetime as dt
+import traceback
 
 # all paths in this script are relative to the project root
 os.chdir(PROJECT_ROOT)
@@ -106,7 +107,7 @@ def reboot(host: Server) -> None:
     # expect host to come back online within a timeout
     reboot_timeout_min = 10
     log(f"Waiting for completion of reboot (timeout {reboot_timeout_min}min)")
-    high_uptime = uptime + grace_period_min * 60 * 0.95
+    high_uptime = int(uptime + grace_period_min * 60 * 0.95)
     # high_uptime = uptime
     command = "[[ $(awk -F. '{print $1}' /proc/uptime) -lt " + str(high_uptime) + " ]]"
     host.wait_for_success(command, timeout=reboot_timeout_min*60)
@@ -136,9 +137,13 @@ class Schedule:
             # are we already within a timeslot?
             today_begin = next_utc(begin, daily_next=False)
             today_end = next_utc(end, daily_next=False)
+            tomorrow_end = next_utc(end)
             if today_begin < now and now < today_end:
                 # we can run right now
                 return today_begin, today_end
+            if today_end < today_begin and today_begin < now and now < tomorrow_end:
+                # we can run right now (but we only end tomrorrow)
+                return today_begin, tomorrow_end
 
             next_begin = next_utc(begin)
             next_end = next_utc(end)
@@ -196,8 +201,8 @@ def main():
     # run("sleep 10")
     # run("echo foo; sleep 70; echo bar")
     timeslots = [
-        # TODO ranges that cross day boundaries don't work
-        ("00:01", "08:00"),
+        # ("15:15", "01:00"),
+        ("00:01", "09:00"),
     ]
     schedule = Schedule(timeslots, reserver=reserve_reboot)
     # schedule.run(f"echo foo; sleep {70}; echo bar")
@@ -222,6 +227,6 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         log("reproduce.py failed:")
-        print(e.with_traceback())
+        print(traceback.format_exc())
         maybe_notify("reproduce.py failed")
     free_reservations()
