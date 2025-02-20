@@ -97,7 +97,6 @@ lib.attrsets.recursiveUpdate ({
   nix.extraOptions = ''
     experimental-features = nix-command flakes
   '';
-  nix.package = pkgs.nixFlakes;
   environment.systemPackages = with pkgs; [
     kmod
     git

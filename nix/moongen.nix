@@ -13,7 +13,7 @@
 , ninja
 , meson
 , bash
-, gcc8Stdenv
+, gcc9Stdenv
 , linux-firmware-pinned
 }:
 let 
@@ -32,7 +32,7 @@ let
     sha256 = "sha256-LsvhuM9zG/2MCTqpYcYjLwMcJ8yHu/4SIGISv5pqEoo=";
   };
 in
-gcc8Stdenv.mkDerivation {
+gcc9Stdenv.mkDerivation {
   pname = "moongen";
   version = "2021.07.17-19";
 

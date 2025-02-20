@@ -158,7 +158,7 @@
         inherit pkgs;
         inherit (self.inputs) xdp-reflector-src;
       };
-      linux-firmware-pinned = (pkgs.linux-firmware.overrideAttrs (old: new: {
+      linux-firmware-pinned = (pkgs2211.linux-firmware.overrideAttrs (old: new: {
         src = fetchGit {
           url = "git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git";
           ref = "main";
