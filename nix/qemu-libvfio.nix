@@ -8,14 +8,14 @@ qemu_full.overrideAttrs ( new: old: rec {
   #   hash = "sha256-kCX2ByuJxERLY2nHjPndVoo7TQm1j4qrpLjRcs42HU4=";
   #   fetchSubmodules = true;
   # };
-  src = fetchFromGitHub {# based on jlevon/qemu master.vfio-user 23.01.2025
+  src = fetchFromGitHub {# based on jlevon/qemu vfio-user.master.v3 20.02.2025
     owner = "vmuxio";
     repo = "qemu";
-    rev = "cd7fccdd25f452d8b49d3e474a18425579dba4d8";
-    hash = "sha256-GYW3teWlkPQRUMtYV1iVZbyjSUlwDln2XoWlsRlQJqw=";
+    rev = "9994c532c659dce3a4013655961300ea93ae1a4e";
+    hash = "sha256-TKZiQBSnMWqhHDnZ3tcVhtIkcR6ysDpQ1PbddbrdysM=";
     fetchSubmodules = true;
   };
-  version = "7.1.5";
+  version = "9.0.50";
 
     #when updating qemu, sync these with what is specified in qemu/subprojects/*.wrap
   libvfio-user-src = pkgs.fetchFromGitLab {
@@ -119,8 +119,17 @@ qemu_full.overrideAttrs ( new: old: rec {
     "--disable-vvfat"
     "--disable-qed"
     "--disable-parallels"
-  ] ++ [ "--enable-vfio-user-server"];
-  patches = old.patches ++ [
+  ] ++ [ "--enable-vfio-user-server" "--enable-vfio-user-client"];
+  patches = let
+      exclude = patch: builtins.isAttrs patch && (
+        # are already applied in jlevon/qemu vfio-user.master.v3 20.02.2025
+        patch.drvAttrs.name == "3e4546d5bd38a1e98d4bd2de48631abf0398a3a2.diff" ||
+        patch.drvAttrs.name == "ac1bbe8ca46c550b3ad99c85744119a3ace7b4f4.diff" ||
+        patch.drvAttrs.name == "99174ce39e86ec6aea7bb7ce326b16e3eed9e3da.diff"
+      );
+    in (builtins.filter
+    (patch: !(exclude patch))
+    old.patches) ++ [
     # ./print.patch
     # ./0001-qemu-hva2gpa.patch
     # ./0001-qemu-dma_read.patch
