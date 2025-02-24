@@ -659,7 +659,7 @@ bool lan_queue_tx::trigger_tx_packet() {
 #endif
 
   // try utilizing hardware tso
-  if (tso && tso_len == 0 && tso_off == 0) {
+  if (dev.vmux->device->isMediating() && tso && tso_len == 0 && tso_off == 0) {
     bool hardware_tso_success = true;
     // try to send all segments
     for (size_t i = d_skip; i < dcnt; i++) {
