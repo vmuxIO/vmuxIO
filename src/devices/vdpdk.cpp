@@ -783,6 +783,26 @@ void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
   dma_flag.test_and_set();
   std::lock_guard guard(dma_mutex);
   dma_flag.clear();
+  if (info->vaddr) {
+    puts(
+      std::format(
+        "MAP [{:x} - {:x}] -> {:x} [{:x} - {:x}]",
+        (uintptr_t)info->iova.iov_base,
+        (uintptr_t)info->iova.iov_base + info->iova.iov_len,
+        (uintptr_t)info->vaddr,
+        (uintptr_t)info->mapping.iov_base,
+        (uintptr_t)info->mapping.iov_base + info->mapping.iov_len
+      ).c_str()
+    );
+  } else {
+    puts(
+      std::format(
+        "MAP [{:x} - {:x}] -> NONE",
+        (uintptr_t)info->iova.iov_base,
+        (uintptr_t)info->iova.iov_base + info->iova.iov_len
+      ).c_str()
+    );
+  }
   // uint32_t flags = 0;
   // VfioUserServer::map_dma_here(ctx, vfuServer.get(), info, &flags);
 }
@@ -796,6 +816,26 @@ void VdpdkDevice::dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
   dma_flag.test_and_set();
   std::lock_guard guard(dma_mutex);
   dma_flag.clear();
+  if (info->vaddr) {
+    puts(
+      std::format(
+        "UNMAP [{:x} - {:x}] -> {:x} [{:x} - {:x}]",
+        (uintptr_t)info->iova.iov_base,
+        (uintptr_t)info->iova.iov_base + info->iova.iov_len,
+        (uintptr_t)info->vaddr,
+        (uintptr_t)info->mapping.iov_base,
+        (uintptr_t)info->mapping.iov_base + info->mapping.iov_len
+      ).c_str()
+    );
+  } else {
+    puts(
+      std::format(
+        "UNMAP [{:x} - {:x}] -> NONE",
+        (uintptr_t)info->iova.iov_base,
+        (uintptr_t)info->iova.iov_base + info->iova.iov_len
+      ).c_str()
+    );
+  }
   // uint32_t flags = 0;
   // VfioUserServer::unmap_dma_here(ctx, vfuServer.get(), info);
 }
