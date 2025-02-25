@@ -1744,6 +1744,7 @@ class Host(Server):
         numactl = f"numactl -C {self.cpupinner.qemu(pin_vm_number)}"
         # numactl = ""
 
+        username = self.whoami()
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
@@ -1788,7 +1789,7 @@ class Host(Server):
             # +
             # ' --trace virtio_mmio_read --trace virtio_mmio_write' +
             +
-            f' 2>/tmp/trace-vm{vm_number}.log'
+            f' 2>/tmp/{username}-trace-vm{vm_number}.log'
             )
 
     def kill_guest(self: 'Host') -> None:

@@ -576,7 +576,7 @@ vm-init NUM="35":
   start_ip = ipaddress.IPv4Address("192.168.56.20")
 
 
-  for i in range(1, {{NUM}}):
+  for i in range(1, {{NUM}} + 1):
     print(f"wrinting cloud-init {i}")
     ip = f"{start_ip + i - 1}"
 
