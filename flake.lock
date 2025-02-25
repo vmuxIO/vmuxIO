@@ -131,11 +131,11 @@
     "libmoon-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1657216690,
-        "narHash": "sha256-lbhIK6ktZdmL4yKE6/7uRL5x7Z/NFtOXSZB+hE5GpCg=",
+        "lastModified": 1740055598,
+        "narHash": "sha256-vAW6VAFNu/aXFreJ/M/qdqh/FSn2daoNF8bMimDnZuw=",
         "ref": "dev/ice",
-        "rev": "a42ed97f0a5aa81db45c29572b9ec44e4dfdadde",
-        "revCount": 452,
+        "rev": "a9ba3a5303d61db400ab688648fdad8892abfc22",
+        "revCount": 453,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/libmoon"
@@ -169,11 +169,11 @@
     "moonmux-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1650996743,
-        "narHash": "sha256-l3h58VU33AP1tWMHM2YMJMFP4A826Exkn+xyrxjJkdQ=",
+        "lastModified": 1740056739,
+        "narHash": "sha256-rlumYEOOFU3TB6PCBnXz2AN5WSNyNapl935HtLXQKDk=",
         "ref": "dpdk-21.11",
-        "rev": "fdd0d97a8b883159d90adad0354a4ec54a1722af",
-        "revCount": 1403,
+        "rev": "3492678a35597bccc73492fb271e6f83abef0a01",
+        "revCount": 1405,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/MoonGen"
