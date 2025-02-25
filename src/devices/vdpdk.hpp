@@ -13,6 +13,8 @@
 
 class VdpdkDevice : public VmuxDevice {
 public:
+  static bool zero_copy;
+
   VdpdkDevice(int device_id, std::shared_ptr<Driver> driver, const uint8_t (*mac_addr)[6]);
 
   void setup_vfu(std::shared_ptr<VfioUserServer> vfu) override;
@@ -56,6 +58,7 @@ private:
     std::unique_ptr<dma_sg_t, sgl_deleter> ring_sgl;
     std::unique_ptr<dma_sg_t, sgl_deleter> tmp_sgl;
     unsigned char *ring;
+    uint64_t nonce;
     uint16_t idx_mask;
     uint16_t front_idx, back_idx;
   };
@@ -63,6 +66,7 @@ private:
   EventFd tx_event_fd;
   bool tx_event_active;
   uint64_t tx_signal_counter;
+  uint64_t tx_queue_nonce = 1;
 
   void rx_callback_fn(bool dma_invalidated);
   // static void rx_callback_static(int vm_number, void *);
@@ -78,6 +82,7 @@ private:
   void dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info);
   static void dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info);
 
+  template<bool ZERO_COPY>
   void tx_poll(bool dma_invalidated);
 
   friend class VdpdkThreads;
@@ -101,9 +106,12 @@ private:
   std::vector<Cluster> clusters;
   std::vector<std::jthread> threads;
 
+  template<bool ZERO_COPY>
   static void tx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev);
   static void rx_poll_thread_single(std::stop_token stop, std::shared_ptr<VdpdkDevice> dev);
+  template<bool ZERO_COPY>
   static void tx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs);
   static void rx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs);
+  template<bool ZERO_COPY>
   static void rxtx_poll_thread_multi(std::stop_token stop, std::vector<std::shared_ptr<VdpdkDevice>> devs);
 };

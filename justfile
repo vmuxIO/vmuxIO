@@ -82,6 +82,10 @@ vmuxVdpdk:
   # sudo gdb -ex "handle SIGTERM nostop print pass" --args {{proot}}/build/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 --log-level "pmd.net.ice*:debug"
   sudo {{proot}}/build_release/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
 
+vmuxVdpdkZ:
+  # sudo gdb -ex "handle SIGTERM nostop print pass" --args {{proot}}/build/vmux -u -q -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 --log-level "pmd.net.ice*:debug"
+  sudo {{proot}}/build_release/vmux -u -q -z -d none -m vdpdk -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0
+
 vmuxMedLog:
   sudo {{proot}}/build/vmux -u -d none -m mediation -s {{vmuxSock}} -- -l 1 -n 1 -a 0000:81:00.0 2>&1 | rg 'ice_callback|send|qemu|dominik'
 

@@ -123,7 +123,7 @@ Result<void> _main(int argc, char **argv) {
   bool pollInMainThread = false;
   uint8_t mac_addr[6];
   cpu_set_t cpuset;
-  while ((ch = getopt(argc, argv, "hd:t:s:m:a:c:e:f:b:qu")) != -1) {
+  while ((ch = getopt(argc, argv, "hd:t:s:m:a:c:e:f:b:quz")) != -1) {
     switch (ch) {
     case 'q':
       LOG_LEVEL = LOG_ERR;
@@ -133,6 +133,9 @@ Result<void> _main(int argc, char **argv) {
       break;
     case 'u':
       useDpdk = true;
+      break;
+    case 'z':
+      VdpdkDevice::zero_copy = true;
       break;
     case 'd':
       pciAddresses.push_back(optarg);
@@ -160,7 +163,7 @@ Result<void> _main(int argc, char **argv) {
       break;
     case 'f':
       if (!Util::parse_cpuset(optarg, cpuset)) {
-        die("vmuxRUnner%zu, Cannot parse cpu pinning set\n", runnerThreadCpus.size())
+        die("vmuxRunner%zu, Cannot parse cpu pinning set\n", runnerThreadCpus.size())
       }
       runnerThreadCpus.push_back(cpuset);
       break;
@@ -180,7 +183,8 @@ Result<void> _main(int argc, char **argv) {
              "as backend for emulation (or \"none\" if not applicable)\n"
           << "-s /tmp/vmux.sock                      Path of the socket\n"
           << "-m passthrough                         vMux mode: "
-             "passthrough, emulation, mediation, e1000-emu\n"
+             "passthrough, emulation, mediation, e1000-emu, vdpdk\n"
+          << "-z                                     use zero-copy in vDPDK\n"
           << "-c cpuset                              cpuset cluster the VM is pinned to. Takes arguements similar to cpuset. Default: 0-7\n"
           << "-e cpuset                              pin Rx thread to cpus.\n"
           << "-f cpuset                              pin Runner thread to cpus.\n";
