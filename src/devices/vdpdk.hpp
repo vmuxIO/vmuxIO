@@ -39,6 +39,8 @@ private:
   // set if vfio-user wants to change dma mapping
   std::atomic_flag dma_flag;
 
+  std::vector<std::pair<void *, size_t>> guest_dma_mappings, host_dma_mappings;
+
   struct RxQueue {
     uintptr_t ring_iova;
     std::unique_ptr<dma_sg_t, sgl_deleter> ring_sgl;
@@ -82,6 +84,7 @@ private:
   void dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info);
   static void dma_unregister_cb_static(vfu_ctx_t *ctx, vfu_dma_info_t *info);
 
+  bool map_guest_to_host_dma(void *addr, size_t len);
   template<bool ZERO_COPY>
   void tx_poll(bool dma_invalidated);
 

@@ -513,6 +513,46 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
   return -1;
 }
 
+bool VdpdkDevice::map_guest_to_host_dma(void *addr, size_t len) {
+  uintptr_t begin = (uintptr_t)addr;
+  uintptr_t end = begin + len;
+  // Check if already mapped
+  for (const auto &mapping : host_dma_mappings) {
+    if (begin >= (uintptr_t)mapping.first &&
+        begin < (uintptr_t)mapping.first + mapping.second &&
+        end > (uintptr_t)mapping.first &&
+        end <= (uintptr_t)mapping.first + mapping.second) {
+      return true;
+    }
+  }
+
+  // Search guest mappings
+  for (const auto &mapping : guest_dma_mappings) {
+    if (begin >= (uintptr_t)mapping.first &&
+        begin < (uintptr_t)mapping.first + mapping.second &&
+        end > (uintptr_t)mapping.first &&
+        end <= (uintptr_t)mapping.first + mapping.second) {
+      int res = rte_extmem_register(mapping.first, mapping.second,
+                                    NULL, 0, 0x1000);
+      if (res != 0) {
+        puts("Failed rte_extmem_register");
+      }
+      res = rte_vfio_container_dma_map(RTE_VFIO_DEFAULT_CONTAINER_FD,
+                                       (uint64_t)mapping.first,
+                                       (uint64_t)mapping.first,
+                                       mapping.second);
+      if (res != 0) {
+        puts("Failed rte_vfio_container_dma_map");
+        return false;
+      }
+      puts("Mapped for host DMA.");
+      host_dma_mappings.push_back(mapping);
+      return true;
+    }
+  }
+  return false;
+}
+
 template<bool ZERO_COPY>
 void VdpdkDevice::tx_poll(bool dma_invalidated) {
   constexpr bool DEBUG_OUTPUT = false;
@@ -735,6 +775,9 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
         // Pass the queue nonce, to ensure we do not try to return old descriptors into a new ring
         memcpy(mbuf_desc + TX_DESC_SIZE, &queue_data->nonce, 8);
 
+        // Map DMA to host
+        map_guest_to_host_dma(buf_addr, buf_len);
+
         // We use IOVA as VA mode, so we can simply pass the buf_addr for buf_iova.
         rte_pktmbuf_attach_extbuf(mbuf, buf_addr, (rte_iova_t)buf_addr, buf_len, shinfo);
       } else {
@@ -820,20 +863,29 @@ void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
   }
 
   if (zero_copy && info->vaddr) {
-    auto &mapping = info->mapping;
-    int res = rte_extmem_register(mapping.iov_base, mapping.iov_len,
-                                  NULL, 0, info->page_size);
-    if (res != 0) {
-      printf("Failed rte_extmem_register");
+    bool found = false;
+    for (auto &[base, len] : guest_dma_mappings) {
+      if (base == info->mapping.iov_base && len == info->mapping.iov_len) {
+        found = true;
+        break;
+      }
+      if ((uintptr_t)base >= (uintptr_t)info->mapping.iov_base &&
+          (uintptr_t)base < (uintptr_t)info->mapping.iov_base + info->mapping.iov_len) {
+        found = true;
+        puts("Overlapping DMA regions.");
+        break;
+      }
+      uintptr_t end = (uintptr_t)base + len - 1;
+      if (end >= (uintptr_t)info->mapping.iov_base &&
+          end < (uintptr_t)info->mapping.iov_base + info->mapping.iov_len) {
+        found = true;
+        puts("Overlapping DMA regions.");
+        break;
+      }
     }
-    res = rte_vfio_container_dma_map(RTE_VFIO_DEFAULT_CONTAINER_FD,
-                                     (uint64_t)mapping.iov_base,
-                                     (uint64_t)mapping.iov_base,
-                                     mapping.iov_len);
-    if (res != 0) {
-      printf("Failed rte_vfio_container_dma_map");
+    if (!found) {
+      guest_dma_mappings.emplace_back(info->mapping.iov_base, info->mapping.iov_len);
     }
-    puts("Mapped for host DMA.");
   }
 }
 
@@ -868,17 +920,29 @@ void VdpdkDevice::dma_unregister_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
   }
 
   if (zero_copy && info->vaddr) {
-    auto &mapping = info->mapping;
-    int res = rte_vfio_container_dma_unmap(RTE_VFIO_DEFAULT_CONTAINER_FD,
-                                     (uint64_t)mapping.iov_base,
-                                     (uint64_t)mapping.iov_base,
-                                     mapping.iov_len);
-    if (res != 0) {
-      printf("Failed rte_vfio_container_dma_unmap");
+    std::pair<void *, size_t> pair{info->mapping.iov_base, info->mapping.iov_len};
+    auto mapping = std::find(host_dma_mappings.begin(), host_dma_mappings.end(), pair);
+    if (mapping != host_dma_mappings.end()) {
+      int res = rte_vfio_container_dma_unmap(RTE_VFIO_DEFAULT_CONTAINER_FD,
+                                       (uint64_t)mapping->first,
+                                       (uint64_t)mapping->first,
+                                       mapping->second);
+      if (res != 0) {
+        puts("Failed rte_vfio_container_dma_unmap");
+      }
+      res = rte_extmem_unregister(mapping->first, mapping->second);
+      if (res != 0) {
+        puts("Failed rte_extmem_unregister");
+      }
+      host_dma_mappings.erase(mapping);
+      puts("Unmapped for host DMA.");
     }
-    res = rte_extmem_unregister(mapping.iov_base, mapping.iov_len);
-    if (res != 0) {
-      printf("Failed rte_extmem_unregister");
+
+    mapping = std::find(guest_dma_mappings.begin(), guest_dma_mappings.end(), pair);
+    if (mapping != guest_dma_mappings.end()) {
+      guest_dma_mappings.erase(mapping);
+    } else {
+      puts("Unknown region");
     }
   }
 }
