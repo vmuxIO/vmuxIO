@@ -15,6 +15,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     nixpkgs-2211.url = "github:NixOS/nixpkgs/nixos-22.11";
     nixpkgs-2111.url = "github:NixOS/nixpkgs/nixos-21.11";
+    nixpkgs-2411.url = "github:NixOS/nixpkgs/nixos-24.11";
 
     flake-utils.url = "github:numtide/flake-utils";
     
@@ -84,6 +85,7 @@
     pkgs = nixpkgs.legacyPackages.${system};
     pkgs2211 = args.nixpkgs-2211.legacyPackages.${system};
     pkgs2111 = args.nixpkgs-2111.legacyPackages.${system};
+    pkgs2411 = args.nixpkgs-2411.legacyPackages.${system};
     flakepkgs = self.packages.${system};
     selfpkgs = self.packages.${system};
     # make-disk-image = import (pkgs.path + "/nixos/lib/make-disk-image.nix");
@@ -156,7 +158,7 @@
         inherit pkgs;
         inherit (self.inputs) xdp-reflector-src;
       };
-      linux-firmware-pinned = (pkgs.linux-firmware.overrideAttrs (old: new: {
+      linux-firmware-pinned = (pkgs2211.linux-firmware.overrideAttrs (old: new: {
         src = fetchGit {
           url = "git://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git";
           ref = "main";
@@ -172,7 +174,7 @@
       #patched qemu
       qemu = pkgs.callPackage ./nix/qemu-libvfio.nix {
         # needs a nixpkgs with qemu ~7.1.0 for patches to apply.
-        inherit pkgs2211;
+        inherit pkgs2411;
       };
 
       qemu-ioregionfd = pkgs2211.qemu.overrideAttrs ( new: old: {
