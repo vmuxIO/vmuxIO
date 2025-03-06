@@ -29,6 +29,10 @@ enum VDPDK_OFFSET {
 
   EVENT_TX = 0x300,
 
+  TX_OFFLOAD_CAPA = 0x400,
+  RX_OFFLOAD_CAPA = 0x408,
+  MAC_ADDRESS = 0x410,
+
   // TX BAR
   // 0x00 - 0xFF: Reserved for queue setup
   TX_WANT_SIGNAL = 0x100,
@@ -37,7 +41,43 @@ enum VDPDK_OFFSET {
   RX_WANT_INTR = 0x100, // 0x40 per queue
 };
 
+struct vdpdk_tx_desc {
+  uint64_t dma_addr;
+  uint16_t len;
+  uint16_t flags;
+  uint16_t tso_segsz;
+  uint8_t l2_len, l3_len;
+  uint64_t offload_flags;
+  uint8_t l4_len;
+};
+// Assert that struct layout is equal to vdpdk source
+static_assert(sizeof(struct vdpdk_tx_desc) <= TX_DESC_SIZE, "vdpdk tx descriptor: invalid size");
+static_assert(offsetof(struct vdpdk_tx_desc, dma_addr) == 0, "vdpdk tx descriptor: unexpected offset");
+static_assert(offsetof(struct vdpdk_tx_desc, len) == 8, "vdpdk tx descriptor: unexpected offset");
+static_assert(offsetof(struct vdpdk_tx_desc, flags) == 10, "vdpdk tx descriptor: unexpected offset");
+static_assert(offsetof(struct vdpdk_tx_desc, tso_segsz) == 12, "vdpdk tx descriptor: unexpected offset");
+static_assert(offsetof(struct vdpdk_tx_desc, l2_len) == 14, "vdpdk tx descriptor: unexpected offset");
+static_assert(offsetof(struct vdpdk_tx_desc, l3_len) == 15, "vdpdk tx descriptor: unexpected offset");
+static_assert(offsetof(struct vdpdk_tx_desc, offload_flags) == 16, "vdpdk tx descriptor: unexpected offset");
+static_assert(offsetof(struct vdpdk_tx_desc, l4_len) == 24, "vdpdk tx descriptor: unexpected offset");
+
 constexpr uint64_t MAX_EMPTY_POLLS = 100000;
+constexpr uint64_t VALID_MBUF_FLAGS = RTE_MBUF_F_TX_UDP_SEG
+                                    | RTE_MBUF_F_TX_TCP_SEG
+                                    | RTE_MBUF_F_TX_IEEE1588_TMST
+                                    | RTE_MBUF_F_TX_TCP_CKSUM
+                                    | RTE_MBUF_F_TX_SCTP_CKSUM
+                                    | RTE_MBUF_F_TX_UDP_CKSUM
+                                    | RTE_MBUF_F_TX_L4_MASK
+                                    | RTE_MBUF_F_TX_IP_CKSUM
+                                    | RTE_MBUF_F_TX_IPV4
+                                    | RTE_MBUF_F_TX_IPV6;
+constexpr uint64_t SUPPORTED_TX_OFFLOADS = RTE_ETH_TX_OFFLOAD_IPV4_CKSUM
+                                         | RTE_ETH_TX_OFFLOAD_UDP_CKSUM
+                                         | RTE_ETH_TX_OFFLOAD_TCP_CKSUM
+                                         | RTE_ETH_TX_OFFLOAD_SCTP_CKSUM
+                                         | RTE_ETH_TX_OFFLOAD_TCP_TSO
+                                         | RTE_ETH_TX_OFFLOAD_MULTI_SEGS;
 
 bool VdpdkDevice::zero_copy = false;
 
@@ -507,6 +547,27 @@ ssize_t VdpdkDevice::region_access_read(char *buf, size_t count, unsigned offset
 
       return count;
     }
+
+    case TX_OFFLOAD_CAPA: {
+      if (count != 8) return -1;
+      uint64_t capa = dpdk_driver->tx_offloads & SUPPORTED_TX_OFFLOADS;
+      memcpy(buf, &capa, 8);
+      return count;
+    }
+
+    case RX_OFFLOAD_CAPA: {
+      if (count != 8) return -1;
+      uint64_t capa = 0;
+      memcpy(buf, &capa, 8);
+      return count;
+    }
+
+    case MAC_ADDRESS: {
+      if (count != 8) return -1;
+      memcpy(buf, mac_addr, 6);
+      buf[6] = buf[7] = 0;
+      return count;
+    }
   }
 
   printf("Invalid read offset: %x\n", offset);
@@ -698,20 +759,23 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
         }
       }
     }
+    // End debug output
 
-    unsigned char *buf_iova_addr = queue_data->ring + (size_t)(idx & idx_mask) * TX_DESC_SIZE;
-    unsigned char *buf_len_addr = buf_iova_addr + 8;
-    unsigned char *desc_flags_addr = buf_len_addr + 2;
+    vdpdk_tx_desc *desc = (vdpdk_tx_desc *)(queue_data->ring + (size_t)(idx & idx_mask) * TX_DESC_SIZE);
 
     // If next descriptor is not available, try again
-    uint16_t flags = rte_read16(desc_flags_addr);
+    uint16_t flags = rte_read16(&desc->flags);
     if (!(flags & TX_FLAG_AVAIL)) {
       break;
     }
 
     if constexpr (ZERO_COPY) {
       // If this buffer is attached to an mbuf, we fully wrapped around and need
-      // to wait until this descriptor was sent by DPDK.
+      // to wait until this descriptor is freed by DPDK.
+
+      // It would be best if we never got to this point. DPDK drivers have
+      // inconsistent cleanup behavior. Try to ensure the ring is large enough
+      // to never fill.
       if (flags & TX_FLAG_ATTACHED) {
         int freed = rte_eth_tx_done_cleanup(0, queue_idx, 0);
         if constexpr (DEBUG_OUTPUT) {
@@ -723,28 +787,10 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
     }
 
     // If FLAG_AVAIL is set, we own the buffer and need to send it
-    uint64_t buf_iova;
-    memcpy(&buf_iova, buf_iova_addr, 8);
-    uint16_t buf_len;
-    memcpy(&buf_len, buf_len_addr, 2);
-    struct iovec buf_iovec;
-    void *buf_addr;
-    {
-      int res = vfu_addr_to_sgl(vfu_ctx, (vfu_dma_addr_t)buf_iova, buf_len, queue_data->tmp_sgl.get(), 1, PROT_READ);
-      if (res < 0) {
-        printf("Invalid packet iova!\n");
-        break;
-      }
-      res = vfu_sgl_get(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1, 0);
-      if (res < 0) {
-        printf("Invalid packet iova!\n");
-        break;
-      }
-      buf_addr = buf_iovec.iov_base;
-    }
 
     // Create pktmbuf
     struct rte_mbuf *mbuf = rte_pktmbuf_alloc(pool);
+    mbuf->ol_flags = 0;
     if (!mbuf) {
       // No buffer available
       printf("Vdpdk mbuf alloc failed\n");
@@ -756,19 +802,113 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
       }
       break;
     }
-    if (rte_pktmbuf_tailroom(mbuf) < buf_len) {
-      // Packet too large, drop it
-      printf("Packet from VM is too large for buffer.\n");
-      rte_pktmbuf_free(mbuf);
-    } else {
-      if constexpr (ZERO_COPY) {
+
+    if constexpr (ZERO_COPY) {
+      // For ZERO_COPY, we attach each descriptor to a host mbuf
+
+      // Initialize mbuf
+      mbuf->pkt_len = 0;
+      mbuf->nb_segs = 1;
+      mbuf->ol_flags |= desc->offload_flags & VALID_MBUF_FLAGS;
+      mbuf->l2_len = desc->l2_len;
+      mbuf->l3_len = desc->l3_len;
+      mbuf->l4_len = desc->l4_len;
+      mbuf->tso_segsz = desc->tso_segsz;
+
+      // Count all descriptors belonging to this packet and allocate mbufs
+      uint16_t idx_max = idx + idx_mask + 1;
+      uint16_t idx_end = idx;
+      struct rte_mbuf *mbuf_cur = mbuf;
+      while(mbuf_cur) {
+        vdpdk_tx_desc *desc = (vdpdk_tx_desc *)(queue_data->ring + (size_t)(idx_end & idx_mask) * TX_DESC_SIZE);
+        idx_end++;
+
+        if (desc->flags & TX_FLAG_NEXT) {
+          // Another descriptor belongs to this packet
+
+          if (idx_end == idx_max) {
+            // Looped around the whole ring. Should not happen unless guest is
+            // buggy or malicious.
+            printf("Vdpdk ring contains infinite NEXT loop\n");
+            tx_queue = nullptr;
+            rte_pktmbuf_free(mbuf);
+            return;
+          }
+
+          struct rte_mbuf *mbuf_next = rte_pktmbuf_alloc(pool);
+
+          // Continue with next mbuf
+          mbuf_cur->next = mbuf_next;
+          mbuf_cur = mbuf_next;
+          if (mbuf_cur) {
+            mbuf->nb_segs++;
+          }
+        } else {
+          if (idx == idx_end) {
+            // This is only possible if we completely filled a max-sized ring
+            // with chained descriptors. Likely we would have run out of
+            // mbufs before this point. We treat this edge-case as an error.
+
+            // I think nb_segs would have overflown by this point, but freeing
+            // should work anyway, so we set mbuf_cur to NULL to signal error.
+            mbuf_cur = NULL;
+          }
+          // We found the last descriptor
+          break;
+        }
+      }
+
+      if (!mbuf_cur) {
+        printf("Vdpdk next mbuf alloc failed\n");
+
+        rte_pktmbuf_free(mbuf);
+
+        // Try freeing buffers
+        int freed = rte_eth_tx_done_cleanup(0, queue_idx, 0);
+        if constexpr (DEBUG_OUTPUT) {
+          nb_cleanup_calls++;
+          last_cleanup_result = freed;
+        }
+        break;
+      }
+
+      // Attach guest buffers
+      mbuf_cur = mbuf;
+      for (uint16_t idx_i = idx; idx_i != idx_end; idx_i++, mbuf_cur = mbuf_cur->next) {
+        vdpdk_tx_desc *desc = (vdpdk_tx_desc *)(queue_data->ring + (size_t)(idx_i & idx_mask) * TX_DESC_SIZE);
+
+        // Get mapped address
+        struct iovec buf_iovec;
+        void *buf_addr;
+        {
+          int res = vfu_addr_to_sgl(vfu_ctx, (vfu_dma_addr_t)desc->dma_addr, desc->len, queue_data->tmp_sgl.get(), 1, PROT_READ);
+          if (res < 0) {
+            // If we are passed an invalid iova, error recovery would be very
+            // complex here. So we just kill the queue.
+            printf("Invalid packet iova!\n");
+            tx_queue = nullptr;
+            // The free callbacks are still executed, but ignored, because
+            // tx_queue is NULL.
+            rte_pktmbuf_free(mbuf);
+            return;
+          }
+          res = vfu_sgl_get(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1, 0);
+          if (res < 0) {
+            printf("Invalid packet iova!\n");
+            tx_queue = nullptr;
+            rte_pktmbuf_free(mbuf);
+            return;
+          }
+          buf_addr = buf_iovec.iov_base;
+        }
+
         // Initialize shared data info and copy descriptor into mbuf
-        auto shinfo = (struct rte_mbuf_ext_shared_info *)rte_mbuf_to_priv(mbuf);
-        unsigned char *mbuf_desc = (unsigned char *)rte_mbuf_to_priv(mbuf) + sizeof(*shinfo);
+        auto shinfo = (struct rte_mbuf_ext_shared_info *)rte_mbuf_to_priv(mbuf_cur);
+        unsigned char *mbuf_desc = (unsigned char *)rte_mbuf_to_priv(mbuf_cur) + sizeof(*shinfo);
         shinfo->free_cb = free_cb;
         shinfo->fcb_opaque = mbuf_desc;
         rte_mbuf_ext_refcnt_set(shinfo, 1);
-        memcpy(mbuf_desc + 8, buf_iova_addr + 8, TX_DESC_SIZE - 8);
+        memcpy(mbuf_desc + 8, (char *)desc + 8, TX_DESC_SIZE - 8);
         // We also need to pass a pointer to the device to the free callback
         uintptr_t uptr = (uintptr_t)this;
         memcpy(mbuf_desc, &uptr, sizeof(uintptr_t));
@@ -776,39 +916,177 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
         memcpy(mbuf_desc + TX_DESC_SIZE, &queue_data->nonce, 8);
 
         // Map DMA to host
-        map_guest_to_host_dma(buf_addr, buf_len);
+        map_guest_to_host_dma(buf_addr, desc->len);
 
         // We use IOVA as VA mode, so we can simply pass the buf_addr for buf_iova.
-        rte_pktmbuf_attach_extbuf(mbuf, buf_addr, (rte_iova_t)buf_addr, buf_len, shinfo);
-      } else {
-        // Copy data to mbuf
-        rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), buf_addr, buf_len);
+        rte_pktmbuf_attach_extbuf(mbuf_cur, buf_addr, (rte_iova_t)buf_addr, desc->len, shinfo);
+
+        mbuf_cur->data_len = desc->len;
+        mbuf->pkt_len += desc->len;
+
+        // Technically not correct to call vfu_sgl_put here,
+        // because the memory is accessed later by the NIC, but the whole sgl
+        // put/get API is a pain for that anyway and likely unnecessary for us 
+        // as it only tracks dirty pages for migration.
+        vfu_sgl_put(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1);
+
+        // Mark buffer as attached
+        // We do not synchronize across threads with this flag,
+        // so no memory barrier is needed.
+        desc->flags |= TX_FLAG_ATTACHED;
       }
-      mbuf->data_len = buf_len;
-      mbuf->pkt_len = buf_len;
-      mbuf->nb_segs = 1;
+
+      // Queue mbuf for TX
       mbufs[nb_mbufs_used++] = mbuf;
-    }
 
-    // Technically not correct in case of zero-copy,
-    // but the whole sgl put/get API is a pain for that anyway and likely unnecessary for us
-    vfu_sgl_put(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1);
+      // Go to next descriptor
+      idx = idx_end;
+    } else if (!(flags & TX_FLAG_NEXT) && rte_pktmbuf_tailroom(mbuf) >= desc->len) {
+      // Fast path for single-segment packets
 
-    if constexpr (ZERO_COPY) {
-      // Mark buffer as attached
-      flags |= TX_FLAG_ATTACHED;
-      // We do not synchronize across threads with this flag,
-      // so no memory barrier is needed.
-      rte_write16_relaxed(flags, desc_flags_addr);
-    } else {
+      // Get mapped address
+      struct iovec buf_iovec;
+      void *buf_addr;
+      {
+        int res = vfu_addr_to_sgl(vfu_ctx, (vfu_dma_addr_t)desc->dma_addr, desc->len, queue_data->tmp_sgl.get(), 1, PROT_READ);
+        if (res < 0) {
+          printf("Invalid packet iova!\n");
+          tx_queue = nullptr;
+          rte_pktmbuf_free(mbuf);
+          return;
+        }
+        res = vfu_sgl_get(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1, 0);
+        if (res < 0) {
+          printf("Invalid packet iova!\n");
+          tx_queue = nullptr;
+          rte_pktmbuf_free(mbuf);
+          return;
+        }
+        buf_addr = buf_iovec.iov_base;
+      }
+
+      // Copy data to mbuf
+      rte_memcpy(rte_pktmbuf_mtod(mbuf, void *), buf_addr, desc->len);
+
+      mbuf->data_len = desc->len;
+      mbuf->pkt_len = desc->len;
+      mbuf->nb_segs = 1;
+      mbuf->ol_flags |= desc->offload_flags & VALID_MBUF_FLAGS;
+      mbuf->l2_len = desc->l2_len;
+      mbuf->l3_len = desc->l3_len;
+      mbuf->l4_len = desc->l4_len;
+      mbuf->tso_segsz = desc->tso_segsz;
+      mbufs[nb_mbufs_used++] = mbuf;
+
+      vfu_sgl_put(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1);
+
       // Release buffer back to VM
       flags &= ~TX_FLAG_AVAIL;
-      rte_write16(flags, desc_flags_addr);
-    }
+      rte_write16(flags, &desc->flags);
 
-    // Go to next descriptor
-    // Index wraps naturally on overflow
-    idx++;
+      // Go to next descriptor
+      // Index wraps naturally on overflow
+      idx++;
+    } else {
+      // Copy 1-to-n guest descriptors to 1-to-m host mbufs
+
+      // Pass offload information
+      mbuf->ol_flags |= desc->offload_flags & VALID_MBUF_FLAGS;
+      mbuf->l2_len = desc->l2_len;
+      mbuf->l3_len = desc->l3_len;
+      mbuf->l4_len = desc->l4_len;
+      mbuf->tso_segsz = desc->tso_segsz;
+
+      mbuf->pkt_len = 0;
+      mbuf->nb_segs = 1;
+      struct rte_mbuf *mbuf_cur = mbuf;
+      uint16_t desc_offset = 0;
+      uint16_t idx_max = idx + idx_mask + 1;
+      uint16_t idx_end = idx;
+
+      // Loop through descriptors and mbufs
+      while (true) {
+        if (mbuf_cur && rte_pktmbuf_tailroom(mbuf_cur) == 0) {
+          // Out of space in mbuf, allocate another one
+          struct rte_mbuf *mbuf_next = rte_pktmbuf_alloc(pool);
+          if (mbuf_next) {
+            mbuf_next->data_len = 0;
+            mbuf->nb_segs++;
+          }
+          // We ignore a possible allocation failure and just drop the packet later
+          mbuf_cur->next = mbuf_next;
+          mbuf_cur = mbuf_next;
+        }
+
+        uint16_t mbuf_remaining = rte_pktmbuf_tailroom(mbuf_cur);
+
+        vdpdk_tx_desc *desc = (vdpdk_tx_desc *)(queue_data->ring + (size_t)(idx_end & idx_mask) * TX_DESC_SIZE);
+        uint16_t desc_remaining = desc->len - desc_offset;
+
+        // Get mapped address
+        struct iovec buf_iovec;
+        void *buf_addr;
+        {
+          int res = vfu_addr_to_sgl(vfu_ctx, (vfu_dma_addr_t)desc->dma_addr, desc->len, queue_data->tmp_sgl.get(), 1, PROT_READ);
+          if (res < 0) {
+            printf("Invalid packet iova!\n");
+            tx_queue = nullptr;
+            rte_pktmbuf_free(mbuf);
+            return;
+          }
+          res = vfu_sgl_get(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1, 0);
+          if (res < 0) {
+            printf("Invalid packet iova!\n");
+            tx_queue = nullptr;
+            rte_pktmbuf_free(mbuf);
+            return;
+          }
+          buf_addr = buf_iovec.iov_base;
+        }
+
+        // Copy data
+        uint16_t copy_amount = std::min(mbuf_remaining, desc_remaining);
+        if (mbuf_cur) {
+          rte_memcpy(rte_pktmbuf_mtod_offset(mbuf_cur, char *, mbuf_cur->data_len), (char *)buf_addr + desc_offset, copy_amount);
+          desc_offset += copy_amount;
+          mbuf_cur->data_len += copy_amount;
+          mbuf->pkt_len += copy_amount;
+        }
+
+        vfu_sgl_put(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1);
+
+        if (desc_offset == desc->len) {
+          // Go to next descriptor if it exists
+          idx_end++;
+          desc_offset = 0;
+          if (!(desc->flags & TX_FLAG_NEXT)) {
+            // We are at the last descriptor
+            break;
+          }
+          if (idx_end == idx_max) {
+            // Every descriptor has TX_FLAG_NEXT set, kill queue
+            printf("Vdpdk ring contains infinite NEXT loop\n");
+            tx_queue = nullptr;
+            rte_pktmbuf_free(mbuf);
+            return;
+          }
+        }
+      }
+
+      // Release all descriptors back to VM
+      rte_io_wmb();
+      for (uint16_t idx_i = idx; idx_i != idx_end; idx_i++) {
+        vdpdk_tx_desc *desc = (vdpdk_tx_desc *)(queue_data->ring + (size_t)(idx_i & idx_mask) * TX_DESC_SIZE);
+        desc->flags &= ~TX_FLAG_AVAIL;
+      }
+      idx = idx_end;
+
+      if (mbuf_cur) {
+        mbufs[nb_mbufs_used++] = mbuf;
+      } else {
+        rte_pktmbuf_free(mbuf);
+      }
+    }
   }
 
   // Send packets in burst if buffer is full or no more packets are available

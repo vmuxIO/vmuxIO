@@ -77,7 +77,7 @@ copy_buf_to_pkt(void *buf, unsigned len, struct rte_mbuf *pkt, unsigned offset)
 
 /* Port initialization used in flow filtering. 8< */
 static void
-filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte_mempool*> &rx_mbuf_pools, std::vector<struct rte_mempool*> &tx_mbuf_pools, bool &tso_supported)
+filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte_mempool*> &rx_mbuf_pools, std::vector<struct rte_mempool*> &tx_mbuf_pools, uint64_t &tx_offloads)
 {
 	int ret;
 	uint16_t i;
@@ -112,7 +112,8 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 			port_id, strerror(-ret));
 
 	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
-	tso_supported = port_conf.txmode.offloads & RTE_ETH_TX_OFFLOAD_TCP_TSO;
+	tx_offloads = port_conf.txmode.offloads;
+	bool tso_supported = tx_offloads & RTE_ETH_TX_OFFLOAD_TCP_TSO;
 	printf(":: initializing port: %d\n", port_id);
 	ret = rte_eth_dev_configure(port_id,
 				nr_queues, nr_queues, &port_conf);
@@ -365,6 +366,7 @@ private:
 	uint16_t port_id;
 	std::vector<bool> mediate; // per VM
 
+	uint64_t tx_offloads;
 	bool tso_supported = false;
 	// list of current tso buffers
 	// one per queue
@@ -429,7 +431,8 @@ public:
 		this->port_id = port_id;
 
 		/* Initializing all ports. 8< */
-		filtering_init_port(port_id, nr_queues, this->rx_mbuf_pools, this->tx_mbuf_pools, this->tso_supported);
+		filtering_init_port(port_id, nr_queues, this->rx_mbuf_pools, this->tx_mbuf_pools, this->tx_offloads);
+		this->tso_supported = this->tx_offloads & RTE_ETH_TX_OFFLOAD_TCP_TSO;
 		if (this->tso_supported) {
 			this->tso_seg = (struct rte_mbuf **) calloc(nr_queues, sizeof(struct rte_mbuf *));
 		}
