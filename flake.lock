@@ -3,11 +3,11 @@
     "dpdk-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1736515195,
-        "narHash": "sha256-xXDw0sqLYhWhpsHs8CknXtUm6e0KX8SlepNzHZV21DU=",
+        "lastModified": 1738184633,
+        "narHash": "sha256-UlLUxju+Z+h0+dV2iY9m5U1xJIX/TKHr5R0kSctGdYE=",
         "ref": "v22.11-libmoon-vdpdk",
-        "rev": "1dddffa5bc41f8c795a9a5d3deb59f750429c815",
-        "revCount": 34498,
+        "rev": "76384f6a0bf600df29cdf4207f7dced73cfd59d6",
+        "revCount": 34502,
         "submodules": true,
         "type": "git",
         "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
@@ -41,11 +41,11 @@
     "dpdk-vdpdk-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1736439683,
-        "narHash": "sha256-rIdYriaFJBSqOw7G55RtpwMjd1LUktmvAQXArk7016M=",
+        "lastModified": 1741228092,
+        "narHash": "sha256-OAEHrP8NiNChUNsyLyQqttWdyUO3oZSHP2J1wzaUgNQ=",
         "ref": "kreutzer-dev-22.11",
-        "rev": "507e967f4f357755ab662afc3ec6d1f0c262128a",
-        "revCount": 34489,
+        "rev": "8d50f68792b2db2a831124739f4cf6dd4dbff462",
+        "revCount": 34494,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/dpdk"
@@ -60,11 +60,11 @@
     "fastclick-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1715200784,
-        "narHash": "sha256-z0Sto2MXXxmizjS/8NNki5adIWVX8uO3BnvwiLGzatc=",
+        "lastModified": 1741033897,
+        "narHash": "sha256-8sn+9A+LuFdMxmII02ZMGqFtIYcOJqdyoYKgAURnTGI=",
         "ref": "refs/heads/main",
-        "rev": "798c545eef6d8f65774c2b02e0310f145e7da443",
-        "revCount": 12729,
+        "rev": "6fc8b6499d68c7e41ab55bd764065dae5181bfae",
+        "revCount": 12777,
         "type": "git",
         "url": "https://github.com/tbarbette/fastclick.git"
       },
@@ -75,14 +75,17 @@
     },
     "flake-parts": {
       "inputs": {
-        "nixpkgs-lib": "nixpkgs-lib"
+        "nixpkgs-lib": [
+          "nix-fast-build",
+          "nixpkgs"
+        ]
       },
       "locked": {
-        "lastModified": 1714641030,
-        "narHash": "sha256-yzcRNDoyVP7+SCNX0wmuDju1NUCt8Dz9+lyUXEI0dbI=",
+        "lastModified": 1736143030,
+        "narHash": "sha256-+hu54pAoLDEZT9pjHlqL9DNzWz0NbUn8NEAHP7PQPzU=",
         "owner": "hercules-ci",
         "repo": "flake-parts",
-        "rev": "e5d10a24b66c3ea8f150e47dfdb0416ab7c3390e",
+        "rev": "b905f6fc23a9051a6e1b741e1438dbfc0634c6de",
         "type": "github"
       },
       "original": {
@@ -96,11 +99,11 @@
         "systems": "systems"
       },
       "locked": {
-        "lastModified": 1710146030,
-        "narHash": "sha256-SZ5L6eA7HJ/nmkzGG7/ISclqe6oZdOZTNoesiInkXPQ=",
+        "lastModified": 1731533236,
+        "narHash": "sha256-l0KFg5HjrsfsO/JpG+r7fRrqm12kzFHyUHqHCVpMMbI=",
         "owner": "numtide",
         "repo": "flake-utils",
-        "rev": "b1d9ab70662946ef0850d488da1c9019f3a9752a",
+        "rev": "11707dc2f618dd54ca8739b309ec4fc024de578b",
         "type": "github"
       },
       "original": {
@@ -131,11 +134,11 @@
     "libmoon-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1657216690,
-        "narHash": "sha256-lbhIK6ktZdmL4yKE6/7uRL5x7Z/NFtOXSZB+hE5GpCg=",
+        "lastModified": 1740055598,
+        "narHash": "sha256-vAW6VAFNu/aXFreJ/M/qdqh/FSn2daoNF8bMimDnZuw=",
         "ref": "dev/ice",
-        "rev": "a42ed97f0a5aa81db45c29572b9ec44e4dfdadde",
-        "revCount": 452,
+        "rev": "a9ba3a5303d61db400ab688648fdad8892abfc22",
+        "revCount": 453,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/libmoon"
@@ -169,11 +172,11 @@
     "moonmux-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1650996743,
-        "narHash": "sha256-l3h58VU33AP1tWMHM2YMJMFP4A826Exkn+xyrxjJkdQ=",
+        "lastModified": 1740056739,
+        "narHash": "sha256-rlumYEOOFU3TB6PCBnXz2AN5WSNyNapl935HtLXQKDk=",
         "ref": "dpdk-21.11",
-        "rev": "fdd0d97a8b883159d90adad0354a4ec54a1722af",
-        "revCount": 1403,
+        "rev": "3492678a35597bccc73492fb271e6f83abef0a01",
+        "revCount": 1405,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/MoonGen"
@@ -194,11 +197,11 @@
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
-        "lastModified": 1715803356,
-        "narHash": "sha256-wvsg/UMM/jekzgbggH56KLZJzRmwrB9ErevaXXyWyqc=",
+        "lastModified": 1736592044,
+        "narHash": "sha256-HkaJeIFgxncLm8MC1BaWRTkge9b1/+mjPcbzXTRshoM=",
         "owner": "Mic92",
         "repo": "nix-fast-build",
-        "rev": "cfff239d93716e92f6467f8953d8f8c12da1892a",
+        "rev": "906af17fcd50c84615a4660d9c08cf89c01cef7d",
         "type": "github"
       },
       "original": {
@@ -209,11 +212,11 @@
     },
     "nixlib": {
       "locked": {
-        "lastModified": 1712450863,
-        "narHash": "sha256-K6IkdtMtq9xktmYPj0uaYc8NsIqHuaAoRBaMgu9Fvrw=",
+        "lastModified": 1736643958,
+        "narHash": "sha256-tmpqTSWVRJVhpvfSN9KXBvKEXplrwKnSZNAoNPf/S/s=",
         "owner": "nix-community",
         "repo": "nixpkgs.lib",
-        "rev": "3c62b6a12571c9a7f65ab037173ee153d539905f",
+        "rev": "1418bc28a52126761c02dd3d89b2d8ca0f521181",
         "type": "github"
       },
       "original": {
@@ -230,11 +233,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1716210724,
-        "narHash": "sha256-iqQa3omRcHGpWb1ds75jS9ruA5R39FTmAkeR3J+ve1w=",
+        "lastModified": 1740947705,
+        "narHash": "sha256-Co2kAD2SZalOm+5zoxmzEVZNvZ17TyafuFsD46BwSdY=",
         "owner": "nix-community",
         "repo": "nixos-generators",
-        "rev": "d14b286322c7f4f897ca4b1726ce38cb68596c94",
+        "rev": "507911df8c35939050ae324caccc7cf4ffb76565",
         "type": "github"
       },
       "original": {
@@ -245,11 +248,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1716509168,
-        "narHash": "sha256-4zSIhSRRIoEBwjbPm3YiGtbd8HDWzFxJjw5DYSDy1n8=",
+        "lastModified": 1741379970,
+        "narHash": "sha256-Wh7esNh7G24qYleLvgOSY/7HlDUzWaL/n4qzlBePpiw=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "bfb7a882678e518398ce9a31a881538679f6f092",
+        "rev": "36fd87baa9083f34f7f5027900b62ee6d09b1f2f",
         "type": "github"
       },
       "original": {
@@ -289,18 +292,6 @@
         "ref": "nixos-22.11",
         "repo": "nixpkgs",
         "type": "github"
-      }
-    },
-    "nixpkgs-lib": {
-      "locked": {
-        "lastModified": 1714640452,
-        "narHash": "sha256-QBx10+k6JWz6u7VsohfSw8g8hjdBZEf8CFzXH1/1Z94=",
-        "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/50eb7ecf4cd0a5756d7275c8ba36790e5bd53e33.tar.gz"
-      },
-      "original": {
-        "type": "tarball",
-        "url": "https://github.com/NixOS/nixpkgs/archive/50eb7ecf4cd0a5756d7275c8ba36790e5bd53e33.tar.gz"
       }
     },
     "qemu-ioregionfd-src": {
@@ -365,11 +356,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1714058656,
-        "narHash": "sha256-Qv4RBm4LKuO4fNOfx9wl40W2rBbv5u5m+whxRYUMiaA=",
+        "lastModified": 1736154270,
+        "narHash": "sha256-p2r8xhQZ3TYIEKBoiEhllKWQqWNJNoT9v64Vmg4q8Zw=",
         "owner": "numtide",
         "repo": "treefmt-nix",
-        "rev": "c6aaf729f34a36c445618580a9f95a48f5e4e03f",
+        "rev": "13c913f5deb3a5c08bb810efd89dc8cb24dd968b",
         "type": "github"
       },
       "original": {
