@@ -24,4 +24,5 @@ vmux-nixbuild
 .nix-channels
 .direnv
 test/ptptest/build
-
+/fastclick
+/dpdk-tap-fwd

@@ -660,6 +660,7 @@ bool lan_queue_tx::trigger_tx_packet() {
 
   // try utilizing hardware tso
   if (dev.vmux->device->isMediating() && tso && tso_len == 0 && tso_off == 0) {
+    // std::cout << "tso pkt_len " << pkt_len << ", l2 " << maclen << ", l3 " << iplen << ", l4 " << l4len << ", segsz " << tso_mss << std::endl;
     bool hardware_tso_success = true;
     // try to send all segments
     for (size_t i = d_skip; i < dcnt; i++) {

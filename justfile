@@ -201,7 +201,7 @@ qemu-virtionet:
 
 vm-libvfio-user SMP="1":
     sudo rm {{qemuMem}} || true
-    sudo qemu/bin/qemu-system-x86_64 \
+    sudo taskset -c 0-7 qemu/bin/qemu-system-x86_64 \
         -cpu host \
         -smp {{SMP}} \
         -enable-kvm \
@@ -538,6 +538,7 @@ build:
   nix build -o {{proot}}/ycsb .#ycsb
   nix build -o {{proot}}/fastclick .#fastclick
   nix build -o {{proot}}/vmux-nixbuild .#vmux
+  nix build -o {{proot}}/dpdk-tap-fwd .#dpdk-tap-fwd
   pushd ./test/ptptest; make -B; popd
   [[ -z $(git submodule status | grep "^-") ]] || echo WARN: git submodules status: not in sync
 

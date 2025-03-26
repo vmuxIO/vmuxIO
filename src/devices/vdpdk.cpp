@@ -156,6 +156,14 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
     die("failed to setup BAR3 region (%d)", errno);
   }
 
+  ret = vfu_setup_region(ctx, VFU_PCI_DEV_BAR5_REGION_IDX,
+                             0x1000, NULL,
+                             region_flags, NULL, 0,
+                             -1, 0);
+  if (ret) {
+    die("failed to setup BAR5 region (%d)", errno);
+  }
+
   ret = vfu_setup_device_dma(ctx, dma_register_cb_static,
                              dma_unregister_cb_static);
   if (ret) {
@@ -169,7 +177,7 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
     die("failed to setup tx eventfd");
   }
 
-  ret = vfu_setup_device_nr_irqs(ctx, VFU_DEV_MSIX_IRQ, MAX_RX_QUEUES);
+  ret = vfu_setup_device_nr_irqs(ctx, VFU_DEV_MSIX_IRQ, MAX_RX_QUEUES + 1);
   if (ret) {
     die("failed to setup irqs");
   }
@@ -177,6 +185,22 @@ void VdpdkDevice::setup_vfu(std::shared_ptr<VfioUserServer> vfu) {
   ret = vfu_setup_irq_state_callback(ctx, VFU_DEV_MSIX_IRQ, dummy_irq_callback);
   if (ret) {
     die("failed to setup irq callback");
+  }
+
+  struct msixcap msixcap{};
+  msixcap.hdr.id = PCI_CAP_ID_MSIX;
+  // Unsure which values are needed here
+  // Table size
+  msixcap.mxc.ts = 0x10;
+  // Table BIR
+  msixcap.mtab.tbir = 5;
+  // PBA BIR
+  msixcap.mpba.pbir = 5;
+  // PBA Offset
+  msixcap.mpba.pbao = 0x400 >> 3;
+
+  if (vfu_pci_add_capability(ctx, 0, 0, &msixcap) < 0) {
+    die("failed to add msi-x capability")
   }
 }
 
@@ -310,7 +334,7 @@ void VdpdkDevice::rx_callback_fn(bool dma_invalidated) {
       if (!rte_read8(rxCtl.ptr() + RX_WANT_INTR + 0x40 * i)) continue;
       if (!vfu_lock.owns_lock())
         vfu_lock.lock();
-      vfu_irq_trigger(this->vfuServer->vfu_ctx, i);
+      vfu_irq_trigger(this->vfuServer->vfu_ctx, i + 1);
     }
   }
 

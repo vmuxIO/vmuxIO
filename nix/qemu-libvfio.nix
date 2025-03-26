@@ -58,5 +58,6 @@ qemu_full.overrideAttrs ( new: old: {
     ./print.patch
     ./0001-qemu-hva2gpa.patch
     ./0001-qemu-dma_read.patch
+    ./qemu-dbg.patch
   ];
 })
