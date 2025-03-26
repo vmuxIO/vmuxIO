@@ -187,17 +187,17 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     interfaces = [
         Interface.VFIO,
         # Interface.VMUX_PT, # interrupts dont work
-        Interface.VMUX_EMU,
+        # Interface.VMUX_EMU,
         # Interface.VMUX_DPDK, # multi-vm broken right now
-        Interface.BRIDGE_E1000,
-        Interface.BRIDGE,
-        Interface.BRIDGE_VHOST,
-        Interface.VMUX_DPDK_E810,
+        # Interface.BRIDGE_E1000,
+        # Interface.BRIDGE,
+        # Interface.BRIDGE_VHOST,
+        # Interface.VMUX_DPDK_E810,
         Interface.VMUX_MED,
         Interface.VMUX_VDPDK,
         ]
     rpsList = [ -1 ]
-    vm_nums = [ 1, 2, 4, 8 , 16 ]
+    vm_nums = [ 1, 2, 4, 8 , 16, 32, 64 ]
     repetitions = 2
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
@@ -209,7 +209,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         rpsList = [ -1 ]
         repetitions = 1
         # DURATION_S = 300
-        vm_nums = [ 16 ]
+        vm_nums = [ 1, 32 ]
 
     # test = YcsbTest(
     #         repetitions=1,

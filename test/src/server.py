@@ -1745,6 +1745,10 @@ class Host(Server):
         # numactl = ""
 
         username = self.whoami()
+
+        if machine_type == "pc":
+            machine_type = "q35,accel=kvm,kernel-irqchip=split"
+
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
@@ -1766,6 +1770,7 @@ class Host(Server):
             ' -enable-kvm' +
             f' -drive id=root,format=qcow2,file={disk_path},'
             'if=none,cache=none' +
+            ' -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on' +
             f' -device virtio-blk-{dev_type},id=rootdisk,drive=root' +
             (',use-ioregionfd=true' if ioregionfd else '') +
             f',queue-size={rx_queue_size}' +
@@ -2015,7 +2020,7 @@ class Guest(Server):
         -------
         """
         # sometimes the VM needs a bit of extra time until it can assign an IP
-        self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
+        self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
         self.exec(f'sudo ip link set {self.test_iface} up')
 
     def setup_test_iface_dpdk_tap(self: 'Guest'):
@@ -2029,21 +2034,12 @@ class Guest(Server):
         Returns
         -------
         """
-        warning("Using test interface via fastlick tap forwarding.")
+        warning("Using test interface via dpdk-tap forwarding.")
         self.bind_test_iface()
-        fastclick_program = "test/fastclick/dpdk-tap.click"
-        fastclick_args = {
-            'ifacePCI0': self.test_iface_addr,
-            'macAddress': self.test_iface_mac,
-            'ipAddress': self.test_iface_ip_net,
-            'devName': self.test_iface,
-        }
-        self.start_fastclick(fastclick_program, "/tmp/fastclick_dpdk_tap.log", script_args=fastclick_args)
-        # wait until interface is ready
-        self.wait_for_success(f'cat /sys/class/net/{self.test_iface}/operstate')
-        # Ensure we actually use the right MAC address
-        sleep(1)
-        self.wait_for_success(f'sudo ip link set {self.test_iface} address {self.test_iface_mac}')
+        project_root = f"{self.moonprogs_dir}/../../"
+        dpdk_tap_bin = f"{project_root}/dpdk-tap-fwd/bin/dpdk-tap-fwd"
+        self.tmux_new('dpdk-tap-fwd', f'{dpdk_tap_bin} -a {self.test_iface_addr} {self.test_iface}')
+        self.setup_test_iface_ip_net()
 
     def start_iperf_server(self, server_hostname: str):
         """
