@@ -101,11 +101,11 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
             test = test[0]
             # test = PTPTest(interface=iface, mode="dpdk-guest", num_vms=0, repetitions=1)
             for repetition in range(test.repetitions):
-                run_test(test, repetition=repetition)
+                run_test(measurement, test, repetition=repetition)
             bench.done(test)
 
 
-def run_test(ptp_test: PTPTest, repetition=0):
+def run_test(measurement, ptp_test: PTPTest, repetition=0):
     host, loadgen = measurement.hosts()
 
     info('Binding loadgen interface')

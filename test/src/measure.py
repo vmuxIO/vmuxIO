@@ -260,6 +260,7 @@ class Measurement:
             info(f"Waiting for connectivity of guests")
             for i in vm_range:
                 self.guests[i].wait_for_connection(timeout=120)
+                self.guests[i].docker_cleanup()
 
         yield self.guests
 

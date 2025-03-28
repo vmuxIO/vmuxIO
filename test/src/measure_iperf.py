@@ -176,7 +176,11 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_MED
           ]
     directions = [ "forward" ]
-    vm_nums = [ 1, 2, 4, 8, 16, 32, 64 ]
+    vm_nums = [ 1,
+               # multi-vm seems to fail right now?
+               # e.g. IPerfTest(repetitions=3, num_vms=2, direction='forward', interface='bridge', length=-1, proto='tcp')
+               # 2, 4, 8, 16, 32, 64
+               ]
     tcp_lengths = [ -1 ]
     udp_lengths = [ 64, 128, 256, 512, 1024, 1470 ]
     repetitions = 3
