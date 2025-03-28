@@ -387,7 +387,27 @@ class Server(ABC):
 
     def tmux_kill(self: 'Server', session_name: str) -> None:
         """
-        Stop all tmux sessions matching session_name.
+        Stop a tmux session matching session_name.
+
+        Parameters
+        ----------
+        session_name : str
+            The name of the session.
+
+        Returns
+        -------
+
+        See Also
+        --------
+        exec : Execute command on the server.
+        tmux_new : Start a tmux session on the server.
+        tmux_send_keys : Send keys to a tmux session on the server.
+        """
+        _ = self.exec(f'tmux -L {self.tmux_socket} kill-session -t ={session_name} || true')
+
+    def tmux_kill_all(self: 'Server', session_name: str) -> None:
+        """
+        Stop all tmux sessions containing session_name.
 
         Parameters
         ----------
@@ -1815,7 +1835,7 @@ class Host(Server):
         Returns
         -------
         """
-        self.tmux_kill('qemu')
+        self.tmux_kill_all('qemu')
 
     def start_vmux(self: 'Host', interface: Interface, num_vms: int = 0) -> None:
         """
@@ -2240,6 +2260,13 @@ class LoadGen(Server):
 
 
     def stop_redis(self, nr: int = 0):
+        # Send Ctrl-C, because redis does not terminate on SIGHUP
+        try:
+            # Should probably replace this with an explicit `kill` but it's a
+            # pain to get the redis-server PID
+            self.tmux_send_keys(f"redis{nr}", "C-c")
+        except:
+            pass
         self.tmux_kill(f"redis{nr}")
 
     def setup_test_iface_ip_net(self: 'LoadGen'):
