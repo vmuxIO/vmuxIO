@@ -3,11 +3,11 @@
     "dpdk-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1738184633,
-        "narHash": "sha256-UlLUxju+Z+h0+dV2iY9m5U1xJIX/TKHr5R0kSctGdYE=",
+        "lastModified": 1743175636,
+        "narHash": "sha256-odpsNt8i0IrW0jNV2nMeeDUWzVK5eQjj4pI4gPSIQX8=",
         "ref": "v22.11-libmoon-vdpdk",
-        "rev": "76384f6a0bf600df29cdf4207f7dced73cfd59d6",
-        "revCount": 34502,
+        "rev": "232e43e4fd222ad34913de152b8d5eaadf9beaae",
+        "revCount": 34509,
         "submodules": true,
         "type": "git",
         "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
