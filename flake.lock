@@ -3,11 +3,11 @@
     "dpdk-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1743175636,
-        "narHash": "sha256-odpsNt8i0IrW0jNV2nMeeDUWzVK5eQjj4pI4gPSIQX8=",
+        "lastModified": 1743528904,
+        "narHash": "sha256-oNOipltntU95T6aT8Ampx3dVA3zPOQ/EyHdESAd4qEg=",
         "ref": "v22.11-libmoon-vdpdk",
-        "rev": "232e43e4fd222ad34913de152b8d5eaadf9beaae",
-        "revCount": 34509,
+        "rev": "0d65b4a6f11a40ed723f3b9a33f6a57f6641b22f",
+        "revCount": 34511,
         "submodules": true,
         "type": "git",
         "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
@@ -41,11 +41,11 @@
     "dpdk-vdpdk-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1742238739,
-        "narHash": "sha256-4erHee7mXGyEz0wLgdcKUEPKiNfOXTRMPc07Q12XcRw=",
+        "lastModified": 1743528193,
+        "narHash": "sha256-AzcwuZsYKdL3IqS6oxa5iu1a2QQs3O7JzXs9QAC1CDo=",
         "ref": "kreutzer-dev-22.11",
-        "rev": "8c12382880288508845f3877318a52be3f7e9186",
-        "revCount": 34498,
+        "rev": "89837a1ce08227dbc3ccadaa203ae5f72300295a",
+        "revCount": 34499,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/dpdk"
