@@ -188,12 +188,12 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     interfaces = [
         Interface.VFIO,
         # Interface.VMUX_PT, # interrupts dont work
-        # Interface.VMUX_EMU,
+        Interface.VMUX_EMU,
         # Interface.VMUX_DPDK, # multi-vm broken right now
-        # Interface.BRIDGE_E1000,
-        # Interface.BRIDGE,
-        # Interface.BRIDGE_VHOST,
-        # Interface.VMUX_DPDK_E810,
+        Interface.BRIDGE_E1000,
+        Interface.BRIDGE,
+        Interface.BRIDGE_VHOST,
+        Interface.VMUX_DPDK_E810,
         Interface.VMUX_MED,
         Interface.VMUX_VDPDK,
         ]

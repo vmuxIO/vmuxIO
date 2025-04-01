@@ -97,7 +97,7 @@ class DeathStarBench:
         out = ""
         try:
             match = "Non-2xx or 3xx responses"
-            out = subprocess.check_output(["grep", "-r", match, out_dir])
+            out = subprocess.check_output(["grep", "-r", match, out_dir]).decode()
         except subprocess.CalledProcessError:
             failure = True
 
