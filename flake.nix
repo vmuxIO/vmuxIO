@@ -2,12 +2,10 @@
   description = "vMux - flexible and fast software-multiplexing of devices for VMs";
 
   nixConfig.extra-substituters = [
-    "https://cache.garnix.io"
     "https://tum-dse.cachix.org"
   ];
 
   nixConfig.extra-trusted-public-keys = [
-    "cache.garnix.io:CTFPyKSLcx5RMJKfLo5EEPUObbA78b0YQ2DTCJXqr9g="
     "tum-dse.cachix.org-1:v67rK18oLwgO0Z4b69l30SrV1yRtqxKpiHodG4YxhNM="
   ];
 
