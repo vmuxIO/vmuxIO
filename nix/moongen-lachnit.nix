@@ -175,6 +175,10 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $out/lib/luajit
     cp -r libmoon/deps/luajit/usr/local/lib $out/lib/luajit
 
+    # remove non-reproducible files:
+    # delete files/dirs individually and ignore errors (e.g. when files don't exist anymore because their parent directory was already deleted)
+    find $out/ -name "__pycache__" -o -name "meson-logs" -o -name "meson-private" -o -name ".*" | xargs -I {} sh -c "rm -r {} || true"
+
     # autopatchelfHook?
     patchelf --shrink-rpath --allowed-rpath-prefixes /nix/store $out/bin/MoonGen
     patchelf --add-rpath $out/lib/libmoon $out/bin/MoonGen
