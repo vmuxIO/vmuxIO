@@ -226,16 +226,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1716509168,
-        "narHash": "sha256-4zSIhSRRIoEBwjbPm3YiGtbd8HDWzFxJjw5DYSDy1n8=",
-        "owner": "NixOS",
+        "lastModified": 1744407648,
+        "narHash": "sha256-6qyLD/PEeBc4dX1G5FP7szHsnwiehcIsyek71xM2mgU=",
+        "owner": "pogobanane",
         "repo": "nixpkgs",
-        "rev": "bfb7a882678e518398ce9a31a881538679f6f092",
+        "rev": "813511e379914c0265d1f4683d579e46b36e7dcb",
         "type": "github"
       },
       "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
+        "owner": "pogobanane",
+        "ref": "vcpus",
         "repo": "nixpkgs",
         "type": "github"
       }

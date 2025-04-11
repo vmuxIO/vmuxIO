@@ -1,0 +1,25 @@
+From a1f1de8738b9c588a56d830b9ff313238d7f8341 Mon Sep 17 00:00:00 2001
+From: Pogobanane <aenderboy@gmx.de>
+Date: Fri, 11 Apr 2025 20:39:08 +0000
+Subject: [PATCH] max_cpus
+
+---
+ hw/i386/pc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/hw/i386/pc.c b/hw/i386/pc.c
+index 29b9964733..5d6dfd2021 100644
+--- a/hw/i386/pc.c
++++ b/hw/i386/pc.c
+@@ -1836,7 +1836,7 @@ static void pc_machine_class_init(ObjectClass *oc, void *data)
+     mc->has_hotpluggable_cpus = true;
+     mc->default_boot_order = "cad";
+     mc->block_default_type = IF_IDE;
+-    mc->max_cpus = 255;
++    mc->max_cpus = 511;
+     mc->reset = pc_machine_reset;
+     mc->wakeup = pc_machine_wakeup;
+     hc->pre_plug = pc_machine_device_pre_plug_cb;
+-- 
+2.47.2
+

@@ -10,12 +10,12 @@
   ];
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:pogobanane/nixpkgs/vcpus";
     nixpkgs-2211.url = "github:NixOS/nixpkgs/nixos-22.11";
     nixpkgs-2111.url = "github:NixOS/nixpkgs/nixos-21.11";
 
     flake-utils.url = "github:numtide/flake-utils";
-    
+
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -180,6 +180,47 @@
         # only pick first 3 patches. Others are CVE fixes which fail to apply
         patches = pkgs.lib.lists.sublist 0 3 pkgs2111.qemu.patches;
       });
+
+      qemu2 = pkgs.qemu.overrideAttrs (new: old: {
+        # version = "8.2.4";
+        # src = "/home/okelmann/qemu-upstream";
+        # src = /home/okelmann/qemu-upstream;
+        # src = pkgs.fetchurl {
+        #   url = "https://download.qemu.org/qemu-${new.version}.tar.xz";
+        #   hash = "sha256-Gf2ddTWlTW4EThhkAqo7OxvfqHw5LsiISFVZLIUQyW8=";
+        # };
+        patches = old.patches ++ [
+              ./0001-max_cpus.patch
+            ];
+      });
+
+      build-linux = let
+        newpkgs = pkgs // {
+          qemu = pkgs.qemu_kvm.overrideAttrs (new: old: {
+            # version = "9.2.0";
+            # src = ../qemu;
+            # src = pkgs.fetchurl {
+            #   url = "https://download.qemu.org/qemu-${new.version}.tar.xz";
+            #   hash = "sha256-Gf2ddTWlTW4EThhkAqo7OxvfqHw5LsiISFVZLIUQyW8=";
+            # };
+            patches = old.patches ++ [
+                  ./0001-max_cpus.patch
+                ];
+            });
+        };
+          newemu = pkgs.qemu_kvm.overrideAttrs (new: old: {
+            # version = "9.2.0";
+            # src = ../qemu;
+            # src = pkgs.fetchurl {
+            #   url = "https://download.qemu.org/qemu-${new.version}.tar.xz";
+            #   hash = "sha256-Gf2ddTWlTW4EThhkAqo7OxvfqHw5LsiISFVZLIUQyW8=";
+            # };
+            patches = old.patches ++ [
+                  ./0001-max_cpus.patch
+                ];
+            });
+      in (pkgs.vmTools.override { customQemu = "${newemu}/bin/qemu-system-x86_64"; } ).runInLinuxVM pkgs.linuxPackages.kernel;
+
 
       devShellGcRoot = pkgs.writeShellApplication {
         name = "stub_app";
