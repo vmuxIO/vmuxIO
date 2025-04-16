@@ -94,9 +94,9 @@ stdenv.mkDerivation {
     "-Dtests=false"
     "-Denable_docs=true"
     "-Denable_kmods=${lib.boolToString mod}"
-    "-Ddebug=true"
   ]
   ++ lib.optional debug "--buildtype=debug"
+  ++ lib.optional debug "-Ddebug=true"
   # kni kernel driver is currently not compatble with 5.11
   ++ lib.optional (mod && kernel.kernelOlder "5.11") "-Ddisable_drivers=kni"
   ++ [ (if shared then "-Ddefault_library=shared" else "-Ddefault_library=static") ]
@@ -120,7 +120,7 @@ stdenv.mkDerivation {
   '';
 
   dontFixup = debug;
-  dontStrip = true;
+  dontStrip = debug;
 
   outputs =
     [ "out" ]
