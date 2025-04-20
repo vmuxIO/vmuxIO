@@ -1030,19 +1030,23 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
 
       // Loop through descriptors and mbufs
       while (true) {
-        if (mbuf_cur && rte_pktmbuf_tailroom(mbuf_cur) == 0) {
+        uint16_t mbuf_remaining = 0;
+        if (mbuf_cur) {
+          mbuf_remaining = rte_pktmbuf_tailroom(mbuf_cur);
+        }
+
+        if (mbuf_cur && mbuf_remaining == 0) {
           // Out of space in mbuf, allocate another one
           struct rte_mbuf *mbuf_next = rte_pktmbuf_alloc(pool);
           if (mbuf_next) {
             mbuf_next->data_len = 0;
             mbuf->nb_segs++;
+            mbuf_remaining = rte_pktmbuf_tailroom(mbuf_next);
           }
           // We ignore a possible allocation failure and just drop the packet later
           mbuf_cur->next = mbuf_next;
           mbuf_cur = mbuf_next;
         }
-
-        uint16_t mbuf_remaining = rte_pktmbuf_tailroom(mbuf_cur);
 
         vdpdk_tx_desc *desc = (vdpdk_tx_desc *)(queue_data->ring + (size_t)(idx_end & idx_mask) * TX_DESC_SIZE);
         uint16_t desc_remaining = desc->len - desc_offset;
