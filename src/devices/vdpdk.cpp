@@ -1073,12 +1073,16 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
         }
 
         // Copy data
-        uint16_t copy_amount = std::min(mbuf_remaining, desc_remaining);
         if (mbuf_cur) {
+          uint16_t copy_amount = std::min(mbuf_remaining, desc_remaining);
           rte_memcpy(rte_pktmbuf_mtod_offset(mbuf_cur, char *, mbuf_cur->data_len), (char *)buf_addr + desc_offset, copy_amount);
           desc_offset += copy_amount;
           mbuf_cur->data_len += copy_amount;
           mbuf->pkt_len += copy_amount;
+        } else {
+          // If we failed to allocate a descriptor, we pretend that we copied
+          // successfully to effectively drop the whole packet.
+          desc_offset += desc_remaining;
         }
 
         vfu_sgl_put(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1);
