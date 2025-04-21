@@ -209,8 +209,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
         # interfaces = [ Interface.VMUX_DPDK ] # vmux dpdk does not support multi-VM right now
         rpsList = [ -1 ]
         repetitions = 1
-        # DURATION_S = 3000
-        vm_nums = [ 1, 32, 64 ]
+        # DURATION_S = 300
+        vm_nums = [ 16 ]
 
     # test = YcsbTest(
     #         repetitions=1,

@@ -177,8 +177,6 @@
   boot.kernelParams = [
     "nokaslr"
     "iomem=relaxed"
-    "intel_iommu=on"
-    "iommu=pt"
     "vfio.enable_unsafe_noiommu_mode=1"
   ] ++ lib.optionals (config.networking.vm_number == 0) [
     # spdk/dpdk hugepages

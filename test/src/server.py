@@ -1774,9 +1774,6 @@ class Host(Server):
 
         username = self.whoami()
 
-        if machine_type == "pc":
-            machine_type = "q35,accel=kvm,kernel-irqchip=split"
-
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
@@ -1798,7 +1795,6 @@ class Host(Server):
             ' -enable-kvm' +
             f' -drive id=root,format=qcow2,file={disk_path},'
             'if=none,cache=none' +
-            ' -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on' +
             f' -device virtio-blk-{dev_type},id=rootdisk,drive=root' +
             (',use-ioregionfd=true' if ioregionfd else '') +
             f',queue-size={rx_queue_size}' +
