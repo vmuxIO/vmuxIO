@@ -112,6 +112,15 @@
 
   hardware.firmware = [ linux-firmware-pinned ];
 
+  boot.kernelPatches = [
+    {
+      name = "enable-vfio-noiommu";
+      patch = null;
+      extraConfig = ''
+        VFIO_NOIOMMU y
+      '';
+    }
+  ];
   boot.kernelPackages = pkgs.linuxKernel.packages.linux_6_1; # 6.1 is LTS
   # our e810 emulation is suspected to be broken with the following (and newer) kernels: 6.6.19
 
