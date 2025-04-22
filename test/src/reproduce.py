@@ -237,38 +237,38 @@ def main():
 
     maybe_notify("reproduce.py tests start")
 
-    # ret = schedule.run(f"python3 ./test/autotest -vvv -c test/conf/{CONFIG_PREFIX}.cfg test-load-lat-file -t test/conf/vdpdk_sizes.cfg")
-    # maybe_notify(f"autotest vdpdk {ret.returncode}")
+    ret = schedule.run(f"python3 ./test/autotest -vvv -c test/conf/{CONFIG_PREFIX}.cfg test-load-lat-file -t test/conf/vdpdk_sizes.cfg")
+    maybe_notify(f"autotest vdpdk {ret.returncode}")
 
     ret = schedule.run(f"python3 ./test/autotest -vvv -c test/conf/{CONFIG_PREFIX}.cfg test-load-lat-file -t test/conf/tests_multihost.cfg")
     maybe_notify(f"autotest normal {ret.returncode}")
 
-    # ret = schedule.run(f"python3 ./test/autotest -vvv -c test/conf/{CONFIG_PREFIX}_medium.cfg test-load-lat-file -t test/conf/tests_scalable_multihost.cfg")
-    # maybe_notify(f"autotest medium {ret.returncode}")
+    ret = schedule.run(f"python3 ./test/autotest -vvv -c test/conf/{CONFIG_PREFIX}_medium.cfg test-load-lat-file -t test/conf/tests_scalable_multihost.cfg")
+    maybe_notify(f"autotest medium {ret.returncode}")
 
-    # # TODO some test need _iommu config, therefore we run them manually instead of through measure.py
-    # # ret = schedule.run(f"python3 ./test/src/measure.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o ./out-vmux0.0.12-pre")
-    # # maybe_notify(f"measure medium {ret.returncode}")
+    # TODO some test need _iommu config, therefore we run them manually instead of through measure.py
+    # ret = schedule.run(f"python3 ./test/src/measure.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o ./out-vmux0.0.12-pre")
+    # maybe_notify(f"measure medium {ret.returncode}")
 
-    # maybe_notify("measure mediation (expected 12h)")
-    # ret = schedule.run(f"python3 ./test/src/measure_mediation.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
-    # maybe_notify(f"measure mediation {ret.returncode}")
+    maybe_notify("measure mediation (expected 12h)")
+    ret = schedule.run(f"python3 ./test/src/measure_mediation.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure mediation {ret.returncode}")
 
-    # maybe_notify("measure ptp (expected 0.1h)")
-    # ret = schedule.run(f"python3 ./test/src/measure_ptp.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
-    # maybe_notify(f"measure ptp {ret.returncode}")
+    maybe_notify("measure ptp (expected 0.1h)")
+    ret = schedule.run(f"python3 ./test/src/measure_ptp.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure ptp {ret.returncode}")
 
-    # maybe_notify("measure hotel (expected 15h)")
-    # ret = schedule.run(f"python3 ./test/src/measure_hotel.py -c test/conf/{CONFIG_PREFIX}_medium_iommu.cfg -vvv -o {OUTPUT}")
-    # maybe_notify(f"measure hotel {ret.returncode}")
+    maybe_notify("measure hotel (expected 15h)")
+    ret = schedule.run(f"python3 ./test/src/measure_hotel.py -c test/conf/{CONFIG_PREFIX}_medium_iommu.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure hotel {ret.returncode}")
 
-    # maybe_notify("measure ycsb 4h")
-    # ret = schedule.run(f"python3 ./test/src/measure_ycsb.py -c test/conf/{CONFIG_PREFIX}_medium_iommu.cfg -vvv -o {OUTPUT}")
-    # maybe_notify(f"measure ycsb {ret.returncode}")
+    maybe_notify("measure ycsb 4h")
+    ret = schedule.run(f"python3 ./test/src/measure_ycsb.py -c test/conf/{CONFIG_PREFIX}_medium_iommu.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure ycsb {ret.returncode}")
 
-    # maybe_notify("measure iperf (expected 2h)")
-    # ret = schedule.run(f"python3 ./test/src/measure_iperf.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
-    # maybe_notify(f"measure iperf {ret.returncode}")
+    maybe_notify("measure iperf (expected 2h)")
+    ret = schedule.run(f"python3 ./test/src/measure_iperf.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure iperf {ret.returncode}")
 
     maybe_notify("reproduce.py done")
 
