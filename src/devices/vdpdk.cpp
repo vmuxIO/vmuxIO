@@ -1148,6 +1148,12 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
 }
 
 void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
+  // TODO: This is not actually safe.
+  // Polling builds on the assumption that DMA mappings are not changed
+  // unless dma_mutex is held. This is not true here, because the mapping is
+  // changed BEFORE the register callback and AFTER the unregister callback.
+  // To fix this, we need to bypass the vfu_sgl API and keep track of our
+  // own mappings.
   dma_flag.test_and_set();
   std::lock_guard guard(dma_mutex);
   dma_flag.clear();
