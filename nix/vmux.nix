@@ -8,9 +8,9 @@ let
     libvfio-user = fetchFromGitHub {
       owner = "vmuxIO";
       repo = "libvfio-user";
-      rev = "9a5124df49efed644f0db7e573ebd0367df480cd"; # vmux branch 14.09.22
+      rev = "7d48e69b29c46a682d069efc1c74bfaa981f39c0"; # vmux branch 14.09.22
       #fetchSubmodules = true;
-      sha256 = "sha256-v48G4GUzdHwdzZcpAjbZG3rutYR9rLXBqvx4clgB7kw=";
+      sha256 = "sha256-47Jm8fvixg3Hw3c/qpaWr0qGPXfET4LrTQOD8ccUByI=";
     };
     # make this the same version as for moongen21?!
     dpdk = fetchFromGitHub {

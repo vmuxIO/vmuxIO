@@ -180,7 +180,33 @@ class Schedule:
 
         return ret
 
+
+class NoSchedule:
+    reserver: Callable[[int], None] | None # reserver(minutes: int): function that reserves relevant resources for minutes
+    max_runtime_h: float
+
+    def __init__(self, reserver: Callable[[int], None] | None = None, max_runtime_h: float = None):
+        self.reserver = reserver
+        self.max_runtime_h = max_runtime_h
+        pass
+
+    def run(self, command: str) -> sp.CompletedProcess:
+        """
+        Run command without any scheduling.
+        """
+        if self.reserver is not None:
+            log(f"Reserving resources for {self.max_runtime_h}h")
+            breakpoint()
+            reserve_minutes = int(self.max_runtime_h * 60) + 1
+            self.reserver(reserve_minutes)
+
+        log(f"Running test without scheduling")
+        ret = run(command)
+        return ret
+
+
 def main():
+    OUTPUT = "./out-vmux0.0.13" # change also in autotest configs
     CONFIG_PREFIX = "autotest_amy_wilfred"
     host, _, loadgen = read_config(f"./test/conf/{CONFIG_PREFIX}.cfg")
     RESERVATION_HOSTS.append(host)
@@ -202,12 +228,17 @@ def main():
     # run("echo foo; sleep 70; echo bar")
     timeslots = [
         # ("15:15", "01:00"),
-        ("00:01", "09:00"),
+        ("00:01", "08:00"),
     ]
-    schedule = Schedule(timeslots, reserver=reserve_reboot)
+    schedule = NoSchedule()
+    # schedule = NoSchedule(reserver=reserve_reboot, max_runtime_h=8)
+    # schedule = Schedule(timeslots, reserver=reserve_reboot)
     # schedule.run(f"echo foo; sleep {70}; echo bar")
 
     maybe_notify("reproduce.py tests start")
+
+    ret = schedule.run(f"python3 ./test/autotest -vvv -c test/conf/{CONFIG_PREFIX}.cfg test-load-lat-file -t test/conf/vdpdk_sizes.cfg")
+    maybe_notify(f"autotest vdpdk {ret.returncode}")
 
     ret = schedule.run(f"python3 ./test/autotest -vvv -c test/conf/{CONFIG_PREFIX}.cfg test-load-lat-file -t test/conf/tests_multihost.cfg")
     maybe_notify(f"autotest normal {ret.returncode}")
@@ -215,8 +246,29 @@ def main():
     ret = schedule.run(f"python3 ./test/autotest -vvv -c test/conf/{CONFIG_PREFIX}_medium.cfg test-load-lat-file -t test/conf/tests_scalable_multihost.cfg")
     maybe_notify(f"autotest medium {ret.returncode}")
 
-    ret = schedule.run(f"python3 ./test/src/measure.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o ./out-vmux0.0.11")
-    maybe_notify(f"measure medium {ret.returncode}")
+    # TODO some test need _iommu config, therefore we run them manually instead of through measure.py
+    # ret = schedule.run(f"python3 ./test/src/measure.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o ./out-vmux0.0.12-pre")
+    # maybe_notify(f"measure medium {ret.returncode}")
+
+    maybe_notify("measure mediation (expected 12h)")
+    ret = schedule.run(f"python3 ./test/src/measure_mediation.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure mediation {ret.returncode}")
+
+    maybe_notify("measure ptp (expected 0.1h)")
+    ret = schedule.run(f"python3 ./test/src/measure_ptp.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure ptp {ret.returncode}")
+
+    maybe_notify("measure hotel (expected 15h)")
+    ret = schedule.run(f"python3 ./test/src/measure_hotel.py -c test/conf/{CONFIG_PREFIX}_medium_iommu.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure hotel {ret.returncode}")
+
+    maybe_notify("measure ycsb 4h")
+    ret = schedule.run(f"python3 ./test/src/measure_ycsb.py -c test/conf/{CONFIG_PREFIX}_medium_iommu.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure ycsb {ret.returncode}")
+
+    maybe_notify("measure iperf (expected 2h)")
+    ret = schedule.run(f"python3 ./test/src/measure_iperf.py -c test/conf/{CONFIG_PREFIX}_medium.cfg -vvv -o {OUTPUT}")
+    maybe_notify(f"measure iperf {ret.returncode}")
 
     maybe_notify("reproduce.py done")
 

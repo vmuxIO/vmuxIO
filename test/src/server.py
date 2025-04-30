@@ -387,7 +387,27 @@ class Server(ABC):
 
     def tmux_kill(self: 'Server', session_name: str) -> None:
         """
-        Stop all tmux sessions matching session_name.
+        Stop a tmux session matching session_name.
+
+        Parameters
+        ----------
+        session_name : str
+            The name of the session.
+
+        Returns
+        -------
+
+        See Also
+        --------
+        exec : Execute command on the server.
+        tmux_new : Start a tmux session on the server.
+        tmux_send_keys : Send keys to a tmux session on the server.
+        """
+        _ = self.exec(f'tmux -L {self.tmux_socket} kill-session -t ={session_name} || true')
+
+    def tmux_kill_all(self: 'Server', session_name: str) -> None:
+        """
+        Stop all tmux sessions containing session_name.
 
         Parameters
         ----------
@@ -1638,7 +1658,7 @@ class Host(Server):
             If not set to 0, will start VM in a way that other VMs with different vm_number can be started at the same time.
         extkern: Optional[str]
             If not None, another root_disk will be booted with an external kernel which allows us to append str to the kernel command line.
-        pin_vm_number: Optional[str]
+        pin_vm_number: int
             If not set to 0, will pin the VM to the same CPUs as the VM with number pin_vm_number
 
 
@@ -1752,6 +1772,11 @@ class Host(Server):
         numactl = f"numactl -C {self.cpupinner.qemu(pin_vm_number)}"
         # numactl = ""
 
+        username = self.whoami()
+
+        if machine_type == "pc":
+            machine_type = "q35,accel=kvm,kernel-irqchip=split"
+
         self.tmux_new(
             MultiHost.enumerate('qemu', vm_number),
             ('gdbserver 0.0.0.0:1234 ' if debug_qemu else '') +
@@ -1773,6 +1798,7 @@ class Host(Server):
             ' -enable-kvm' +
             f' -drive id=root,format=qcow2,file={disk_path},'
             'if=none,cache=none' +
+            ' -device intel-iommu,intremap=on,device-iotlb=on,caching-mode=on' +
             f' -device virtio-blk-{dev_type},id=rootdisk,drive=root' +
             (',use-ioregionfd=true' if ioregionfd else '') +
             f',queue-size={rx_queue_size}' +
@@ -1796,7 +1822,7 @@ class Host(Server):
             # +
             # ' --trace virtio_mmio_read --trace virtio_mmio_write' +
             +
-            f' 2>/tmp/trace-vm{vm_number}.log'
+            f' 2>/tmp/{username}-trace-vm{vm_number}.log'
             )
 
     def kill_guest(self: 'Host') -> None:
@@ -1809,7 +1835,7 @@ class Host(Server):
         Returns
         -------
         """
-        self.tmux_kill('qemu')
+        self.tmux_kill_all('qemu')
 
     def start_vmux(self: 'Host', interface: Interface, num_vms: int = 0) -> None:
         """
@@ -1841,11 +1867,11 @@ class Host(Server):
             vmux_mode = "vdpdk"
         if not interface.is_passthrough():
             if num_vms == 0:
-                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(1)} -f {self.cpupinner.vmux_runner(1)}'
+                args = f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, 0)} -m {vmux_mode} -c {self.cpupinner.qemu(1)} -e {self.cpupinner.vmux_rx(1)} -f {self.cpupinner.vmux_runner(1)}'
             else:
                 for vm_number in MultiHost.range(num_vms):
                     vmux_socket = f"{MultiHost.vfu_path(self.vmux_socket_path, vm_number)}"
-                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode} -e {self.cpupinner.vmux_rx(vm_number)} -f {self.cpupinner.vmux_runner(vm_number)}'
+                    args += f' -s {vmux_socket} -d none -t {MultiHost.iface_name(self.test_tap, vm_number)} -m {vmux_mode} -c {self.cpupinner.qemu(vm_number)} -e {self.cpupinner.vmux_rx(vm_number)} -f {self.cpupinner.vmux_runner(vm_number)}'
 
         base_mac = MultiHost.mac(self.guest_test_iface_mac, 1) # vmux increments macs itself
         project_root = str(Path(self.moonprogs_dir) / "../..") # nix wants nicely formatted paths
@@ -2023,7 +2049,7 @@ class Guest(Server):
         -------
         """
         # sometimes the VM needs a bit of extra time until it can assign an IP
-        self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface} 2>&1 | tee /tmp/foo')
+        self.wait_for_success(f'sudo ip address add {self.test_iface_ip_net} dev {self.test_iface}')
         self.exec(f'sudo ip link set {self.test_iface} up')
 
     def setup_test_iface_dpdk_tap(self: 'Guest'):
@@ -2037,21 +2063,12 @@ class Guest(Server):
         Returns
         -------
         """
-        warning("Using test interface via fastlick tap forwarding.")
+        warning("Using test interface via dpdk-tap forwarding.")
         self.bind_test_iface()
-        fastclick_program = "test/fastclick/dpdk-tap.click"
-        fastclick_args = {
-            'ifacePCI0': self.test_iface_addr,
-            'macAddress': self.test_iface_mac,
-            'ipAddress': self.test_iface_ip_net,
-            'devName': self.test_iface,
-        }
-        self.start_fastclick(fastclick_program, "/tmp/fastclick_dpdk_tap.log", script_args=fastclick_args)
-        # wait until interface is ready
-        self.wait_for_success(f'cat /sys/class/net/{self.test_iface}/operstate')
-        # Ensure we actually use the right MAC address
-        sleep(1)
-        self.wait_for_success(f'sudo ip link set {self.test_iface} address {self.test_iface_mac}')
+        project_root = f"{self.moonprogs_dir}/../../"
+        dpdk_tap_bin = f"{project_root}/dpdk-tap-fwd/bin/dpdk-tap-fwd"
+        self.tmux_new('dpdk-tap-fwd', f'{dpdk_tap_bin} -a {self.test_iface_addr} {self.test_iface}')
+        self.setup_test_iface_ip_net()
 
     def start_iperf_server(self, server_hostname: str):
         """
@@ -2243,6 +2260,13 @@ class LoadGen(Server):
 
 
     def stop_redis(self, nr: int = 0):
+        # Send Ctrl-C, because redis does not terminate on SIGHUP
+        try:
+            # Should probably replace this with an explicit `kill` but it's a
+            # pain to get the redis-server PID
+            self.tmux_send_keys(f"redis{nr}", "C-c")
+        except:
+            pass
         self.tmux_kill(f"redis{nr}")
 
     def setup_test_iface_ip_net(self: 'LoadGen'):

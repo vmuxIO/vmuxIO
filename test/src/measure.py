@@ -188,14 +188,6 @@ class Measurement:
     def virtual_machines(self, interface: Interface, num: int = 1, batch: int = 32) -> Iterator[Dict[int, Guest]]:
         # Batching is necessary cause if network setup takes to long, bringing up the interfaces times out, networking is permanently broken and systemds spiral into busy restarting
 
-        # vDPDK can poll two VMs with one thread, which affects CPU pinning
-        vdpdk_thread_sharing = False
-        if interface == Interface.VMUX_VDPDK and num > 2:
-            vdpdk_thread_sharing = True
-            first_shared_vm = num // 2
-            if num % 2 != 0:
-                first_shared_vm += 1
-
         # host: inital cleanup
 
         debug('Initial cleanup')
@@ -249,12 +241,6 @@ class Measurement:
                 info(f"Starting VM {i} ({interface.value})")
 
                 pin_vm_number = i
-                if vdpdk_thread_sharing and i - 1 >= first_shared_vm:
-                    # First VM is matched with the last,
-                    # Second with the second last, and so on
-                    # Increment by one because vm_number is counted starting from 1
-                    pin_vm_number = num - (i - 1) - 1 + 1
-                    info(f"Shared pinning with VM {pin_vm_number}")
 
                 # self.host.run_guest(net_type=interface.net_type(), machine_type='pc', qemu_build_dir=QEMU_BUILD_DIR, vm_number=81)
                 self.host.run_guest(

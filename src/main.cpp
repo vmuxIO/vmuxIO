@@ -113,16 +113,17 @@ Result<void> _main(int argc, char **argv) {
   std::vector<std::string> tapNames;
   std::vector<std::string> sockets;
   std::vector<std::string> modes;
+  std::vector<cpu_set_t> vmClusters;
   std::vector<cpu_set_t> rxThreadCpus;
   std::vector<cpu_set_t> runnerThreadCpus;
   std::unique_ptr<VdpdkThreads> vdpdkThreads;
   cpu_set_t default_cpuset;
-  Util::parse_cpuset("0-6", default_cpuset);
+  Util::parse_cpuset("0-7", default_cpuset);
   bool useDpdk = false;
   bool pollInMainThread = false;
   uint8_t mac_addr[6];
   cpu_set_t cpuset;
-  while ((ch = getopt(argc, argv, "hd:t:s:m:a:e:f:b:qu")) != -1) {
+  while ((ch = getopt(argc, argv, "hd:t:s:m:a:c:e:f:b:quz")) != -1) {
     switch (ch) {
     case 'q':
       LOG_LEVEL = LOG_ERR;
@@ -132,6 +133,9 @@ Result<void> _main(int argc, char **argv) {
       break;
     case 'u':
       useDpdk = true;
+      break;
+    case 'z':
+      VdpdkDevice::zero_copy = true;
       break;
     case 'd':
       pciAddresses.push_back(optarg);
@@ -145,6 +149,12 @@ Result<void> _main(int argc, char **argv) {
     case 'm':
       modes.push_back(optarg);
       break;
+    case 'c':
+      if (!Util::parse_cpuset(optarg, cpuset)) {
+        die("vmCluster%zu, Cannot parse cpu pinning set\n", vmClusters.size())
+      }
+      vmClusters.push_back(cpuset);
+      break;
     case 'e':
       if (!Util::parse_cpuset(optarg, cpuset)) {
         die("vmuxRx%zu, Cannot parse cpu pinning set\n", rxThreadCpus.size())
@@ -153,7 +163,7 @@ Result<void> _main(int argc, char **argv) {
       break;
     case 'f':
       if (!Util::parse_cpuset(optarg, cpuset)) {
-        die("vmuxRUnner%zu, Cannot parse cpu pinning set\n", runnerThreadCpus.size())
+        die("vmuxRunner%zu, Cannot parse cpu pinning set\n", runnerThreadCpus.size())
       }
       runnerThreadCpus.push_back(cpuset);
       break;
@@ -173,8 +183,10 @@ Result<void> _main(int argc, char **argv) {
              "as backend for emulation (or \"none\" if not applicable)\n"
           << "-s /tmp/vmux.sock                      Path of the socket\n"
           << "-m passthrough                         vMux mode: "
-             "passthrough, emulation, mediation, e1000-emu\n"
-          << "-e cpuset                              pin Rx thread to cpus. Takes arguements similar to cpuset. Default: 0-6\n"
+             "passthrough, emulation, mediation, e1000-emu, vdpdk\n"
+          << "-z                                     use zero-copy in vDPDK\n"
+          << "-c cpuset                              cpuset cluster the VM is pinned to. Takes arguements similar to cpuset. Default: 0-7\n"
+          << "-e cpuset                              pin Rx thread to cpus.\n"
           << "-f cpuset                              pin Runner thread to cpus.\n";
       return outcome::success();
     default:
@@ -203,11 +215,14 @@ Result<void> _main(int argc, char **argv) {
   }
 
   // fill default cpusets
+  for (size_t i = vmClusters.size();  i <= sockets.size(); i++) {
+    vmClusters.push_back(default_cpuset);
+  }
   for (size_t i = rxThreadCpus.size();  i <= sockets.size(); i++) {
-    rxThreadCpus.push_back(default_cpuset);
+    rxThreadCpus.push_back(vmClusters[i]);
   }
   for (size_t i = runnerThreadCpus.size();  i <= sockets.size(); i++) {
-    runnerThreadCpus.push_back(default_cpuset);
+    runnerThreadCpus.push_back(vmClusters[i]);
   }
 
   // parse base mac
@@ -307,10 +322,10 @@ Result<void> _main(int argc, char **argv) {
       device->driver->mediation_enable(i);
       if (!vdpdkThreads) {
         // Parameter is threshold of number of VMs above which two VMs will share one polling thread
-        vdpdkThreads = std::make_unique<VdpdkThreads>(2);
+        vdpdkThreads = std::make_unique<VdpdkThreads>();
       }
       // We pin the TX thread to the runnerThreadCpus, as the runner thread is rarely used in vDPDK
-      vdpdkThreads->add_device(vdpdk_device, rxThreadCpus[i], runnerThreadCpus[i]);
+      vdpdkThreads->add_device(vdpdk_device, rxThreadCpus[i], runnerThreadCpus[i], vmClusters[i]);
       noRxThread = true;
     }
     if (modes[i] == "e1000-emu") {

@@ -149,6 +149,10 @@
         selfpkgs = flakepkgs;
         inherit self;
       };
+      dpdk-tap-fwd = pkgs.callPackage ./nix/dpdk-tap-fwd.nix {
+        selfpkgs = flakepkgs;
+        inherit self;
+      };
       ycsb = pkgs.callPackage ./nix/ycsb.nix { };
 
       # util

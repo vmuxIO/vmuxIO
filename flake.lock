@@ -3,11 +3,11 @@
     "dpdk-lachnit-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1736515195,
-        "narHash": "sha256-xXDw0sqLYhWhpsHs8CknXtUm6e0KX8SlepNzHZV21DU=",
+        "lastModified": 1743528904,
+        "narHash": "sha256-oNOipltntU95T6aT8Ampx3dVA3zPOQ/EyHdESAd4qEg=",
         "ref": "v22.11-libmoon-vdpdk",
-        "rev": "1dddffa5bc41f8c795a9a5d3deb59f750429c815",
-        "revCount": 34498,
+        "rev": "0d65b4a6f11a40ed723f3b9a33f6a57f6641b22f",
+        "revCount": 34511,
         "submodules": true,
         "type": "git",
         "url": "https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
@@ -41,11 +41,11 @@
     "dpdk-vdpdk-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1736439683,
-        "narHash": "sha256-rIdYriaFJBSqOw7G55RtpwMjd1LUktmvAQXArk7016M=",
+        "lastModified": 1743528193,
+        "narHash": "sha256-AzcwuZsYKdL3IqS6oxa5iu1a2QQs3O7JzXs9QAC1CDo=",
         "ref": "kreutzer-dev-22.11",
-        "rev": "507e967f4f357755ab662afc3ec6d1f0c262128a",
-        "revCount": 34489,
+        "rev": "89837a1ce08227dbc3ccadaa203ae5f72300295a",
+        "revCount": 34499,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/dpdk"
@@ -131,11 +131,11 @@
     "libmoon-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1657216690,
-        "narHash": "sha256-lbhIK6ktZdmL4yKE6/7uRL5x7Z/NFtOXSZB+hE5GpCg=",
+        "lastModified": 1740055598,
+        "narHash": "sha256-vAW6VAFNu/aXFreJ/M/qdqh/FSn2daoNF8bMimDnZuw=",
         "ref": "dev/ice",
-        "rev": "a42ed97f0a5aa81db45c29572b9ec44e4dfdadde",
-        "revCount": 452,
+        "rev": "a9ba3a5303d61db400ab688648fdad8892abfc22",
+        "revCount": 453,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/libmoon"
@@ -169,11 +169,11 @@
     "moonmux-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1650996743,
-        "narHash": "sha256-l3h58VU33AP1tWMHM2YMJMFP4A826Exkn+xyrxjJkdQ=",
+        "lastModified": 1740056739,
+        "narHash": "sha256-rlumYEOOFU3TB6PCBnXz2AN5WSNyNapl935HtLXQKDk=",
         "ref": "dpdk-21.11",
-        "rev": "fdd0d97a8b883159d90adad0354a4ec54a1722af",
-        "revCount": 1403,
+        "rev": "3492678a35597bccc73492fb271e6f83abef0a01",
+        "revCount": 1405,
         "submodules": true,
         "type": "git",
         "url": "https://github.com/vmuxIO/MoonGen"

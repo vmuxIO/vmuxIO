@@ -22,6 +22,7 @@
 #include <rte_cycles.h>
 #include <rte_lcore.h>
 #include <rte_mbuf.h>
+#include "eventfd.hpp"
 #include "sims/nic/e810_bm/e810_ptp.h"
 #include "src/util.hpp"
 #include "src/drivers/driver.hpp"
@@ -76,7 +77,7 @@ copy_buf_to_pkt(void *buf, unsigned len, struct rte_mbuf *pkt, unsigned offset)
 
 /* Port initialization used in flow filtering. 8< */
 static void
-filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte_mempool*> &rx_mbuf_pools, std::vector<struct rte_mempool*> &tx_mbuf_pools, bool &tso_supported)
+filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte_mempool*> &rx_mbuf_pools, std::vector<struct rte_mempool*> &tx_mbuf_pools, uint64_t &tx_offloads)
 {
 	int ret;
 	uint16_t i;
@@ -96,8 +97,9 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 				RTE_ETH_TX_OFFLOAD_TCP_TSO	   |
 				RTE_ETH_TX_OFFLOAD_MULTI_SEGS, 
 		},
-
-
+		.intr_conf = {
+			.rxq = 1,
+		},
 	};
 	struct rte_eth_txconf txq_conf;
 	struct rte_eth_rxconf rxq_conf;
@@ -110,7 +112,8 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 			port_id, strerror(-ret));
 
 	port_conf.txmode.offloads &= dev_info.tx_offload_capa;
-	tso_supported = port_conf.txmode.offloads & RTE_ETH_TX_OFFLOAD_TCP_TSO;
+	tx_offloads = port_conf.txmode.offloads;
+	bool tso_supported = tx_offloads & RTE_ETH_TX_OFFLOAD_TCP_TSO;
 	printf(":: initializing port: %d\n", port_id);
 	ret = rte_eth_dev_configure(port_id,
 				nr_queues, nr_queues, &port_conf);
@@ -155,7 +158,7 @@ filtering_init_port(uint16_t port_id, uint16_t nr_queues, std::vector<struct rte
 		// TODO allocate these elsewhere
 		size_t buffer_size = tso_supported ? (4096 * 4 + RTE_PKTMBUF_HEADROOM) : RTE_MBUF_DEFAULT_BUF_SIZE;
 		// Private data is used by Vdpdk
-		size_t priv_size = sizeof(struct rte_mbuf_ext_shared_info) + VDPDK_CONSTS::TX_DESC_SIZE;
+		size_t priv_size = sizeof(struct rte_mbuf_ext_shared_info) + VDPDK_CONSTS::TX_DESC_SIZE + 0x8;
 		tx_pool = rte_pktmbuf_pool_create(std::format("TX_MBUF_POOL_{}", i).c_str(), NUM_MBUFS * 2,
 			64, priv_size, buffer_size, rte_socket_id()); // TODO constant for cache
 		if (tx_pool == NULL)
@@ -363,6 +366,7 @@ private:
 	uint16_t port_id;
 	std::vector<bool> mediate; // per VM
 
+	uint64_t tx_offloads;
 	bool tso_supported = false;
 	// list of current tso buffers
 	// one per queue
@@ -427,7 +431,8 @@ public:
 		this->port_id = port_id;
 
 		/* Initializing all ports. 8< */
-		filtering_init_port(port_id, nr_queues, this->rx_mbuf_pools, this->tx_mbuf_pools, this->tso_supported);
+		filtering_init_port(port_id, nr_queues, this->rx_mbuf_pools, this->tx_mbuf_pools, this->tx_offloads);
+		this->tso_supported = this->tx_offloads & RTE_ETH_TX_OFFLOAD_TCP_TSO;
 		if (this->tso_supported) {
 			this->tso_seg = (struct rte_mbuf **) calloc(nr_queues, sizeof(struct rte_mbuf *));
 		}
@@ -700,7 +705,43 @@ public:
 			}
 			nb_bufs_used = 0;
 		}
-  }
+	}
+
+	void add_rx_epoll(int vm_id, Epoll &epoll) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
+			if (rte_eth_dev_rx_intr_ctl_q(0, queue_id, epoll.fd(), RTE_INTR_EVENT_ADD, NULL) != 0) {
+				die("rte_eth_dev_rx_intr_ctl_q add failed");
+			}
+		}
+	}
+
+	void remove_rx_epoll(int vm_id, Epoll &epoll) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
+			if (rte_eth_dev_rx_intr_ctl_q(0, queue_id, epoll.fd(), RTE_INTR_EVENT_DEL, NULL) != 0) {
+				die("rte_eth_dev_rx_intr_ctl_q del failed");
+			}
+		}
+	}
+
+	void enable_rx_intr(int vm_id) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
+			if (rte_eth_dev_rx_intr_enable(0, queue_id) != 0) {
+				die("rte_eth_dev_rx_intr_enable failed");
+			}
+		}
+	}
+
+	void disable_rx_intr(int vm_id) {
+		for (int q_idx = 0; q_idx < MAX_QUEUES_PER_VM; q_idx++) {
+			int queue_id = this->get_rx_queue_id(vm_id, q_idx);
+			if (rte_eth_dev_rx_intr_disable(0, queue_id) != 0) {
+				die("rte_eth_dev_rx_intr_enable failed");
+			}
+		}
+	}
  
   /* Enables Timesync / PTP */
   virtual void enableTimesync(uint16_t port) {

@@ -9,9 +9,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <rte_dev.h>
-#include <rte_ethdev.h>
-#include <rte_memory.h>
 #include <set>
 #include <signal.h>
 #include <stdexcept>
@@ -36,8 +33,6 @@
 extern "C" {
 #include "libvfio-user.h"
 }
-
-constexpr bool USE_DMA_MAP_HACK = false;
 
 class VfioUserServer;
 
@@ -378,22 +373,6 @@ public:
       die("Failed to populate iovec array");
     }
 
-    // TODO: temporary hack, move this out of here
-    if constexpr (USE_DMA_MAP_HACK) {
-      printf("MAP DPDK DMA\n");
-      __builtin_dump_struct(mapping, &printf);
-      struct rte_eth_dev_info info;
-      if (rte_eth_dev_info_get(0, &info) != 0) {
-        die("Failed rte_eth_dev_info_get");
-      }
-      if (rte_extmem_register(mapping->iov_base, mapping->iov_len, NULL, 0, 0x1000) != 0) {
-        die("Failed rte_extmem_register");
-      }
-      if (rte_dev_dma_map(info.device, mapping->iov_base, (uint64_t)mapping->iov_base, mapping->iov_len) != 0) {
-        printf("Failed rte_dev_dma_map");
-      }
-    }
-
     printf("Add Address to mapped addresses\n");
     vfu->sgs[info->vaddr] = sgl;
     vfu->mappings[info->iova.iov_base] = mapping;
@@ -430,21 +409,6 @@ public:
     if (vfu->sgs.count(info->vaddr) > 1) {
       printf("Why?\n");
       // return;
-    }
-
-    // TODO: temporary hack, move this out of here
-    if constexpr (USE_DMA_MAP_HACK) {
-      auto &mapping = vfu->mappings[info->iova.iov_base];
-      struct rte_eth_dev_info info;
-      if (rte_eth_dev_info_get(0, &info) != 0) {
-        die("Failed rte_eth_dev_info_get");
-      }
-      if (rte_dev_dma_unmap(info.device, mapping->iov_base, (uint64_t)mapping->iov_base, mapping->iov_len) != 0) {
-        printf("Failed rte_dev_dma_unmap");
-      }
-      if (rte_extmem_unregister(mapping->iov_base, mapping->iov_len) != 0) {
-        die("Failed rte_extmem_unregister");
-      }
     }
 
     vfu->mappings.erase(info->iova.iov_base);

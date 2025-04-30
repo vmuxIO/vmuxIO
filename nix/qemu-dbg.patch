@@ -1,0 +1,17 @@
+diff --git a/hw/vfio/pci.c b/hw/vfio/pci.c
+index 3ae3a134ca..d18d553d30 100644
+--- a/hw/vfio/pci.c
++++ b/hw/vfio/pci.c
+@@ -1577,6 +1577,12 @@ static void vfio_msix_early_setup(VFIOPCIDevice *vdev, Error **errp)
+     msix->pba_offset = pba & ~PCI_MSIX_FLAGS_BIRMASK;
+     msix->entries = (ctrl & PCI_MSIX_FLAGS_QSIZE) + 1;
+ 
++    printf("MSIX EARLY SETUP ####################\n");
++    printf("table bar %d, offset 0x%x, pba bar %d, offset 0x%x, entries %d\n",
++           msix->table_bar, msix->table_offset, msix->pba_bar, msix->pba_offset, msix->entries);
++    printf("bar %d size 0x%x\n", msix->table_bar, vdev->bars[msix->table_bar].region.size);
++    printf("bar %d size 0x%x\n", msix->pba_bar, vdev->bars[msix->pba_bar].region.size);
++
+     /*
+      * Test the size of the pba_offset variable and catch if it extends outside
+      * of the specified BAR. If it is the case, we need to apply a hardware
