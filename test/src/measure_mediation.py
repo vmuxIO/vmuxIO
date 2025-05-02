@@ -113,7 +113,7 @@ def fastclick_ethertype_classifiers(vm_number: int):
     start = 0x1234
     for i in range(PER_VM_FLOWS):
         etype = start + i
-        class_ = f"0/{etype:X}"
+        class_ = f"12/{etype:X}"
         ret[f"class{i}"] = class_
     return ret
 
