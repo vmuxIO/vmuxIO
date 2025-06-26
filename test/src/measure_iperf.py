@@ -167,7 +167,8 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           # Interface.VMUX_EMU_E810, # tap backend not implemented for e810 (see #127)
           # Interface.VMUX_DPDK, # e1000 dpdk backend doesn't support multi-VM
           Interface.VMUX_DPDK_E810,
-          Interface.VMUX_MED
+          Interface.VMUX_MED,
+          Interface.VMUX_VDPDK
           ]
     udp_interfaces = [ # tap based interfaces have very broken ARP behaviour with udp
           Interface.VFIO,
@@ -175,7 +176,7 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
           Interface.VMUX_DPDK_E810,
           Interface.VMUX_MED
           ]
-    directions = [ "forward" ]
+    directions = [ "forward", "reverse", "bidirectional" ]
     vm_nums = [ 1,
                # multi-vm seems to fail right now?
                # e.g. IPerfTest(repetitions=3, num_vms=2, direction='forward', interface='bridge', length=-1, proto='tcp')
@@ -183,18 +184,18 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
                ]
     tcp_lengths = [ -1 ]
     udp_lengths = [ 64, 128, 256, 512, 1024, 1470 ]
-    repetitions = 3
+    repetitions = 10
     DURATION_S = 61 if not G.BRIEF else 11
     if G.BRIEF:
         # interfaces = [ Interface.BRIDGE_E1000 ]
         # interfaces = [ Interface.VMUX_DPDK_E810, Interface.BRIDGE_E1000 ]
-        interfaces = [ Interface.VMUX_MED ]
+        interfaces = [ Interface.VMUX_VDPDK ]
         # interfaces = [ Interface.VMUX_EMU ]
-        directions = [ "forward" ]
+        directions = [ "reverse" ]
         # vm_nums = [ 1, 2, 4 ]
-        vm_nums = [ 2 ]
+        vm_nums = [ 1 ]
         # vm_nums = [ 128, 160 ]
-        DURATION_S = 10
+        # DURATION_S = 100
         repetitions = 1
 
     def exclude(test):
@@ -213,18 +214,18 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
     )
     tests += IPerfTest.list_tests(test_matrix, exclude_test=exclude)
 
-    if not G.BRIEF:
-        # packet-size UDP tests, but only one VM and not tap based interfaces
-        test_matrix = dict(
-            repetitions=[ repetitions ],
-            direction=directions,
-            interface=[ interface.value for interface in udp_interfaces],
-            num_vms=[ 1 ],
-            length=udp_lengths,
-            proto=["udp"]
-        )
-        tests += IPerfTest.list_tests(test_matrix, exclude_test=exclude)
-        tests = deduplicate(tests)
+    # if not G.BRIEF:
+    #     # packet-size UDP tests, but only one VM and not tap based interfaces
+    #     test_matrix = dict(
+    #         repetitions=[ repetitions ],
+    #         direction=directions,
+    #         interface=[ interface.value for interface in udp_interfaces],
+    #         num_vms=[ 1 ],
+    #         length=udp_lengths,
+    #         proto=["udp"]
+    #     )
+    #     tests += IPerfTest.list_tests(test_matrix, exclude_test=exclude)
+    #     tests = deduplicate(tests)
 
     args_reboot = ["interface", "num_vms", "direction"]
     info(f"Iperf Test execution plan:")
@@ -263,7 +264,10 @@ def main(measurement: Measurement, plan_only: bool = False) -> None:
 
                 def foreach_parallel(i, guest): # pyright: ignore[reportGeneralTypeIssues]
                     guest.modprobe_test_iface_drivers(interface=interface)
-                    guest.setup_test_iface_ip_net()
+                    if interface.guest_driver() == "vfio-pci":
+                        guest.setup_test_iface_dpdk_tap()
+                    else:
+                        guest.setup_test_iface_ip_net()
                 end_foreach(guests, foreach_parallel)
 
                 for [proto, length], b_tests in bench.multi_iterator(a_tests, ["proto", "length"]):
