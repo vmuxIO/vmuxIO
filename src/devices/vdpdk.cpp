@@ -1030,19 +1030,23 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
 
       // Loop through descriptors and mbufs
       while (true) {
-        if (mbuf_cur && rte_pktmbuf_tailroom(mbuf_cur) == 0) {
+        uint16_t mbuf_remaining = 0;
+        if (mbuf_cur) {
+          mbuf_remaining = rte_pktmbuf_tailroom(mbuf_cur);
+        }
+
+        if (mbuf_cur && mbuf_remaining == 0) {
           // Out of space in mbuf, allocate another one
           struct rte_mbuf *mbuf_next = rte_pktmbuf_alloc(pool);
           if (mbuf_next) {
             mbuf_next->data_len = 0;
             mbuf->nb_segs++;
+            mbuf_remaining = rte_pktmbuf_tailroom(mbuf_next);
           }
           // We ignore a possible allocation failure and just drop the packet later
           mbuf_cur->next = mbuf_next;
           mbuf_cur = mbuf_next;
         }
-
-        uint16_t mbuf_remaining = rte_pktmbuf_tailroom(mbuf_cur);
 
         vdpdk_tx_desc *desc = (vdpdk_tx_desc *)(queue_data->ring + (size_t)(idx_end & idx_mask) * TX_DESC_SIZE);
         uint16_t desc_remaining = desc->len - desc_offset;
@@ -1069,12 +1073,16 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
         }
 
         // Copy data
-        uint16_t copy_amount = std::min(mbuf_remaining, desc_remaining);
         if (mbuf_cur) {
+          uint16_t copy_amount = std::min(mbuf_remaining, desc_remaining);
           rte_memcpy(rte_pktmbuf_mtod_offset(mbuf_cur, char *, mbuf_cur->data_len), (char *)buf_addr + desc_offset, copy_amount);
           desc_offset += copy_amount;
           mbuf_cur->data_len += copy_amount;
           mbuf->pkt_len += copy_amount;
+        } else {
+          // If we failed to allocate a descriptor, we pretend that we copied
+          // successfully to effectively drop the whole packet.
+          desc_offset += desc_remaining;
         }
 
         vfu_sgl_put(vfu_ctx, queue_data->tmp_sgl.get(), &buf_iovec, 1);
@@ -1140,6 +1148,12 @@ void VdpdkDevice::tx_poll(bool dma_invalidated) {
 }
 
 void VdpdkDevice::dma_register_cb(vfu_ctx_t *ctx, vfu_dma_info_t *info) {
+  // TODO: This is not actually safe.
+  // Polling builds on the assumption that DMA mappings are not changed
+  // unless dma_mutex is held. This is not true here, because the mapping is
+  // changed BEFORE the register callback and AFTER the unregister callback.
+  // To fix this, we need to bypass the vfu_sgl API and keep track of our
+  // own mappings.
   dma_flag.test_and_set();
   std::lock_guard guard(dma_mutex);
   dma_flag.clear();
