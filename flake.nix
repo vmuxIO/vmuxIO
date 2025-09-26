@@ -41,16 +41,16 @@
     };
 
     moongen-lachnit-src = {
-      url = "git+https://vmux-public-03:glpat-mzjPaHL4HHd6wmY1Ln-y@gitlab.lrz.de/okelmann/moongen-lachnit.git?ref=dpdk-22.11&submodules=1";
+      url = "git+https://vmux-public-03:glpat-Kg_9GCmtUM91HlonQJEuAW86MQp1OjFvYmwK.01.100p1j872@gitlab.lrz.de/okelmann/moongen-lachnit.git?ref=dpdk-22.11&submodules=1";
       flake = false;
     };
     libmoon-lachnit-src = {
       #url = "git+file:///home/okelmann/idp-lachnit/moongen/libmoon";
-      url = "git+https://vmux-public-02:glpat-BhN7mLDVABgL_esB-o3N@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-22.11&submodules=1";
+      url = "git+https://vmux-public-02:glpat-9Whjn0b8UV7eSWWVaTpkSW86MQp1OjFvYm0K.01.100g77g95@gitlab.lrz.de/okelmann/libmoon-lachnit.git?ref=dpdk-22.11&submodules=1";
       flake = false;
     };
     dpdk-lachnit-src = {
-      url = "git+https://vmux-public-01:glpat-A1uoQxy-BNP6yYvohL4b@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v22.11-libmoon&submodules=1";
+      url = "git+https://vmux-public-01:glpat-Q_4Tmv1nq_UFx8erbt6SyW86MQp1OjFvYm4K.01.100gfaplj@gitlab.lrz.de/okelmann/dpdk-lachnit.git?ref=v22.11-libmoon&submodules=1";
       flake = false;
     };
 
