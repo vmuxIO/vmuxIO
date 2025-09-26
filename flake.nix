@@ -15,7 +15,7 @@
     nixpkgs-2111.url = "github:NixOS/nixpkgs/nixos-21.11";
 
     flake-utils.url = "github:numtide/flake-utils";
-    
+
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -27,18 +27,18 @@
     };
 
     # on flake submodules https://github.com/NixOS/nix/pull/5434
-    moonmux-src = {
-      url = "git+https://github.com/vmuxIO/MoonGen?ref=dpdk-21.11&submodules=1";
-      flake = false;
-    };
-    libmoon-src = {
-      url = "git+https://github.com/vmuxIO/libmoon?ref=dev/ice&submodules=1";
-      flake = false;
-    };
-    dpdk-src = {
-      url = "git+https://github.com/vmuxIO/dpdk?ref=21.11-moon-vmux&submodules=1";
-      flake = false;
-    };
+    # moonmux-src = {
+    #   url = "git+https://github.com/vmuxIO/MoonGen?ref=dpdk-21.11&submodules=1";
+    #   flake = false;
+    # };
+    # libmoon-src = {
+    #   url = "git+https://github.com/vmuxIO/libmoon?ref=dev/ice&submodules=1";
+    #   flake = false;
+    # };
+    # dpdk-src = {
+    #   url = "git+https://github.com/vmuxIO/dpdk?ref=21.11-moon-vmux&submodules=1";
+    #   flake = false;
+    # };
 
     moongen-lachnit-src = {
       url = "git+https://vmux-public-03:glpat-Kg_9GCmtUM91HlonQJEuAW86MQp1OjFvYmwK.01.100p1j872@gitlab.lrz.de/okelmann/moongen-lachnit.git?ref=dpdk-22.11&submodules=1";
@@ -96,12 +96,12 @@
         linux = pkgs.linuxPackages_5_10.kernel;
         inherit (flakepkgs) linux-firmware-pinned;
       };
-      moongen21 = pkgs.callPackage ./nix/moongen21.nix {
-        linux = pkgs.linuxPackages_5_10.kernel;
-        pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)
-        inherit (flakepkgs) linux-firmware-pinned;
-        inherit self;
-      };
+      # moongen21 = pkgs.callPackage ./nix/moongen21.nix {
+      #   linux = pkgs.linuxPackages_5_10.kernel;
+      #   pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)
+      #   inherit (flakepkgs) linux-firmware-pinned;
+      #   inherit self;
+      # };
       moongen-lachnit = pkgs.callPackage ./nix/moongen-lachnit.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
         pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)

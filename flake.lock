@@ -19,25 +19,6 @@
         "url": "https://vmux-public-01:glpat-Q_4Tmv1nq_UFx8erbt6SyW86MQp1OjFvYm4K.01.100gfaplj@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
       }
     },
-    "dpdk-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1657216509,
-        "narHash": "sha256-/Ixes+4cWSsKbLhxPTg8NM2IUKrYY+jh/LHFN9RS8vk=",
-        "ref": "21.11-moon-vmux",
-        "rev": "1717a5465aeda0cbaa393f66e4d3176cf6b3a6c0",
-        "revCount": 31525,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/vmuxIO/dpdk"
-      },
-      "original": {
-        "ref": "21.11-moon-vmux",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/vmuxIO/dpdk"
-      }
-    },
     "fastclick-src": {
       "flake": false,
       "locked": {
@@ -109,25 +90,6 @@
         "url": "https://vmux-public-02:glpat-9Whjn0b8UV7eSWWVaTpkSW86MQp1OjFvYm0K.01.100g77g95@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
       }
     },
-    "libmoon-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1657216690,
-        "narHash": "sha256-lbhIK6ktZdmL4yKE6/7uRL5x7Z/NFtOXSZB+hE5GpCg=",
-        "ref": "dev/ice",
-        "rev": "a42ed97f0a5aa81db45c29572b9ec44e4dfdadde",
-        "revCount": 452,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/vmuxIO/libmoon"
-      },
-      "original": {
-        "ref": "dev/ice",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/vmuxIO/libmoon"
-      }
-    },
     "moongen-lachnit-src": {
       "flake": false,
       "locked": {
@@ -145,25 +107,6 @@
         "submodules": true,
         "type": "git",
         "url": "https://vmux-public-03:glpat-Kg_9GCmtUM91HlonQJEuAW86MQp1OjFvYmwK.01.100p1j872@gitlab.lrz.de/okelmann/moongen-lachnit.git"
-      }
-    },
-    "moonmux-src": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1650996743,
-        "narHash": "sha256-l3h58VU33AP1tWMHM2YMJMFP4A826Exkn+xyrxjJkdQ=",
-        "ref": "dpdk-21.11",
-        "rev": "fdd0d97a8b883159d90adad0354a4ec54a1722af",
-        "revCount": 1403,
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/vmuxIO/MoonGen"
-      },
-      "original": {
-        "ref": "dpdk-21.11",
-        "submodules": true,
-        "type": "git",
-        "url": "https://github.com/vmuxIO/MoonGen"
       }
     },
     "nix-fast-build": {
@@ -306,13 +249,10 @@
     "root": {
       "inputs": {
         "dpdk-lachnit-src": "dpdk-lachnit-src",
-        "dpdk-src": "dpdk-src",
         "fastclick-src": "fastclick-src",
         "flake-utils": "flake-utils",
         "libmoon-lachnit-src": "libmoon-lachnit-src",
-        "libmoon-src": "libmoon-src",
         "moongen-lachnit-src": "moongen-lachnit-src",
-        "moonmux-src": "moonmux-src",
         "nix-fast-build": "nix-fast-build",
         "nixos-generators": "nixos-generators",
         "nixpkgs": "nixpkgs",
