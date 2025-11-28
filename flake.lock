@@ -19,6 +19,25 @@
         "url": "https://vmux-public-01:glpat-Q_4Tmv1nq_UFx8erbt6SyW86MQp1OjFvYm4K.01.100gfaplj@gitlab.lrz.de/okelmann/dpdk-lachnit.git"
       }
     },
+    "dpdk-ng-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1759599870,
+        "narHash": "sha256-Z/r4qFiqVvhcKn9YmSGYcEbovijqESPp4g1hEuJFCL4=",
+        "ref": "v22.11-libmoon",
+        "rev": "1fcd6087567ab7d2ee02cde555a2e70d56587ad4",
+        "revCount": 34478,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/tumi8/dpdk.git"
+      },
+      "original": {
+        "ref": "v22.11-libmoon",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/tumi8/dpdk.git"
+      }
+    },
     "fastclick-src": {
       "flake": false,
       "locked": {
@@ -90,6 +109,25 @@
         "url": "https://vmux-public-02:glpat-9Whjn0b8UV7eSWWVaTpkSW86MQp1OjFvYm0K.01.100g77g95@gitlab.lrz.de/okelmann/libmoon-lachnit.git"
       }
     },
+    "libmoon-ng-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1761146452,
+        "narHash": "sha256-oikIAd/2fC3rFEtEZXucIk5HSlsXk1GIbbCKpBaPvwU=",
+        "ref": "v22.11",
+        "rev": "23fa0b54009ec2f3638b4286824c19edf1921a45",
+        "revCount": 667,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/tumi8/libmoon.git"
+      },
+      "original": {
+        "ref": "v22.11",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/tumi8/libmoon.git"
+      }
+    },
     "moongen-lachnit-src": {
       "flake": false,
       "locked": {
@@ -107,6 +145,25 @@
         "submodules": true,
         "type": "git",
         "url": "https://vmux-public-03:glpat-Kg_9GCmtUM91HlonQJEuAW86MQp1OjFvYmwK.01.100p1j872@gitlab.lrz.de/okelmann/moongen-lachnit.git"
+      }
+    },
+    "moongen-ng-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1761327031,
+        "narHash": "sha256-EhR3M9RE66O6Gb8jkUsBa9SPEndxG5ThuG6tacArau8=",
+        "ref": "v22.11",
+        "rev": "2644b26f9d8cffcd4c76219bd3ec9db93c10b039",
+        "revCount": 1538,
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/tumi8/moongen.git"
+      },
+      "original": {
+        "ref": "v22.11",
+        "submodules": true,
+        "type": "git",
+        "url": "https://github.com/tumi8/moongen.git"
       }
     },
     "nix-fast-build": {
@@ -249,10 +306,13 @@
     "root": {
       "inputs": {
         "dpdk-lachnit-src": "dpdk-lachnit-src",
+        "dpdk-ng-src": "dpdk-ng-src",
         "fastclick-src": "fastclick-src",
         "flake-utils": "flake-utils",
         "libmoon-lachnit-src": "libmoon-lachnit-src",
+        "libmoon-ng-src": "libmoon-ng-src",
         "moongen-lachnit-src": "moongen-lachnit-src",
+        "moongen-ng-src": "moongen-ng-src",
         "nix-fast-build": "nix-fast-build",
         "nixos-generators": "nixos-generators",
         "nixpkgs": "nixpkgs",

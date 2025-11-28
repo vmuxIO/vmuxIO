@@ -54,6 +54,19 @@
       flake = false;
     };
 
+    moongen-ng-src = {
+      url = "git+https://github.com/tumi8/moongen.git?ref=v22.11&submodules=1";
+      flake = false;
+    };
+    libmoon-ng-src = {
+      url = "git+https://github.com/tumi8/libmoon.git?ref=v22.11&submodules=1";
+      flake = false;
+    };
+    dpdk-ng-src = {
+      url = "git+https://github.com/tumi8/dpdk.git?ref=v22.11-libmoon&submodules=1";
+      flake = false;
+    };
+
     xdp-reflector-src = {
       url = "git+https://github.com/vmuxIO/xdp-reflector?ref=main&submodules=1";
       flake = false;
@@ -103,6 +116,12 @@
       #   inherit self;
       # };
       moongen-lachnit = pkgs.callPackage ./nix/moongen-lachnit.nix {
+        linux = pkgs.linuxPackages_5_10.kernel;
+        pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)
+        inherit (flakepkgs) linux-firmware-pinned;
+        inherit self;
+      };
+      moongen-ng = pkgs.callPackage ./nix/moongen-ng.nix {
         linux = pkgs.linuxPackages_5_10.kernel;
         pkgs = pkgs2211; # pin, because it stopped building on 23.11 (needs patches, used cmake version will be deprricated soon)
         inherit (flakepkgs) linux-firmware-pinned;
